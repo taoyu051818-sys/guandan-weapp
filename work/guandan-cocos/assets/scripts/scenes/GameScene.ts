@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, Node } from 'cc'
+import { _decorator, Color, Component, Label, Node, UITransform, Vec3 } from 'cc'
 import { GameManager, type GameSnapshot } from '../game/GameManager'
 import { HandController } from '../ui/HandController'
 
@@ -42,13 +42,15 @@ export class GameScene extends Component {
 
   protected onLoad (): void {
     if (!this.gameManager) this.gameManager = this.getComponent(GameManager) ?? this.addComponent(GameManager)
-    this.gameManager.node.on('guandan:state', this.render, this)
-    this.hand?.node.on('guandan:card-toggle', this.gameManager.toggleCard, this.gameManager)
-    this.playButton?.on(Node.EventType.TOUCH_END, this.gameManager.playSelected, this.gameManager)
-    this.passButton?.on(Node.EventType.TOUCH_END, this.gameManager.pass, this.gameManager)
-    this.confirmTributeButton?.on(Node.EventType.TOUCH_END, this.gameManager.confirmTribute, this.gameManager)
-    this.finishTributeButton?.on(Node.EventType.TOUCH_END, this.gameManager.finishTribute, this.gameManager)
-    this.nextRoundButton?.on(Node.EventType.TOUCH_END, this.gameManager.nextRound, this.gameManager)
+    const manager = this.gameManager!
+    this.ensureFallbackUi()
+    manager.node.on('guandan:state', this.render, this)
+    this.hand?.node.on('guandan:card-toggle', manager.toggleCard, manager)
+    this.playButton?.on(Node.EventType.TOUCH_END, manager.playSelected, manager)
+    this.passButton?.on(Node.EventType.TOUCH_END, manager.pass, manager)
+    this.confirmTributeButton?.on(Node.EventType.TOUCH_END, manager.confirmTribute, manager)
+    this.finishTributeButton?.on(Node.EventType.TOUCH_END, manager.finishTribute, manager)
+    this.nextRoundButton?.on(Node.EventType.TOUCH_END, manager.nextRound, manager)
   }
 
   protected start (): void {
@@ -85,5 +87,44 @@ export class GameScene extends Component {
         this.overlayLabel.string = `${snapshot.settlement.winnerTeam === 'teamA' ? '本局胜利' : '本局失利'}\n${snapshot.settlement.message}\n${snapshot.settlement.fullRank.join(' · ')}`
       }
     }
+  }
+
+  /** Lets the first playable scene run before the art prefabs are bound in Creator. */
+  private ensureFallbackUi (): void {
+    if (!this.hand) {
+      const handNode = new Node('HumanHand')
+      handNode.parent = this.node
+      handNode.setPosition(new Vec3(0, -265, 0))
+      handNode.addComponent(UITransform).setContentSize(1040, 150)
+      this.hand = handNode.addComponent(HandController)
+    }
+    this.hintLabel ??= this.makeLabel('Hint', 0, -150, 24)
+    this.phaseLabel ??= this.makeLabel('Phase', 0, 282, 30)
+    this.scoreLabel ??= this.makeLabel('Score', 0, 232, 22)
+    this.overlayLabel ??= this.makeLabel('Overlay', 0, 42, 30)
+    this.playButton ??= this.makeButton('PlayButton', '出牌', -115)
+    this.passButton ??= this.makeButton('PassButton', '不要', 0)
+    this.confirmTributeButton ??= this.makeButton('ConfirmTributeButton', '确认贡牌', 115)
+    this.finishTributeButton ??= this.makeButton('FinishTributeButton', '开始本局', 115)
+    this.nextRoundButton ??= this.makeButton('NextRoundButton', '下一局', 115)
+  }
+
+  private makeLabel (name: string, x: number, y: number, fontSize: number): Label {
+    const node = new Node(name)
+    node.parent = this.node
+    node.setPosition(new Vec3(x, y, 0))
+    node.addComponent(UITransform).setContentSize(1100, 80)
+    const label = node.addComponent(Label)
+    label.fontSize = fontSize
+    label.lineHeight = fontSize + 8
+    label.color = new Color(245, 239, 215)
+    label.horizontalAlign = Label.HorizontalAlign.CENTER
+    return label
+  }
+
+  private makeButton (name: string, text: string, x: number): Node {
+    const label = this.makeLabel(name, x, -205, 28)
+    label.string = `【${text}】`
+    return label.node
   }
 }
