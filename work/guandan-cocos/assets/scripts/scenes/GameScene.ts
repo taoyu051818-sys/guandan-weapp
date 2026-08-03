@@ -1,13 +1,25 @@
-import { Component, Label, Node } from 'cc'
+import { _decorator, Component, Label, Node } from 'cc'
 import { GameManager, type GameSnapshot } from '../game/GameManager'
 import { HandController } from '../ui/HandController'
 
+const { ccclass, property } = _decorator
+
 /** Attach this to the Game scene root and bind editor nodes in the Inspector. */
+@ccclass('GameScene')
 export class GameScene extends Component {
+  @property(GameManager)
   public gameManager: GameManager | null = null
+
+  @property(HandController)
   public hand: HandController | null = null
+
+  @property(Label)
   public hintLabel: Label | null = null
+
+  @property(Node)
   public playButton: Node | null = null
+
+  @property(Node)
   public passButton: Node | null = null
 
   protected onLoad (): void {
