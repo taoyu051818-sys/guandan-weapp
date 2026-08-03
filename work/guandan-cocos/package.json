@@ -3,5 +3,9 @@
   "private": true,
   "scripts": {
     "sync:core": "node scripts/sync-core.mjs"
-  }
+  },
+  "creator": {
+    "version": "3.8.8"
+  },
+  "uuid": "7d3a11fd-8077-44d7-abca-7069d57454fb"
 }
