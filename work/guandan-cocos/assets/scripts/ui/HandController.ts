@@ -1,4 +1,4 @@
-import { _decorator, Component, instantiate, Node, Prefab, Vec3 } from 'cc'
+import { _decorator, Component, instantiate, Node, Prefab, UITransform, Vec3 } from 'cc'
 import type { Card } from '../core/generated'
 import { CardView } from './CardView'
 
@@ -14,7 +14,8 @@ export class HandController extends Component {
     const displayHand = [...hand].sort((a, b) => sortOrder === 'desc' ? b.value - a.value : a.value - b.value)
     const ids = new Set(displayHand.map(card => card.id))
     this.cards.forEach((node, id) => { if (!ids.has(id)) { node.destroy(); this.cards.delete(id) } })
-    const spacing = Math.min(68, 920 / Math.max(displayHand.length - 1, 1))
+    const availableWidth = Math.max(280, (this.getComponent(UITransform)?.contentSize.width ?? 1040) - 100)
+    const spacing = Math.min(68, availableWidth / Math.max(displayHand.length - 1, 1))
     const startX = -spacing * (displayHand.length - 1) / 2
     displayHand.forEach((card, index) => {
       let node = this.cards.get(card.id)
