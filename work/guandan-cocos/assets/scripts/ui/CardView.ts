@@ -1,6 +1,6 @@
 import { _decorator, Color, Component, Graphics, Label, Node, UITransform, Vec3, tween } from 'cc'
 
-export type CardPresentation = { id: string, rank: string, suit: string, red: boolean, selected: boolean }
+export type CardPresentation = { id: string, rank: string, suit: string, red: boolean, selected: boolean, interactive?: boolean }
 
 const { ccclass } = _decorator
 
@@ -29,14 +29,19 @@ export class CardView extends Component {
     label.horizontalAlign = Label.HorizontalAlign.CENTER
     label.verticalAlign = Label.VerticalAlign.CENTER
     this.node.on(Node.EventType.TOUCH_END, this.toggle, this)
+    if (this.card) this.applyCard()
   }
 
   public bind (card: CardPresentation): void {
     this.card = card
-    if (!this.label) return
-    this.label.string = `${card.rank}\n${card.suit}`
-    this.label.color = card.red ? new Color(190, 44, 44) : new Color(245, 240, 220)
-    this.setSelected(card.selected, false)
+    this.applyCard()
+  }
+
+  private applyCard (): void {
+    if (!this.card || !this.label) return
+    this.label.string = `${this.card.rank}\n${this.card.suit}`
+    this.label.color = this.card.red ? new Color(190, 44, 44) : new Color(32, 43, 50)
+    this.setSelected(this.card.selected, false)
   }
 
   public setSelected (selected: boolean, animated = true): void {
@@ -48,7 +53,7 @@ export class CardView extends Component {
   }
 
   private toggle (): void {
-    if (!this.card) return
+    if (!this.card || this.card.interactive === false) return
     this.setSelected(!this.card.selected)
     this.node.emit('guandan:card-toggle', this.card.id)
   }
