@@ -22,7 +22,10 @@ export class CardView extends Component {
     surface!.roundRect(-39, -57, 78, 114, 8)
     surface!.fill()
     surface!.stroke()
-    const label = (this.getComponent(Label) ?? this.addComponent(Label))!
+    const labelNode = new Node('CardText')
+    labelNode.parent = this.node
+    labelNode.addComponent(UITransform).setContentSize(72, 106)
+    const label = labelNode.addComponent(Label)
     this.label = label
     label.fontSize = 24
     label.lineHeight = 30
