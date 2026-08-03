@@ -5,6 +5,8 @@ import { GameSession } from '../session/GameSession'
 import { GroupingController, type GroupingResult } from '../game/GroupingController'
 import type { Difficulty } from '../core/generated/lib/ai'
 import { LobbyController, type LobbySnapshot } from '../network/LobbyController'
+import { PlayerSeatController } from '../ui/PlayerSeatController'
+import { PlayAreaController } from '../ui/PlayAreaController'
 
 const { ccclass, property } = _decorator
 
@@ -28,6 +30,9 @@ export class GameScene extends Component {
 
   @property(HandController)
   public hand: HandController | null = null
+
+  @property(PlayAreaController)
+  public playArea: PlayAreaController | null = null
 
   @property(Label)
   public hintLabel: Label | null = null
@@ -60,6 +65,7 @@ export class GameScene extends Component {
   private groupingNodes: Node[] = []
   private groupingResult: GroupingResult | null = null
   private tutorialStep = 0
+  private playerSeats = new Map<string, PlayerSeatController>()
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
@@ -92,6 +98,8 @@ export class GameScene extends Component {
 
   private render (snapshot: GameSnapshot): void {
     this.hand?.render(snapshot.state.players.p1.hand, snapshot.selectedCardIds)
+    this.playArea?.render(snapshot.state.playArea)
+    ;(['p2', 'p3', 'p4'] as const).forEach(id => this.playerSeats.get(id)?.render(snapshot.state.players[id], snapshot.state.currentTurn === id, this.session?.snapshot.gameMode === 'double_open' && id === 'p3'))
     if (this.hintLabel) this.hintLabel.string = snapshot.hint
     if (this.phaseLabel) this.phaseLabel.string = snapshot.phase === 'playing' ? `级牌 ${snapshot.state.currentLevel}` : snapshot.phase === 'tribute' ? '进贡与还贡' : '本局结算'
     if (this.scoreLabel) this.scoreLabel.string = `我方 ${snapshot.teamLevels.teamA} 级 · ${snapshot.scores.teamA} 分    对方 ${snapshot.teamLevels.teamB} 级 · ${snapshot.scores.teamB} 分`
@@ -126,6 +134,19 @@ export class GameScene extends Component {
       handNode.addComponent(UITransform).setContentSize(1040, 150)
       this.hand = handNode.addComponent(HandController)
     }
+    if (!this.playArea) {
+      const playNode = new Node('PlayArea')
+      playNode.parent = this.node
+      playNode.addComponent(UITransform).setContentSize(900, 420)
+      this.playArea = playNode.addComponent(PlayAreaController)
+    }
+    ;([['p3', 0, 310], ['p4', -510, 35], ['p2', 510, 35]] as const).forEach(([id, x, y]) => {
+      if (this.playerSeats.has(id)) return
+      const seat = new Node(`Seat-${id}`)
+      seat.parent = this.node
+      seat.setPosition(new Vec3(x, y, 0))
+      this.playerSeats.set(id, seat.addComponent(PlayerSeatController))
+    })
     this.hintLabel ??= this.makeLabel('Hint', 0, -150, 24)
     this.phaseLabel ??= this.makeLabel('Phase', 0, 282, 30)
     this.scoreLabel ??= this.makeLabel('Score', 0, 232, 22)
@@ -270,7 +291,7 @@ export class GameScene extends Component {
   }
 
   private setTableVisible (visible: boolean): void {
-    [this.hand?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.playButton, this.passButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton].forEach(node => { if (node) node.active = visible })
+    [this.hand?.node, this.playArea?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.playButton, this.passButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, ...[...this.playerSeats.values()].map(seat => seat.node)].forEach(node => { if (node) node.active = visible })
   }
 
   private clearNodes (nodes: Node[]): void { while (nodes.length) nodes.pop()?.destroy() }
