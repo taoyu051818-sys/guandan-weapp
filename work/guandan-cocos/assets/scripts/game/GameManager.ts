@@ -2,6 +2,7 @@ import { _decorator, Component } from 'cc'
 import { createGame, createTribute, dealNextRound, getPlayInfo, getPossiblePlays, giveTribute, highestCard, isRoundOver, lowestCard, passTurn, playCards, returnTribute, runAiTurns, settle, tributeLeader } from '../core/generated'
 import type { Card, EngineState, PlayerId, Rank, SettlementResult, Team, TributeState } from '../core/generated'
 import { GameSession } from '../session/GameSession'
+import { CocosAudioController } from '../audio/CocosAudioController'
 
 export type GameSnapshot = {
   state: EngineState
@@ -24,6 +25,9 @@ const { ccclass, property } = _decorator
 export class GameManager extends Component {
   @property(GameSession)
   public session: GameSession | null = null
+
+  @property(CocosAudioController)
+  public audio: CocosAudioController | null = null
   public state!: EngineState
   public selectedCardIds = new Set<string>()
   public phase: 'playing' | 'tribute' | 'settlement' = 'playing'
@@ -70,8 +74,11 @@ export class GameManager extends Component {
     if (this.phase !== 'playing' || this.state.currentTurn !== 'p1') return
     const cards = this.selectedCards()
     try {
+      const info = getPlayInfo(cards)
       this.state = playCards(this.state, 'p1', cards)
       this.selectedCardIds.clear()
+      if (info?.type === 'Bomb' || info?.type === 'StraightFlush' || info?.type === 'Rocket') this.audio?.playBomb()
+      else this.audio?.playCard()
       this.finishHumanAction()
     } catch (error) {
       this.emitSnapshot(error instanceof Error ? error.message : '出牌失败')
@@ -83,6 +90,7 @@ export class GameManager extends Component {
     try {
       this.state = passTurn(this.state, 'p1')
       this.selectedCardIds.clear()
+      this.audio?.playPass()
       this.finishHumanAction()
     } catch (error) {
       this.emitSnapshot(error instanceof Error ? error.message : '当前不能不要')
