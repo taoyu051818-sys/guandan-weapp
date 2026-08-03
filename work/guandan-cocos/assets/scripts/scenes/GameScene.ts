@@ -10,6 +10,7 @@ import { PlayAreaController } from '../ui/PlayAreaController'
 import { CocosAudioController } from '../audio/CocosAudioController'
 import { ChatController, QUICK_CHAT_PHRASES, type QuickChat } from '../ui/ChatController'
 import type { PlayerId } from '../core/generated'
+import { ScreenAdapter, type TableViewport } from '../ui/ScreenAdapter'
 
 const { ccclass, property } = _decorator
 
@@ -85,6 +86,7 @@ export class GameScene extends Component {
   private chatNodes: Node[] = []
   private latestSnapshot: GameSnapshot | null = null
   private hurryScheduled = false
+  private screen: ScreenAdapter | null = null
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
@@ -93,6 +95,8 @@ export class GameScene extends Component {
     if (!this.lobby) this.lobby = this.getComponent(LobbyController) ?? this.addComponent(LobbyController)
     if (!this.audio) this.audio = this.getComponent(CocosAudioController) ?? this.addComponent(CocosAudioController)
     this.chat = this.getComponent(ChatController) ?? this.addComponent(ChatController)
+    const screen = (this.getComponent(ScreenAdapter) ?? this.addComponent(ScreenAdapter)) as ScreenAdapter
+    this.screen = screen
     const manager = this.gameManager!
     const lobby = this.lobby!
     const audio = this.audio!
@@ -102,6 +106,8 @@ export class GameScene extends Component {
     lobby.session = this.session
     audio.session = this.session
     this.ensureFallbackUi()
+    screen.events.on('guandan:viewport', this.applyResponsiveLayout, this)
+    this.applyResponsiveLayout(screen.viewport)
     manager.node.on('guandan:state', this.render, this)
     this.hand?.node.on('guandan:card-toggle', manager.toggleCard, manager)
     this.playButton?.on(Node.EventType.TOUCH_END, manager.playSelected, manager)
@@ -129,6 +135,7 @@ export class GameScene extends Component {
     this.lobby?.events.off('guandan:round-prepared', this.applyNetworkRoundPrepared, this)
     this.lobby?.events.off('guandan:round-ended', this.applyNetworkRoundEnded, this)
     this.chat?.events.off('guandan:chat', this.renderChat, this)
+    this.screen?.events.off('guandan:viewport', this.applyResponsiveLayout, this)
   }
 
   private render (snapshot: GameSnapshot): void {
@@ -401,7 +408,10 @@ export class GameScene extends Component {
   private layoutSeats (humanId: 'p1' | 'p2' | 'p3' | 'p4'): void {
     const order: Array<'p1' | 'p2' | 'p3' | 'p4'> = ['p1', 'p2', 'p3', 'p4']
     const humanIndex = order.indexOf(humanId)
-    const positions = [new Vec3(0, -260, 0), new Vec3(510, 35, 0), new Vec3(0, 310, 0), new Vec3(-510, 35, 0)]
+    const screen = this.screen
+    const positions = screen
+      ? [new Vec3(0, screen.safeBottomY(116), 0), new Vec3(screen.safeRightX(132), 18, 0), new Vec3(0, screen.safeTopY(66), 0), new Vec3(screen.safeLeftX(132), 18, 0)]
+      : [new Vec3(0, -260, 0), new Vec3(510, 35, 0), new Vec3(0, 310, 0), new Vec3(-510, 35, 0)]
     order.forEach((id, index) => this.playerSeats.get(id)?.node.setPosition(positions[(index - humanIndex + 4) % 4]))
   }
 
@@ -412,10 +422,35 @@ export class GameScene extends Component {
 
   private clearNodes (nodes: Node[]): void { while (nodes.length) nodes.pop()?.destroy() }
 
+  /** Repositions every table control when the device rotates, resizes or exposes a notch inset. */
+  private applyResponsiveLayout (viewport: TableViewport): void {
+    const safeWidth = viewport.width - viewport.safeLeft - viewport.safeRight
+    this.hand?.node.setPosition(new Vec3(0, this.screen?.safeBottomY(72) ?? -265, 0))
+    this.hand?.node.getComponent(UITransform)?.setContentSize(Math.max(300, safeWidth - 72), 150)
+    this.playArea?.node.getComponent(UITransform)?.setContentSize(Math.max(300, safeWidth - 360), Math.max(300, viewport.height - 270))
+    this.phaseLabel?.node.setPosition(new Vec3(0, this.screen?.safeTopY(40) ?? 282, 0))
+    this.scoreLabel?.node.setPosition(new Vec3(0, this.screen?.safeTopY(94) ?? 232, 0))
+    this.hintLabel?.node.setPosition(new Vec3(0, this.screen?.safeBottomY(198) ?? -150, 0))
+    this.ownChatLabel?.node.setPosition(new Vec3(0, this.screen?.safeBottomY(188) ?? -155, 0))
+    this.overlayLabel?.node.setPosition(Vec3.ZERO)
+    const controlsY = this.screen?.safeBottomY(142) ?? -205
+    this.passButton?.setPosition(new Vec3(-185, controlsY, 0))
+    this.hintButton?.setPosition(new Vec3(-62, controlsY, 0))
+    this.resetButton?.setPosition(new Vec3(62, controlsY, 0))
+    this.playButton?.setPosition(new Vec3(185, controlsY, 0))
+    this.confirmTributeButton?.setPosition(new Vec3(0, controlsY, 0))
+    this.finishTributeButton?.setPosition(new Vec3(0, controlsY, 0))
+    this.nextRoundButton?.setPosition(new Vec3(0, controlsY, 0))
+    this.chatButton?.setPosition(new Vec3(this.screen?.safeLeftX(150) ?? -535, controlsY, 0))
+    this.clearNodes(this.chatNodes)
+    this.redrawBackdrop(viewport)
+    if (this.latestSnapshot) this.render(this.latestSnapshot)
+  }
+
   private toggleChatPanel (): void {
     if (this.chatNodes.length) { this.clearNodes(this.chatNodes); return }
     QUICK_CHAT_PHRASES.forEach((phrase, index) => {
-      const node = this.makeChatButton(phrase.text, -415, 115 - index * 48)
+      const node = this.makeChatButton(phrase.text, this.screen?.safeLeftX(220) ?? -415, (this.screen?.safeBottomY(480) ?? 115) - index * 48)
       node.on(Node.EventType.TOUCH_END, () => {
         const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
         this.chat?.send(humanId, phrase)
@@ -486,24 +521,37 @@ export class GameScene extends Component {
     if (this.backdrop) return
     const node = new Node('TableBackdrop')
     node.parent = this.node
-    node.addComponent(UITransform).setContentSize(1280, 720)
-    const graphics = node.addComponent(Graphics)
+    node.addComponent(UITransform)
+    node.addComponent(Graphics)
+    this.backdrop = node
+    this.redrawBackdrop(this.screen?.viewport ?? { width: 1280, height: 720, halfWidth: 640, halfHeight: 360, safeLeft: 0, safeRight: 0, safeTop: 0, safeBottom: 0 })
+    node.setSiblingIndex(0)
+  }
+
+  private redrawBackdrop (viewport: TableViewport): void {
+    const node = this.backdrop
+    const graphics = node?.getComponent(Graphics)
+    const transform = node?.getComponent(UITransform)
+    if (!node || !graphics || !transform) return
+    const { width, height, halfWidth, halfHeight } = viewport
+    transform.setContentSize(width, height)
+    graphics.clear()
     graphics.fillColor = new Color(8, 39, 32, 255)
-    graphics.rect(-640, -360, 1280, 720)
+    graphics.rect(-halfWidth, -halfHeight, width, height)
     graphics.fill()
     graphics.fillColor = new Color(17, 82, 61, 255)
-    graphics.ellipse(0, 18, 560, 255)
+    const tableRx = Math.max(260, halfWidth - 78)
+    const tableRy = Math.max(170, halfHeight - 108)
+    graphics.ellipse(0, 10, tableRx, tableRy)
     graphics.fill()
     graphics.strokeColor = new Color(188, 143, 57, 255)
     graphics.lineWidth = 5
-    graphics.ellipse(0, 18, 560, 255)
+    graphics.ellipse(0, 10, tableRx, tableRy)
     graphics.stroke()
     graphics.strokeColor = new Color(87, 50, 19, 255)
     graphics.lineWidth = 18
-    graphics.roundRect(-620, -340, 1240, 680, 36)
+    graphics.roundRect(-halfWidth + 20, -halfHeight + 20, width - 40, height - 40, 36)
     graphics.stroke()
-    node.setSiblingIndex(0)
-    this.backdrop = node
   }
 
   private makeButton (name: string, text: string, x: number): Node {
