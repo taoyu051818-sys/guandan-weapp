@@ -59,5 +59,7 @@ export class CardView extends Component {
     if (!this.card || this.card.interactive === false) return
     this.setSelected(!this.card.selected)
     this.node.emit('guandan:card-toggle', this.card.id)
+    // Cocos custom Node events do not bubble: forward explicitly to HandController.
+    this.node.parent?.emit('guandan:card-toggle', this.card.id)
   }
 }
