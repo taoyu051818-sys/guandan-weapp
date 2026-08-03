@@ -507,31 +507,52 @@ export class GameScene extends Component {
   }
 
   private makeButton (name: string, text: string, x: number): Node {
-    const label = this.makeLabel(name, x, -205, 28)
-    const graphics = label.node.addComponent(Graphics)
+    const node = new Node(name)
+    node.parent = this.node
+    node.setPosition(new Vec3(x, -205, 0))
+    node.addComponent(UITransform).setContentSize(244, 56)
+    const graphics = node.addComponent(Graphics)
     graphics.fillColor = new Color(74, 50, 21, 235)
     graphics.strokeColor = new Color(218, 179, 79, 255)
     graphics.lineWidth = 2
     graphics.roundRect(-122, -28, 244, 56, 14)
     graphics.fill()
     graphics.stroke()
-    label.string = `【${text}】`
+    const textNode = new Node('ButtonText')
+    textNode.parent = node
+    textNode.addComponent(UITransform).setContentSize(230, 52)
+    const label = textNode.addComponent(Label)
+    label.fontSize = 25
+    label.lineHeight = 32
+    label.horizontalAlign = Label.HorizontalAlign.CENTER
+    label.verticalAlign = Label.VerticalAlign.CENTER
+    label.string = text
     label.color = new Color(245, 224, 156)
-    return label.node
+    return node
   }
 
   private makeChatButton (text: string, x: number, y: number): Node {
-    const label = this.makeLabel('QuickChat', x, y, 17)
-    label.node.getComponent(UITransform)?.setContentSize(380, 42)
-    const graphics = label.node.addComponent(Graphics)
+    const node = new Node('QuickChat')
+    node.parent = this.node
+    node.setPosition(new Vec3(x, y, 0))
+    node.addComponent(UITransform).setContentSize(380, 42)
+    const graphics = node.addComponent(Graphics)
     graphics.fillColor = new Color(20, 42, 39, 245)
     graphics.strokeColor = new Color(188, 143, 57, 220)
     graphics.lineWidth = 1
     graphics.roundRect(-190, -21, 380, 42, 12)
     graphics.fill()
     graphics.stroke()
+    const textNode = new Node('QuickChatText')
+    textNode.parent = node
+    textNode.addComponent(UITransform).setContentSize(360, 38)
+    const label = textNode.addComponent(Label)
+    label.fontSize = 17
+    label.lineHeight = 23
+    label.horizontalAlign = Label.HorizontalAlign.CENTER
+    label.verticalAlign = Label.VerticalAlign.CENTER
     label.string = text
     label.color = new Color(245, 239, 215)
-    return label.node
+    return node
   }
 }
