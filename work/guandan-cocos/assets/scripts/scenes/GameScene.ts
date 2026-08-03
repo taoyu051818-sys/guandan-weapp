@@ -4,6 +4,7 @@ import { HandController } from '../ui/HandController'
 import { GameSession } from '../session/GameSession'
 import { GroupingController, type GroupingResult } from '../game/GroupingController'
 import type { Difficulty } from '../core/generated/lib/ai'
+import { LobbyController, type LobbySnapshot } from '../network/LobbyController'
 
 const { ccclass, property } = _decorator
 
@@ -18,6 +19,12 @@ export class GameScene extends Component {
 
   @property(GroupingController)
   public grouping: GroupingController | null = null
+
+  @property(LobbyController)
+  public lobby: LobbyController | null = null
+
+  @property
+  public lobbyEndpoint = 'ws://127.0.0.1:3002/weapp'
 
   @property(HandController)
   public hand: HandController | null = null
@@ -58,8 +65,11 @@ export class GameScene extends Component {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
     if (!this.gameManager) this.gameManager = this.getComponent(GameManager) ?? this.addComponent(GameManager)
     if (!this.grouping) this.grouping = this.getComponent(GroupingController) ?? this.addComponent(GroupingController)
+    if (!this.lobby) this.lobby = this.getComponent(LobbyController) ?? this.addComponent(LobbyController)
     const manager = this.gameManager!
+    const lobby = this.lobby!
     manager.session = this.session
+    lobby.session = this.session
     this.ensureFallbackUi()
     manager.node.on('guandan:state', this.render, this)
     this.hand?.node.on('guandan:card-toggle', manager.toggleCard, manager)
@@ -68,6 +78,7 @@ export class GameScene extends Component {
     this.confirmTributeButton?.on(Node.EventType.TOUCH_END, manager.confirmTribute, manager)
     this.finishTributeButton?.on(Node.EventType.TOUCH_END, manager.finishTribute, manager)
     this.nextRoundButton?.on(Node.EventType.TOUCH_END, manager.nextRound, manager)
+    lobby.events.on('guandan:lobby', this.renderLobby, this)
   }
 
   protected start (): void {
@@ -76,6 +87,7 @@ export class GameScene extends Component {
 
   protected onDestroy (): void {
     this.gameManager?.node.off('guandan:state', this.render, this)
+    this.lobby?.events.off('guandan:lobby', this.renderLobby, this)
   }
 
   private render (snapshot: GameSnapshot): void {
@@ -134,7 +146,7 @@ export class GameScene extends Component {
     this.addMenuButton('标准对局', 60, () => this.beginGrouping('medium', 'standard'))
     this.addMenuButton('双明牌教学', 5, () => this.beginGrouping('easy', 'double_open'))
     this.addMenuButton('大师挑战', -50, () => this.beginGrouping('master', 'standard'))
-    this.addMenuButton('多人联机大厅（开发中）', -105, () => this.session?.enterLobby())
+    this.addMenuButton('多人联机大厅', -105, () => this.showLobby())
     this.addMenuButton('新手教程', -160, () => this.showTutorial())
     this.addMenuButton('游戏设置', -215, () => this.showSettings())
   }
@@ -219,6 +231,42 @@ export class GameScene extends Component {
     const theme = this.addGroupingButton('切换视觉主题', -130, () => { this.session?.updateSettings({ visualTheme: snapshot.settings.visualTheme === 'luxury' ? 'compact' : 'luxury' }); this.showSettings() })
     const back = this.addGroupingButton('返回主菜单', -190, () => this.showMenu())
     this.groupingNodes.push(title.node, state.node, difficulty, order, rule, theme, back)
+  }
+
+  private showLobby (): void {
+    this.clearNodes(this.menuNodes)
+    this.clearNodes(this.groupingNodes)
+    this.setTableVisible(false)
+    this.session?.enterLobby()
+    this.lobby?.connect(this.lobbyEndpoint)
+    this.renderLobby(this.lobby?.snapshot ?? { connected: false, rooms: [], roomId: null, members: [], myPlayerId: null, error: null })
+  }
+
+  private renderLobby (snapshot: LobbySnapshot): void {
+    if (this.session?.snapshot.status !== 'lobby') return
+    this.clearNodes(this.groupingNodes)
+    const title = this.makeMenuLabel('多人联机大厅', 0, 220, 42)
+    const state = this.makeMenuLabel(snapshot.error ?? (snapshot.connected ? `服务已连接 · ${snapshot.roomId ? `房间 ${snapshot.roomId} · ${snapshot.members.length}/4` : '发现附近房间'}` : '正在连接服务…'), 0, 165, 19)
+    this.groupingNodes.push(title.node, state.node)
+    if (snapshot.roomId) {
+      const members = this.makeMenuLabel(`席位：${snapshot.members.length ? snapshot.members.join(' · ') : '等待同步'}`, 0, 105, 22)
+      const leave = this.addGroupingButton('离开房间', 30, () => this.lobby?.leaveRoom())
+      this.groupingNodes.push(members.node, leave)
+      if (snapshot.myPlayerId === 'p1' && snapshot.members.length === 4) {
+        const start = this.addGroupingButton('四人已齐，开始游戏', -35, () => this.lobby?.startGame())
+        this.groupingNodes.push(start)
+      }
+    } else {
+      const create = this.addGroupingButton('创建六位房间', 95, () => this.lobby?.createRoom())
+      const refresh = this.addGroupingButton('刷新房间列表', 35, () => this.lobby?.refreshRooms())
+      this.groupingNodes.push(create, refresh)
+      snapshot.rooms.slice(0, 3).forEach((room, index) => {
+        const join = this.addGroupingButton(`加入 ${room.hostName} 的房间 ${room.roomId}（${room.playerCount}/4）`, -35 - index * 55, () => this.lobby?.joinRoom(room.roomId))
+        this.groupingNodes.push(join)
+      })
+    }
+    const back = this.addGroupingButton('返回主菜单', -210, () => { this.lobby?.leaveRoom(); this.showMenu() })
+    this.groupingNodes.push(back)
   }
 
   private setTableVisible (visible: boolean): void {
