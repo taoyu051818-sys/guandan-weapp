@@ -14,7 +14,10 @@ export class PlayerSeatController extends Component {
     const transform = this.getComponent(UITransform) ?? this.addComponent(UITransform)
     transform!.setContentSize(220, 72)
     this.graphics = this.getComponent(Graphics) ?? this.addComponent(Graphics)
-    this.label = this.getComponent(Label) ?? this.addComponent(Label)
+    const labelNode = new Node('SeatText')
+    labelNode.parent = this.node
+    labelNode.addComponent(UITransform).setContentSize(210, 68)
+    this.label = labelNode.addComponent(Label)
     this.label!.fontSize = 19
     this.label!.lineHeight = 25
     this.label!.horizontalAlign = Label.HorizontalAlign.CENTER
@@ -30,7 +33,10 @@ export class PlayerSeatController extends Component {
     bubbleGraphics.roundRect(-140, -24, 280, 48, 14)
     bubbleGraphics.fill()
     bubbleGraphics.stroke()
-    this.chatLabel = bubble.addComponent(Label)
+    const chatText = new Node('ChatText')
+    chatText.parent = bubble
+    chatText.addComponent(UITransform).setContentSize(260, 42)
+    this.chatLabel = chatText.addComponent(Label)
     this.chatLabel.fontSize = 16
     this.chatLabel.lineHeight = 22
     this.chatLabel.horizontalAlign = Label.HorizontalAlign.CENTER
