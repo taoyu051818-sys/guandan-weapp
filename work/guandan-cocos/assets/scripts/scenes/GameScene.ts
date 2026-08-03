@@ -223,6 +223,8 @@ export class GameScene extends Component {
     this.addMenuButton('多人联机大厅', -105, () => this.showLobby())
     this.addMenuButton('新手教程', -160, () => this.showTutorial())
     this.addMenuButton('游戏设置', -215, () => this.showSettings())
+    this.addMenuButton('玩家数据看板', -270, () => this.showStats())
+    this.addMenuButton('战役挑战', -325, () => this.beginGrouping('medium', 'campaign'))
   }
 
   private beginGrouping (difficulty: Difficulty, mode: 'standard' | 'double_open' | 'campaign'): void {
@@ -305,6 +307,18 @@ export class GameScene extends Component {
     const theme = this.addGroupingButton('切换视觉主题', -130, () => { this.session?.updateSettings({ visualTheme: snapshot.settings.visualTheme === 'luxury' ? 'compact' : 'luxury' }); this.showSettings() })
     const back = this.addGroupingButton('返回主菜单', -190, () => this.showMenu())
     this.groupingNodes.push(title.node, state.node, difficulty, order, rule, theme, back)
+  }
+
+  private showStats (): void {
+    this.clearNodes(this.menuNodes)
+    this.clearNodes(this.groupingNodes)
+    const stats = this.session?.snapshot.playerStats
+    if (!stats) return
+    const winRate = stats.gamesPlayed ? Math.round(stats.wins * 100 / stats.gamesPlayed) : 0
+    const title = this.makeMenuLabel('玩家数据看板', 0, 205, 42)
+    const values = this.makeMenuLabel(`当前积分  ${stats.elo}\n总场数  ${stats.gamesPlayed}      胜率  ${winRate}%\n头游次数  ${stats.firstPlaceFinishes}      炸弹次数  ${stats.bombsPlayed}`, 0, 92, 26)
+    const back = this.addGroupingButton('返回主菜单', -105, () => this.showMenu())
+    this.groupingNodes.push(title.node, values.node, back)
   }
 
   private showLobby (): void {
