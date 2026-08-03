@@ -3,6 +3,7 @@ import { createGame, createTribute, dealNextRound, getPlayInfo, getPossiblePlays
 import type { Card, EngineState, PlayerId, Rank, SettlementResult, Team, TributeState } from '../core/generated'
 import { GameSession } from '../session/GameSession'
 import { CocosAudioController } from '../audio/CocosAudioController'
+import { LobbyController } from '../network/LobbyController'
 
 export type GameSnapshot = {
   state: EngineState
@@ -28,6 +29,9 @@ export class GameManager extends Component {
 
   @property(CocosAudioController)
   public audio: CocosAudioController | null = null
+
+  @property(LobbyController)
+  public lobby: LobbyController | null = null
   public state!: EngineState
   public selectedCardIds = new Set<string>()
   public phase: 'playing' | 'tribute' | 'settlement' = 'playing'
@@ -58,7 +62,7 @@ export class GameManager extends Component {
 
   public toggleCard (cardId: string): void {
     if (this.phase !== 'playing' && this.phase !== 'tribute') return
-    if (this.phase === 'playing' && (this.state.currentTurn !== 'p1' || this.state.finishedPlayers.length > 0)) return
+    if (this.phase === 'playing' && (this.state.currentTurn !== this.humanId || this.state.finishedPlayers.length > 0)) return
     if (this.selectedCardIds.has(cardId)) this.selectedCardIds.delete(cardId)
     else this.selectedCardIds.add(cardId)
     const cards = this.selectedCards()
@@ -71,11 +75,17 @@ export class GameManager extends Component {
   }
 
   public playSelected (): void {
-    if (this.phase !== 'playing' || this.state.currentTurn !== 'p1') return
+    if (this.phase !== 'playing' || this.state.currentTurn !== this.humanId) return
     const cards = this.selectedCards()
+    if (this.session?.snapshot.isMultiplayer) {
+      if (!cards.length) return this.emitSnapshot('请选择要出的牌')
+      this.lobby?.play(cards.map(card => card.id))
+      this.selectedCardIds.clear()
+      return
+    }
     try {
       const info = getPlayInfo(cards)
-      this.state = playCards(this.state, 'p1', cards)
+      this.state = playCards(this.state, this.humanId, cards)
       this.selectedCardIds.clear()
       if (info?.type === 'Bomb' || info?.type === 'StraightFlush' || info?.type === 'Rocket') this.audio?.playBomb()
       else this.audio?.playCard()
@@ -86,9 +96,14 @@ export class GameManager extends Component {
   }
 
   public pass (): void {
-    if (this.phase !== 'playing' || this.state.currentTurn !== 'p1') return
+    if (this.phase !== 'playing' || this.state.currentTurn !== this.humanId) return
+    if (this.session?.snapshot.isMultiplayer) {
+      this.lobby?.pass()
+      this.selectedCardIds.clear()
+      return
+    }
     try {
-      this.state = passTurn(this.state, 'p1')
+      this.state = passTurn(this.state, this.humanId)
       this.selectedCardIds.clear()
       this.audio?.playPass()
       this.finishHumanAction()
@@ -99,8 +114,8 @@ export class GameManager extends Component {
 
   /** Cycles legal human plays, preserving the desktop HandArea hint behavior. */
   public hint (): void {
-    if (this.phase !== 'playing' || this.state.currentTurn !== 'p1') return
-    const choices = getPossiblePlays(this.state.players.p1.hand, this.state.lastValidPlay, this.session?.snapshot.difficulty ?? 'medium')
+    if (this.phase !== 'playing' || this.state.currentTurn !== this.humanId) return
+    const choices = getPossiblePlays(this.state.players[this.humanId].hand, this.state.lastValidPlay, this.session?.snapshot.difficulty ?? 'medium')
     if (!choices.length) return this.emitSnapshot('没有可用提示，请选择不要')
     const choice = choices[this.hintIndex++ % choices.length]
     this.selectedCardIds = new Set(choice.map(card => card.id))
@@ -176,14 +191,14 @@ export class GameManager extends Component {
   }
 
   private selectedCards (): Card[] {
-    return this.state.players.p1.hand.filter(card => this.selectedCardIds.has(card.id))
+    return this.state.players[this.humanId].hand.filter(card => this.selectedCardIds.has(card.id))
   }
 
   private finishHumanAction (): void {
     if (this.maybeSettle()) return
     this.state = runAiTurns(this.state, this.session?.snapshot.difficulty ?? 'medium', 60)
     if (this.maybeSettle()) return
-    this.emitSnapshot(this.state.currentTurn === 'p1' ? '轮到你出牌' : '电脑正在思考')
+    this.emitSnapshot(this.state.currentTurn === this.humanId ? '轮到你出牌' : '电脑正在思考')
   }
 
   private maybeSettle (): boolean {
@@ -238,4 +253,6 @@ export class GameManager extends Component {
       settlement: this.settlement,
     } satisfies GameSnapshot)
   }
+
+  private get humanId (): PlayerId { return this.session?.snapshot.myPlayerId ?? 'p1' }
 }
