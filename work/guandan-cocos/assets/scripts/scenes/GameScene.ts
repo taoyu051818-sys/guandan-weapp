@@ -76,6 +76,7 @@ export class GameScene extends Component {
   private groupingResult: GroupingResult | null = null
   private tutorialStep = 0
   private playerSeats = new Map<string, PlayerSeatController>()
+  private backdrop: Node | null = null
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
@@ -180,6 +181,7 @@ export class GameScene extends Component {
 
   /** Lets the first playable scene run before the art prefabs are bound in Creator. */
   private ensureFallbackUi (): void {
+    this.ensureBackdrop()
     if (!this.hand) {
       const handNode = new Node('HumanHand')
       handNode.parent = this.node
@@ -219,14 +221,15 @@ export class GameScene extends Component {
     const title = this.makeMenuLabel('掼 蛋 大 师', 0, 210, 56)
     const subtitle = this.makeMenuLabel('THE ROYAL GUANDAN', 0, 145, 18)
     this.menuNodes.push(title.node, subtitle.node)
-    this.addMenuButton('标准对局', 60, () => this.beginGrouping('medium', 'standard'))
-    this.addMenuButton('双明牌教学', 5, () => this.beginGrouping('easy', 'double_open'))
-    this.addMenuButton('大师挑战', -50, () => this.beginGrouping('master', 'standard'))
-    this.addMenuButton('多人联机大厅', -105, () => this.showLobby())
-    this.addMenuButton('新手教程', -160, () => this.showTutorial())
-    this.addMenuButton('游戏设置', -215, () => this.showSettings())
-    this.addMenuButton('玩家数据看板', -270, () => this.showStats())
-    this.addMenuButton('战役挑战', -325, () => this.beginGrouping('medium', 'campaign'))
+    // Two columns keep all entry points inside a 16:9 landscape viewport.
+    this.addMenuButton('标准对局', -145, 65, () => this.beginGrouping('medium', 'standard'))
+    this.addMenuButton('双明牌教学', 145, 65, () => this.beginGrouping('easy', 'double_open'))
+    this.addMenuButton('大师挑战', -145, 0, () => this.beginGrouping('master', 'standard'))
+    this.addMenuButton('多人联机大厅', 145, 0, () => this.showLobby())
+    this.addMenuButton('新手教程', -145, -65, () => this.showTutorial())
+    this.addMenuButton('游戏设置', 145, -65, () => this.showSettings())
+    this.addMenuButton('玩家数据看板', -145, -130, () => this.showStats())
+    this.addMenuButton('战役挑战', 145, -130, () => this.beginGrouping('medium', 'campaign'))
   }
 
   private beginGrouping (difficulty: Difficulty, mode: 'standard' | 'double_open' | 'campaign'): void {
@@ -384,8 +387,9 @@ export class GameScene extends Component {
     return label
   }
 
-  private addMenuButton (text: string, y: number, action: () => void): void {
+  private addMenuButton (text: string, x: number, y: number, action: () => void): void {
     const node = this.addGroupingButton(text, y, action)
+    node.setPosition(new Vec3(x, y, 0))
     this.menuNodes.push(node)
   }
 
@@ -407,6 +411,31 @@ export class GameScene extends Component {
     label.color = new Color(245, 239, 215)
     label.horizontalAlign = Label.HorizontalAlign.CENTER
     return label
+  }
+
+  /** Vector-only felt table so the initial scene is presentable before art assets arrive. */
+  private ensureBackdrop (): void {
+    if (this.backdrop) return
+    const node = new Node('TableBackdrop')
+    node.parent = this.node
+    node.addComponent(UITransform).setContentSize(1280, 720)
+    const graphics = node.addComponent(Graphics)
+    graphics.fillColor = new Color(8, 39, 32, 255)
+    graphics.rect(-640, -360, 1280, 720)
+    graphics.fill()
+    graphics.fillColor = new Color(17, 82, 61, 255)
+    graphics.ellipse(0, 18, 560, 255)
+    graphics.fill()
+    graphics.strokeColor = new Color(188, 143, 57, 255)
+    graphics.lineWidth = 5
+    graphics.ellipse(0, 18, 560, 255)
+    graphics.stroke()
+    graphics.strokeColor = new Color(87, 50, 19, 255)
+    graphics.lineWidth = 18
+    graphics.roundRect(-620, -340, 1240, 680, 36)
+    graphics.stroke()
+    node.setSiblingIndex(0)
+    this.backdrop = node
   }
 
   private makeButton (name: string, text: string, x: number): Node {
