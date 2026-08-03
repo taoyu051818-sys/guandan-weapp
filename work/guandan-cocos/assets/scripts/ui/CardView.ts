@@ -11,9 +11,11 @@ export class CardView extends Component {
   private label?: Label
 
   protected onLoad (): void {
-    const transform = this.getComponent(UITransform) ?? this.addComponent(UITransform)
-    transform.setContentSize(82, 118)
-    this.label = this.getComponent(Label) ?? this.addComponent(Label)
+    let transform = this.getComponent(UITransform)
+    if (!transform) transform = this.addComponent(UITransform)
+    transform!.setContentSize(82, 118)
+    const label = (this.getComponent(Label) ?? this.addComponent(Label))!
+    this.label = label
     this.node.on(Node.EventType.TOUCH_END, this.toggle, this)
   }
 
