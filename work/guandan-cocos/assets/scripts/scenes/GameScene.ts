@@ -103,6 +103,8 @@ export class GameScene extends Component {
     this.nextRoundButton?.on(Node.EventType.TOUCH_END, manager.nextRound, manager)
     lobby.events.on('guandan:lobby', this.renderLobby, this)
     lobby.events.on('guandan:network-state', this.applyNetworkState, this)
+    lobby.events.on('guandan:round-prepared', this.applyNetworkRoundPrepared, this)
+    lobby.events.on('guandan:round-ended', this.applyNetworkRoundEnded, this)
   }
 
   protected start (): void {
@@ -113,6 +115,8 @@ export class GameScene extends Component {
     this.gameManager?.node.off('guandan:state', this.render, this)
     this.lobby?.events.off('guandan:lobby', this.renderLobby, this)
     this.lobby?.events.off('guandan:network-state', this.applyNetworkState, this)
+    this.lobby?.events.off('guandan:round-prepared', this.applyNetworkRoundPrepared, this)
+    this.lobby?.events.off('guandan:round-ended', this.applyNetworkRoundEnded, this)
   }
 
   private render (snapshot: GameSnapshot): void {
@@ -158,6 +162,18 @@ export class GameScene extends Component {
     this.clearNodes(this.groupingNodes)
     this.setTableVisible(true)
     this.gameManager?.applyServerState(state, state.currentTurn === (this.session?.snapshot.myPlayerId ?? 'p1') ? '轮到你出牌' : '等待其他玩家')
+  }
+
+  private applyNetworkRoundPrepared (packet: { state: GameSnapshot['state'], tribute: GameSnapshot['tribute'] }): void {
+    this.clearNodes(this.menuNodes)
+    this.clearNodes(this.groupingNodes)
+    this.setTableVisible(true)
+    this.gameManager?.applyNetworkRoundPrepared(packet.state, packet.tribute)
+  }
+
+  private applyNetworkRoundEnded (result: NonNullable<GameSnapshot['settlement']>): void {
+    this.setTableVisible(true)
+    this.gameManager?.applyNetworkRoundEnded(result)
   }
 
   /** Lets the first playable scene run before the art prefabs are bound in Creator. */
