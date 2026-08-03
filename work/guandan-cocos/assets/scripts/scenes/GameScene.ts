@@ -8,6 +8,8 @@ import { LobbyController, type LobbySnapshot } from '../network/LobbyController'
 import { PlayerSeatController } from '../ui/PlayerSeatController'
 import { PlayAreaController } from '../ui/PlayAreaController'
 import { CocosAudioController } from '../audio/CocosAudioController'
+import { ChatController, QUICK_CHAT_PHRASES, type QuickChat } from '../ui/ChatController'
+import type { PlayerId } from '../core/generated'
 
 const { ccclass, property } = _decorator
 
@@ -77,6 +79,12 @@ export class GameScene extends Component {
   private tutorialStep = 0
   private playerSeats = new Map<string, PlayerSeatController>()
   private backdrop: Node | null = null
+  private chat: ChatController | null = null
+  private chatButton: Node | null = null
+  private ownChatLabel: Label | null = null
+  private chatNodes: Node[] = []
+  private latestSnapshot: GameSnapshot | null = null
+  private hurryScheduled = false
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
@@ -84,6 +92,7 @@ export class GameScene extends Component {
     if (!this.grouping) this.grouping = this.getComponent(GroupingController) ?? this.addComponent(GroupingController)
     if (!this.lobby) this.lobby = this.getComponent(LobbyController) ?? this.addComponent(LobbyController)
     if (!this.audio) this.audio = this.getComponent(CocosAudioController) ?? this.addComponent(CocosAudioController)
+    this.chat = this.getComponent(ChatController) ?? this.addComponent(ChatController)
     const manager = this.gameManager!
     const lobby = this.lobby!
     const audio = this.audio!
@@ -106,6 +115,7 @@ export class GameScene extends Component {
     lobby.events.on('guandan:network-state', this.applyNetworkState, this)
     lobby.events.on('guandan:round-prepared', this.applyNetworkRoundPrepared, this)
     lobby.events.on('guandan:round-ended', this.applyNetworkRoundEnded, this)
+    this.chat?.events.on('guandan:chat', this.renderChat, this)
   }
 
   protected start (): void {
@@ -118,9 +128,11 @@ export class GameScene extends Component {
     this.lobby?.events.off('guandan:network-state', this.applyNetworkState, this)
     this.lobby?.events.off('guandan:round-prepared', this.applyNetworkRoundPrepared, this)
     this.lobby?.events.off('guandan:round-ended', this.applyNetworkRoundEnded, this)
+    this.chat?.events.off('guandan:chat', this.renderChat, this)
   }
 
   private render (snapshot: GameSnapshot): void {
+    this.latestSnapshot = snapshot
     const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
     this.hand?.render(snapshot.state.players[humanId].hand, snapshot.selectedCardIds)
     this.playArea?.render(snapshot.state.playArea, humanId)
@@ -129,7 +141,7 @@ export class GameScene extends Component {
       const seat = this.playerSeats.get(id)
       if (!seat) return
       seat.node.active = id !== humanId
-      if (id !== humanId) seat.render(snapshot.state.players[id], snapshot.state.currentTurn === id, this.session?.snapshot.gameMode === 'double_open' && this.oppositeOf(humanId) === id)
+      if (id !== humanId) seat.render(snapshot.state.players[id], snapshot.state.currentTurn === id, this.session?.snapshot.gameMode === 'double_open' && this.oppositeOf(humanId) === id, this.chat?.get(id)?.message)
     })
     if (this.hintLabel) this.hintLabel.string = snapshot.hint
     if (this.phaseLabel) this.phaseLabel.string = snapshot.phase === 'playing' ? `级牌 ${snapshot.state.currentLevel}` : snapshot.phase === 'tribute' ? '进贡与还贡' : '本局结算'
@@ -158,6 +170,11 @@ export class GameScene extends Component {
         this.overlayLabel.string = `${snapshot.settlement.winnerTeam === 'teamA' ? '本局胜利' : '本局失利'}\n${snapshot.settlement.message}\n${snapshot.settlement.fullRank.join(' · ')}${campaignText}`
       }
     }
+    if (this.ownChatLabel) {
+      this.ownChatLabel.string = this.chat?.get(humanId)?.message ?? ''
+      this.ownChatLabel.node.active = Boolean(this.ownChatLabel.string)
+    }
+    this.scheduleAiHurry(snapshot, humanId)
   }
 
   private applyNetworkState (state: GameSnapshot['state']): void {
@@ -213,6 +230,12 @@ export class GameScene extends Component {
     this.confirmTributeButton ??= this.makeButton('ConfirmTributeButton', '确认贡牌', 0)
     this.finishTributeButton ??= this.makeButton('FinishTributeButton', '开始本局', 0)
     this.nextRoundButton ??= this.makeButton('NextRoundButton', '下一局', 0)
+    this.chatButton ??= this.makeButton('ChatButton', '快捷语', -535)
+    this.chatButton.setPosition(new Vec3(-535, -205, 0))
+    this.chatButton.on(Node.EventType.TOUCH_END, this.toggleChatPanel, this)
+    this.ownChatLabel ??= this.makeLabel('OwnChatBubble', 0, -155, 18)
+    this.ownChatLabel.color = new Color(43, 48, 49)
+    this.ownChatLabel.node.active = false
   }
 
   private showMenu (): void {
@@ -363,7 +386,10 @@ export class GameScene extends Component {
   }
 
   private setTableVisible (visible: boolean): void {
-    [this.hand?.node, this.playArea?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.playButton, this.passButton, this.hintButton, this.resetButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, ...[...this.playerSeats.values()].map(seat => seat.node)].forEach(node => { if (node) node.active = visible })
+    if (!visible) this.clearNodes(this.chatNodes)
+    const tableNodes = [this.hand?.node, this.playArea?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.ownChatLabel?.node, this.chatButton, this.playButton, this.passButton, this.hintButton, this.resetButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton]
+    tableNodes.push(...Array.from(this.playerSeats.values(), seat => seat.node))
+    tableNodes.forEach(node => { if (node) node.active = visible })
   }
 
   private layoutSeats (humanId: 'p1' | 'p2' | 'p3' | 'p4'): void {
@@ -379,6 +405,42 @@ export class GameScene extends Component {
   }
 
   private clearNodes (nodes: Node[]): void { while (nodes.length) nodes.pop()?.destroy() }
+
+  private toggleChatPanel (): void {
+    if (this.chatNodes.length) { this.clearNodes(this.chatNodes); return }
+    QUICK_CHAT_PHRASES.forEach((phrase, index) => {
+      const node = this.makeChatButton(phrase.text, -415, 115 - index * 48)
+      node.on(Node.EventType.TOUCH_END, () => {
+        const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
+        this.chat?.send(humanId, phrase)
+        this.audio?.playVoice(phrase.voice)
+        this.clearNodes(this.chatNodes)
+      }, this)
+      this.chatNodes.push(node)
+    })
+  }
+
+  private renderChat (_chat: QuickChat | null): void {
+    if (this.latestSnapshot) this.render(this.latestSnapshot)
+  }
+
+  private scheduleAiHurry (snapshot: GameSnapshot, humanId: PlayerId): void {
+    const shouldHurry = snapshot.phase === 'playing' && snapshot.state.currentTurn === humanId
+    if (!shouldHurry) { this.hurryScheduled = false; return }
+    if (this.hurryScheduled) return
+    this.hurryScheduled = true
+    this.scheduleOnce(() => {
+      this.hurryScheduled = false
+      const current = this.latestSnapshot
+      if (!current || current.phase !== 'playing' || current.state.currentTurn !== humanId) return
+      const candidates = (['p1', 'p2', 'p3', 'p4'] as const).filter(id => id !== humanId && current.state.players[id].hand.length > 0)
+      const id = candidates[Math.floor(Math.random() * candidates.length)]
+      if (!id) return
+      const phrase = QUICK_CHAT_PHRASES[0]
+      this.chat?.send(id, phrase)
+      this.audio?.playVoice(phrase.voice)
+    }, 15)
+  }
 
   private makeMenuLabel (text: string, x: number, y: number, fontSize: number): Label {
     const label = this.makeLabel('MenuLabel', x, y, fontSize)
@@ -449,6 +511,21 @@ export class GameScene extends Component {
     graphics.stroke()
     label.string = `【${text}】`
     label.color = new Color(245, 224, 156)
+    return label.node
+  }
+
+  private makeChatButton (text: string, x: number, y: number): Node {
+    const label = this.makeLabel('QuickChat', x, y, 17)
+    label.node.getComponent(UITransform)?.setContentSize(380, 42)
+    const graphics = label.node.addComponent(Graphics)
+    graphics.fillColor = new Color(20, 42, 39, 245)
+    graphics.strokeColor = new Color(188, 143, 57, 220)
+    graphics.lineWidth = 1
+    graphics.roundRect(-190, -21, 380, 42, 12)
+    graphics.fill()
+    graphics.stroke()
+    label.string = text
+    label.color = new Color(245, 239, 215)
     return label.node
   }
 }
