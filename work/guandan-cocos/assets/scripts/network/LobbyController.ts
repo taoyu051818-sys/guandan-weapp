@@ -1,5 +1,6 @@
 import { _decorator, Component, EventTarget } from 'cc'
 import type { PlayerId } from '../core/generated'
+import type { EngineState } from '../core/generated'
 import { GameSession } from '../session/GameSession'
 import { CocosSocketClient } from './CocosSocketClient'
 
@@ -30,7 +31,10 @@ export class LobbyController extends Component {
     this.client.on('roomJoined', (message: Wire<{ roomId: string, myPlayerId: PlayerId }>) => this.enterRoom(message.roomId, message.myPlayerId, this.snapshot.members))
     this.client.on('roomRejoined', (message: Wire<{ roomId: string, myPlayerId: PlayerId }>) => this.enterRoom(message.roomId, message.myPlayerId, this.snapshot.members))
     this.client.on('roomMembers', (message: Wire<{ memberPlayerIds?: PlayerId[] }>) => this.patch({ members: message.memberPlayerIds ?? [] }))
-    this.client.on('gameState', () => this.session?.beginNetworkGrouping())
+    this.client.on('gameState', (message: Wire<{ state?: EngineState }>) => {
+      if (message.state) this.events.emit('guandan:network-state', message.state)
+      this.session?.beginPlay()
+    })
   }
 
   public connect (endpoint: string): void {
@@ -43,11 +47,13 @@ export class LobbyController extends Component {
   public createRoom (hostName = '玩家'): void { this.send('createRoom', { roomId: String(Math.floor(100000 + Math.random() * 900000)), hostName }) }
   public joinRoom (roomId: string): void { if (!/^\d{6}$/.test(roomId)) return this.patch({ error: '房间号必须为六位数字' }); this.send('joinRoom', { roomId }) }
   public startGame (): void { if (!this.snapshot.roomId) return; this.send('startGame', { roomId: this.snapshot.roomId }) }
+  public play (cardIds: string[]): void { if (this.snapshot.roomId) this.send('play', { roomId: this.snapshot.roomId, cardIds }) }
+  public pass (): void { if (this.snapshot.roomId) this.send('pass', { roomId: this.snapshot.roomId }) }
   public leaveRoom (): void { if (this.snapshot.roomId) this.send('leaveRoom', { roomId: this.snapshot.roomId }); this.patch({ roomId: null, members: [], myPlayerId: null }); this.session?.leaveToMenu() }
 
   protected onDestroy (): void { this.client.close() }
 
   private send (type: string, payload?: unknown): void { try { this.client.send(type, payload) } catch (error) { this.patch({ error: error instanceof Error ? error.message : '网络未连接' }) } }
-  private enterRoom (roomId: string, myPlayerId: PlayerId, members: PlayerId[]): void { this.patch({ roomId, myPlayerId, members, error: null }); this.session?.joinRoom(roomId) }
+  private enterRoom (roomId: string, myPlayerId: PlayerId, members: PlayerId[]): void { this.patch({ roomId, myPlayerId, members, error: null }); this.session?.joinRoom(roomId, myPlayerId) }
   private patch (next: Partial<LobbySnapshot>): void { this.snapshot = { ...this.snapshot, ...next }; this.events.emit('guandan:lobby', this.snapshot) }
 }
