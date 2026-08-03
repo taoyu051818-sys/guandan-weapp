@@ -1,0 +1,12 @@
+# Dependency and generated output
+**/node_modules/
+**/dist/
+**/.DS_Store
+**/.cache/
+
+# Local IDE/runtime state
+.idea/
+.vscode/
+*.log
+
+# Keep source audio only; generated mini-program assets are rebuilt by scripts/build-native-weapp.mjs
