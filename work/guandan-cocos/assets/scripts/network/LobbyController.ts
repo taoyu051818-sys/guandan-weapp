@@ -38,6 +38,9 @@ export class LobbyController extends Component {
     this.client.on('roundEnded', (message: Wire<{ result?: SettlementResult }>) => { if (message.result) this.events.emit('guandan:round-ended', message.result) })
     this.client.on('roundPrepared', (message: Wire<{ state?: EngineState, tribute?: TributeState }>) => { if (message.state) this.events.emit('guandan:round-prepared', { state: message.state, tribute: message.tribute ?? null }) })
     this.client.on('tributeUpdated', (message: Wire<{ state?: EngineState, tribute?: TributeState }>) => { if (message.state) this.events.emit('guandan:round-prepared', { state: message.state, tribute: message.tribute ?? null }) })
+    this.client.on('chat', (message: Wire<{ playerId?: PlayerId, text?: string }>) => {
+      if (message.playerId && message.text) this.events.emit('guandan:chat', { playerId: message.playerId, text: message.text })
+    })
   }
 
   public connect (endpoint: string): void {
@@ -56,6 +59,7 @@ export class LobbyController extends Component {
   public tribute (cardId: string): void { if (this.snapshot.roomId) this.send('tribute', { roomId: this.snapshot.roomId, cardId }) }
   public returnTribute (cardId: string): void { if (this.snapshot.roomId) this.send('returnTribute', { roomId: this.snapshot.roomId, cardId }) }
   public finishTribute (): void { if (this.snapshot.roomId) this.send('finishTribute', { roomId: this.snapshot.roomId }) }
+  public chat (text: string): void { if (this.snapshot.roomId) this.send('chat', { roomId: this.snapshot.roomId, text }) }
   public leaveRoom (): void { if (this.snapshot.roomId) this.send('leaveRoom', { roomId: this.snapshot.roomId }); this.patch({ roomId: null, members: [], myPlayerId: null }); this.session?.leaveToMenu() }
 
   protected onDestroy (): void { this.client.close() }
