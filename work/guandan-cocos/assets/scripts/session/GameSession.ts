@@ -23,6 +23,7 @@ export type SessionSnapshot = {
   gameMode: GameMode
   isMultiplayer: boolean
   roomId: string | null
+  myPlayerId: PlayerId
   difficulty: Difficulty
   currentLevel: Rank
   dealerId: PlayerId | null
@@ -35,7 +36,7 @@ const { ccclass } = _decorator
 const storageKey = 'guandan-cocos-session-v1'
 
 const defaults = (): SessionSnapshot => ({
-  status: 'menu', gameMode: 'standard', isMultiplayer: false, roomId: null,
+  status: 'menu', gameMode: 'standard', isMultiplayer: false, roomId: null, myPlayerId: 'p1',
   difficulty: 'medium', currentLevel: 2, dealerId: null,
   teamLevels: { teamA: 2, teamB: 2 },
   settings: { soundEnabled: true, volume: 0.5, bgmEnabled: true, bgmVolume: 0.3, sortOrder: 'desc', rulePreset: 'classic', visualTheme: 'luxury' },
@@ -51,14 +52,14 @@ export class GameSession extends Component {
   protected onLoad (): void { this.restore() }
 
   public beginLocalGame (difficulty: Difficulty, mode: GameMode = 'standard'): void {
-    this.snapshot = { ...this.snapshot, status: 'grouping', difficulty, gameMode: mode, isMultiplayer: false, roomId: null, dealerId: null }
+    this.snapshot = { ...this.snapshot, status: 'grouping', difficulty, gameMode: mode, isMultiplayer: false, roomId: null, myPlayerId: 'p1', dealerId: null }
     this.commit()
   }
 
   public setDifficulty (difficulty: Difficulty): void { this.snapshot = { ...this.snapshot, difficulty }; this.commit() }
 
   public enterLobby (): void { this.snapshot = { ...this.snapshot, status: 'lobby', isMultiplayer: true }; this.commit() }
-  public joinRoom (roomId: string): void { this.snapshot = { ...this.snapshot, status: 'lobby', isMultiplayer: true, roomId }; this.commit() }
+  public joinRoom (roomId: string, myPlayerId: PlayerId): void { this.snapshot = { ...this.snapshot, status: 'lobby', isMultiplayer: true, roomId, myPlayerId }; this.commit() }
   public beginNetworkGrouping (): void { this.snapshot = { ...this.snapshot, status: 'grouping' }; this.commit() }
   public leaveToMenu (): void { this.snapshot = { ...this.snapshot, status: 'menu', roomId: null, isMultiplayer: false }; this.commit() }
 
