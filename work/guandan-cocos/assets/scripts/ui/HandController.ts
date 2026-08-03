@@ -10,12 +10,13 @@ export class HandController extends Component {
   public cardPrefab: Prefab | null = null
   private cards = new Map<string, Node>()
 
-  public render (hand: Card[], selectedCardIds: string[]): void {
-    const ids = new Set(hand.map(card => card.id))
+  public render (hand: Card[], selectedCardIds: string[], sortOrder: 'asc' | 'desc' = 'desc'): void {
+    const displayHand = [...hand].sort((a, b) => sortOrder === 'desc' ? b.value - a.value : a.value - b.value)
+    const ids = new Set(displayHand.map(card => card.id))
     this.cards.forEach((node, id) => { if (!ids.has(id)) { node.destroy(); this.cards.delete(id) } })
-    const spacing = Math.min(68, 920 / Math.max(hand.length - 1, 1))
-    const startX = -spacing * (hand.length - 1) / 2
-    hand.forEach((card, index) => {
+    const spacing = Math.min(68, 920 / Math.max(displayHand.length - 1, 1))
+    const startX = -spacing * (displayHand.length - 1) / 2
+    displayHand.forEach((card, index) => {
       let node = this.cards.get(card.id)
       if (!node) {
         node = this.cardPrefab ? instantiate(this.cardPrefab) : new Node(`card-${card.id}`)
