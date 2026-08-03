@@ -88,6 +88,7 @@ export class GameScene extends Component {
     const audio = this.audio!
     manager.session = this.session
     manager.audio = audio
+    manager.lobby = lobby
     lobby.session = this.session
     audio.session = this.session
     this.ensureFallbackUi()
@@ -101,6 +102,7 @@ export class GameScene extends Component {
     this.finishTributeButton?.on(Node.EventType.TOUCH_END, manager.finishTribute, manager)
     this.nextRoundButton?.on(Node.EventType.TOUCH_END, manager.nextRound, manager)
     lobby.events.on('guandan:lobby', this.renderLobby, this)
+    lobby.events.on('guandan:network-state', this.applyNetworkState, this)
   }
 
   protected start (): void {
@@ -110,12 +112,20 @@ export class GameScene extends Component {
   protected onDestroy (): void {
     this.gameManager?.node.off('guandan:state', this.render, this)
     this.lobby?.events.off('guandan:lobby', this.renderLobby, this)
+    this.lobby?.events.off('guandan:network-state', this.applyNetworkState, this)
   }
 
   private render (snapshot: GameSnapshot): void {
-    this.hand?.render(snapshot.state.players.p1.hand, snapshot.selectedCardIds)
-    this.playArea?.render(snapshot.state.playArea)
-    ;(['p2', 'p3', 'p4'] as const).forEach(id => this.playerSeats.get(id)?.render(snapshot.state.players[id], snapshot.state.currentTurn === id, this.session?.snapshot.gameMode === 'double_open' && id === 'p3'))
+    const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
+    this.hand?.render(snapshot.state.players[humanId].hand, snapshot.selectedCardIds)
+    this.playArea?.render(snapshot.state.playArea, humanId)
+    this.layoutSeats(humanId)
+    ;(['p1', 'p2', 'p3', 'p4'] as const).forEach(id => {
+      const seat = this.playerSeats.get(id)
+      if (!seat) return
+      seat.node.active = id !== humanId
+      if (id !== humanId) seat.render(snapshot.state.players[id], snapshot.state.currentTurn === id, this.session?.snapshot.gameMode === 'double_open' && this.oppositeOf(humanId) === id)
+    })
     if (this.hintLabel) this.hintLabel.string = snapshot.hint
     if (this.phaseLabel) this.phaseLabel.string = snapshot.phase === 'playing' ? `级牌 ${snapshot.state.currentLevel}` : snapshot.phase === 'tribute' ? '进贡与还贡' : '本局结算'
     if (this.scoreLabel) this.scoreLabel.string = `我方 ${snapshot.teamLevels.teamA} 级 · ${snapshot.scores.teamA} 分    对方 ${snapshot.teamLevels.teamB} 级 · ${snapshot.scores.teamB} 分`
@@ -143,6 +153,13 @@ export class GameScene extends Component {
     }
   }
 
+  private applyNetworkState (state: GameSnapshot['state']): void {
+    this.clearNodes(this.menuNodes)
+    this.clearNodes(this.groupingNodes)
+    this.setTableVisible(true)
+    this.gameManager?.applyServerState(state, state.currentTurn === (this.session?.snapshot.myPlayerId ?? 'p1') ? '轮到你出牌' : '等待其他玩家')
+  }
+
   /** Lets the first playable scene run before the art prefabs are bound in Creator. */
   private ensureFallbackUi (): void {
     if (!this.hand) {
@@ -158,11 +175,11 @@ export class GameScene extends Component {
       playNode.addComponent(UITransform).setContentSize(900, 420)
       this.playArea = playNode.addComponent(PlayAreaController)
     }
-    ;([['p3', 0, 310], ['p4', -510, 35], ['p2', 510, 35]] as const).forEach(([id, x, y]) => {
+    ;(['p1', 'p2', 'p3', 'p4'] as const).forEach(id => {
       if (this.playerSeats.has(id)) return
       const seat = new Node(`Seat-${id}`)
       seat.parent = this.node
-      seat.setPosition(new Vec3(x, y, 0))
+      seat.setPosition(new Vec3(0, 0, 0))
       this.playerSeats.set(id, seat.addComponent(PlayerSeatController))
     })
     this.hintLabel ??= this.makeLabel('Hint', 0, -150, 24)
@@ -312,6 +329,18 @@ export class GameScene extends Component {
 
   private setTableVisible (visible: boolean): void {
     [this.hand?.node, this.playArea?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.playButton, this.passButton, this.hintButton, this.resetButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, ...[...this.playerSeats.values()].map(seat => seat.node)].forEach(node => { if (node) node.active = visible })
+  }
+
+  private layoutSeats (humanId: 'p1' | 'p2' | 'p3' | 'p4'): void {
+    const order: Array<'p1' | 'p2' | 'p3' | 'p4'> = ['p1', 'p2', 'p3', 'p4']
+    const humanIndex = order.indexOf(humanId)
+    const positions = [new Vec3(0, -260, 0), new Vec3(510, 35, 0), new Vec3(0, 310, 0), new Vec3(-510, 35, 0)]
+    order.forEach((id, index) => this.playerSeats.get(id)?.node.setPosition(positions[(index - humanIndex + 4) % 4]))
+  }
+
+  private oppositeOf (id: 'p1' | 'p2' | 'p3' | 'p4'): 'p1' | 'p2' | 'p3' | 'p4' {
+    const opposites: Record<'p1' | 'p2' | 'p3' | 'p4', 'p1' | 'p2' | 'p3' | 'p4'> = { p1: 'p3', p2: 'p4', p3: 'p1', p4: 'p2' }
+    return opposites[id]
   }
 
   private clearNodes (nodes: Node[]): void { while (nodes.length) nodes.pop()?.destroy() }
