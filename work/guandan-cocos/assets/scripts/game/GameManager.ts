@@ -1,5 +1,5 @@
 import { _decorator, Component } from 'cc'
-import { createGame, createTribute, dealNextRound, getPlayInfo, getPossiblePlays, giveTribute, highestCard, isRoundOver, lowestCard, passTurn, playCards, returnTribute, runAiTurns, settle, tributeLeader } from '../core/generated'
+import { createGame, createTribute, dealNextRound, getPlayInfo, getPossiblePlays, giveTribute, highestCard, isRoundOver, lowestCard, makeDecision, passTurn, playCards, returnTribute, settle, tributeLeader } from '../core/generated'
 import type { Card, EngineState, PlayerId, Rank, SettlementResult, Team, TributeState } from '../core/generated'
 import { GameSession } from '../session/GameSession'
 import { CocosAudioController } from '../audio/CocosAudioController'
@@ -42,8 +42,10 @@ export class GameManager extends Component {
   public tribute: TributeState | null = null
   public settlement: SettlementResult | null = null
   private hintIndex = 0
+  private aiTurnToken = 0
 
   public startRound (dealer?: PlayerId): void {
+    this.aiTurnToken += 1
     const session = this.session ?? this.getComponent(GameSession)
     const level = session?.snapshot.currentLevel ?? 2
     const roundDealer = dealer ?? session?.snapshot.dealerId ?? 'p1'
@@ -57,7 +59,8 @@ export class GameManager extends Component {
     this.tribute = null
     this.settlement = null
     session?.beginPlay()
-    this.emitSnapshot('新对局开始，轮到你出牌')
+    this.emitSnapshot(this.state.currentTurn === this.humanId ? '新对局开始，轮到你出牌' : '新对局开始，电脑正在思考…')
+    if (this.state.currentTurn !== this.humanId) this.runNextAiTurn()
   }
 
   public toggleCard (cardId: string): void {
@@ -130,12 +133,14 @@ export class GameManager extends Component {
 
   /** Called by the WebSocket adapter after service-authoritative state sync. */
   public applyServerState (state: EngineState, hint = '已同步服务器状态'): void {
+    this.aiTurnToken += 1
     this.state = state
     this.selectedCardIds.clear()
     this.emitSnapshot(hint)
   }
 
   public applyNetworkRoundPrepared (state: EngineState, tribute: TributeState | null): void {
+    this.aiTurnToken += 1
     this.state = state
     this.tribute = tribute
     this.phase = tribute ? 'tribute' : 'playing'
@@ -147,6 +152,7 @@ export class GameManager extends Component {
   }
 
   public applyNetworkRoundEnded (result: SettlementResult): void {
+    this.aiTurnToken += 1
     this.teamLevels = result.teamLevels
     this.aFailStreaks = result.aFailStreaks
     this.lastRoundRank = result.fullRank
@@ -155,7 +161,7 @@ export class GameManager extends Component {
     this.phase = 'settlement'
     this.selectedCardIds.clear()
     this.session?.setRoundLevels(result.teamLevels, result.currentLevel)
-    this.session?.recordRound(result.winnerTeam, result.fullRank[0] === this.humanId, 0)
+    this.session?.recordRound(result.winnerTeam, result.fullRank[0] === this.humanId, 0, { levelUp: result.levelUp, currentLevel: result.currentLevel, teamLevels: result.teamLevels, scores: this.scores })
     this.session?.beginSettlement()
     this.emitSnapshot(result.message)
   }
@@ -229,9 +235,41 @@ export class GameManager extends Component {
 
   private finishHumanAction (): void {
     if (this.maybeSettle()) return
-    this.state = runAiTurns(this.state, this.session?.snapshot.difficulty ?? 'medium', 60)
+    this.runNextAiTurn()
+  }
+
+  /** One scheduled AI action at a time, matching the desktop game's visible thinking rhythm. */
+  private runNextAiTurn (): void {
+    if (this.session?.snapshot.isMultiplayer) return
     if (this.maybeSettle()) return
-    this.emitSnapshot(this.state.currentTurn === this.humanId ? '轮到你出牌' : '电脑正在思考')
+    if (this.state.currentTurn === this.humanId) {
+      this.emitSnapshot('轮到你出牌')
+      return
+    }
+    const token = ++this.aiTurnToken
+    const aiId = this.state.currentTurn
+    this.emitSnapshot(`${this.state.players[aiId].name} 正在思考…`)
+    this.scheduleOnce(() => {
+      if (token !== this.aiTurnToken || this.phase !== 'playing' || this.state.currentTurn !== aiId) return
+      try {
+        const ai = this.state.players[aiId]
+        const cards = makeDecision(ai.hand, this.state.lastValidPlay, this.session?.snapshot.difficulty ?? 'medium', ai.team, this.state.players, aiId, { currentLevel: this.state.currentLevel, teamLevels: this.teamLevels, roundMeta: null })
+        if (cards?.length) {
+          const info = getPlayInfo(cards)
+          this.state = info ? playCards(this.state, aiId, cards) : passTurn(this.state, aiId)
+          if (info?.type === 'Bomb' || info?.type === 'StraightFlush' || info?.type === 'Rocket') this.audio?.playBomb()
+          else this.audio?.playCard()
+        } else {
+          this.state = passTurn(this.state, aiId)
+          this.audio?.playPass()
+        }
+      } catch (error) {
+        this.emitSnapshot(error instanceof Error ? error.message : '电脑出牌失败')
+        return
+      }
+      if (this.maybeSettle()) return
+      this.runNextAiTurn()
+    }, 0.72)
   }
 
   private maybeSettle (): boolean {
@@ -246,7 +284,7 @@ export class GameManager extends Component {
     this.phase = 'settlement'
     this.selectedCardIds.clear()
     this.session?.setRoundLevels(this.teamLevels, result.currentLevel)
-    this.session?.recordRound(result.winnerTeam, result.fullRank[0] === 'p1', this.state.playArea.filter(action => action.type === 'Bomb' || action.type === 'StraightFlush' || action.type === 'Rocket').length)
+    this.session?.recordRound(result.winnerTeam, result.fullRank[0] === this.humanId, this.state.playArea.filter(action => action.type === 'Bomb' || action.type === 'StraightFlush' || action.type === 'Rocket').length, { levelUp: result.levelUp, currentLevel: result.currentLevel, teamLevels: result.teamLevels, scores: this.scores })
     this.session?.beginSettlement()
     this.emitSnapshot(result.message)
     return true
