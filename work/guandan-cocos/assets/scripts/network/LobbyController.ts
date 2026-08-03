@@ -1,6 +1,6 @@
 import { _decorator, Component, EventTarget } from 'cc'
 import type { PlayerId } from '../core/generated'
-import type { EngineState } from '../core/generated'
+import type { EngineState, SettlementResult, TributeState } from '../core/generated'
 import { GameSession } from '../session/GameSession'
 import { CocosSocketClient } from './CocosSocketClient'
 
@@ -35,6 +35,9 @@ export class LobbyController extends Component {
       if (message.state) this.events.emit('guandan:network-state', message.state)
       this.session?.beginPlay()
     })
+    this.client.on('roundEnded', (message: Wire<{ result?: SettlementResult }>) => { if (message.result) this.events.emit('guandan:round-ended', message.result) })
+    this.client.on('roundPrepared', (message: Wire<{ state?: EngineState, tribute?: TributeState }>) => { if (message.state) this.events.emit('guandan:round-prepared', { state: message.state, tribute: message.tribute ?? null }) })
+    this.client.on('tributeUpdated', (message: Wire<{ state?: EngineState, tribute?: TributeState }>) => { if (message.state) this.events.emit('guandan:round-prepared', { state: message.state, tribute: message.tribute ?? null }) })
   }
 
   public connect (endpoint: string): void {
@@ -49,6 +52,10 @@ export class LobbyController extends Component {
   public startGame (): void { if (!this.snapshot.roomId) return; this.send('startGame', { roomId: this.snapshot.roomId }) }
   public play (cardIds: string[]): void { if (this.snapshot.roomId) this.send('play', { roomId: this.snapshot.roomId, cardIds }) }
   public pass (): void { if (this.snapshot.roomId) this.send('pass', { roomId: this.snapshot.roomId }) }
+  public nextRound (): void { if (this.snapshot.roomId) this.send('nextRound', { roomId: this.snapshot.roomId }) }
+  public tribute (cardId: string): void { if (this.snapshot.roomId) this.send('tribute', { roomId: this.snapshot.roomId, cardId }) }
+  public returnTribute (cardId: string): void { if (this.snapshot.roomId) this.send('returnTribute', { roomId: this.snapshot.roomId, cardId }) }
+  public finishTribute (): void { if (this.snapshot.roomId) this.send('finishTribute', { roomId: this.snapshot.roomId }) }
   public leaveRoom (): void { if (this.snapshot.roomId) this.send('leaveRoom', { roomId: this.snapshot.roomId }); this.patch({ roomId: null, members: [], myPlayerId: null }); this.session?.leaveToMenu() }
 
   protected onDestroy (): void { this.client.close() }
