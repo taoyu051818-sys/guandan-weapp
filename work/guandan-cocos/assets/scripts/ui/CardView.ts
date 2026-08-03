@@ -1,8 +1,11 @@
-import { Color, Component, Label, Node, UITransform, Vec3, tween } from 'cc'
+import { _decorator, Color, Component, Label, Node, UITransform, Vec3, tween } from 'cc'
 
 export type CardPresentation = { id: string, rank: string, suit: string, red: boolean, selected: boolean }
 
+const { ccclass } = _decorator
+
 /** A code-only fallback card view; replace Label nodes with a card prefab later. */
+@ccclass('CardView')
 export class CardView extends Component {
   private card?: CardPresentation
   private label?: Label
