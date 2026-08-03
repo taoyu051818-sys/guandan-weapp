@@ -124,6 +124,7 @@ export class GameScene extends Component {
     lobby.events.on('guandan:round-ended', this.applyNetworkRoundEnded, this)
     lobby.events.on('guandan:chat', this.applyNetworkChat, this)
     this.chat?.events.on('guandan:chat', this.renderChat, this)
+    this.session?.events.on('guandan:session', this.refreshBackdropTheme, this)
   }
 
   protected start (): void {
@@ -139,6 +140,7 @@ export class GameScene extends Component {
     this.lobby?.events.off('guandan:chat', this.applyNetworkChat, this)
     this.chat?.events.off('guandan:chat', this.renderChat, this)
     this.screen?.events.off('guandan:viewport', this.applyResponsiveLayout, this)
+    this.session?.events.off('guandan:session', this.refreshBackdropTheme, this)
   }
 
   private render (snapshot: GameSnapshot): void {
@@ -366,7 +368,9 @@ export class GameScene extends Component {
     if (!stats) return
     const winRate = stats.gamesPlayed ? Math.round(stats.wins * 100 / stats.gamesPlayed) : 0
     const title = this.makeMenuLabel('玩家数据看板', 0, 205, 42)
-    const values = this.makeMenuLabel(`当前积分  ${stats.elo}\n总场数  ${stats.gamesPlayed}      胜率  ${winRate}%\n头游次数  ${stats.firstPlaceFinishes}      炸弹次数  ${stats.bombsPlayed}`, 0, 92, 26)
+    const recent = this.session?.snapshot.recentMatch
+    const recentText = recent ? `\n最近一局  ${recent.winnerTeam === 'teamA' ? '我方胜利' : '对方胜利'} · ${recent.levelUp >= 0 ? '+' : ''}${recent.levelUp} 级 · ${recent.scores.teamA}:${recent.scores.teamB}` : '\n最近一局  暂无记录'
+    const values = this.makeMenuLabel(`当前积分  ${stats.elo}\n总场数  ${stats.gamesPlayed}      胜率  ${winRate}%\n头游次数  ${stats.firstPlaceFinishes}      炸弹次数  ${stats.bombsPlayed}${recentText}`, 0, 92, 26)
     const back = this.addGroupingButton('返回主菜单', -105, () => this.showMenu())
     this.groupingNodes.push(title.node, values.node, back)
   }
@@ -552,22 +556,27 @@ export class GameScene extends Component {
     const { width, height, halfWidth, halfHeight } = viewport
     transform.setContentSize(width, height)
     graphics.clear()
-    graphics.fillColor = new Color(8, 39, 32, 255)
+    const compact = this.session?.snapshot.settings.visualTheme === 'compact'
+    graphics.fillColor = compact ? new Color(10, 43, 57, 255) : new Color(8, 39, 32, 255)
     graphics.rect(-halfWidth, -halfHeight, width, height)
     graphics.fill()
-    graphics.fillColor = new Color(17, 82, 61, 255)
+    graphics.fillColor = compact ? new Color(18, 72, 89, 255) : new Color(17, 82, 61, 255)
     const tableRx = Math.max(260, halfWidth - 78)
     const tableRy = Math.max(170, halfHeight - 108)
     graphics.ellipse(0, 10, tableRx, tableRy)
     graphics.fill()
-    graphics.strokeColor = new Color(188, 143, 57, 255)
-    graphics.lineWidth = 5
+    graphics.strokeColor = compact ? new Color(103, 190, 208, 255) : new Color(188, 143, 57, 255)
+    graphics.lineWidth = compact ? 3 : 5
     graphics.ellipse(0, 10, tableRx, tableRy)
     graphics.stroke()
-    graphics.strokeColor = new Color(87, 50, 19, 255)
-    graphics.lineWidth = 18
-    graphics.roundRect(-halfWidth + 20, -halfHeight + 20, width - 40, height - 40, 36)
+    graphics.strokeColor = compact ? new Color(20, 55, 68, 255) : new Color(87, 50, 19, 255)
+    graphics.lineWidth = compact ? 10 : 18
+    graphics.roundRect(-halfWidth + 20, -halfHeight + 20, width - 40, height - 40, compact ? 18 : 36)
     graphics.stroke()
+  }
+
+  private refreshBackdropTheme (): void {
+    if (this.screen) this.redrawBackdrop(this.screen.viewport)
   }
 
   private makeButton (name: string, text: string, x: number): Node {
