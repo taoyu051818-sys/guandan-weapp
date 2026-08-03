@@ -18,6 +18,7 @@ export type SessionSettings = {
 
 export type PlayerStats = { gamesPlayed: number, wins: number, bombsPlayed: number, firstPlaceFinishes: number, elo: number }
 export type CampaignProgress = { chapter: number, targetWins: number, wins: number, losses: number, completed: boolean, failed: boolean }
+export type RecentMatch = { finishedAt: number, winnerTeam: Team, levelUp: number, currentLevel: Rank, teamLevels: Record<Team, Rank>, scores: Record<Team, number> }
 
 export type SessionSnapshot = {
   status: SessionStatus
@@ -32,6 +33,7 @@ export type SessionSnapshot = {
   settings: SessionSettings
   playerStats: PlayerStats
   campaignProgress: CampaignProgress | null
+  recentMatch: RecentMatch | null
 }
 
 const { ccclass } = _decorator
@@ -42,7 +44,7 @@ const defaults = (): SessionSnapshot => ({
   difficulty: 'medium', currentLevel: 2, dealerId: null,
   teamLevels: { teamA: 2, teamB: 2 },
   settings: { soundEnabled: true, volume: 0.5, bgmEnabled: true, bgmVolume: 0.3, sortOrder: 'desc', rulePreset: 'classic', visualTheme: 'luxury' },
-  playerStats: { gamesPlayed: 0, wins: 0, bombsPlayed: 0, firstPlaceFinishes: 0, elo: 1000 }, campaignProgress: null,
+  playerStats: { gamesPlayed: 0, wins: 0, bombsPlayed: 0, firstPlaceFinishes: 0, elo: 1000 }, campaignProgress: null, recentMatch: null,
 })
 
 /** Cocos replacement for the desktop Zustand application store. */
@@ -85,7 +87,7 @@ export class GameSession extends Component {
     this.commit()
   }
 
-  public recordRound (winner: Team, wasFirst: boolean, bombCount: number): void {
+  public recordRound (winner: Team, wasFirst: boolean, bombCount: number, recent?: Omit<RecentMatch, 'finishedAt' | 'winnerTeam'>): void {
     const previous = this.snapshot.playerStats
     const myTeam: Team = this.snapshot.myPlayerId === 'p1' || this.snapshot.myPlayerId === 'p3' ? 'teamA' : 'teamB'
     const didWin = winner === myTeam
@@ -93,7 +95,12 @@ export class GameSession extends Component {
       ? { ...this.snapshot.campaignProgress, wins: this.snapshot.campaignProgress.wins + Number(didWin), losses: this.snapshot.campaignProgress.losses + Number(!didWin) }
       : this.snapshot.campaignProgress
     if (campaign) { campaign.completed = campaign.wins >= campaign.targetWins; campaign.failed = campaign.losses >= 2 }
-    this.snapshot = { ...this.snapshot, playerStats: { ...previous, gamesPlayed: previous.gamesPlayed + 1, wins: previous.wins + Number(didWin), bombsPlayed: previous.bombsPlayed + bombCount, firstPlaceFinishes: previous.firstPlaceFinishes + Number(wasFirst), elo: Math.max(0, previous.elo + (didWin ? 16 : -12)) }, campaignProgress: campaign }
+    this.snapshot = {
+      ...this.snapshot,
+      playerStats: { ...previous, gamesPlayed: previous.gamesPlayed + 1, wins: previous.wins + Number(didWin), bombsPlayed: previous.bombsPlayed + bombCount, firstPlaceFinishes: previous.firstPlaceFinishes + Number(wasFirst), elo: Math.max(0, previous.elo + (didWin ? 16 : -12)) },
+      campaignProgress: campaign,
+      recentMatch: recent ? { finishedAt: Date.now(), winnerTeam: winner, ...recent } : this.snapshot.recentMatch,
+    }
     this.commit()
   }
 
