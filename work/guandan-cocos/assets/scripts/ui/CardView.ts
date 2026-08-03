@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Label, Node, UITransform, Vec3, tween } from 'cc'
+import { _decorator, Color, Component, Graphics, Label, Node, UITransform, Vec3, tween } from 'cc'
 
 export type CardPresentation = { id: string, rank: string, suit: string, red: boolean, selected: boolean }
 
@@ -14,8 +14,20 @@ export class CardView extends Component {
     let transform = this.getComponent(UITransform)
     if (!transform) transform = this.addComponent(UITransform)
     transform!.setContentSize(82, 118)
+    const surface = this.getComponent(Graphics) ?? this.addComponent(Graphics)
+    surface!.clear()
+    surface!.fillColor = new Color(249, 245, 232, 255)
+    surface!.strokeColor = new Color(177, 141, 68, 255)
+    surface!.lineWidth = 2
+    surface!.roundRect(-39, -57, 78, 114, 8)
+    surface!.fill()
+    surface!.stroke()
     const label = (this.getComponent(Label) ?? this.addComponent(Label))!
     this.label = label
+    label.fontSize = 24
+    label.lineHeight = 30
+    label.horizontalAlign = Label.HorizontalAlign.CENTER
+    label.verticalAlign = Label.VerticalAlign.CENTER
     this.node.on(Node.EventType.TOUCH_END, this.toggle, this)
   }
 
