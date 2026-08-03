@@ -1,6 +1,7 @@
 import { _decorator, Component, EventTarget, sys } from 'cc'
 import type { PlayerId, Rank, Team } from '../core/generated'
 import type { Difficulty } from '../core/generated/lib/ai'
+import { setRuleProfileByPreset } from '../core/generated/lib/rules'
 
 export type GameMode = 'standard' | 'double_open' | 'campaign'
 export type SessionStatus = 'menu' | 'grouping' | 'dealing' | 'playing' | 'tribute' | 'settlement' | 'lobby'
@@ -77,6 +78,7 @@ export class GameSession extends Component {
 
   public updateSettings (settings: Partial<SessionSettings>): void {
     this.snapshot = { ...this.snapshot, settings: { ...this.snapshot.settings, ...settings } }
+    setRuleProfileByPreset(this.snapshot.settings.rulePreset)
     this.commit()
   }
 
