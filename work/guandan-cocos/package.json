@@ -1,0 +1,7 @@
+{
+  "name": "guandan-cocos",
+  "private": true,
+  "scripts": {
+    "sync:core": "node scripts/sync-core.mjs"
+  }
+}
