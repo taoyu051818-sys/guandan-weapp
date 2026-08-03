@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Label, Node, UITransform, Vec3 } from 'cc'
+import { _decorator, Color, Component, Graphics, Label, Node, UITransform, Vec3 } from 'cc'
 import { GameManager, type GameSnapshot } from '../game/GameManager'
 import { HandController } from '../ui/HandController'
 import { GameSession } from '../session/GameSession'
@@ -52,6 +52,7 @@ export class GameScene extends Component {
   private menuNodes: Node[] = []
   private groupingNodes: Node[] = []
   private groupingResult: GroupingResult | null = null
+  private tutorialStep = 0
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
@@ -134,6 +135,8 @@ export class GameScene extends Component {
     this.addMenuButton('双明牌教学', 5, () => this.beginGrouping('easy', 'double_open'))
     this.addMenuButton('大师挑战', -50, () => this.beginGrouping('master', 'standard'))
     this.addMenuButton('多人联机大厅（开发中）', -105, () => this.session?.enterLobby())
+    this.addMenuButton('新手教程', -160, () => this.showTutorial())
+    this.addMenuButton('游戏设置', -215, () => this.showSettings())
   }
 
   private beginGrouping (difficulty: Difficulty, mode: 'standard' | 'double_open' | 'campaign'): void {
@@ -173,6 +176,49 @@ export class GameScene extends Component {
     this.clearNodes(this.groupingNodes)
     this.setTableVisible(true)
     this.gameManager?.startRound(this.groupingResult?.dealerId)
+  }
+
+  private showTutorial (): void {
+    this.clearNodes(this.menuNodes)
+    this.clearNodes(this.groupingNodes)
+    const steps = [
+      ['游戏目标', '四人两队、两副牌。尽快出完手牌并与对家配合，争取头游和升级。'],
+      ['基本牌型', '单张、对子、三张、三带二、顺子、三连对、钢板、炸弹、同花顺和火箭。'],
+      ['逢人配', '当前级别的红桃牌是逢人配，可在组合中充当除大小王外的任意点数。'],
+      ['进贡与还贡', '上一局末游向赢家进贡最大牌；赢家还一张不超过 10 的牌。大王可触发抗贡。'],
+    ] as const
+    const [title, content] = steps[this.tutorialStep]
+    const heading = this.makeMenuLabel(`新手教程 · ${this.tutorialStep + 1}/${steps.length}`, 0, 190, 38)
+    const titleLabel = this.makeMenuLabel(title, 0, 110, 30)
+    const contentLabel = this.makeMenuLabel(content, 0, 45, 22)
+    const previous = this.addGroupingButton('上一页', -70, () => { this.tutorialStep = Math.max(0, this.tutorialStep - 1); this.showTutorial() })
+    const next = this.addGroupingButton(this.tutorialStep === steps.length - 1 ? '返回主菜单' : '下一页', -140, () => {
+      if (this.tutorialStep === steps.length - 1) this.showMenu()
+      else { this.tutorialStep += 1; this.showTutorial() }
+    })
+    previous.setPosition(new Vec3(-145, -70, 0))
+    next.setPosition(new Vec3(145, -70, 0))
+    this.groupingNodes.push(heading.node, titleLabel.node, contentLabel.node, previous, next)
+  }
+
+  private showSettings (): void {
+    this.clearNodes(this.menuNodes)
+    this.clearNodes(this.groupingNodes)
+    const snapshot = this.session?.snapshot
+    if (!snapshot) return
+    const title = this.makeMenuLabel('游戏设置', 0, 215, 42)
+    const state = this.makeMenuLabel(`AI：${snapshot.difficulty}    手牌：${snapshot.settings.sortOrder === 'desc' ? '大牌在左' : '小牌在左'}    规则：${snapshot.settings.rulePreset === 'classic' ? '经典' : '竞技'}\n主题：${snapshot.settings.visualTheme === 'luxury' ? '华丽' : '简洁'}    音效：${snapshot.settings.soundEnabled ? '开' : '关'}    音乐：${snapshot.settings.bgmEnabled ? '开' : '关'}`, 0, 125, 20)
+    const difficulty = this.addGroupingButton('切换 AI 难度', 50, () => {
+      const levels: Difficulty[] = ['easy', 'medium', 'hard', 'master']
+      const current = levels.indexOf(snapshot.difficulty)
+      this.session?.setDifficulty(levels[(current + 1) % levels.length])
+      this.showSettings()
+    })
+    const order = this.addGroupingButton('切换手牌排序', -10, () => { this.session?.updateSettings({ sortOrder: snapshot.settings.sortOrder === 'desc' ? 'asc' : 'desc' }); this.showSettings() })
+    const rule = this.addGroupingButton('切换规则预设', -70, () => { this.session?.updateSettings({ rulePreset: snapshot.settings.rulePreset === 'classic' ? 'tournament' : 'classic' }); this.showSettings() })
+    const theme = this.addGroupingButton('切换视觉主题', -130, () => { this.session?.updateSettings({ visualTheme: snapshot.settings.visualTheme === 'luxury' ? 'compact' : 'luxury' }); this.showSettings() })
+    const back = this.addGroupingButton('返回主菜单', -190, () => this.showMenu())
+    this.groupingNodes.push(title.node, state.node, difficulty, order, rule, theme, back)
   }
 
   private setTableVisible (visible: boolean): void {
@@ -215,7 +261,15 @@ export class GameScene extends Component {
 
   private makeButton (name: string, text: string, x: number): Node {
     const label = this.makeLabel(name, x, -205, 28)
+    const graphics = label.node.addComponent(Graphics)
+    graphics.fillColor = new Color(74, 50, 21, 235)
+    graphics.strokeColor = new Color(218, 179, 79, 255)
+    graphics.lineWidth = 2
+    graphics.roundRect(-122, -28, 244, 56, 14)
+    graphics.fill()
+    graphics.stroke()
     label.string = `【${text}】`
+    label.color = new Color(245, 224, 156)
     return label.node
   }
 }
