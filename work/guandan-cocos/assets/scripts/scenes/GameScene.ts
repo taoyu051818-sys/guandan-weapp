@@ -152,7 +152,9 @@ export class GameScene extends Component {
         const actions = snapshot.tribute.actions.map(action => `${action.from} → ${action.to}`).join('\n')
         this.overlayLabel.string = `${title}\n${actions}`
       } else if (isSettlement && snapshot.settlement) {
-        this.overlayLabel.string = `${snapshot.settlement.winnerTeam === 'teamA' ? '本局胜利' : '本局失利'}\n${snapshot.settlement.message}\n${snapshot.settlement.fullRank.join(' · ')}`
+        const campaign = this.session?.snapshot.campaignProgress
+        const campaignText = campaign ? `\n战役：${campaign.wins}/${campaign.targetWins} 胜 · ${campaign.losses}/2 负${campaign.completed ? ' · 闯关成功' : campaign.failed ? ' · 闯关失败' : ''}` : ''
+        this.overlayLabel.string = `${snapshot.settlement.winnerTeam === 'teamA' ? '本局胜利' : '本局失利'}\n${snapshot.settlement.message}\n${snapshot.settlement.fullRank.join(' · ')}${campaignText}`
       }
     }
   }
