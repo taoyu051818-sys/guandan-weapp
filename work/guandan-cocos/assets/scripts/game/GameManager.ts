@@ -150,10 +150,12 @@ export class GameManager extends Component {
     this.teamLevels = result.teamLevels
     this.aFailStreaks = result.aFailStreaks
     this.lastRoundRank = result.fullRank
+    this.scores = { ...this.scores, [result.winnerTeam]: this.scores[result.winnerTeam] + result.levelUp }
     this.settlement = result
     this.phase = 'settlement'
     this.selectedCardIds.clear()
     this.session?.setRoundLevels(result.teamLevels, result.currentLevel)
+    this.session?.recordRound(result.winnerTeam, result.fullRank[0] === this.humanId, 0)
     this.session?.beginSettlement()
     this.emitSnapshot(result.message)
   }
