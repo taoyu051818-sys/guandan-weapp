@@ -9,6 +9,7 @@ export class PlayerSeatController extends Component {
   private label: Label | null = null
   private graphics: Graphics | null = null
   private chatLabel: Label | null = null
+  private chatBubble: Node | null = null
 
   protected onLoad (): void {
     const transform = this.getComponent(UITransform) ?? this.addComponent(UITransform)
@@ -43,6 +44,7 @@ export class PlayerSeatController extends Component {
     this.chatLabel.verticalAlign = Label.VerticalAlign.CENTER
     this.chatLabel.color = new Color(43, 48, 49)
     bubble.active = false
+    this.chatBubble = bubble
   }
 
   public render (player: Player, isTurn: boolean, showHand = false, chat?: string): void {
@@ -59,7 +61,7 @@ export class PlayerSeatController extends Component {
     this.label!.string = `${isTurn ? '▶ ' : ''}${player.name}  ·  ${team}\n${showHand ? `明牌 ${player.hand.length} 张` : `剩余手牌 ${player.hand.length} 张`}`
     if (this.chatLabel) {
       this.chatLabel.string = chat ?? ''
-      this.chatLabel.node.active = Boolean(chat)
+      if (this.chatBubble) this.chatBubble.active = Boolean(chat)
     }
   }
 }
