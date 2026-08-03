@@ -1,4 +1,4 @@
-import { Component } from 'cc'
+import { _decorator, Component } from 'cc'
 import { createGame, getPlayInfo, isRoundOver, passTurn, playCards, runAiTurns } from '../core/generated'
 import type { Card, EngineState, PlayerId } from '../core/generated'
 
@@ -8,10 +8,13 @@ export type GameSnapshot = {
   hint: string
 }
 
+const { ccclass } = _decorator
+
 /**
  * Cocos side's single source of interactive round state.  Network clients
  * replace `state` only with snapshots validated by the server.
  */
+@ccclass('GameManager')
 export class GameManager extends Component {
   public state!: EngineState
   public selectedCardIds = new Set<string>()
