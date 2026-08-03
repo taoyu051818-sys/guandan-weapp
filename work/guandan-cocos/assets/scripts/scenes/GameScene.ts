@@ -7,6 +7,7 @@ import type { Difficulty } from '../core/generated/lib/ai'
 import { LobbyController, type LobbySnapshot } from '../network/LobbyController'
 import { PlayerSeatController } from '../ui/PlayerSeatController'
 import { PlayAreaController } from '../ui/PlayAreaController'
+import { CocosAudioController } from '../audio/CocosAudioController'
 
 const { ccclass, property } = _decorator
 
@@ -24,6 +25,9 @@ export class GameScene extends Component {
 
   @property(LobbyController)
   public lobby: LobbyController | null = null
+
+  @property(CocosAudioController)
+  public audio: CocosAudioController | null = null
 
   @property
   public lobbyEndpoint = 'ws://127.0.0.1:3002/weapp'
@@ -78,10 +82,14 @@ export class GameScene extends Component {
     if (!this.gameManager) this.gameManager = this.getComponent(GameManager) ?? this.addComponent(GameManager)
     if (!this.grouping) this.grouping = this.getComponent(GroupingController) ?? this.addComponent(GroupingController)
     if (!this.lobby) this.lobby = this.getComponent(LobbyController) ?? this.addComponent(LobbyController)
+    if (!this.audio) this.audio = this.getComponent(CocosAudioController) ?? this.addComponent(CocosAudioController)
     const manager = this.gameManager!
     const lobby = this.lobby!
+    const audio = this.audio!
     manager.session = this.session
+    manager.audio = audio
     lobby.session = this.session
+    audio.session = this.session
     this.ensureFallbackUi()
     manager.node.on('guandan:state', this.render, this)
     this.hand?.node.on('guandan:card-toggle', manager.toggleCard, manager)
