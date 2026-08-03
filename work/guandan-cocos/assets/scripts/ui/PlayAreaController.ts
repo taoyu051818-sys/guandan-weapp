@@ -3,14 +3,15 @@ import type { PlayAction, PlayerId } from '../core/generated'
 import { CardView } from './CardView'
 
 const { ccclass } = _decorator
-const places: Record<PlayerId, Vec3> = { p1: new Vec3(0, -72, 0), p2: new Vec3(290, 0, 0), p3: new Vec3(0, 112, 0), p4: new Vec3(-290, 0, 0) }
+const order: PlayerId[] = ['p1', 'p2', 'p3', 'p4']
+const relativePlaces = [new Vec3(0, -72, 0), new Vec3(290, 0, 0), new Vec3(0, 112, 0), new Vec3(-290, 0, 0)]
 
 /** Displays each seat's newest action, including pass prompts and played-card fans. */
 @ccclass('PlayAreaController')
 export class PlayAreaController extends Component {
   private actionNodes = new Map<PlayerId, Node>()
 
-  public render (actions: PlayAction[]): void {
+  public render (actions: PlayAction[], humanId: PlayerId = 'p1'): void {
     const latest = new Map<PlayerId, PlayAction>()
     actions.slice(-4).forEach(action => latest.set(action.playerId, action))
     ;(['p1', 'p2', 'p3', 'p4'] as PlayerId[]).forEach(id => {
@@ -20,7 +21,7 @@ export class PlayAreaController extends Component {
       old?.destroy()
       const root = new Node(`play-${id}`)
       root.parent = this.node
-      root.setPosition(places[id])
+      root.setPosition(relativePlaces[(order.indexOf(id) - order.indexOf(humanId) + 4) % 4])
       root.addComponent(UITransform).setContentSize(250, 120)
       this.actionNodes.set(id, root)
       if (action.type === 'Pass') {
