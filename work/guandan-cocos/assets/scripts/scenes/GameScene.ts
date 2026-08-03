@@ -2,6 +2,8 @@ import { _decorator, Color, Component, Label, Node, UITransform, Vec3 } from 'cc
 import { GameManager, type GameSnapshot } from '../game/GameManager'
 import { HandController } from '../ui/HandController'
 import { GameSession } from '../session/GameSession'
+import { GroupingController, type GroupingResult } from '../game/GroupingController'
+import type { Difficulty } from '../core/generated/lib/ai'
 
 const { ccclass, property } = _decorator
 
@@ -13,6 +15,9 @@ export class GameScene extends Component {
 
   @property(GameManager)
   public gameManager: GameManager | null = null
+
+  @property(GroupingController)
+  public grouping: GroupingController | null = null
 
   @property(HandController)
   public hand: HandController | null = null
@@ -44,9 +49,14 @@ export class GameScene extends Component {
   @property(Node)
   public nextRoundButton: Node | null = null
 
+  private menuNodes: Node[] = []
+  private groupingNodes: Node[] = []
+  private groupingResult: GroupingResult | null = null
+
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
     if (!this.gameManager) this.gameManager = this.getComponent(GameManager) ?? this.addComponent(GameManager)
+    if (!this.grouping) this.grouping = this.getComponent(GroupingController) ?? this.addComponent(GroupingController)
     const manager = this.gameManager!
     manager.session = this.session
     this.ensureFallbackUi()
@@ -60,8 +70,7 @@ export class GameScene extends Component {
   }
 
   protected start (): void {
-    // The listener is now bound, so the first deal cannot be missed.
-    this.gameManager?.startRound()
+    this.showMenu()
   }
 
   protected onDestroy (): void {
@@ -113,6 +122,82 @@ export class GameScene extends Component {
     this.confirmTributeButton ??= this.makeButton('ConfirmTributeButton', '确认贡牌', 115)
     this.finishTributeButton ??= this.makeButton('FinishTributeButton', '开始本局', 115)
     this.nextRoundButton ??= this.makeButton('NextRoundButton', '下一局', 115)
+  }
+
+  private showMenu (): void {
+    this.clearNodes(this.groupingNodes)
+    this.setTableVisible(false)
+    const title = this.makeMenuLabel('掼 蛋 大 师', 0, 210, 56)
+    const subtitle = this.makeMenuLabel('THE ROYAL GUANDAN', 0, 145, 18)
+    this.menuNodes.push(title.node, subtitle.node)
+    this.addMenuButton('标准对局', 60, () => this.beginGrouping('medium', 'standard'))
+    this.addMenuButton('双明牌教学', 5, () => this.beginGrouping('easy', 'double_open'))
+    this.addMenuButton('大师挑战', -50, () => this.beginGrouping('master', 'standard'))
+    this.addMenuButton('多人联机大厅（开发中）', -105, () => this.session?.enterLobby())
+  }
+
+  private beginGrouping (difficulty: Difficulty, mode: 'standard' | 'double_open' | 'campaign'): void {
+    this.clearNodes(this.menuNodes)
+    this.session?.beginLocalGame(difficulty, mode)
+    this.showGrouping()
+  }
+
+  private showGrouping (): void {
+    this.clearNodes(this.groupingNodes)
+    const title = this.makeMenuLabel('摸牌定庄', 0, 205, 46)
+    const detail = this.makeMenuLabel('红牌为我方（玩家、对家），黑牌为对方。点数最大者先出。', 0, 125, 22)
+    this.groupingNodes.push(title.node, detail.node)
+    const draw = this.addGroupingButton('摸牌', 20, () => this.drawGrouping())
+    const back = this.addGroupingButton('返回主菜单', -45, () => this.showMenu())
+    this.groupingNodes.push(draw, back)
+  }
+
+  private drawGrouping (): void {
+    const result = this.grouping?.draw(this.session?.snapshot.currentLevel ?? 2)
+    if (!result) return
+    this.groupingResult = result
+    this.session?.completeGrouping(result.dealerId)
+    this.clearNodes(this.groupingNodes)
+    const cards = (['p1', 'p2', 'p3', 'p4'] as const).map(id => {
+      const card = result.draws[id]
+      const suit = card.suit === 'heart' ? '♥' : card.suit === 'diamond' ? '♦' : card.suit === 'spade' ? '♠' : '♣'
+      return `${id === 'p1' ? '玩家' : id === 'p2' ? '下家' : id === 'p3' ? '对家' : '上家'}  ${suit}${card.rank}`
+    }).join('     ')
+    const title = this.makeMenuLabel(`庄家：${result.dealerId === 'p1' ? '玩家' : result.dealerId}`, 0, 160, 36)
+    const summary = this.makeMenuLabel(cards, 0, 90, 24)
+    const enter = this.addGroupingButton('进入对局', -5, () => this.enterRound())
+    this.groupingNodes.push(title.node, summary.node, enter)
+  }
+
+  private enterRound (): void {
+    this.clearNodes(this.groupingNodes)
+    this.setTableVisible(true)
+    this.gameManager?.startRound(this.groupingResult?.dealerId)
+  }
+
+  private setTableVisible (visible: boolean): void {
+    [this.hand?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.playButton, this.passButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton].forEach(node => { if (node) node.active = visible })
+  }
+
+  private clearNodes (nodes: Node[]): void { while (nodes.length) nodes.pop()?.destroy() }
+
+  private makeMenuLabel (text: string, x: number, y: number, fontSize: number): Label {
+    const label = this.makeLabel('MenuLabel', x, y, fontSize)
+    label.string = text
+    label.color = new Color(218, 179, 79)
+    return label
+  }
+
+  private addMenuButton (text: string, y: number, action: () => void): void {
+    const node = this.addGroupingButton(text, y, action)
+    this.menuNodes.push(node)
+  }
+
+  private addGroupingButton (text: string, y: number, action: () => void): Node {
+    const node = this.makeButton('MenuButton', text, 0)
+    node.setPosition(new Vec3(0, y, 0))
+    node.on(Node.EventType.TOUCH_END, action, this)
+    return node
   }
 
   private makeLabel (name: string, x: number, y: number, fontSize: number): Label {
