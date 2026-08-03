@@ -1,0 +1,12 @@
+# Cocos Creator 3.8 generated directories
+/library/
+/temp/
+/local/
+/build/
+/profiles/
+/native/engine/android/**/*/assets
+
+# Dependencies and editor workspace files
+node_modules/
+.vscode/
+.idea/
