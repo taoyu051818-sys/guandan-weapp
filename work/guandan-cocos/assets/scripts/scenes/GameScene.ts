@@ -134,7 +134,7 @@ export class GameScene extends Component {
   private render (snapshot: GameSnapshot): void {
     this.latestSnapshot = snapshot
     const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
-    this.hand?.render(snapshot.state.players[humanId].hand, snapshot.selectedCardIds)
+    this.hand?.render(snapshot.state.players[humanId].hand, snapshot.selectedCardIds, this.session?.snapshot.settings.sortOrder)
     this.playArea?.render(snapshot.state.playArea, humanId)
     this.layoutSeats(humanId)
     ;(['p1', 'p2', 'p3', 'p4'] as const).forEach(id => {
@@ -323,18 +323,24 @@ export class GameScene extends Component {
     const snapshot = this.session?.snapshot
     if (!snapshot) return
     const title = this.makeMenuLabel('游戏设置', 0, 215, 42)
-    const state = this.makeMenuLabel(`AI：${snapshot.difficulty}    手牌：${snapshot.settings.sortOrder === 'desc' ? '大牌在左' : '小牌在左'}    规则：${snapshot.settings.rulePreset === 'classic' ? '经典' : '竞技'}\n主题：${snapshot.settings.visualTheme === 'luxury' ? '华丽' : '简洁'}    音效：${snapshot.settings.soundEnabled ? '开' : '关'}    音乐：${snapshot.settings.bgmEnabled ? '开' : '关'}`, 0, 125, 20)
-    const difficulty = this.addGroupingButton('切换 AI 难度', 50, () => {
+    const state = this.makeMenuLabel(`AI：${snapshot.difficulty}    手牌：${snapshot.settings.sortOrder === 'desc' ? '大牌在左' : '小牌在左'}    规则：${snapshot.settings.rulePreset === 'classic' ? '经典' : '竞技'}\n主题：${snapshot.settings.visualTheme === 'luxury' ? '华丽' : '简洁'}    音效：${snapshot.settings.soundEnabled ? `${Math.round(snapshot.settings.volume * 100)}%` : '关'}    音乐：${snapshot.settings.bgmEnabled ? `${Math.round(snapshot.settings.bgmVolume * 100)}%` : '关'}`, 0, 145, 20)
+    const difficulty = this.addGroupingButton('切换 AI 难度', 70, () => {
       const levels: Difficulty[] = ['easy', 'medium', 'hard', 'master']
       const current = levels.indexOf(snapshot.difficulty)
       this.session?.setDifficulty(levels[(current + 1) % levels.length])
       this.showSettings()
     })
-    const order = this.addGroupingButton('切换手牌排序', -10, () => { this.session?.updateSettings({ sortOrder: snapshot.settings.sortOrder === 'desc' ? 'asc' : 'desc' }); this.showSettings() })
-    const rule = this.addGroupingButton('切换规则预设', -70, () => { this.session?.updateSettings({ rulePreset: snapshot.settings.rulePreset === 'classic' ? 'tournament' : 'classic' }); this.showSettings() })
-    const theme = this.addGroupingButton('切换视觉主题', -130, () => { this.session?.updateSettings({ visualTheme: snapshot.settings.visualTheme === 'luxury' ? 'compact' : 'luxury' }); this.showSettings() })
-    const back = this.addGroupingButton('返回主菜单', -190, () => this.showMenu())
-    this.groupingNodes.push(title.node, state.node, difficulty, order, rule, theme, back)
+    const order = this.addGroupingButton('切换手牌排序', 70, () => { this.session?.updateSettings({ sortOrder: snapshot.settings.sortOrder === 'desc' ? 'asc' : 'desc' }); this.showSettings() })
+    const rule = this.addGroupingButton('切换规则预设', 5, () => { this.session?.updateSettings({ rulePreset: snapshot.settings.rulePreset === 'classic' ? 'tournament' : 'classic' }); this.showSettings() })
+    const theme = this.addGroupingButton('切换视觉主题', 5, () => { this.session?.updateSettings({ visualTheme: snapshot.settings.visualTheme === 'luxury' ? 'compact' : 'luxury' }); this.showSettings() })
+    const sound = this.addGroupingButton(snapshot.settings.soundEnabled ? '关闭音效' : '开启音效', -60, () => { this.session?.updateSettings({ soundEnabled: !snapshot.settings.soundEnabled }); this.showSettings() })
+    const bgm = this.addGroupingButton(snapshot.settings.bgmEnabled ? '关闭音乐' : '开启音乐', -60, () => { this.session?.updateSettings({ bgmEnabled: !snapshot.settings.bgmEnabled }); this.showSettings() })
+    const soundVolume = this.addGroupingButton(`音效音量 ${Math.round(snapshot.settings.volume * 100)}%`, -125, () => { this.session?.updateSettings({ volume: Number(((snapshot.settings.volume + 0.1) % 1.1).toFixed(1)) }); this.showSettings() })
+    const musicVolume = this.addGroupingButton(`音乐音量 ${Math.round(snapshot.settings.bgmVolume * 100)}%`, -125, () => { this.session?.updateSettings({ bgmVolume: Number(((snapshot.settings.bgmVolume + 0.1) % 1.1).toFixed(1)) }); this.showSettings() })
+    const back = this.addGroupingButton('返回主菜单', -205, () => this.showMenu())
+    ;[difficulty, rule, sound, soundVolume].forEach(node => node.setPosition(new Vec3(-145, node.position.y, 0)))
+    ;[order, theme, bgm, musicVolume].forEach(node => node.setPosition(new Vec3(145, node.position.y, 0)))
+    this.groupingNodes.push(title.node, state.node, difficulty, order, rule, theme, sound, bgm, soundVolume, musicVolume, back)
   }
 
   private showStats (): void {
