@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "outDir": ".tmp-sim",
+    "rootDir": "."
+  },
+  "include": [
+    "scripts/*.ts",
+    "src/lib/ai.ts",
+    "src/lib/rules.ts",
+    "src/lib/deck.ts",
+    "src/types/game.ts"
+  ]
+}
