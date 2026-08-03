@@ -1,6 +1,9 @@
-import { Component, UITransform, Vec3, view } from 'cc'
+import { _decorator, Component, UITransform, Vec3, view } from 'cc'
+
+const { ccclass } = _decorator
 
 /** Keeps the table inside safe horizontal bounds on 16:9, 19.5:9 and tablets. */
+@ccclass('TableLayout')
 export class TableLayout extends Component {
   private readonly designWidth = 1280
   private readonly designHeight = 720
