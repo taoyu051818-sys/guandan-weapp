@@ -1,5 +1,5 @@
 import { _decorator, Component } from 'cc'
-import { createGame, createTribute, dealNextRound, getPlayInfo, giveTribute, highestCard, isRoundOver, lowestCard, passTurn, playCards, returnTribute, runAiTurns, settle, tributeLeader } from '../core/generated'
+import { createGame, createTribute, dealNextRound, getPlayInfo, getPossiblePlays, giveTribute, highestCard, isRoundOver, lowestCard, passTurn, playCards, returnTribute, runAiTurns, settle, tributeLeader } from '../core/generated'
 import type { Card, EngineState, PlayerId, Rank, SettlementResult, Team, TributeState } from '../core/generated'
 import { GameSession } from '../session/GameSession'
 
@@ -33,6 +33,7 @@ export class GameManager extends Component {
   public lastRoundRank: PlayerId[] = []
   public tribute: TributeState | null = null
   public settlement: SettlementResult | null = null
+  private hintIndex = 0
 
   public startRound (dealer?: PlayerId): void {
     const session = this.session ?? this.getComponent(GameSession)
@@ -86,6 +87,22 @@ export class GameManager extends Component {
     } catch (error) {
       this.emitSnapshot(error instanceof Error ? error.message : '当前不能不要')
     }
+  }
+
+  /** Cycles legal human plays, preserving the desktop HandArea hint behavior. */
+  public hint (): void {
+    if (this.phase !== 'playing' || this.state.currentTurn !== 'p1') return
+    const choices = getPossiblePlays(this.state.players.p1.hand, this.state.lastValidPlay, this.session?.snapshot.difficulty ?? 'medium')
+    if (!choices.length) return this.emitSnapshot('没有可用提示，请选择不要')
+    const choice = choices[this.hintIndex++ % choices.length]
+    this.selectedCardIds = new Set(choice.map(card => card.id))
+    const info = getPlayInfo(choice)
+    this.emitSnapshot(info ? `提示：${info.type}` : '已选择可出牌组')
+  }
+
+  public clearSelected (): void {
+    this.selectedCardIds.clear()
+    this.emitSnapshot('已重置选择')
   }
 
   /** Called by the WebSocket adapter after service-authoritative state sync. */
