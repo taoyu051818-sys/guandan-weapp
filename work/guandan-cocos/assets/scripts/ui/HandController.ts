@@ -1,8 +1,12 @@
-import { Component, instantiate, Node, Prefab, Vec3 } from 'cc'
+import { _decorator, Component, instantiate, Node, Prefab, Vec3 } from 'cc'
 import type { Card } from '../core/generated'
 import { CardView } from './CardView'
 
+const { ccclass, property } = _decorator
+
+@ccclass('HandController')
 export class HandController extends Component {
+  @property(Prefab)
   public cardPrefab: Prefab | null = null
   private cards = new Map<string, Node>()
 
