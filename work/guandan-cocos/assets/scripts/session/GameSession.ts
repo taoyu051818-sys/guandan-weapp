@@ -54,6 +54,8 @@ export class GameSession extends Component {
     this.commit()
   }
 
+  public setDifficulty (difficulty: Difficulty): void { this.snapshot = { ...this.snapshot, difficulty }; this.commit() }
+
   public enterLobby (): void { this.snapshot = { ...this.snapshot, status: 'lobby', isMultiplayer: true }; this.commit() }
   public joinRoom (roomId: string): void { this.snapshot = { ...this.snapshot, status: 'grouping', isMultiplayer: true, roomId }; this.commit() }
   public leaveToMenu (): void { this.snapshot = { ...this.snapshot, status: 'menu', roomId: null, isMultiplayer: false }; this.commit() }
