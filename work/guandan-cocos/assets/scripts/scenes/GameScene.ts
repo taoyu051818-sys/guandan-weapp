@@ -53,6 +53,12 @@ export class GameScene extends Component {
   public passButton: Node | null = null
 
   @property(Node)
+  public hintButton: Node | null = null
+
+  @property(Node)
+  public resetButton: Node | null = null
+
+  @property(Node)
   public confirmTributeButton: Node | null = null
 
   @property(Node)
@@ -81,6 +87,8 @@ export class GameScene extends Component {
     this.hand?.node.on('guandan:card-toggle', manager.toggleCard, manager)
     this.playButton?.on(Node.EventType.TOUCH_END, manager.playSelected, manager)
     this.passButton?.on(Node.EventType.TOUCH_END, manager.pass, manager)
+    this.hintButton?.on(Node.EventType.TOUCH_END, manager.hint, manager)
+    this.resetButton?.on(Node.EventType.TOUCH_END, manager.clearSelected, manager)
     this.confirmTributeButton?.on(Node.EventType.TOUCH_END, manager.confirmTribute, manager)
     this.finishTributeButton?.on(Node.EventType.TOUCH_END, manager.finishTribute, manager)
     this.nextRoundButton?.on(Node.EventType.TOUCH_END, manager.nextRound, manager)
@@ -109,6 +117,8 @@ export class GameScene extends Component {
     const isSettlement = snapshot.phase === 'settlement'
     if (this.playButton) this.playButton.active = isPlaying
     if (this.passButton) this.passButton.active = isPlaying
+    if (this.hintButton) this.hintButton.active = isPlaying
+    if (this.resetButton) this.resetButton.active = isPlaying
     if (this.confirmTributeButton) this.confirmTributeButton.active = isTribute && !snapshot.tribute?.isAntiTribute && snapshot.tribute?.phase !== 'done'
     if (this.finishTributeButton) this.finishTributeButton.active = isTribute && Boolean(snapshot.tribute?.isAntiTribute || snapshot.tribute?.phase === 'done')
     if (this.nextRoundButton) this.nextRoundButton.active = isSettlement
@@ -151,11 +161,13 @@ export class GameScene extends Component {
     this.phaseLabel ??= this.makeLabel('Phase', 0, 282, 30)
     this.scoreLabel ??= this.makeLabel('Score', 0, 232, 22)
     this.overlayLabel ??= this.makeLabel('Overlay', 0, 42, 30)
-    this.playButton ??= this.makeButton('PlayButton', '出牌', -115)
-    this.passButton ??= this.makeButton('PassButton', '不要', 0)
-    this.confirmTributeButton ??= this.makeButton('ConfirmTributeButton', '确认贡牌', 115)
-    this.finishTributeButton ??= this.makeButton('FinishTributeButton', '开始本局', 115)
-    this.nextRoundButton ??= this.makeButton('NextRoundButton', '下一局', 115)
+    this.passButton ??= this.makeButton('PassButton', '不要', -185)
+    this.hintButton ??= this.makeButton('HintButton', '提示', -62)
+    this.resetButton ??= this.makeButton('ResetButton', '重置', 62)
+    this.playButton ??= this.makeButton('PlayButton', '出牌', 185)
+    this.confirmTributeButton ??= this.makeButton('ConfirmTributeButton', '确认贡牌', 0)
+    this.finishTributeButton ??= this.makeButton('FinishTributeButton', '开始本局', 0)
+    this.nextRoundButton ??= this.makeButton('NextRoundButton', '下一局', 0)
   }
 
   private showMenu (): void {
@@ -291,7 +303,7 @@ export class GameScene extends Component {
   }
 
   private setTableVisible (visible: boolean): void {
-    [this.hand?.node, this.playArea?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.playButton, this.passButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, ...[...this.playerSeats.values()].map(seat => seat.node)].forEach(node => { if (node) node.active = visible })
+    [this.hand?.node, this.playArea?.node, this.hintLabel?.node, this.phaseLabel?.node, this.scoreLabel?.node, this.overlayLabel?.node, this.playButton, this.passButton, this.hintButton, this.resetButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, ...[...this.playerSeats.values()].map(seat => seat.node)].forEach(node => { if (node) node.active = visible })
   }
 
   private clearNodes (nodes: Node[]): void { while (nodes.length) nodes.pop()?.destroy() }
