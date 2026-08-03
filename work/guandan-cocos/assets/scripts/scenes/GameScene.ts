@@ -1,12 +1,16 @@
 import { _decorator, Color, Component, Label, Node, UITransform, Vec3 } from 'cc'
 import { GameManager, type GameSnapshot } from '../game/GameManager'
 import { HandController } from '../ui/HandController'
+import { GameSession } from '../session/GameSession'
 
 const { ccclass, property } = _decorator
 
 /** Attach this to the Game scene root and bind editor nodes in the Inspector. */
 @ccclass('GameScene')
 export class GameScene extends Component {
+  @property(GameSession)
+  public session: GameSession | null = null
+
   @property(GameManager)
   public gameManager: GameManager | null = null
 
@@ -41,8 +45,10 @@ export class GameScene extends Component {
   public nextRoundButton: Node | null = null
 
   protected onLoad (): void {
+    if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
     if (!this.gameManager) this.gameManager = this.getComponent(GameManager) ?? this.addComponent(GameManager)
     const manager = this.gameManager!
+    manager.session = this.session
     this.ensureFallbackUi()
     manager.node.on('guandan:state', this.render, this)
     this.hand?.node.on('guandan:card-toggle', manager.toggleCard, manager)
