@@ -1,6 +1,7 @@
 import { _decorator, Component } from 'cc'
 import { createGame, createTribute, dealNextRound, getPlayInfo, giveTribute, highestCard, isRoundOver, lowestCard, passTurn, playCards, returnTribute, runAiTurns, settle, tributeLeader } from '../core/generated'
 import type { Card, EngineState, PlayerId, Rank, SettlementResult, Team, TributeState } from '../core/generated'
+import { GameSession } from '../session/GameSession'
 
 export type GameSnapshot = {
   state: EngineState
@@ -13,7 +14,7 @@ export type GameSnapshot = {
   settlement: SettlementResult | null
 }
 
-const { ccclass } = _decorator
+const { ccclass, property } = _decorator
 
 /**
  * Cocos side's single source of interactive round state.  Network clients
@@ -21,6 +22,8 @@ const { ccclass } = _decorator
  */
 @ccclass('GameManager')
 export class GameManager extends Component {
+  @property(GameSession)
+  public session: GameSession | null = null
   public state!: EngineState
   public selectedCardIds = new Set<string>()
   public phase: 'playing' | 'tribute' | 'settlement' = 'playing'
@@ -31,16 +34,20 @@ export class GameManager extends Component {
   public tribute: TributeState | null = null
   public settlement: SettlementResult | null = null
 
-  public startRound (dealer: PlayerId = 'p1'): void {
-    this.state = createGame(2, dealer)
+  public startRound (dealer?: PlayerId): void {
+    const session = this.session ?? this.getComponent(GameSession)
+    const level = session?.snapshot.currentLevel ?? 2
+    const roundDealer = dealer ?? session?.snapshot.dealerId ?? 'p1'
+    this.state = createGame(level, roundDealer)
     this.selectedCardIds.clear()
     this.phase = 'playing'
-    this.teamLevels = { teamA: 2, teamB: 2 }
+    this.teamLevels = session?.snapshot.teamLevels ?? { teamA: 2, teamB: 2 }
     this.aFailStreaks = { teamA: 0, teamB: 0 }
     this.scores = { teamA: 0, teamB: 0 }
     this.lastRoundRank = []
     this.tribute = null
     this.settlement = null
+    session?.beginPlay()
     this.emitSnapshot('新对局开始，轮到你出牌')
   }
 
@@ -101,10 +108,12 @@ export class GameManager extends Component {
     this.selectedCardIds.clear()
     if (!this.tribute) {
       this.phase = 'playing'
+      this.session?.beginPlay()
       this.finishHumanAction()
       return
     }
     this.phase = 'tribute'
+    this.session?.beginTribute()
     this.runTributeAi()
     this.emitSnapshot(this.tribute.isAntiTribute ? '抗贡成立，请开始本局' : '请完成进贡与还贡')
   }
@@ -136,6 +145,7 @@ export class GameManager extends Component {
     this.state = { ...this.state, currentTurn: tributeLeader(this.tribute, this.lastRoundRank, this.lastRoundRank[0] ?? 'p1'), lastValidPlay: null }
     this.tribute = null
     this.phase = 'playing'
+    this.session?.beginPlay()
     this.selectedCardIds.clear()
     this.finishHumanAction()
   }
@@ -146,7 +156,7 @@ export class GameManager extends Component {
 
   private finishHumanAction (): void {
     if (this.maybeSettle()) return
-    this.state = runAiTurns(this.state, 'medium', 60)
+    this.state = runAiTurns(this.state, this.session?.snapshot.difficulty ?? 'medium', 60)
     if (this.maybeSettle()) return
     this.emitSnapshot(this.state.currentTurn === 'p1' ? '轮到你出牌' : '电脑正在思考')
   }
@@ -162,6 +172,9 @@ export class GameManager extends Component {
     this.settlement = result
     this.phase = 'settlement'
     this.selectedCardIds.clear()
+    this.session?.setRoundLevels(this.teamLevels, result.currentLevel)
+    this.session?.recordRound(result.winnerTeam, result.fullRank[0] === 'p1', this.state.playArea.filter(action => action.type === 'Bomb' || action.type === 'StraightFlush' || action.type === 'Rocket').length)
+    this.session?.beginSettlement()
     this.emitSnapshot(result.message)
     return true
   }
