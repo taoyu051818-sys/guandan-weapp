@@ -33,7 +33,8 @@ export class GameScene extends Component {
   public audio: CocosAudioController | null = null
 
   @property
-  public lobbyEndpoint = 'ws://127.0.0.1:3002/weapp'
+  /** Production must set a wss:// endpoint in the Inspector or build profile. */
+  public lobbyEndpoint = ''
 
   @property(HandController)
   public hand: HandController | null = null
@@ -121,6 +122,7 @@ export class GameScene extends Component {
     lobby.events.on('guandan:network-state', this.applyNetworkState, this)
     lobby.events.on('guandan:round-prepared', this.applyNetworkRoundPrepared, this)
     lobby.events.on('guandan:round-ended', this.applyNetworkRoundEnded, this)
+    lobby.events.on('guandan:chat', this.applyNetworkChat, this)
     this.chat?.events.on('guandan:chat', this.renderChat, this)
   }
 
@@ -134,6 +136,7 @@ export class GameScene extends Component {
     this.lobby?.events.off('guandan:network-state', this.applyNetworkState, this)
     this.lobby?.events.off('guandan:round-prepared', this.applyNetworkRoundPrepared, this)
     this.lobby?.events.off('guandan:round-ended', this.applyNetworkRoundEnded, this)
+    this.lobby?.events.off('guandan:chat', this.applyNetworkChat, this)
     this.chat?.events.off('guandan:chat', this.renderChat, this)
     this.screen?.events.off('guandan:viewport', this.applyResponsiveLayout, this)
   }
@@ -201,6 +204,12 @@ export class GameScene extends Component {
   private applyNetworkRoundEnded (result: NonNullable<GameSnapshot['settlement']>): void {
     this.setTableVisible(true)
     this.gameManager?.applyNetworkRoundEnded(result)
+  }
+
+  private applyNetworkChat (packet: { playerId: PlayerId, text: string }): void {
+    const phrase = QUICK_CHAT_PHRASES.find(item => item.text === packet.text)
+    this.chat?.show(packet.playerId, packet.text, phrase?.voice ?? '')
+    if (phrase) this.audio?.playVoice(phrase.voice)
   }
 
   /** Lets the first playable scene run before the art prefabs are bound in Creator. */
@@ -367,6 +376,10 @@ export class GameScene extends Component {
     this.clearNodes(this.groupingNodes)
     this.setTableVisible(false)
     this.session?.enterLobby()
+    if (!this.lobbyEndpoint) {
+      this.renderLobby({ connected: false, rooms: [], roomId: null, members: [], myPlayerId: null, error: '未配置联机服务地址：请在 GameRoot 的 lobbyEndpoint 填入 wss:// 域名（本地开发可填 ws://局域网IP:3002/weapp）' })
+      return
+    }
     this.lobby?.connect(this.lobbyEndpoint)
     this.renderLobby(this.lobby?.snapshot ?? { connected: false, rooms: [], roomId: null, members: [], myPlayerId: null, error: null })
   }
@@ -453,8 +466,11 @@ export class GameScene extends Component {
       const node = this.makeChatButton(phrase.text, this.screen?.safeLeftX(220) ?? -415, (this.screen?.safeBottomY(480) ?? 115) - index * 48)
       node.on(Node.EventType.TOUCH_END, () => {
         const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
-        this.chat?.send(humanId, phrase)
-        this.audio?.playVoice(phrase.voice)
+        if (this.session?.snapshot.isMultiplayer) this.lobby?.chat(phrase.text)
+        else {
+          this.chat?.send(humanId, phrase)
+          this.audio?.playVoice(phrase.voice)
+        }
         this.clearNodes(this.chatNodes)
       }, this)
       this.chatNodes.push(node)
