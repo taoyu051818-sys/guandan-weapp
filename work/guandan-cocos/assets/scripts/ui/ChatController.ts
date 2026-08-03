@@ -22,7 +22,11 @@ export class ChatController extends Component {
   private nextId = 1
 
   public send (playerId: PlayerId, phrase: typeof QUICK_CHAT_PHRASES[number]): void {
-    const chat: QuickChat = { id: this.nextId++, playerId, message: phrase.text, voice: phrase.voice }
+    this.show(playerId, phrase.text, phrase.voice)
+  }
+
+  public show (playerId: PlayerId, message: string, voice = ''): void {
+    const chat: QuickChat = { id: this.nextId++, playerId, message, voice }
     this.messages.set(playerId, chat)
     this.events.emit('guandan:chat', chat)
     this.scheduleClear(chat)
