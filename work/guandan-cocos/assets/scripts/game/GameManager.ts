@@ -135,8 +135,32 @@ export class GameManager extends Component {
     this.emitSnapshot(hint)
   }
 
+  public applyNetworkRoundPrepared (state: EngineState, tribute: TributeState | null): void {
+    this.state = state
+    this.tribute = tribute
+    this.phase = tribute ? 'tribute' : 'playing'
+    this.settlement = null
+    this.selectedCardIds.clear()
+    if (tribute) this.session?.beginTribute()
+    else this.session?.beginPlay()
+    this.emitSnapshot(tribute ? (tribute.isAntiTribute ? '抗贡成立，等待开始本局' : '请完成进贡与还贡') : '本局开始')
+  }
+
+  public applyNetworkRoundEnded (result: SettlementResult): void {
+    this.teamLevels = result.teamLevels
+    this.aFailStreaks = result.aFailStreaks
+    this.lastRoundRank = result.fullRank
+    this.settlement = result
+    this.phase = 'settlement'
+    this.selectedCardIds.clear()
+    this.session?.setRoundLevels(result.teamLevels, result.currentLevel)
+    this.session?.beginSettlement()
+    this.emitSnapshot(result.message)
+  }
+
   public nextRound (): void {
     if (this.phase !== 'settlement' || !this.settlement) return
+    if (this.session?.snapshot.isMultiplayer) { this.lobby?.nextRound(); return }
     if (this.settlement.isGameWon) {
       this.startRound()
       return
@@ -164,12 +188,18 @@ export class GameManager extends Component {
       const cards = this.selectedCards()
       if (cards.length !== 1) throw new Error('请选择一张牌')
       const action = this.tribute.phase === 'tributing'
-        ? this.tribute.actions.find(item => item.from === 'p1' && !item.card)
-        : this.tribute.actions.find(item => item.to === 'p1' && !item.returnCard)
+        ? this.tribute.actions.find(item => item.from === this.humanId && !item.card)
+        : this.tribute.actions.find(item => item.to === this.humanId && !item.returnCard)
       if (!action) throw new Error('当前等待其他玩家操作')
+      if (this.session?.snapshot.isMultiplayer) {
+        if (this.tribute.phase === 'tributing') this.lobby?.tribute(cards[0].id)
+        else this.lobby?.returnTribute(cards[0].id)
+        this.selectedCardIds.clear()
+        return
+      }
       const result = this.tribute.phase === 'tributing'
-        ? giveTribute(this.state, this.tribute, 'p1', cards[0].id)
-        : returnTribute(this.state, this.tribute, 'p1', cards[0].id)
+        ? giveTribute(this.state, this.tribute, this.humanId, cards[0].id)
+        : returnTribute(this.state, this.tribute, this.humanId, cards[0].id)
       this.state = result.state
       this.tribute = result.tribute
       this.selectedCardIds.clear()
@@ -182,6 +212,7 @@ export class GameManager extends Component {
 
   public finishTribute (): void {
     if (this.phase !== 'tribute' || !this.tribute || (!this.tribute.isAntiTribute && this.tribute.phase !== 'done')) return
+    if (this.session?.snapshot.isMultiplayer) { this.lobby?.finishTribute(); return }
     this.state = { ...this.state, currentTurn: tributeLeader(this.tribute, this.lastRoundRank, this.lastRoundRank[0] ?? 'p1'), lastValidPlay: null }
     this.tribute = null
     this.phase = 'playing'
