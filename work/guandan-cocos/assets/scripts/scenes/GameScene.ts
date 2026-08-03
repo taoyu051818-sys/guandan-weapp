@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Graphics, Label, Node, UITransform, Vec3 } from 'cc'
+import { _decorator, Color, Component, EditBox, Graphics, Label, Node, UITransform, Vec3 } from 'cc'
 import { GameManager, type GameSnapshot } from '../game/GameManager'
 import { HandController } from '../ui/HandController'
 import { GameSession } from '../session/GameSession'
@@ -88,6 +88,7 @@ export class GameScene extends Component {
   private latestSnapshot: GameSnapshot | null = null
   private hurryScheduled = false
   private screen: ScreenAdapter | null = null
+  private roomCodeInput: EditBox | null = null
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession) ?? this.addComponent(GameSession)
@@ -391,6 +392,7 @@ export class GameScene extends Component {
   private renderLobby (snapshot: LobbySnapshot): void {
     if (this.session?.snapshot.status !== 'lobby') return
     this.clearNodes(this.groupingNodes)
+    this.roomCodeInput = null
     const title = this.makeMenuLabel('多人联机大厅', 0, 220, 42)
     const state = this.makeMenuLabel(snapshot.error ?? (snapshot.connected ? `服务已连接 · ${snapshot.roomId ? `房间 ${snapshot.roomId} · ${snapshot.members.length}/4` : '发现附近房间'}` : '正在连接服务…'), 0, 165, 19)
     this.groupingNodes.push(title.node, state.node)
@@ -405,9 +407,12 @@ export class GameScene extends Component {
     } else {
       const create = this.addGroupingButton('创建六位房间', 95, () => this.lobby?.createRoom())
       const refresh = this.addGroupingButton('刷新房间列表', 35, () => this.lobby?.refreshRooms())
-      this.groupingNodes.push(create, refresh)
+      const input = this.makeRoomCodeInput(0, -28)
+      const joinInput = this.addGroupingButton('加入输入的房间', -85, () => this.lobby?.joinRoom(this.roomCodeInput?.string.trim() ?? ''))
+      this.roomCodeInput = input.getComponentInChildren(EditBox)
+      this.groupingNodes.push(create, refresh, input, joinInput)
       snapshot.rooms.slice(0, 3).forEach((room, index) => {
-        const join = this.addGroupingButton(`加入 ${room.hostName} 的房间 ${room.roomId}（${room.playerCount}/4）`, -35 - index * 55, () => this.lobby?.joinRoom(room.roomId))
+        const join = this.addGroupingButton(`加入 ${room.hostName} 的房间 ${room.roomId}（${room.playerCount}/4）`, -140 - index * 48, () => this.lobby?.joinRoom(room.roomId))
         this.groupingNodes.push(join)
       })
     }
@@ -626,6 +631,46 @@ export class GameScene extends Component {
     label.verticalAlign = Label.VerticalAlign.CENTER
     label.string = text
     label.color = new Color(245, 239, 215)
+    return node
+  }
+
+  /** Native edit field for the desktop Lobby's direct six-digit room-code join. */
+  private makeRoomCodeInput (x: number, y: number): Node {
+    const node = new Node('RoomCodeInput')
+    node.parent = this.node
+    node.setPosition(new Vec3(x, y, 0))
+    node.addComponent(UITransform).setContentSize(330, 50)
+    const graphics = node.addComponent(Graphics)
+    graphics.fillColor = new Color(12, 29, 32, 235)
+    graphics.strokeColor = new Color(188, 143, 57, 220)
+    graphics.lineWidth = 2
+    graphics.roundRect(-165, -25, 330, 50, 12)
+    graphics.fill()
+    graphics.stroke()
+    const editNode = new Node('RoomCodeEdit')
+    editNode.parent = node
+    editNode.addComponent(UITransform).setContentSize(300, 42)
+    const edit = editNode.addComponent(EditBox)
+    edit.maxLength = 6
+    edit.inputMode = EditBox.InputMode.NUMERIC
+    const inputText = new Node('InputText')
+    inputText.parent = editNode
+    inputText.addComponent(UITransform).setContentSize(280, 38)
+    const textLabel = inputText.addComponent(Label)
+    textLabel.fontSize = 22
+    textLabel.lineHeight = 28
+    textLabel.horizontalAlign = Label.HorizontalAlign.CENTER
+    edit.textLabel = textLabel
+    const placeholder = new Node('Placeholder')
+    placeholder.parent = editNode
+    placeholder.addComponent(UITransform).setContentSize(280, 38)
+    const placeholderLabel = placeholder.addComponent(Label)
+    placeholderLabel.fontSize = 20
+    placeholderLabel.lineHeight = 26
+    placeholderLabel.horizontalAlign = Label.HorizontalAlign.CENTER
+    placeholderLabel.color = new Color(160, 180, 176)
+    edit.placeholderLabel = placeholderLabel
+    edit.placeholder = '输入六位房间号'
     return node
   }
 }
