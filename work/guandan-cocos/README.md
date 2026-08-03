@@ -4,9 +4,9 @@
 
 ## 打开方式
 
-1. 使用 Cocos Creator 3.8+ 导入本目录。
+1. 使用 Cocos Creator 3.8.8 导入本目录。
 2. 运行 `node scripts/sync-core.mjs`，将共享核心同步到 `assets/scripts/core/generated`。
-3. 在 Creator 中新建横屏场景 `assets/scenes/Game.scene`，根节点挂载 `GameScene`，并放置 `Canvas`。
+3. 在 Creator 中新建横屏场景 `assets/scenes/Game.scene`，根节点挂载 `GameScene`，并放置 `Canvas`。在 Project Settings 的屏幕设置中选择横屏；通过 Inspector 绑定 `GameManager`、`HandController`、提示文本和操作按钮；这些组件均已使用 `@ccclass` / `@property` 注册，符合 Creator 场景序列化规范。
 4. 构建目标选择「微信小游戏」。
 
 `GameScene`、`GameManager`、`HandController` 和 `TableLayout` 已经提供：
