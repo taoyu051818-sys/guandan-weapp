@@ -12,7 +12,7 @@ type RuntimeIntelLike = {
 
 type MasterDeps = {
   getMinEnemyHand: (players: Record<PlayerId, Player>, myTeam: Team) => number;
-  getEnemyPressureModel: (players: Record<PlayerId, Player>, myTeam: Team) => { sprintRisk: number; baitRisk: number };
+  getEnemyPressureModel: (players: Record<PlayerId, Player>, myTeam: Team, teammateId: PlayerId) => { sprintRisk: number; baitRisk: number };
   getRankCounts: (cards: Card[]) => Array<{ value: number; count: number }>;
   memoGetPlayInfo: (play: Card[]) => { type: PlayType; maxValue: number } | undefined;
   isBombType: (type: PlayType) => boolean;
@@ -321,7 +321,7 @@ export const chooseMasterOverride = (args: MasterArgs, deps: MasterDeps): Card[]
     .filter((len) => len > 0);
   const enemyAt6 = hasEnemyAt6(enemyHands);
   const enemyAt5 = hasEnemyAt5(enemyHands);
-  const pressure = deps.getEnemyPressureModel(players, myTeam);
+  const pressure = deps.getEnemyPressureModel(players, myTeam, teammateId);
   const myLevel = aiContext?.teamLevels?.[myTeam];
   const isAChallenge = myLevel === 'A';
   const tributeAggressiveLead = !!aiContext?.roundMeta?.fromTribute && !aiContext.roundMeta.isAntiTribute;

@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "source": "素材/音效/音效.txt",
+  "authorization": "Project authorization confirmed by the user on 2026-08-04.",
+  "assets": [
+    {
+      "label": "同花顺",
+      "key": "licensed/straight_flush",
+      "file": "straight_flush.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/9f/9f6d19fa-01ee-4668-913a-8c0b80345ba8.f5861.mp3"
+    },
+    {
+      "label": "顺子",
+      "key": "licensed/straight",
+      "file": "straight.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3a/3a415123-ce33-4221-9329-95e8d7004ef6.3830f.mp3"
+    },
+    {
+      "label": "对小王",
+      "key": "licensed/pair_small_joker",
+      "file": "pair_small_joker.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/bc/bcbfbc62-da5c-447f-a890-ee7685db6087.ae0fa.mp3"
+    },
+    {
+      "label": "大王",
+      "key": "licensed/single_big_joker",
+      "file": "single_big_joker.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/12/12d5cfec-fbf0-44ea-b3c8-40fc43f1c557.9f870.mp3"
+    },
+    {
+      "label": "小王",
+      "key": "licensed/single_small_joker",
+      "file": "single_small_joker.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3e/3eb574c7-3cd1-4217-afb9-b08bce88c607.12cfb.mp3"
+    },
+    {
+      "label": "等等，轿夫抬杠子对A",
+      "key": "licensed/pair_a_phrase",
+      "file": "pair_a_phrase.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/74/740f86a0-e430-4635-93a8-a80446351c6c.d7ceb.mp3",
+      "usage": "download-only-until-label-is-confirmed"
+    },
+    {
+      "label": "单张A",
+      "key": "licensed/single_a",
+      "file": "single_a.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/30/307fd8ce-5142-44a7-a830-6c16bedcce58.2e16c.mp3"
+    },
+    {
+      "label": "对老K",
+      "key": "licensed/pair_k",
+      "file": "pair_k.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/81/81e83a89-877a-44a7-b947-625dae7c1136.efc30.mp3"
+    },
+    {
+      "label": "单张K",
+      "key": "licensed/single_k",
+      "file": "single_k.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/27/27e45534-80a1-4e63-81ff-a7581dd6d2f8.c3798.mp3"
+    },
+    {
+      "label": "对J",
+      "key": "licensed/pair_j",
+      "file": "pair_j.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/65/651c2017-2b54-4948-b1f6-c0b4b2ddeb36.64e14.mp3"
+    },
+    {
+      "label": "单张J",
+      "key": "licensed/single_j",
+      "file": "single_j.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/f2/f2ad59b5-0b1b-4f7b-9df9-015d8348faec.31af1.mp3"
+    },
+    {
+      "label": "对9",
+      "key": "licensed/pair_9",
+      "file": "pair_9.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/81/8185c95a-b9f8-4f39-93c6-e123eb936401.d65ca.mp3"
+    },
+    {
+      "label": "单张9",
+      "key": "licensed/single_9",
+      "file": "single_9.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/d6/d62bd8c7-57f3-49c5-a624-88a2824e0368.5cb8c.mp3"
+    },
+    {
+      "label": "对7",
+      "key": "licensed/pair_7",
+      "file": "pair_7.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/5b/5b3df909-6016-40d2-9357-30abd56f0f3c.ea4fb.mp3"
+    },
+    {
+      "label": "单张6",
+      "key": "licensed/single_6",
+      "file": "single_6.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/28/287aa164-9b33-4d09-8831-64e2d2715ddb.81a62.mp3"
+    },
+    {
+      "label": "对5",
+      "key": "licensed/pair_5",
+      "file": "pair_5.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/23/230f0085-f93f-4cd0-acfe-302e2796b17e.a3274.mp3"
+    },
+    {
+      "label": "单张5（女声）",
+      "key": "licensed/single_5_female",
+      "file": "single_5_female.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/55/55fc8c78-4e70-4a3f-a295-7528c8b87c70.e8e31.mp3"
+    },
+    {
+      "label": "单张5（男声）",
+      "key": "licensed/single_5_male",
+      "file": "single_5_male.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/09/0993b521-aa76-4df9-bdda-20b5ccc5836d.53530.mp3"
+    },
+    {
+      "label": "对4",
+      "key": "licensed/pair_4",
+      "file": "pair_4.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/a8/a84f5c76-8391-4928-9928-722e44c90d33.e7615.mp3"
+    },
+    {
+      "label": "对3",
+      "key": "licensed/pair_3",
+      "file": "pair_3.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3d/3debd1a9-4705-40a9-a723-cb494f67d683.90ebf.mp3"
+    },
+    {
+      "label": "对2",
+      "key": "licensed/pair_2",
+      "file": "pair_2.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/d8/d80ead4f-3723-4847-aa77-c0292b63bafb.6f4cb.mp3"
+    },
+    {
+      "label": "单张2",
+      "key": "licensed/single_2",
+      "file": "single_2.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/af/af437165-6d5a-4b60-86ff-f00aa5537717.f815f.mp3"
+    },
+    {
+      "label": "炸弹音效",
+      "key": "licensed/bomb",
+      "file": "bomb.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/b3/b376c1d2-c47c-4f1f-8307-e3c6624ff25b.e17ec.mp3"
+    },
+    {
+      "label": "过",
+      "key": "licensed/pass",
+      "file": "pass.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/f7/f7c52c5a-d385-4161-8733-257da36bd77d.e952a.mp3"
+    },
+    {
+      "label": "发牌音效",
+      "key": "licensed/deal",
+      "file": "deal.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/6a/6ab12f8a-a2e6-435b-8efd-2289d26a28e8.9762e.mp3"
+    },
+    {
+      "label": "失败结束音效",
+      "key": "licensed/defeat",
+      "file": "defeat.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/c2/c2c4a06f-280c-4ec6-a4f3-38a7d06ba5a5.97b7a.mp3"
+    },
+    {
+      "label": "对6",
+      "key": "licensed/pair_6",
+      "file": "pair_6.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/c2/c2d7d6ba-c33a-4ae3-97fb-b215dff3aebe.47c39.mp3"
+    }
+  ],
+  "excluded": [
+    {
+      "label": "炸弹特效图汇总",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/8b/8b6df27d-a934-42cf-9c2e-d30c1b2c7c1f.76410.png",
+      "reason": "Rejected during visual curation; never downloaded or included in the runtime."
+    }
+  ]
+}

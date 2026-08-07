@@ -1,4 +1,4 @@
-import { Card, PlayType, PlayAction, Rank, Suit } from '../types/game';
+import { Card, PlayType, PlayAction, Rank, Suit, PlayResolution, WildcardUsage } from '../types/game';
 
 export interface RuleProfile {
   allowA2345Straight: boolean;
@@ -125,7 +125,7 @@ const isConsecutive = (cards: Card[], length: number, countPerRank: number) => {
 }
 
 // 原始的基础判断逻辑（不考虑逢人配）
-const getBasePlayInfo = (cards: Card[], profile: RuleProfile): { type: PlayType; maxValue: number, length?: number } | null => {
+const getBasePlayInfo = (cards: Card[], profile: RuleProfile): PlayResolution | null => {
   const len = cards.length;
   const rankCounts = getRankCounts(cards);
 
@@ -190,7 +190,7 @@ const getBasePlayInfo = (cards: Card[], profile: RuleProfile): { type: PlayType;
   return null;
 };
 
-export const getPlayInfos = (cards: Card[]): { type: PlayType; maxValue: number, length?: number }[] => {
+export const getPlayInfos = (cards: Card[]): PlayResolution[] => {
   if (cards.length === 0) return [];
 
   const wildcards = cards.filter(c => c.isRedJoker);
@@ -201,14 +201,14 @@ export const getPlayInfos = (cards: Card[]): { type: PlayType; maxValue: number,
     return info ? [info] : [];
   }
 
-  const validInfos: Map<string, ReturnType<typeof getBasePlayInfo>> = new Map();
+  const validInfos = new Map<string, PlayResolution>();
 
-  const tryAddInfo = (simulatedCards: Card[]) => {
+  const tryAddInfo = (simulatedCards: Card[], wildcardUsages: WildcardUsage[]) => {
     const info = getBasePlayInfo(simulatedCards, currentRuleProfile);
     if (info) {
       const key = `${info.type}-${info.maxValue}`;
       if (!validInfos.has(key)) {
-        validInfos.set(key, info);
+        validInfos.set(key, { ...info, wildcardUsages });
       }
     }
   };
@@ -220,7 +220,7 @@ export const getPlayInfos = (cards: Card[]): { type: PlayType; maxValue: number,
     for (const v of allValues) {
       for (const s of suits) {
         const simCard: Card = { id: 'sim', suit: s, rank: '2' as Rank, value: v, isLevelCard: false, isRedJoker: false };
-        tryAddInfo([...normalCards, simCard]);
+        tryAddInfo([...normalCards, simCard], [{ cardId: wildcards[0].id, representedValue: v, representedSuit: s }]);
       }
     }
   } else if (wildcards.length === 2) {
@@ -230,17 +230,20 @@ export const getPlayInfos = (cards: Card[]): { type: PlayType; maxValue: number,
           for (const s2 of suits) {
             const simCard1: Card = { id: 'sim1', suit: s1, rank: '2' as Rank, value: v1, isLevelCard: false, isRedJoker: false };
             const simCard2: Card = { id: 'sim2', suit: s2, rank: '2' as Rank, value: v2, isLevelCard: false, isRedJoker: false };
-            tryAddInfo([...normalCards, simCard1, simCard2]);
+            tryAddInfo([...normalCards, simCard1, simCard2], [
+              { cardId: wildcards[0].id, representedValue: v1, representedSuit: s1 },
+              { cardId: wildcards[1].id, representedValue: v2, representedSuit: s2 },
+            ]);
           }
         }
       }
     }
   }
 
-  return Array.from(validInfos.values()).filter(info => info !== null) as { type: PlayType; maxValue: number, length?: number }[];
+  return Array.from(validInfos.values());
 };
 
-export const getPlayInfo = (cards: Card[]): { type: PlayType; maxValue: number, length?: number } | null => {
+export const getPlayInfo = (cards: Card[]): PlayResolution | null => {
   const infos = getPlayInfos(cards);
   if (infos.length === 0) return null;
   
@@ -256,6 +259,9 @@ export const getPlayInfo = (cards: Card[]): { type: PlayType; maxValue: number, 
   // 必须返回 maxValue 最大的那种组合，否则逢人配可能会被错误地当做小牌
   return infos.reduce((prev, current) => (prev.maxValue > current.maxValue) ? prev : current);
 };
+
+/** Explicit name for presentation consumers; getPlayInfo remains API-compatible. */
+export const resolvePlay = (cards: Card[]): PlayResolution | null => getPlayInfo(cards);
 
 export const canPlay = (
   cards: Card[],
@@ -299,4 +305,90 @@ export const canPlay = (
   }
 
   return false;
+};
+
+/**
+ * Stable reason codes for presentation and protocol callers.  Rules stay
+ * authoritative here; clients may translate these codes without duplicating
+ * bomb/type/length comparison logic.
+ */
+export type PlayValidationCode =
+  | 'valid'
+  | 'empty'
+  | 'invalid-combination'
+  | 'type-mismatch'
+  | 'card-count-mismatch'
+  | 'not-high-enough'
+  | 'requires-bomb'
+  | 'bomb-too-small'
+  | 'rocket-unbeatable';
+
+export interface PlayValidation {
+  code: PlayValidationCode;
+  canPlay: boolean;
+  resolution: PlayResolution | null;
+  requiredType: PlayType | null;
+}
+
+const isBombResolution = (info: PlayResolution) =>
+  info.type === PlayType.Bomb || info.type === PlayType.StraightFlush;
+
+const strongestResolution = (infos: PlayResolution[]): PlayResolution | null =>
+  infos.length
+    ? infos.reduce((previous, current) => previous.maxValue > current.maxValue ? previous : current)
+    : null;
+
+/**
+ * Explains why a selected group can or cannot follow the current table play.
+ * This deliberately calls `canPlay` first so the diagnostic can never reject
+ * a group accepted by the actual rules path.
+ */
+export const diagnosePlay = (cards: Card[], lastPlay: PlayAction | null): PlayValidation => {
+  if (cards.length === 0) {
+    return { code: 'empty', canPlay: false, resolution: null, requiredType: lastPlay?.type ?? null };
+  }
+
+  const resolution = getPlayInfo(cards);
+  if (!resolution) {
+    return { code: 'invalid-combination', canPlay: false, resolution: null, requiredType: lastPlay?.type ?? null };
+  }
+  if (canPlay(cards, lastPlay)) {
+    return { code: 'valid', canPlay: true, resolution, requiredType: lastPlay?.type ?? null };
+  }
+  if (!lastPlay || lastPlay.type === PlayType.Pass) {
+    // Defensive fallback: a recognized leading play should already have been
+    // accepted by canPlay, but callers still receive a safe non-playable code.
+    return { code: 'invalid-combination', canPlay: false, resolution, requiredType: null };
+  }
+
+  const myInfos = getPlayInfos(cards);
+  const lastInfos = getPlayInfos(lastPlay.cards);
+  const lastInfo = strongestResolution(lastInfos.filter(info => info.type === lastPlay.type))
+    ?? strongestResolution(lastInfos);
+  if (!lastInfo) {
+    return { code: 'type-mismatch', canPlay: false, resolution, requiredType: lastPlay.type };
+  }
+
+  if (lastInfo.type === PlayType.Rocket) {
+    return { code: 'rocket-unbeatable', canPlay: false, resolution, requiredType: lastInfo.type };
+  }
+
+  const myBombs = myInfos.filter(isBombResolution);
+  if (isBombResolution(lastInfo)) {
+    return {
+      code: myBombs.length ? 'bomb-too-small' : 'requires-bomb',
+      canPlay: false,
+      resolution,
+      requiredType: lastInfo.type,
+    };
+  }
+
+  const matchingType = myInfos.filter(info => info.type === lastInfo.type);
+  if (!matchingType.length) {
+    return { code: 'type-mismatch', canPlay: false, resolution, requiredType: lastInfo.type };
+  }
+  if (cards.length !== lastPlay.cards.length) {
+    return { code: 'card-count-mismatch', canPlay: false, resolution, requiredType: lastInfo.type };
+  }
+  return { code: 'not-high-enough', canPlay: false, resolution, requiredType: lastInfo.type };
 };

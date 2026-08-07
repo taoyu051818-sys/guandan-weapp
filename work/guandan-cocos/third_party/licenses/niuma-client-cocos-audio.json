@@ -1,0 +1,489 @@
+{
+  "schemaVersion": 3,
+  "source": "https://github.com/niuma-wj/client-cocos",
+  "sourceRevision": "f9d037feaef5a80867fd97c8dd39b9a7486fbeca",
+  "license": "MIT",
+  "licenseFile": "third_party/licenses/NiuMa-client-cocos-MIT.txt",
+  "selection": "Complete semantically explicit Female announcements, pass variants, countdown 0-5, game start/results, and the single quick-chat phrase whose runtime text exactly matches the verified Female sentence.",
+  "mappingEvidence": {
+    "phraseTextArrays": [
+      "assets/Scripts/Game/GuanDan/GuanDanPlayer.ts",
+      "assets/Scripts/Game/GuanDan/SeatPanel.ts"
+    ],
+    "phraseAudioRouter": "assets/Scripts/Game/GuanDan/AudioControl.ts",
+    "rule": "The old client displays zero-based phrase array index N and AudioControl.playPhrase routes it to one-based Phrase/Female/phraseNN."
+  },
+  "runtimeDirectory": "assets/game-assets/audio/voices/niuma",
+  "assets": [
+    {
+      "label": "单张 2（女声）",
+      "key": "niuma/single_2",
+      "file": "single_2.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_2.mp3",
+      "bytes": 4528,
+      "sha256": "1beb296d39a196d9a12f7819be1c628ecd4c79c175bb31854003e4f5390f4f91"
+    },
+    {
+      "label": "单张 3（女声）",
+      "key": "niuma/single_3",
+      "file": "single_3.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_3.mp3",
+      "bytes": 6095,
+      "sha256": "abc3791980b17307f969f29e8234f4697342cad9d3ac786600545bfe9141d768"
+    },
+    {
+      "label": "单张 4（女声）",
+      "key": "niuma/single_4",
+      "file": "single_4.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_4.mp3",
+      "bytes": 6722,
+      "sha256": "4db792abdf5ba063973f2bc0b48b7d029ef21461f7eb78957b45f6b466f752b2"
+    },
+    {
+      "label": "单张 5（女声）",
+      "key": "niuma/single_5",
+      "file": "single_5.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_5.mp3",
+      "bytes": 8290,
+      "sha256": "d1487134d7e0cb6fa4be8d637a966dec9305128377dce4f33ef35bd7428ea7fa"
+    },
+    {
+      "label": "单张 6（女声）",
+      "key": "niuma/single_6",
+      "file": "single_6.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_6.mp3",
+      "bytes": 6095,
+      "sha256": "5eaa1224cdcdaf2037a693edb14f16b31bd75a9685bbe45509e0eeced1adbd80"
+    },
+    {
+      "label": "单张 7（女声）",
+      "key": "niuma/single_7",
+      "file": "single_7.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_7.mp3",
+      "bytes": 7663,
+      "sha256": "1a6e8237fc1620d113dd65e12086dbb1f4467aab55c84584ec0f116d871e3ad6"
+    },
+    {
+      "label": "单张 8（女声）",
+      "key": "niuma/single_8",
+      "file": "single_8.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_8.mp3",
+      "bytes": 5782,
+      "sha256": "960e8be1f77b2c67b73a1b60ddedcb20f5a189d11f82537782c1e920437c7234"
+    },
+    {
+      "label": "单张 9（女声）",
+      "key": "niuma/single_9",
+      "file": "single_9.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_9.mp3",
+      "bytes": 10171,
+      "sha256": "6744ce5c84bed3e23229b3ba502b8586e020ff785aebe8af1909576342d7f774"
+    },
+    {
+      "label": "单张 10（女声）",
+      "key": "niuma/single_10",
+      "file": "single_10.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_10.mp3",
+      "bytes": 7349,
+      "sha256": "d769a992c800dd2ed63d87a2fda194511940e36ab9bbc2769aeb62f0eb08a5e6"
+    },
+    {
+      "label": "单张 j（女声）",
+      "key": "niuma/single_j",
+      "file": "single_j.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_11.mp3",
+      "bytes": 5782,
+      "sha256": "f50cc21db52f260a6dbe32f7f5de67244cf8e83ad6f0c3852ebdca97f1630c46"
+    },
+    {
+      "label": "单张 q（女声）",
+      "key": "niuma/single_q",
+      "file": "single_q.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_12.mp3",
+      "bytes": 6095,
+      "sha256": "32783b89caed74a3e5017c64453cdb797f3a0d52fb4ba06a598ca46fb689eaa1"
+    },
+    {
+      "label": "单张 k（女声）",
+      "key": "niuma/single_k",
+      "file": "single_k.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_13.mp3",
+      "bytes": 5469,
+      "sha256": "869d3f22651f8400fdb2b5a01586c90b93bbdf1f8e66ed61c958d96258719626"
+    },
+    {
+      "label": "单张 a（女声）",
+      "key": "niuma/single_a",
+      "file": "single_a.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_14.mp3",
+      "bytes": 5782,
+      "sha256": "3408a0c8a9ee192cb14105c751a416167275eb9f3bfeb0f6749d267f95d63183"
+    },
+    {
+      "label": "单张 small_joker（女声）",
+      "key": "niuma/single_small_joker",
+      "file": "single_small_joker.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_15.mp3",
+      "bytes": 10484,
+      "sha256": "a39a492dd9c45b70605bb52ccf5d2ee11e7b19a684799b644880f0c6523a37a3"
+    },
+    {
+      "label": "单张 big_joker（女声）",
+      "key": "niuma/single_big_joker",
+      "file": "single_big_joker.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/1_16.mp3",
+      "bytes": 8917,
+      "sha256": "4d9f8b1abcc769b0036672ee2710b951cd7e0b88dc482e8b08c70449729ee182"
+    },
+    {
+      "label": "对子 2（女声）",
+      "key": "niuma/pair_2",
+      "file": "pair_2.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_2.mp3",
+      "bytes": 7976,
+      "sha256": "dbd4b3d2c6e74db02d815b9395e08f021726dd752372fa5dd8c8d7128e9ed268"
+    },
+    {
+      "label": "对子 3（女声）",
+      "key": "niuma/pair_3",
+      "file": "pair_3.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_3.mp3",
+      "bytes": 8290,
+      "sha256": "a121eedab40c99157252dbded2e1e8ca05d59f9a249b93af196cc149e7152fd9"
+    },
+    {
+      "label": "对子 4（女声）",
+      "key": "niuma/pair_4",
+      "file": "pair_4.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_4.mp3",
+      "bytes": 8290,
+      "sha256": "041cfd40b418ce9914278da27e577dafac7f91d5a16e5ad8bb0490ff2db39728"
+    },
+    {
+      "label": "对子 5（女声）",
+      "key": "niuma/pair_5",
+      "file": "pair_5.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_5.mp3",
+      "bytes": 8917,
+      "sha256": "357dfe9aa5eea98e9c67fd814f289b34b9233abfca33c0fa3278d0b72d967744"
+    },
+    {
+      "label": "对子 6（女声）",
+      "key": "niuma/pair_6",
+      "file": "pair_6.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_6.mp3",
+      "bytes": 8290,
+      "sha256": "4cd6c7b7389b867f2555413f3ddd179e24e0c6aecd2e1848ec9d089e10a58c34"
+    },
+    {
+      "label": "对子 7（女声）",
+      "key": "niuma/pair_7",
+      "file": "pair_7.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_7.mp3",
+      "bytes": 9544,
+      "sha256": "4841d0fb9a99cc8dc547df3b220d0d81ba8b0546f7e9d54a96bc0bb7b24ed52d"
+    },
+    {
+      "label": "对子 8（女声）",
+      "key": "niuma/pair_8",
+      "file": "pair_8.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_8.mp3",
+      "bytes": 9544,
+      "sha256": "b61a1919bb1a284be2860e3bcdbb41b6047ac3c7d144f7cbc4f2f8b8e35037b6"
+    },
+    {
+      "label": "对子 9（女声）",
+      "key": "niuma/pair_9",
+      "file": "pair_9.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_9.mp3",
+      "bytes": 10798,
+      "sha256": "18ffb2c7d806356cd0a1c89e0c7ba6e52e6e0e5ddbd0242070bc4fab9216afcd"
+    },
+    {
+      "label": "对子 10（女声）",
+      "key": "niuma/pair_10",
+      "file": "pair_10.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_10.mp3",
+      "bytes": 10484,
+      "sha256": "9db388110e7325566dd7a5b9c0d232a0cfd6326067be1f41bd3e8ba57ac3d915"
+    },
+    {
+      "label": "对子 j（女声）",
+      "key": "niuma/pair_j",
+      "file": "pair_j.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_11.mp3",
+      "bytes": 7663,
+      "sha256": "de5706e9dc3133e3473da8fc5489c0f391f0b92262a7e3de13016c5fb40da71a"
+    },
+    {
+      "label": "对子 q（女声）",
+      "key": "niuma/pair_q",
+      "file": "pair_q.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_12.mp3",
+      "bytes": 8917,
+      "sha256": "85f8873b78a0e4a18395bc3c492467352fa94bb48f15cc4735a0015a86479ca0"
+    },
+    {
+      "label": "对子 k（女声）",
+      "key": "niuma/pair_k",
+      "file": "pair_k.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_13.mp3",
+      "bytes": 8290,
+      "sha256": "67545430b17de4084617216f92717dbf6f8d76ea8f69e5fb27c895bf07e2027f"
+    },
+    {
+      "label": "对子 a（女声）",
+      "key": "niuma/pair_a",
+      "file": "pair_a.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/2_14.mp3",
+      "bytes": 9857,
+      "sha256": "ca2246bebf56efa5834f3eddcfb9cbf38f74b929dfb25d97a0f6454e00f33183"
+    },
+    {
+      "label": "对子（女声，王对子通用）",
+      "key": "niuma/pair_joker_generic",
+      "file": "pair_joker_generic.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/duizi.mp3",
+      "bytes": 37485,
+      "sha256": "f51648308fd252bec66bcdaca760ad6d01e9085d597d6b8b8b07e860632755f3"
+    },
+    {
+      "label": "三张（女声）",
+      "key": "niuma/triple",
+      "file": "triple.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/sanzhang.mp3",
+      "bytes": 9230,
+      "sha256": "b6ffbbb4a42ae9cf80e35ca2f647d9c56f65f24c6c2b4265d02679bb5bcd85ec"
+    },
+    {
+      "label": "顺子（女声）",
+      "key": "niuma/straight",
+      "file": "straight.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/shunzi.mp3",
+      "bytes": 45165,
+      "sha256": "260d060775859ec13f8022aadf0f275d3b1c7efbdb2fe92328a603e666062bf6"
+    },
+    {
+      "label": "三带二（女声）",
+      "key": "niuma/triple_with_pair",
+      "file": "triple_with_pair.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/sandaier.mp3",
+      "bytes": 13305,
+      "sha256": "cbd1b317cc33e2f5d64173a0dd3cd7606b0eac98d97e9762a5daddde913dc0dc"
+    },
+    {
+      "label": "三连对（女声）",
+      "key": "niuma/tube",
+      "file": "tube.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/sanliandui.mp3",
+      "bytes": 45165,
+      "sha256": "09c13f2dc6deaa74a87feb0ceec46ffac8db46b2012e2cea69f2b82dcae2be9f"
+    },
+    {
+      "label": "同花顺（女声）",
+      "key": "niuma/straight_flush",
+      "file": "straight_flush.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/tonghuashun.mp3",
+      "bytes": 43245,
+      "sha256": "d805aef9019966f446956ddc0d33dd193e5d9e6c5a80eb2af2b656be48ebdcf9"
+    },
+    {
+      "label": "炸弹（女声）",
+      "key": "niuma/bomb",
+      "file": "bomb.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/zhadan.mp3",
+      "bytes": 9544,
+      "sha256": "6ec7a1bfbb82a8bdac71623879d191befc85ec5af28990f5e3f917e047f02df0"
+    },
+    {
+      "label": "王炸（女声）",
+      "key": "niuma/king_bomb",
+      "file": "king_bomb.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/wangzha.mp3",
+      "bytes": 9544,
+      "sha256": "7fe40e93b9e538de7f71c246ae4da488050b2667feb255f80e36a9834f4089c7"
+    },
+    {
+      "label": "不要 1（女声）",
+      "key": "niuma/pass_1",
+      "file": "pass_1.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/pass1.mp3",
+      "bytes": 13619,
+      "sha256": "277c60d0e68780f077c4bbac9f23060a8565b93b21f0bd517e6308e59368bbf6"
+    },
+    {
+      "label": "不要 2（女声）",
+      "key": "niuma/pass_2",
+      "file": "pass_2.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/pass2.mp3",
+      "bytes": 4528,
+      "sha256": "4524999692c14b1fdad6f59f2afa5c4896dc855340ac3aa8bbfe83f48217d3cb"
+    },
+    {
+      "label": "不要 3（女声）",
+      "key": "niuma/pass_3",
+      "file": "pass_3.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/pass3.mp3",
+      "bytes": 11022,
+      "sha256": "4c133a2ff6e6f9d7e4b521fb94c916b40f0ae69084e67db9aada1d62a0e9b8de"
+    },
+    {
+      "label": "倒计时 0",
+      "key": "niuma/countdown_0",
+      "file": "countdown_0.mp3",
+      "sourcePath": "assets/GuanDan/Audio/Clock/warning0.mp3",
+      "bytes": 3144,
+      "sha256": "df25e4399f8116e94116c687ff58ae1d3c1c72c47874969a96a47aa7f5695d8b"
+    },
+    {
+      "label": "倒计时 1",
+      "key": "niuma/countdown_1",
+      "file": "countdown_1.mp3",
+      "sourcePath": "assets/GuanDan/Audio/Clock/warning1.mp3",
+      "bytes": 3980,
+      "sha256": "c3ac5ca459d7d5581a17bf185ee8b35aef0e9458446f6e514a8e1f5fbde114f0"
+    },
+    {
+      "label": "倒计时 2",
+      "key": "niuma/countdown_2",
+      "file": "countdown_2.mp3",
+      "sourcePath": "assets/GuanDan/Audio/Clock/warning2.mp3",
+      "bytes": 3562,
+      "sha256": "6db973563d7448b7a8e102aa320e6c6fdab93a02c65ff98be6bcd724295bd6b3"
+    },
+    {
+      "label": "倒计时 3",
+      "key": "niuma/countdown_3",
+      "file": "countdown_3.mp3",
+      "sourcePath": "assets/GuanDan/Audio/Clock/warning3.mp3",
+      "bytes": 3144,
+      "sha256": "a896d0262fb7827b71ca9740e8cf2554b18140d6e569cda7f32ae0e8397d65cb"
+    },
+    {
+      "label": "倒计时 4",
+      "key": "niuma/countdown_4",
+      "file": "countdown_4.mp3",
+      "sourcePath": "assets/GuanDan/Audio/Clock/warning4.mp3",
+      "bytes": 3144,
+      "sha256": "f2f5ae36f0ee2026204ac9ef4eb7ba3a8d123d90fb9181834ef83d633d78f674"
+    },
+    {
+      "label": "倒计时 5",
+      "key": "niuma/countdown_5",
+      "file": "countdown_5.mp3",
+      "sourcePath": "assets/GuanDan/Audio/Clock/warning5.mp3",
+      "bytes": 3980,
+      "sha256": "e6bb33e771e0eeff8808a5829a9fa6441570f38aa1aa25c643ebb037cf5f8885"
+    },
+    {
+      "label": "本局开始",
+      "key": "niuma/game_start",
+      "file": "game_start.mp3",
+      "sourcePath": "assets/GuanDan/Audio/gamestart.mp3",
+      "bytes": 26375,
+      "sha256": "8a90d5820e79fa3b909048655ea1b05d24bcd7457ab113d42879c183d73ed51e"
+    },
+    {
+      "label": "胜利",
+      "key": "niuma/victory",
+      "file": "victory.mp3",
+      "sourcePath": "assets/GuanDan/Audio/win.mp3",
+      "bytes": 26357,
+      "sha256": "bd327b75635336f99bb4053b9e1a62155ad2e52a6f3ba8eb5186be98c167602d"
+    },
+    {
+      "label": "失败",
+      "key": "niuma/defeat",
+      "file": "defeat.mp3",
+      "sourcePath": "assets/GuanDan/Audio/lose.mp3",
+      "bytes": 39314,
+      "sha256": "85227be41a2526aad3570f991c177873988b81e2c06e4e7772f9800d01f6916b"
+    },
+    {
+      "label": "快捷语：称赞出牌（女声）",
+      "key": "niuma/chat_nice_play",
+      "file": "chat_nice_play.ogg",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase02.ogg",
+      "sourcePhraseIndex": 2,
+      "sourceText": "你的牌打得太好啦",
+      "runtimePhraseId": "nice-play",
+      "runtimeText": "你的牌打得太好啦",
+      "decision": "语义一致且表达友好；运行时文案与原声逐字一致。",
+      "bytes": 25562,
+      "sha256": "c6e0be0998e28be6a47eb85f2284d05809b6fdde008646acc805b99062ea266c"
+    }
+  ],
+  "excluded": [
+    {
+      "label": "飞机（旧工程用于钢板）",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/feiji.mp3",
+      "reason": "项目统一使用“钢板”术语；旧控制器把该文件路由给钢板，文件名则指向“飞机”，禁止接入。"
+    },
+    {
+      "label": "压牌",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Female/yapai.mp3",
+      "reason": "旧控制器以随机概率播放，缺少能由规则层稳定判定的语义事件，禁止自动接入。"
+    },
+    {
+      "label": "旧发牌循环",
+      "sourcePath": "assets/GuanDan/Audio/dealcard.ogg",
+      "reason": "当前已有用户授权 MP3 发牌音，旧 OGG 既重复又未纳入微信端格式回归，暂不进入运行时。"
+    },
+    {
+      "label": "快捷语 1（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase01.ogg",
+      "sourcePhraseIndex": 1,
+      "sourceText": "快点儿吧，等到花儿都谢了",
+      "reason": "虽属于催牌，但与当前“请尽快出牌”不一一对应且带催促反讽，不进入运行映射。"
+    },
+    {
+      "label": "快捷语 3（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase03.ogg",
+      "sourcePhraseIndex": 3,
+      "sourceText": "整个一个悲剧啊",
+      "reason": "负面评价且可能形成嘲讽，与当前六条中性快捷语不符。"
+    },
+    {
+      "label": "快捷语 4（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase04.ogg",
+      "sourcePhraseIndex": 4,
+      "sourceText": "一手烂牌臭到底",
+      "reason": "贬损牌局体验，不能安全映射为中性快捷语。"
+    },
+    {
+      "label": "快捷语 5（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase05.ogg",
+      "sourcePhraseIndex": 5,
+      "sourceText": "你家里是开银行的吧",
+      "reason": "语境和指向不明确，可能带讽刺意味。"
+    },
+    {
+      "label": "快捷语 6（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase06.ogg",
+      "sourcePhraseIndex": 6,
+      "sourceText": "不要吵啦，专心玩牌吧",
+      "reason": "当前没有对应语义，且带有训斥语气。"
+    },
+    {
+      "label": "快捷语 7（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase07.ogg",
+      "sourcePhraseIndex": 7,
+      "sourceText": "大清早，鸡都还没叫慌什么",
+      "reason": "时间语境固定且带反讽，不能映射为通用“大家加油”。"
+    },
+    {
+      "label": "快捷语 8（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase08.ogg",
+      "sourcePhraseIndex": 8,
+      "sourceText": "再见了，我会想念大家的",
+      "reason": "表达离场，与当前“再来一局”语义相反。"
+    },
+    {
+      "label": "快捷语 9（女声）",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase09.ogg",
+      "sourcePhraseIndex": 9,
+      "sourceText": "别墨迹，快点出牌",
+      "reason": "虽属于催牌，但“别墨迹”不符合中性文案标准，不进入当前中性白名单。"
+    }
+  ]
+}

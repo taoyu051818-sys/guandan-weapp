@@ -1,0 +1,96 @@
+import { createGame, PlayType, type Card, type EngineState, type PlayAction, type PlayerId } from '../core/generated'
+
+export type FixedMatchFixture = Readonly<{
+  id: string
+  label: string
+  description: string
+  createState: () => EngineState
+}>
+
+const PLAYER_IDS: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4']
+
+const allCards = (state: EngineState): Card[] => PLAYER_IDS
+  .flatMap(id => state.players[id].hand)
+  .map(card => ({ ...card }))
+  .sort((left, right) => left.id.localeCompare(right.id))
+
+const takeMatching = (cards: readonly Card[], predicate: (card: Card) => boolean, count: number): Card[] =>
+  cards.filter(predicate).slice(0, count)
+
+const unique = (cards: readonly Card[]): Card[] => {
+  const seen = new Set<string>()
+  return cards.filter(card => {
+    if (seen.has(card.id)) return false
+    seen.add(card.id)
+    return true
+  })
+}
+
+const dealWithPreferredHumanCards = (preferred: readonly Card[]): EngineState => {
+  const base = createGame(2, 'p1')
+  const cards = allCards(base)
+  const preferredCards = unique(preferred).filter(card => cards.some(candidate => candidate.id === card.id))
+  const preferredIds = new Set(preferredCards.map(card => card.id))
+  const remaining = cards.filter(card => !preferredIds.has(card.id))
+  const humanHand = preferredCards.concat(remaining.splice(0, 27 - preferredCards.length))
+  const hands: Record<PlayerId, Card[]> = {
+    p1: humanHand,
+    p2: remaining.splice(0, 27),
+    p3: remaining.splice(0, 27),
+    p4: remaining.splice(0, 27),
+  }
+  return {
+    ...base,
+    currentTurn: 'p1',
+    players: Object.fromEntries(PLAYER_IDS.map(id => [id, { ...base.players[id], hand: hands[id].map(card => ({ ...card })) }])) as EngineState['players'],
+  }
+}
+
+const deterministicOpening = (): EngineState => dealWithPreferredHumanCards([])
+
+const wildcardAndBombOpening = (): EngineState => {
+  const sample = allCards(createGame(2, 'p1'))
+  const wildcard = takeMatching(sample, card => Boolean(card.isRedJoker), 1)
+  const straightParts = [3, 4, 5, 6].flatMap(value => takeMatching(sample, card => card.value === value && card.suit !== 'joker', 1))
+  const bomb = takeMatching(sample, card => card.rank === 8, 4)
+  return dealWithPreferredHumanCards([...wildcard, ...straightParts, ...bomb])
+}
+
+const followBombState = (): EngineState => {
+  const base = createGame(2, 'p1')
+  const cards = allCards(base)
+  const tableCards = takeMatching(cards, card => card.rank === 7, 4)
+  const tableIds = new Set(tableCards.map(card => card.id))
+  const available = cards.filter(card => !tableIds.has(card.id))
+  const bomb = takeMatching(available, card => card.rank === 8, 4)
+  const bombIds = new Set(bomb.map(card => card.id))
+  const remaining = available.filter(card => !bombIds.has(card.id))
+  const hands: Record<PlayerId, Card[]> = {
+    p1: bomb.concat(remaining.splice(0, 23)),
+    p2: remaining.splice(0, 27),
+    p3: remaining.splice(0, 27),
+    p4: remaining.splice(0, 23),
+  }
+  const tableAction: PlayAction = {
+    playerId: 'p4',
+    cards: tableCards.map(card => ({ ...card })),
+    type: PlayType.Bomb,
+    resolution: { type: PlayType.Bomb, maxValue: 7, length: 4, wildcardUsages: [] },
+  }
+  return {
+    ...base,
+    currentTurn: 'p1',
+    players: Object.fromEntries(PLAYER_IDS.map(id => [id, { ...base.players[id], hand: hands[id].map(card => ({ ...card })) }])) as EngineState['players'],
+    playArea: [tableAction],
+    lastValidPlay: tableAction,
+  }
+}
+
+export const FIXED_MATCH_FIXTURES: readonly FixedMatchFixture[] = Object.freeze([
+  Object.freeze({ id: 'match-opening', label: '固定开局', description: '固定 108 张牌分配，稳定检查发牌、手牌布局和首轮交互。', createState: deterministicOpening }),
+  Object.freeze({ id: 'match-wildcard-bomb', label: '逢人配与炸弹手牌', description: '己方固定持有红心级牌、顺子骨架和四张炸弹，便于真实选牌测试。', createState: wildcardAndBombOpening }),
+  Object.freeze({ id: 'match-follow-bomb', label: '炸弹压制场景', description: '上家已出四张 7，轮到己方使用固定四张 8，检查提示、出牌和主特效。', createState: followBombState }),
+])
+
+export const createFixedMatchState = (id: string): EngineState | null =>
+  FIXED_MATCH_FIXTURES.find(fixture => fixture.id === id)?.createState() ?? null

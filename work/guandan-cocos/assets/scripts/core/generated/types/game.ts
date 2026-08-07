@@ -36,10 +36,26 @@ export enum PlayType {
   Pass = 'Pass', // 不出
 }
 
+/** The exact semantic result of resolving a played group. Kept engine-only: no UI coordinates. */
+export interface WildcardUsage {
+  cardId: string;
+  representedValue: number;
+  representedSuit?: Suit;
+}
+
+export interface PlayResolution {
+  type: PlayType;
+  maxValue: number;
+  length?: number;
+  wildcardUsages?: WildcardUsage[];
+}
+
 export interface PlayAction {
   playerId: PlayerId;
   cards: Card[];
   type: PlayType;
+  /** Optional for backwards-compatible network snapshots created by older clients. */
+  resolution?: PlayResolution;
 }
 
 export interface SettlementInfo {

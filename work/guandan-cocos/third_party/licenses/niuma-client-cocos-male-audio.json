@@ -1,0 +1,392 @@
+{
+  "schemaVersion": 1,
+  "source": "https://github.com/niuma-wj/client-cocos",
+  "sourceRevision": "f9d037feaef5a80867fd97c8dd39b9a7486fbeca",
+  "license": "MIT",
+  "licenseFile": "third_party/licenses/NiuMa-client-cocos-MIT.txt",
+  "runtimeDirectory": "assets/game-assets/audio/voices/niuma-male",
+  "selection": "Optional Male voice pack; never mixed with the default Female human-voice fallback chain.",
+  "routingEvidence": {
+    "phraseAndPlayRouter": "assets/Scripts/Game/GuanDan/AudioControl.ts",
+    "phraseTextArrays": [
+      "assets/Scripts/Game/GuanDan/GuanDanPlayer.ts",
+      "assets/Scripts/Game/GuanDan/SeatPanel.ts"
+    ]
+  },
+  "assets": [
+    {
+      "label": "单张 2（男声）",
+      "key": "niuma-male/single_2",
+      "file": "single_2.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_2.mp3",
+      "bytes": 5155,
+      "sha256": "8ed63370c18adab6a68dd2ffb62627dd06a1f26f22b78501094146e17473dfc7"
+    },
+    {
+      "label": "单张 3（男声）",
+      "key": "niuma-male/single_3",
+      "file": "single_3.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_3.mp3",
+      "bytes": 7663,
+      "sha256": "babb4b12ef16b64b40d6018039636a4830f751d50bd61eec248347fe2e114552"
+    },
+    {
+      "label": "单张 4（男声）",
+      "key": "niuma-male/single_4",
+      "file": "single_4.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_4.mp3",
+      "bytes": 5782,
+      "sha256": "a83fda0a342c6542a0777b291685c61b87b48ff580c0e76ce4037c4819fb780d"
+    },
+    {
+      "label": "单张 5（男声）",
+      "key": "niuma-male/single_5",
+      "file": "single_5.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_5.mp3",
+      "bytes": 7976,
+      "sha256": "5152855bd3f8f628820af2b81ef77ffacd7d17bc2601e371a33c45fb0d175d76"
+    },
+    {
+      "label": "单张 6（男声）",
+      "key": "niuma-male/single_6",
+      "file": "single_6.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_6.mp3",
+      "bytes": 5155,
+      "sha256": "c5dc46405859f612fc8510d47dc4dc2b4ebe5e7394ba7ef762b9f5841c6a64c7"
+    },
+    {
+      "label": "单张 7（男声）",
+      "key": "niuma-male/single_7",
+      "file": "single_7.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_7.mp3",
+      "bytes": 5782,
+      "sha256": "ce1667a41e5655661fb060a4e35e1118841d89aede00e181b6ddab4cfd1236f5"
+    },
+    {
+      "label": "单张 8（男声）",
+      "key": "niuma-male/single_8",
+      "file": "single_8.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_8.mp3",
+      "bytes": 4528,
+      "sha256": "f13131e60ad92d8909f420e8e22b1d4d09691fca74ce0b882fa1ce7152d4d8d2"
+    },
+    {
+      "label": "单张 9（男声）",
+      "key": "niuma-male/single_9",
+      "file": "single_9.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_9.mp3",
+      "bytes": 8290,
+      "sha256": "727997f77e7ed9986bd56bd60425fb96c8843862c10aca4d507e4ef42ac75868"
+    },
+    {
+      "label": "单张 10（男声）",
+      "key": "niuma-male/single_10",
+      "file": "single_10.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_10.mp3",
+      "bytes": 5469,
+      "sha256": "1f0934c5ccc74c30eccff8491e178855ccd35ae7b6f0fa975e6c6cef5447fffa"
+    },
+    {
+      "label": "单张 j（男声）",
+      "key": "niuma-male/single_j",
+      "file": "single_j.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_11.mp3",
+      "bytes": 2855,
+      "sha256": "4f898d527c75d1013162a60a4adae104ec364256f909adb3a205eb2d3b1b981b"
+    },
+    {
+      "label": "单张 q（男声）",
+      "key": "niuma-male/single_q",
+      "file": "single_q.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_12.mp3",
+      "bytes": 5782,
+      "sha256": "98c47e19fa18a070638f4941b74b98ee5a537c73bebe06f0ec49427d2c07e8f1"
+    },
+    {
+      "label": "单张 k（男声）",
+      "key": "niuma-male/single_k",
+      "file": "single_k.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_13.mp3",
+      "bytes": 4528,
+      "sha256": "bfa1544566e4440cffdb50d811bf17c98748e8943ad8640b88df304d0deae83a"
+    },
+    {
+      "label": "单张 a（男声）",
+      "key": "niuma-male/single_a",
+      "file": "single_a.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_14.mp3",
+      "bytes": 4842,
+      "sha256": "853b85c620ec3e5efb0eb66f23aa1a4f48f2f76f66df759c314a205a7dffbe6b"
+    },
+    {
+      "label": "单张 small_joker（男声）",
+      "key": "niuma-male/single_small_joker",
+      "file": "single_small_joker.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_15.mp3",
+      "bytes": 7349,
+      "sha256": "e379fd8cd32e504b91fd10afcf36e8985eed2582365b22e8e1ca6a8f1d75fbfa"
+    },
+    {
+      "label": "单张 big_joker（男声）",
+      "key": "niuma-male/single_big_joker",
+      "file": "single_big_joker.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/1_16.mp3",
+      "bytes": 8917,
+      "sha256": "d8ac42e33bdce3dea188c3f55504ea9f418c11e9a262cf7a955a210c855d178d"
+    },
+    {
+      "label": "对子 2（男声）",
+      "key": "niuma-male/pair_2",
+      "file": "pair_2.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_2.mp3",
+      "bytes": 5469,
+      "sha256": "6760b94f7385647ed63d83436c19aa6732a87de10d9236193e67991e0d29e0a6"
+    },
+    {
+      "label": "对子 3（男声）",
+      "key": "niuma-male/pair_3",
+      "file": "pair_3.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_3.mp3",
+      "bytes": 7036,
+      "sha256": "8b22df439b45fe3e57029ef0ff1d9d47f546dab0bcd94e5d2355b2d22c06c5d7"
+    },
+    {
+      "label": "对子 4（男声）",
+      "key": "niuma-male/pair_4",
+      "file": "pair_4.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_4.mp3",
+      "bytes": 5782,
+      "sha256": "b4db3e90ea365cc4f49b4b562d9a96ddecbb80190f34af515cbdccad7c59a1ec"
+    },
+    {
+      "label": "对子 5（男声）",
+      "key": "niuma-male/pair_5",
+      "file": "pair_5.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_5.mp3",
+      "bytes": 8917,
+      "sha256": "f74cbd8febe4fef742d11747a5b35bceb6cea33023f4bae5dda73def5fab0efd"
+    },
+    {
+      "label": "对子 6（男声）",
+      "key": "niuma-male/pair_6",
+      "file": "pair_6.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_6.mp3",
+      "bytes": 6409,
+      "sha256": "d7949e240d9b58f2e3d6deb42a13cfb67a7c232d1c6b85af6716ffced8921606"
+    },
+    {
+      "label": "对子 7（男声）",
+      "key": "niuma-male/pair_7",
+      "file": "pair_7.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_7.mp3",
+      "bytes": 7976,
+      "sha256": "fffda296c36328b6ed71cb5a1aeca7b189f34e247f8a63b9d75860ae29ff36d4"
+    },
+    {
+      "label": "对子 8（男声）",
+      "key": "niuma-male/pair_8",
+      "file": "pair_8.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_8.mp3",
+      "bytes": 6722,
+      "sha256": "eb2d677792cb2c622b1d8c6b7ca9c568b5fd4895e7383b5e45e80518392f7b1a"
+    },
+    {
+      "label": "对子 9（男声）",
+      "key": "niuma-male/pair_9",
+      "file": "pair_9.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_9.mp3",
+      "bytes": 8917,
+      "sha256": "787931667533b22c8efb952c1c502ce35ea697a2b8c698045a23debea08d4f80"
+    },
+    {
+      "label": "对子 10（男声）",
+      "key": "niuma-male/pair_10",
+      "file": "pair_10.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_10.mp3",
+      "bytes": 7349,
+      "sha256": "6a31f96d1b19f7d396879b0075d9c23e44043f6d8c9e48244a98b892d3b55e58"
+    },
+    {
+      "label": "对子 j（男声）",
+      "key": "niuma-male/pair_j",
+      "file": "pair_j.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_11.mp3",
+      "bytes": 8290,
+      "sha256": "6e8bdc7bfb7b3e3aec48cc361304deaa4d4a5151d7b475eaf9395d4ccc671725"
+    },
+    {
+      "label": "对子 q（男声）",
+      "key": "niuma-male/pair_q",
+      "file": "pair_q.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_12.mp3",
+      "bytes": 8290,
+      "sha256": "754ed6f372ffcefa8b926e7f7dffb3f46c872c2113dea99ae2c1867a4688b97b"
+    },
+    {
+      "label": "对子 k（男声）",
+      "key": "niuma-male/pair_k",
+      "file": "pair_k.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_13.mp3",
+      "bytes": 7976,
+      "sha256": "13d3e7d95e7234cf39819775354b419a12c1200a4b59f17522b458cc22d1108c"
+    },
+    {
+      "label": "对子 a（男声）",
+      "key": "niuma-male/pair_a",
+      "file": "pair_a.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/2_14.mp3",
+      "bytes": 8603,
+      "sha256": "634ddff5d45940790405f632fe258a683aa1841fb0b4dae2a8dfb8b4d4f68ee3"
+    },
+    {
+      "label": "对子（男声，王对子通用）",
+      "key": "niuma-male/pair_joker_generic",
+      "file": "pair_joker_generic.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/duizi.mp3",
+      "bytes": 33453,
+      "sha256": "2741187fb94c2de7365c44d2790992b4c5982f405642e0abd5ec8ea8af4a0c8c"
+    },
+    {
+      "label": "三张（男声）",
+      "key": "niuma-male/triple",
+      "file": "triple.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/sanzhang.mp3",
+      "bytes": 7663,
+      "sha256": "5e8431d81536f83ff38b03ee11e29ecb6aa5b28d2a22dd654bf0697abdd23a5c"
+    },
+    {
+      "label": "顺子（男声）",
+      "key": "niuma-male/straight",
+      "file": "straight.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/shunzi.mp3",
+      "bytes": 21487,
+      "sha256": "b3a52180b9974a68868406377214fb8167baf48f20354babd34f916f1ca7ab4f"
+    },
+    {
+      "label": "三带二（男声）",
+      "key": "niuma-male/triple_with_pair",
+      "file": "triple_with_pair.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/sandaier.mp3",
+      "bytes": 13305,
+      "sha256": "10ba66dc336150a5213e43be62a3097d6e057713f1e9edf544a85195bac6f121"
+    },
+    {
+      "label": "三连对（男声）",
+      "key": "niuma-male/tube",
+      "file": "tube.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/sanliandui.mp3",
+      "bytes": 41805,
+      "sha256": "eaa059dfde0e2985ed4373589d42b7947e34760099b2269d86290145d515a386"
+    },
+    {
+      "label": "同花顺（男声）",
+      "key": "niuma-male/straight_flush",
+      "file": "straight_flush.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/tonghuashun.mp3",
+      "bytes": 53289,
+      "sha256": "14149d73110ea608cecca5d3036d537fb82402611c7b3d99565464dd978a4296"
+    },
+    {
+      "label": "炸弹（男声）",
+      "key": "niuma-male/bomb",
+      "file": "bomb.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/zhadan.mp3",
+      "bytes": 5782,
+      "sha256": "e15e71bed90a914b3446c432148050a388e85ae6ac2fd045d74e4c8bb78c0b07"
+    },
+    {
+      "label": "王炸（男声）",
+      "key": "niuma-male/king_bomb",
+      "file": "king_bomb.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/wangzha.mp3",
+      "bytes": 10814,
+      "sha256": "eda3d6ad70912c6d707dbcd85a1bde336d97d9335832cc137ab0df16dbbe249d"
+    },
+    {
+      "label": "不要 1（男声）",
+      "key": "niuma-male/pass_1",
+      "file": "pass_1.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/pass1.mp3",
+      "bytes": 8603,
+      "sha256": "b0ba5abb3568b13fef0992066f6817d24a805be9e93d68a15fecf8cd89c74b9d"
+    },
+    {
+      "label": "不要 2（男声）",
+      "key": "niuma-male/pass_2",
+      "file": "pass_2.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/pass2.mp3",
+      "bytes": 5155,
+      "sha256": "d6d72a2028b2b9eb56de48f913fbdf8f4ddf9b48c2fff4f30e5a0d3dc83dabe8"
+    },
+    {
+      "label": "不要 3（男声）",
+      "key": "niuma-male/pass_3",
+      "file": "pass_3.mp3",
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/pass3.mp3",
+      "bytes": 5171,
+      "sha256": "8f4b2213b0246e341a604d437e59f219fb2e45cdad3d142370f2b6717509da55"
+    },
+    {
+      "label": "快捷语：称赞出牌（男声）",
+      "key": "niuma-male/chat_nice_play",
+      "file": "chat_nice_play.ogg",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase02.ogg",
+      "sourcePhraseIndex": 2,
+      "sourceText": "你的牌打得太好啦",
+      "runtimePhraseId": "nice-play",
+      "runtimeText": "你的牌打得太好啦",
+      "bytes": 32140,
+      "sha256": "cf6b8fc81ac712b27d8e7fc02edb9484d3b02fac34d4a12c250332905e3b2348"
+    }
+  ],
+  "excluded": [
+    {
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/feiji.mp3",
+      "reason": "“飞机”与当前“钢板”术语冲突。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/ChuPai/Male/yapai.mp3",
+      "reason": "旧客户端随机播放，当前没有稳定且权威的“压住上一手”语义事件。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase01.ogg",
+      "sourcePhraseIndex": 1,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase03.ogg",
+      "sourcePhraseIndex": 3,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase04.ogg",
+      "sourcePhraseIndex": 4,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase05.ogg",
+      "sourcePhraseIndex": 5,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase06.ogg",
+      "sourcePhraseIndex": 6,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase07.ogg",
+      "sourcePhraseIndex": 7,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase08.ogg",
+      "sourcePhraseIndex": 8,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    },
+    {
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Male/phrase09.ogg",
+      "sourcePhraseIndex": 9,
+      "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
+    }
+  ]
+}

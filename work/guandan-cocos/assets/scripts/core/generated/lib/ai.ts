@@ -702,6 +702,17 @@ const getIntent = (
   return 'tempo';
 };
 
+const getTeammateId = (
+  players: Record<PlayerId, Player>,
+  myPlayerId: PlayerId,
+  myTeam: Team
+): PlayerId => {
+  const teammate = (Object.keys(players) as PlayerId[])
+    .find((id) => id !== myPlayerId && players[id].team === myTeam);
+  if (!teammate) throw new Error(`AI player ${myPlayerId} has no teammate on ${myTeam}`);
+  return teammate;
+};
+
 const removeCards = (hand: Card[], play: Card[]) => {
   const used = new Set(play.map(c => c.id));
   return hand.filter(c => !used.has(c.id));
@@ -838,17 +849,20 @@ const getMinEnemyHand = (players: Record<PlayerId, Player>, myTeam: Team) =>
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-const getEnemyPressureModel = (players: Record<PlayerId, Player>, myTeam: Team): EnemyPressureModel => {
+const getEnemyPressureModel = (
+  players: Record<PlayerId, Player>,
+  myTeam: Team,
+  teammateId: PlayerId
+): EnemyPressureModel => {
   const enemyHands = Object.values(players)
     .filter((p) => p.team !== myTeam)
     .map((p) => p.hand.length)
     .filter((len) => len > 0);
   const minEnemyHand = enemyHands.length ? Math.min(...enemyHands) : 99;
   const doubleEnemyLow = enemyHands.filter((len) => len <= 10).length >= 2;
-  const teammateHand = Object.values(players)
-    .filter((p) => p.team === myTeam)
-    .map((p) => p.hand.length)
-    .sort((a, b) => a - b)[0] ?? 0;
+  const teammateHand = players[teammateId]?.team === myTeam
+    ? players[teammateId].hand.length
+    : 99;
   const enemySinglePairStreak = Math.max(
     ...Object.entries(players)
       .filter(([, p]) => p.team !== myTeam)
@@ -1533,17 +1547,17 @@ export const makeDecision = (
   const order: PlayerId[] = ['p1', 'p2', 'p3', 'p4'];
   const myIndex = order.indexOf(myPlayerId);
   const nextPlayerId = order[(myIndex + 1) % 4];
-  const teammateId = order[(myIndex + 2) % 4];
-  const prevPlayerId = order[(myIndex + 3) % 4];
+  const teammateId = getTeammateId(players, myPlayerId, myTeam);
 
-  const nextPlayer = players[nextPlayerId];
   const teammate = players[teammateId];
-  const prevPlayer = players[prevPlayerId];
   if (difficulty === 'master') {
     metricsState.endgameDepth = advancedRole === 'support' ? 0.95 : 1.05;
   }
 
-  const enemyHandCounts = [nextPlayer.hand.length, prevPlayer.hand.length].filter(len => len > 0);
+  const enemyHandCounts = Object.values(players)
+    .filter((player) => player.team !== myTeam)
+    .map((player) => player.hand.length)
+    .filter(len => len > 0);
   const minEnemyHandCount = Math.min(...enemyHandCounts);
   const myLevel = aiContext?.teamLevels?.[myTeam];
   const isAChallenge = myLevel === 'A';

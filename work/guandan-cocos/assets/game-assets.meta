@@ -1,0 +1,14 @@
+{
+  "ver": "1.2.0",
+  "importer": "directory",
+  "imported": true,
+  "uuid": "87181bc2-13f6-4640-b2c3-65d459f9f79b",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "isBundle": true,
+    "bundleConfigID": "16ogE3cTNLWL7oGnGbH61y",
+    "bundleName": "game-assets",
+    "priority": 6
+  }
+}

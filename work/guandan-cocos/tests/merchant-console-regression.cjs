@@ -1,0 +1,65 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const projectRoot = path.resolve(__dirname, '..')
+const developmentApis = fs.readFileSync(path.join(projectRoot, 'assets/scripts/services/DevelopmentApis.ts'), 'utf8')
+const platformApi = fs.readFileSync(path.join(projectRoot, 'assets/scripts/services/PlatformApi.ts'), 'utf8')
+const frontPages = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/FrontPageController.ts'), 'utf8')
+const pageRouter = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/PageRouter.ts'), 'utf8')
+const uiFactory = fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/RuntimeUiFactory.ts'), 'utf8')
+
+assert.match(developmentApis, /export interface MerchantGateway/)
+assert.match(developmentApis, /getConsole\(\): Promise<MerchantConsole>/)
+assert.match(developmentApis, /apply\(application: MerchantApplication\): Promise<MerchantProfile>/)
+assert.match(developmentApis, /createStore\(store: MerchantStoreDraft\): Promise<MerchantStore>/)
+assert.match(developmentApis, /addEmployee\(employee: MerchantEmployeeDraft\): Promise<MerchantEmployee>/)
+assert.match(developmentApis, /grantPoints\(grant: MerchantPointGrantDraft\): Promise<MerchantPointGrant>/)
+assert.match(developmentApis, /SAMPLE_MERCHANT_CONSOLE/)
+assert.match(developmentApis, /陵水生活馆（演示）/)
+assert.match(developmentApis, /DevelopmentMerchantGateway[\s\S]*getConsole[\s\S]*SAMPLE_MERCHANT_CONSOLE/)
+for (const method of ['apply', 'createStore', 'addEmployee', 'grantPoints']) {
+  assert.match(developmentApis, new RegExp(`public async ${method} \\([^)]*\\): Promise<[^>]+> \\{ throw new FeatureInDevelopmentError`), `development ${method} must stay read-only`)
+}
+
+for (const route of ['/api/v1/merchants/apply', '/api/v1/merchants/me', '/api/v1/merchants/stores', '/api/v1/merchants/employees', '/api/v1/merchants/points/grant']) {
+  assert.match(platformApi, new RegExp(route.replaceAll('/', '\\/')), `missing merchant route ${route}`)
+}
+assert.match(platformApi, /class HttpMerchantGateway implements MerchantGateway/)
+assert.match(platformApi, /uncertainMutationKeys = new Map<string, string>/)
+assert.match(platformApi, /'Idempotency-Key': key/g)
+assert.match(platformApi, /normalizeMerchantConsole/)
+assert.match(platformApi, /商户后台响应包含其他商户的数据/)
+assert.match(platformApi, /INVALID_MERCHANT_INPUT/)
+
+assert.doesNotMatch(frontPages, /移动端管理界面开发中/)
+const moreMenu = frontPages.slice(frontPages.indexOf('private showMoreMenu'), frontPages.indexOf('public openEffectLabTable'))
+assert.doesNotMatch(moreMenu, /商户后台/, 'the ordinary player More menu must not expose the merchant migration surface')
+assert.match(frontPages, /private async showMerchantConsole/)
+assert.match(frontPages, /this\.gateways\.merchant\.getConsole\(\)/)
+assert.match(frontPages, /error instanceof PlatformApiError && error\.status === 403/)
+assert.match(frontPages, /renderMerchantApplication\('当前账号没有商户权限/)
+assert.match(frontPages, /只读演示 · 未连接平台服务 · 不会提交任何写入/)
+assert.match(frontPages, /if \(!this\.gateways\.configured\)[\s\S]*写入按钮仅在已配置平台/)
+assert.match(frontPages, /merchantConsole\.merchant\.status !== 'active'/)
+assert.match(frontPages, /merchantConsole\.role === 'owner' \|\| merchantConsole\.role === 'manager'/)
+assert.match(frontPages, /merchantConsole\.role === 'owner'/)
+assert.match(frontPages, /this\.gateways\.merchant\.apply\(\{ name, contactName \}\)/)
+assert.match(frontPages, /this\.gateways\.merchant\.createStore\(\{ name, address \}\)/)
+assert.match(frontPages, /this\.gateways\.merchant\.addEmployee\(\{ employeeUserId, role \}\)/)
+assert.match(frontPages, /this\.gateways\.merchant\.grantPoints\(\{ storeId, recipientUserId, amount, note \}\)/)
+assert.match(frontPages, /pendingMerchantAction/)
+for (const page of ['merchant-apply', 'merchant-store', 'merchant-employee', 'merchant-grant']) {
+  assert.match(frontPages, new RegExp(`pageToken !== this\\.pageRequestToken \\|\\| this\\.router\\.current !== '${page}'`), `${page} must ignore late write responses`)
+  assert.match(pageRouter, new RegExp(`'${page}'`), `${page} must be a routed page`)
+}
+assert.match(frontPages, /MerchantGrantRecipientInput/)
+assert.match(frontPages, /Number\(amountInput\.string\.trim\(\)\)/)
+assert.doesNotMatch(frontPages, /recipientUserId:\s*['"][^'"]+['"]/, 'merchant UI must never submit a fixed recipient account')
+
+assert.match(uiFactory, /public formInput \(/)
+assert.match(uiFactory, /options\.inputMode \?\? EditBox\.InputMode\.ANY/)
+assert.match(uiFactory, /options\.initialValue \?\? ''/)
+assert.equal(uiFactory.indexOf("new Node('TEXT_LABEL')") < uiFactory.indexOf('editNode.addComponent(EditBox)'), true, 'form labels must exist before EditBox initialization')
+
+process.stdout.write('merchant console static regression checks passed\n')

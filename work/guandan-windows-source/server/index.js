@@ -2,6 +2,12 @@ import { Server } from "socket.io";
 import { createServer } from "http";
 import { createRequire } from 'module';
 
+// 该 Socket.IO 服务只保留给旧网页端局域网联调。生产 Cocos 通道必须使用
+// weapp-ws.js；强制票据模式下拒绝启动，避免误开一个绕过入桌票据的入口。
+if (process.env.GAME_TICKET_REQUIRED === '1' || process.env.GAME_TICKET_REQUIRED === 'true') {
+  throw new Error('GAME_TICKET_REQUIRED 模式请启动 server/weapp-ws.js，旧 Socket.IO 服务仅供本地兼容')
+}
+
 const require = createRequire(import.meta.url);
 const { canPlay, getPlayInfo, PlayType } = require('../../../shared-core/dist');
 

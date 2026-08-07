@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "source": "https://github.com/niuma-wj/client-cocos",
+  "sourceRevision": "f9d037feaef5a80867fd97c8dd39b9a7486fbeca",
+  "license": "MIT",
+  "licenseFile": "third_party/licenses/NiuMa-client-cocos-MIT.txt",
+  "runtimeDirectory": "assets/game-assets/audio/music/niuma",
+  "asset": {
+    "key": "music/niuma/table_theme",
+    "file": "table_theme.mp3",
+    "sourcePath": "assets/GuanDan/Audio/bg.mp3",
+    "bytes": 488594,
+    "sha256": "7b3ea165ad9529c2b3d1320661cbbcff87262ab833d6814372e1dbe11f6bda43",
+    "format": {
+      "channels": 2,
+      "sampleRate": 44100,
+      "bitRate": 128000,
+      "durationSeconds": 30.537125
+    },
+    "use": "Optional looping lobby/table background music controlled by the independent music switch and volume."
+  },
+  "releaseBoundary": "Source and hash are verified; loop seam, loudness and device playback still require human listening before production release."
+}

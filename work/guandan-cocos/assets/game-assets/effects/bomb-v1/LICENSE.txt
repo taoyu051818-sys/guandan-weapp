@@ -1,0 +1,11 @@
+Bomb VFX Procedural Asset Pack
+SPDX-License-Identifier: CC0-1.0
+
+The PNG files in this directory are generated locally by
+scripts/generate-bomb-vfx-assets.py. No third-party artwork is incorporated.
+
+To the extent possible under law, the authors have waived all copyright and
+related or neighboring rights to these generated visual assets under the
+Creative Commons CC0 1.0 Universal dedication.
+
+License text: https://creativecommons.org/publicdomain/zero/1.0/legalcode

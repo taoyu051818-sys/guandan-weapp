@@ -1,0 +1,32 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const read = relative => fs.readFileSync(path.join(root, relative), 'utf8')
+
+const runtimeUi = read('assets/scripts/ui/RuntimeUiFactory.ts')
+const tableHud = read('assets/scripts/ui/TableGameHud.ts')
+const seats = read('assets/scripts/ui/PlayerSeatController.ts')
+const playArea = read('assets/scripts/ui/PlayAreaController.ts')
+const replay = read('assets/scripts/ui/ReplayBoardView.ts')
+const loading = read('assets/scripts/ui/StartupLoadingOverlay.ts')
+const chat = read('assets/scripts/ui/ChatController.ts')
+
+assert.match(runtimeUi, /export const applyForegroundTextStyle[\s\S]*label\.enableOutline = true[\s\S]*label\.outlineWidth = Math\.max\(1, outlineWidth\)/, 'runtime text must use the shared outline contract')
+assert.match(runtimeUi, /public label[\s\S]*return applyForegroundTextStyle\(label\)/, 'ordinary runtime labels must be outlined by default')
+assert.match(runtimeUi, /public button[\s\S]*applyForegroundTextStyle\([\s\S]*style\.textOutlineWidth \?\? 2/, 'button text must keep a non-zero default outline')
+assert.match(runtimeUi, /public quickChatButton[\s\S]*applyForegroundTextStyle\(label/, 'quick-chat button text must also keep an outline')
+assert.match(tableHud, /const createLabel[\s\S]*return applyForegroundTextStyle\(label/, 'all table HUD text must inherit the foreground style')
+assert.match(seats, /this\.graphics = this\.getComponent\(Graphics\)[\s\S]*applyForegroundTextStyle\(this\.label!/, 'seat text must combine a local translucent surface with an outline')
+assert.match(seats, /bubbleGraphics\.fillColor = new Color\([\s\S]*applyForegroundTextStyle\(this\.chatLabel/, 'chat bubbles must keep their own local surface and styled text')
+assert.match(replay, /const createPanel[\s\S]*graphics\.fillColor[\s\S]*const createText[\s\S]*return applyForegroundTextStyle\(label/, 'replay text must be rendered on local panels with an outline')
+assert.match(loading, /LoadingInformationBand[\s\S]*this\.bandGraphics = bandNode\.addComponent\(Graphics\)/, 'loading copy must remain on the translucent information band')
+assert.match(loading, /const createLabel[\s\S]*return applyForegroundTextStyle\(label/, 'loading and retry text must be outlined')
+assert.doesNotMatch(chat, /addComponent\(Label\)/, 'ChatController must not create an unstyled parallel text surface')
+
+assert.match(playArea, /if \(action\.type === 'Pass'\)[\s\S]*const badge = root\.addComponent\(Graphics\)[\s\S]*badge\.roundRect\(-54, -24, 108, 48, 14\)[\s\S]*applyForegroundTextStyle\(text/, 'the pass callout must use a compact translucent badge and outlined text')
+assert.match(playArea, /const textNode = new Node\('PassText'\)[\s\S]*textNode\.parent = root[\s\S]*const text = textNode\.addComponent\(Label\)/, 'the pass text must use a child node so it does not conflict with the badge Graphics renderer')
+assert.match(playArea, /tween\(opacity\)\.delay\(0\.72\)\.to\(0\.32, \{ opacity: 0 \}\)[\s\S]*this\.destroyNode\(root\)/, 'the pass callout must still expire after one presentation beat')
+
+console.log('foreground text style regression tests passed')

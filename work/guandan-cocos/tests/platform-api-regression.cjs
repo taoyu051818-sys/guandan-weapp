@@ -1,0 +1,623 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const Module = require('node:module')
+const path = require('node:path')
+
+const projectRoot = path.resolve(__dirname, '..')
+const sourcePath = path.join(projectRoot, 'assets/scripts/services/PlatformApi.ts')
+const typescriptPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript'
+const ts = require(typescriptPath)
+
+const source = fs.readFileSync(sourcePath, 'utf8')
+const compiled = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
+  fileName: sourcePath,
+}).outputText
+const runtimeModule = new Module(sourcePath, module)
+runtimeModule.filename = sourcePath
+runtimeModule.paths = Module._nodeModulePaths(path.dirname(sourcePath))
+const previousTypeScriptLoader = Module._extensions['.ts']
+Module._extensions['.ts'] = (targetModule, filename) => {
+  const dependency = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
+    fileName: filename,
+  }).outputText
+  targetModule._compile(dependency, filename)
+}
+try {
+  runtimeModule._compile(compiled, sourcePath)
+} finally {
+  if (previousTypeScriptLoader) Module._extensions['.ts'] = previousTypeScriptLoader
+  else delete Module._extensions['.ts']
+}
+
+const developmentSourcePath = path.join(projectRoot, 'assets/scripts/services/DevelopmentApis.ts')
+const developmentCompiled = ts.transpileModule(fs.readFileSync(developmentSourcePath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  fileName: developmentSourcePath,
+}).outputText
+const developmentModule = new Module(developmentSourcePath, module)
+developmentModule.filename = developmentSourcePath
+developmentModule.paths = Module._nodeModulePaths(path.dirname(developmentSourcePath))
+developmentModule._compile(developmentCompiled, developmentSourcePath)
+
+const { createHttpGateways, PlatformApiClient, PlatformApiError } = runtimeModule.exports
+const { DevelopmentTournamentGateway } = developmentModule.exports
+const ok = data => ({ status: 200, body: { ok: true, data, error: null } })
+const errorResponse = (status, code, message, details, retryable) => ({
+  status,
+  body: { ok: false, data: null, error: { code, message, details, ...(retryable === undefined ? {} : { retryable }) } },
+})
+const validMatched = (overrides = {}) => ({
+  matchId: 'm1',
+  mode: 'quick',
+  status: 'matched',
+  roomId: '123456',
+  seat: 'p2',
+  gameEndpoint: 'ws://127.0.0.1:3002/weapp',
+  gameTicket: 'signed-ticket',
+  expiresAt: Date.now() + 60_000,
+  ...overrides,
+})
+const validMerchantConsole = (overrides = {}) => ({
+  merchant: { id: 'mch1', ownerUserId: 'u1', name: '陵水生活馆', contactName: '店长', status: 'active', dailyPointLimit: 5000, createdAt: 1000 },
+  role: 'owner',
+  stores: [{ id: 'str1', merchantId: 'mch1', name: '清水湾店', address: '陵水示例地址', status: 'active', createdAt: 1100 }],
+  employees: [{ id: 'mch1:u2', merchantId: 'mch1', userId: 'u2', role: 'cashier', status: 'active', updatedAt: 1200 }],
+  grants: [{ id: 'mgr1', merchantId: 'mch1', storeId: 'str1', operatorUserId: 'u2', recipientUserId: 'u3', amount: 250, note: '消费奖励', status: 'posted', createdAt: 1300 }],
+  grantedPoints: 250,
+  ...overrides,
+})
+const validFixedTournament = (overrides = {}) => ({
+  id: 't16',
+  title: '陵水16人积分赛',
+  summary: '固定16人 · 三轮积分',
+  status: 'running',
+  entryFee: 0,
+  queueId: 'lingshui_16_cup',
+  enrolled: true,
+  format: 'fixed16-latin-3',
+  capacity: 16,
+  checkedInCount: 16,
+  roundsTotal: 3,
+  currentRound: 1,
+  advanceCount: 8,
+  ...overrides,
+})
+const validTournamentStanding = (overrides = {}) => ({
+  userId: 'u1',
+  displayName: '陵水玩家',
+  played: 1,
+  wins: 1,
+  firstPlaces: 1,
+  points: 3,
+  opponentPoints: 4,
+  rank: 1,
+  advanced: false,
+  qualificationStatus: 'pending',
+  ...overrides,
+})
+const validTournamentState = (overrides = {}) => ({
+  tournament: validFixedTournament(),
+  phase: 'round-active',
+  capacity: 16,
+  checkedInCount: 16,
+  roundNumber: 1,
+  roundsTotal: 3,
+  tablesTotal: 4,
+  tablesSettled: 0,
+  cutoffRank: 8,
+  viewerEntry: { enrolled: true, checkedIn: true, rosterLocked: true },
+  assignment: { assignmentId: 'tpa-roster-r1-t1', roundNumber: 1, tableNumber: 1, status: 'pending' },
+  viewerStanding: validTournamentStanding(),
+  ...overrides,
+})
+
+class FakeTransport {
+  constructor () { this.requests = [] }
+
+  async request (input) {
+    this.requests.push(input)
+    const url = new URL(input.url)
+    if (url.pathname === '/api/v1/auth/dev-login') {
+      assert.deepEqual(input.body, { deviceId: 'regression-device', displayName: '陵水玩家' }, 'development login body must keep the stable identity contract')
+      return ok({ accessToken: 'test-token', expiresAt: Date.now() + 60_000, user: { id: 'u1' } })
+    }
+    assert.equal(input.headers.Authorization, 'Bearer test-token', `missing auth header for ${url.pathname}`)
+    if (input.method === 'GET') assert.equal(input.headers['Content-Type'], undefined, `GET ${url.pathname} must not send Content-Type`)
+    if (url.pathname === '/api/v1/products') return ok({ products: [{ id: 'rice', name: '大米', description: '5kg', tag: '粮油', points: 3200, availableStock: 12 }] })
+    if (url.pathname === '/api/v1/wallet') return ok({ wallet: { balance: 8000, currency: 'POINTS' }, ledgerEntries: [] })
+    if (url.pathname === '/api/v1/orders/redeem') return ok({ order: { orderId: 'o1', productId: 'rice', quantity: 1, totalPoints: 3200, status: 'paid' } })
+    if (url.pathname === '/api/v1/tournaments' && input.method === 'GET') return ok({ tournaments: [
+      { id: 't1', title: '周末赛', summary: '三轮积分赛', status: 'open', entryFee: 200, queueId: 'weekend_cup', enrolled: true },
+      validFixedTournament(),
+    ] })
+    if (url.pathname === '/api/v1/tournaments/t1/enroll') return ok({ enrollment: { tournamentId: 't1' } })
+    if (url.pathname === '/api/v1/tournaments/t16/check-in') return ok(validTournamentState())
+    if (url.pathname === '/api/v1/tournaments/t16/state') return ok(validTournamentState({
+      assignment: { assignmentId: 'tpa-roster-r1-t1', round: 1, table: 1, status: 'pending' },
+    }))
+    if (url.pathname === '/api/v1/tournaments/t1/standings') return ok({
+      tournament: { id: 't1', title: '周末赛', summary: '三轮积分赛', status: 'open', entryFee: 200, queueId: 'weekend_cup', enrolled: true, roundsTotal: 3, currentRound: 1, advanceCount: 8 },
+      standings: [validTournamentStanding({ advanced: true, qualificationStatus: 'qualified' })],
+      provisional: false,
+      cutoffRank: 8,
+      viewerStanding: validTournamentStanding({ advanced: true, qualificationStatus: 'qualified' }),
+    })
+    if (url.pathname === '/api/v1/me/dashboard') return ok({
+      user: { id: 'u1', accountId: '58310427', displayName: '陵水玩家', comprehensiveScore: 6311 },
+      rating: { games: 2, wins: 1, eloOffset: 0, baseScore: 6311, comprehensiveScore: 6311 },
+      stats: { gamesPlayed: 2, wins: 1, firstPlaceFinishes: 1, bombsPlayed: 3 },
+      season: { id: 's1', name: '夏季赛季', status: 'active', progress: { score: 5, gamesPlayed: 2, wins: 1 } },
+      recentMatches: [{ eventId: 'e1', replayId: 'r1', matchId: 'm1', roomId: '123456', place: 1, won: true, tournamentId: 't1', finishedAt: 1000 }],
+    })
+    if (url.pathname === '/api/v1/season/tasks' && input.method === 'GET') return ok({ season: { id: 's1', name: '夏季赛季', status: 'active' }, tasks: [{ id: 'daily', name: '完成一局', target: 1, rewardPoints: 80, progress: 1, completed: true, claimed: false, cadence: 'daily' }] })
+    if (url.pathname === '/api/v1/season/tasks/daily/claim') return ok({ claim: { taskId: 'daily' } })
+    if (url.pathname === '/api/v1/replays' && input.method === 'GET') return ok({ replays: [{ id: 'r1', eventId: 'e1', matchId: 'm1', roomId: '123456', ranking: ['p1', 'p3', 'p2', 'p4'], winnerTeam: 'teamA', finishedAt: 1000, eventCount: 1 }] })
+    if (url.pathname === '/api/v1/replays/r1') return ok({ replay: { id: 'r1', eventId: 'e1', matchId: 'm1', roomId: '123456', ranking: ['p1', 'p3', 'p2', 'p4'], winnerTeam: 'teamA', finishedAt: 1000, participants: { p1: '陵水玩家' }, events: [{ sequence: 1, at: 900, type: 'play', roundSequence: 2, playerId: 'p1', cards: [{ rank: 'A', suit: 'heart' }], playType: 'Single', automatic: false }] } })
+    if (url.pathname === '/api/v1/spectate') return ok({ delaySeconds: 30, feeds: [
+      { matchId: 'm-live', tableLabel: '快速匹配 · MLIVE桌', mode: 'quick', status: 'running', startedAt: 800, finishedAt: null, abortedAt: null, abortReason: null, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 1, totalEventCount: 2, timelineComplete: false },
+      { matchId: 'm-aborted', tableLabel: '快速匹配 · MABORT桌', mode: 'quick', status: 'aborted', startedAt: 600, finishedAt: null, abortedAt: 900, abortReason: 'empty-timeout', delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 2, totalEventCount: 2, timelineComplete: true },
+      { matchId: 'm-classic-50', tableLabel: '经典场 · 底分50', mode: 'classic_50', status: 'running', startedAt: 850, finishedAt: null, abortedAt: null, abortReason: null, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 0, totalEventCount: 0, timelineComplete: false },
+    ] })
+    if (url.pathname === '/api/v1/spectate/m1') return ok({ feed: { matchId: 'm1', tableLabel: '快速匹配 · M1桌', mode: 'quick', status: 'finished', startedAt: 800, finishedAt: 1000, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 1, totalEventCount: 1, timelineComplete: true, availableThrough: 1100, events: [{ sequence: 1, at: 900, type: 'play', playerId: 'p1' }] } })
+    if (url.pathname === '/api/v1/merchants/apply') return ok({ merchant: { id: 'mch1', ownerUserId: 'u1', name: '陵水生活馆', contactName: '店长', status: 'pending', dailyPointLimit: 5000, createdAt: 1000 } })
+    if (url.pathname === '/api/v1/merchants/me') return ok({
+      merchant: { id: 'mch1', ownerUserId: 'u1', name: '陵水生活馆', contactName: '店长', status: 'active', dailyPointLimit: 5000, createdAt: 1000 },
+      role: 'owner',
+      stores: [{ id: 'str1', merchantId: 'mch1', name: '清水湾店', address: '陵水示例地址', status: 'active', createdAt: 1100 }],
+      employees: [{ id: 'mch1:u2', merchantId: 'mch1', userId: 'u2', role: 'cashier', status: 'active', updatedAt: 1200 }],
+      grants: [{ id: 'mgr1', merchantId: 'mch1', storeId: 'str1', operatorUserId: 'u2', recipientUserId: 'u3', amount: 250, note: '消费奖励', status: 'posted', createdAt: 1300 }],
+      grantedPoints: 250,
+    })
+    if (url.pathname === '/api/v1/merchants/stores') return ok({ store: { id: 'str2', merchantId: 'mch1', name: '椰林店', address: '陵水椰林镇', status: 'active', createdAt: 1400 } })
+    if (url.pathname === '/api/v1/merchants/employees') return ok({ employee: { id: 'mch1:u4', merchantId: 'mch1', userId: 'u4', role: 'manager', status: 'active', updatedAt: 1500 } })
+    if (url.pathname === '/api/v1/merchants/points/grant') return ok({ grant: { id: 'mgr2', merchantId: 'mch1', storeId: 'str1', operatorUserId: 'u1', recipientUserId: 'u5', amount: 80, note: '到店奖励', status: 'posted', createdAt: 1600, duplicate: false } })
+    if (url.pathname === '/api/v1/match/join') return ok({ match: {
+      matchId: input.body.assignmentId ? 'm16' : input.body.mode === 'quick' ? 'm1' : `m-${input.body.mode}`,
+      mode: input.body.mode,
+      status: 'matching',
+    } })
+    if (url.pathname === '/api/v1/match/status') return ok({ match: validMatched() })
+    if (url.pathname === '/api/v1/match/cancel') return ok({ match: { matchId: 'm1', status: 'cancelled' } })
+    throw new Error(`unhandled fake route: ${input.method} ${url.pathname}`)
+  }
+}
+
+const assertMalformedTicket = async (ticket, expectedPattern, config = {}) => {
+  const transport = { request: async input => {
+    if (new URL(input.url).pathname === '/api/v1/match/status') return ok({ match: ticket })
+    throw new Error('unexpected route')
+  } }
+  const gateways = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', ...config }, transport)
+  await assert.rejects(gateways.matchmaking.getStatus('m1'), error => {
+    assert.ok(error instanceof PlatformApiError)
+    assert.equal(error.code, 'MALFORMED_RESPONSE')
+    assert.equal(error.status, 200)
+    assert.equal(error.retryable, false)
+    assert.match(error.message, expectedPattern)
+    return true
+  })
+}
+
+const testDevelopmentTournamentState = async () => {
+  const gateway = new DevelopmentTournamentGateway()
+  const tournaments = await gateway.listTournaments()
+  const fixedTournament = tournaments.find(item => item.queueId === 'lingshui_16_cup')
+  assert.equal(fixedTournament.format, 'fixed16-latin-3')
+  const state = await gateway.getState(fixedTournament.id)
+  assert.equal(state.capacity, 16)
+  assert.equal(state.checkedInCount, 16)
+  assert.equal(state.roundNumber, 1)
+  assert.equal(state.assignment.tableNumber, 1)
+  assert.equal(state.assignment.status, 'pending')
+  assert.equal((await gateway.checkIn(fixedTournament.id)).assignment.assignmentId, state.assignment.assignmentId)
+}
+
+const testBasicGateways = async () => {
+  assert.throws(
+    () => createHttpGateways({ baseUrl: 'http://platform.example', deviceId: 'unsafe' }, new FakeTransport()),
+    /HTTPS/,
+    'HTTP platform endpoints must be rejected unless an explicit development policy is provided',
+  )
+  const lockedTransport = new FakeTransport()
+  const lockedGateways = createHttpGateways({ baseUrl: 'http://127.0.0.1:3003', deviceId: 'locked-device', httpEndpointPolicy: 'allow-localhost-insecure' }, lockedTransport)
+  await assert.rejects(lockedGateways.shop.listProducts(), error => error instanceof PlatformApiError && error.code === 'AUTH_REQUIRED', 'development login must be opt-in')
+  assert.equal(lockedTransport.requests.length, 0, 'a production client must not silently call development login')
+
+  const transport = new FakeTransport()
+  let storedToken = null
+  const gateways = createHttpGateways({
+    baseUrl: 'http://127.0.0.1:3003/',
+    deviceId: 'regression-device',
+    allowDevelopmentLogin: true,
+    httpEndpointPolicy: 'allow-localhost-insecure',
+    credentialStore: {
+      getAccessToken: () => storedToken,
+      setAccessToken: token => { storedToken = token },
+      clearAccessToken: () => { storedToken = null },
+    },
+  }, transport)
+
+  const products = await gateways.shop.listProducts()
+  assert.deepEqual(products[0], { id: 'rice', name: '大米', description: '5kg', category: '粮油', pointsPrice: 3200, stock: 12, imageUrl: undefined })
+  assert.equal(storedToken, 'test-token')
+  assert.equal(transport.requests.filter(request => request.url.endsWith('/api/v1/auth/dev-login')).length, 1, 'login should be shared across gateways')
+  assert.deepEqual(await gateways.wallet.getWallet(), { points: 8000, diamonds: 0 })
+
+  const order = await gateways.shop.createOrder('rice', 1, 3200)
+  assert.equal(order.totalPoints, 3200)
+  const orderRequest = transport.requests.find(request => request.url.endsWith('/api/v1/orders/redeem'))
+  assert.match(orderRequest.headers['Idempotency-Key'], /^shop-/)
+  assert.deepEqual(orderRequest.body, { productId: 'rice', quantity: 1, expectedPointsPrice: 3200 })
+
+  const tournaments = await gateways.tournaments.listTournaments()
+  assert.equal(tournaments[0].name, '周末赛')
+  const fixedTournament = tournaments.find(item => item.id === 't16')
+  assert.equal(fixedTournament.queueId, 'lingshui_16_cup')
+  assert.equal(fixedTournament.format, 'fixed16-latin-3')
+  assert.equal(fixedTournament.capacity, 16)
+  assert.equal(fixedTournament.checkedInCount, 16)
+  assert.equal((await gateways.tournaments.enroll('t1', 200)).enrolled, true)
+  const enrollRequest = transport.requests.find(request => request.url.endsWith('/api/v1/tournaments/t1/enroll'))
+  assert.deepEqual(enrollRequest.body, { expectedEntryPoints: 200 })
+  const checkedInState = await gateways.tournaments.checkIn('t16')
+  assert.equal(checkedInState.phase, 'round-active')
+  assert.equal(checkedInState.checkedInCount, 16)
+  assert.equal(checkedInState.assignment.assignmentId, 'tpa-roster-r1-t1')
+  assert.equal(checkedInState.assignment.roundNumber, 1)
+  assert.equal(checkedInState.assignment.tableNumber, 1)
+  assert.equal(checkedInState.assignment.status, 'pending')
+  assert.equal(checkedInState.viewerEntry.rosterLocked, true)
+  assert.equal(checkedInState.viewerStanding.qualificationStatus, 'pending')
+  const checkInRequest = transport.requests.find(request => request.url.endsWith('/api/v1/tournaments/t16/check-in'))
+  assert.equal(checkInRequest.method, 'POST')
+  assert.equal(checkInRequest.body, undefined)
+  const refreshedState = await gateways.tournaments.getState('t16')
+  assert.equal(refreshedState.assignment.roundNumber, 1, 'wire round/table aliases must normalize to the public roundNumber/tableNumber contract')
+  assert.equal(refreshedState.assignment.tableNumber, 1)
+  assert.equal(transport.requests.find(request => request.url.endsWith('/api/v1/tournaments/t16/state')).method, 'GET')
+  const standings = await gateways.tournaments.getStandings('t1')
+  assert.equal(standings.tournament.roundsTotal, 3)
+  assert.equal(standings.standings[0].displayName, '陵水玩家')
+  assert.equal(standings.standings[0].advanced, true)
+  assert.equal(standings.standings[0].qualificationStatus, 'qualified')
+  assert.equal(standings.provisional, false)
+  assert.equal(standings.cutoffRank, 8)
+  assert.equal(standings.viewerStanding.userId, 'u1')
+
+  const dashboard = await gateways.playerCenter.getDashboard()
+  assert.equal(dashboard.user.accountId, '58310427')
+  assert.equal(dashboard.user.comprehensiveScore, 6311)
+  assert.equal(dashboard.rating.comprehensiveScore, 6311)
+  assert.equal(dashboard.stats.elo, 6311, 'legacy client stat field must fall back to the authoritative comprehensive score')
+  assert.equal(dashboard.recentMatches[0].replayId, 'r1')
+  const taskList = await gateways.seasons.listTasks()
+  assert.equal(taskList.tasks[0].completed, true)
+  await gateways.seasons.claim('daily')
+  assert.match(transport.requests.find(request => request.url.endsWith('/api/v1/season/tasks/daily/claim')).headers['Idempotency-Key'], /^task-/)
+  assert.equal((await gateways.replays.list())[0].eventCount, 1)
+  const replay = await gateways.replays.get('r1')
+  assert.equal(replay.events[0].cards[0].rank, 'A')
+  assert.equal(replay.events[0].roundSequence, 2)
+  assert.equal(replay.events[0].playType, 'Single')
+  assert.equal(replay.events[0].automatic, false)
+  const publicMatches = await gateways.spectator.list(30)
+  assert.equal(publicMatches[0].status, 'running')
+  assert.equal(publicMatches[0].tableLabel, '快速匹配 · MLIVE桌')
+  assert.equal('roomId' in publicMatches[0], false, '公开观战 DTO 不应包含入桌房间码')
+  assert.equal(publicMatches[1].status, 'aborted')
+  assert.equal(publicMatches[1].abortReason, 'empty-timeout')
+  assert.equal(publicMatches[2].mode, 'classic_50')
+  const publicFeed = await gateways.spectator.getFeed('m1', 30)
+  assert.equal(publicFeed.delaySeconds, 30)
+  assert.equal(publicFeed.status, 'finished')
+  assert.equal(publicFeed.events.length, 1)
+
+  const merchantConsole = await gateways.merchant.getConsole()
+  assert.equal(merchantConsole.merchant.status, 'active')
+  assert.equal(merchantConsole.role, 'owner')
+  assert.equal(merchantConsole.stores[0].name, '清水湾店')
+  assert.equal(merchantConsole.employees[0].role, 'cashier')
+  assert.equal(merchantConsole.grants[0].amount, 250)
+  assert.equal((await gateways.merchant.apply({ name: '陵水生活馆', contactName: '店长' })).status, 'pending')
+  assert.equal((await gateways.merchant.createStore({ name: '椰林店', address: '陵水椰林镇' })).id, 'str2')
+  assert.equal((await gateways.merchant.addEmployee({ employeeUserId: 'u4', role: 'manager' })).userId, 'u4')
+  assert.equal((await gateways.merchant.grantPoints({ storeId: 'str1', recipientUserId: 'u5', amount: 80, note: '到店奖励' })).duplicate, false)
+  for (const route of ['/api/v1/merchants/apply', '/api/v1/merchants/stores', '/api/v1/merchants/employees', '/api/v1/merchants/points/grant']) {
+    const request = transport.requests.find(item => new URL(item.url).pathname === route)
+    assert.match(request.headers['Idempotency-Key'], /^merchant-/, `${route} must carry an idempotency key`)
+  }
+  assert.deepEqual(transport.requests.find(item => item.url.endsWith('/api/v1/merchants/stores')).body, { name: '椰林店', address: '陵水椰林镇' })
+  assert.deepEqual(transport.requests.find(item => item.url.endsWith('/api/v1/merchants/employees')).body, { employeeUserId: 'u4', role: 'manager' })
+  assert.deepEqual(transport.requests.find(item => item.url.endsWith('/api/v1/merchants/points/grant')).body, { storeId: 'str1', recipientUserId: 'u5', amount: 80, note: '到店奖励' })
+
+  assert.equal((await gateways.matchmaking.joinQueue('quick')).ticketId, 'm1')
+  assert.deepEqual(transport.requests.find(request => request.url.endsWith('/api/v1/match/join')).body, { mode: 'quick' })
+  for (const queueId of ['classic_50', 'classic_300', 'classic_2000', 'classic_10000']) {
+    const classicTicket = await gateways.matchmaking.joinQueue(queueId)
+    assert.equal(classicTicket.queueId, queueId)
+    assert.equal(classicTicket.ticketId, `m-${queueId}`)
+  }
+  const assignedTicket = await gateways.matchmaking.joinQueue('lingshui_16_cup', { tournamentId: 't16', assignmentId: 'tpa-roster-r1-t1' })
+  assert.equal(assignedTicket.ticketId, 'm16')
+  assert.equal(assignedTicket.queueId, 'lingshui_16_cup')
+  const matchJoinRequests = transport.requests.filter(request => request.url.endsWith('/api/v1/match/join'))
+  assert.deepEqual(matchJoinRequests.at(-1).body, { mode: 'lingshui_16_cup', tournamentId: 't16', assignmentId: 'tpa-roster-r1-t1' })
+  const matched = await gateways.matchmaking.getStatus('m1')
+  assert.equal(matched.joinToken, 'signed-ticket')
+  assert.equal(matched.seat, 'p2')
+  assert.ok(matched.expiresAt > Date.now())
+  await gateways.matchmaking.cancel('m1')
+}
+
+const testWechatLoginBody = async () => {
+  const requests = []
+  const gateways = createHttpGateways({
+    baseUrl: 'https://platform.example',
+    deviceId: 'wechat-device',
+    displayName: '海风玩家',
+    loginProvider: async () => ({ kind: 'wechat', code: 'wx-code' }),
+  }, { request: async input => {
+    requests.push(input)
+    const route = new URL(input.url).pathname
+    if (route === '/api/v1/auth/wx-login') return ok({ accessToken: 'wx-token' })
+    if (route === '/api/v1/wallet') return ok({ wallet: { balance: 1 } })
+    throw new Error('unexpected route')
+  } })
+  await gateways.wallet.getWallet()
+  assert.deepEqual(requests[0].body, { code: 'wx-code', displayName: '海风玩家' })
+  assert.equal(requests.some(item => item.url.endsWith('/api/v1/auth/dev-login')), false)
+}
+
+const testErrorMetadata = async () => {
+  const client = new PlatformApiClient({ request: async () => errorResponse(409, 'PRICE_CHANGED', '价格已变更', { currentPointsPrice: 3300 }, false) }, {
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token',
+  })
+  await assert.rejects(client.request('/api/v1/failure'), error => {
+    assert.ok(error instanceof PlatformApiError)
+    assert.equal(error.status, 409)
+    assert.equal(error.code, 'PRICE_CHANGED')
+    assert.deepEqual(error.details, { currentPointsPrice: 3300 })
+    assert.equal(error.retryable, false)
+    return true
+  })
+
+  const retryableClient = new PlatformApiClient({ request: async () => errorResponse(503, 'UPSTREAM_DOWN', '上游暂不可用', { region: 'hn' }, true) }, {
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token',
+  })
+  await assert.rejects(retryableClient.request('/api/v1/failure'), error => error instanceof PlatformApiError && error.status === 503 && error.code === 'UPSTREAM_DOWN' && error.retryable)
+
+  const malformedClient = new PlatformApiClient({ request: async () => ({ status: 200, body: { ok: true, error: null } }) }, {
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token',
+  })
+  await assert.rejects(malformedClient.request('/api/v1/malformed'), error => error instanceof PlatformApiError && error.code === 'MALFORMED_RESPONSE')
+}
+
+const testConcurrentUnauthorizedRefresh = async () => {
+  let loginCalls = 0
+  let clearCalls = 0
+  const attempts = new Map()
+  const transport = { request: async input => {
+    const route = new URL(input.url).pathname
+    if (route === '/api/v1/auth/dev-login') {
+      loginCalls += 1
+      await new Promise(resolve => setTimeout(resolve, 8))
+      return ok({ accessToken: 'fresh-token' })
+    }
+    assert.equal(route, '/api/v1/wallet')
+    const requestId = Number(new URL(input.url).searchParams.get('requestId'))
+    const count = (attempts.get(requestId) ?? 0) + 1
+    attempts.set(requestId, count)
+    if (input.headers.Authorization === 'Bearer stale-token') {
+      await new Promise(resolve => setTimeout(resolve, (requestId % 10) * 3))
+      return errorResponse(401, 'TOKEN_EXPIRED', '令牌过期')
+    }
+    assert.equal(input.headers.Authorization, 'Bearer fresh-token')
+    return ok({ requestId })
+  } }
+  let storedToken = 'stale-token'
+  const client = new PlatformApiClient(transport, {
+    baseUrl: 'https://platform.example',
+    deviceId: 'regression-device',
+    allowDevelopmentLogin: true,
+    credentialStore: {
+      getAccessToken: () => storedToken,
+      setAccessToken: token => { storedToken = token },
+      clearAccessToken: () => { clearCalls += 1; storedToken = null },
+    },
+  })
+  const results = await Promise.all(Array.from({ length: 20 }, (_, requestId) => client.request(`/api/v1/wallet?requestId=${requestId}`)))
+  assert.deepEqual(results.map(item => item.requestId), Array.from({ length: 20 }, (_, index) => index))
+  assert.equal(loginCalls, 1, 'twenty staggered 401 responses must share one refresh login')
+  assert.equal(clearCalls, 1, 'late stale-token 401 responses must not clear the fresh token')
+  assert.equal(storedToken, 'fresh-token')
+  assert.ok([...attempts.values()].every(value => value === 2), 'every request should retry exactly once')
+}
+
+const testTicketValidation = async () => {
+  await assertMalformedTicket({ matchId: 'm1', mode: 'quick', status: 'queued' }, /状态/)
+  await assertMalformedTicket({ matchId: 'm1', mode: 'unknown', status: 'matching' }, /队列/)
+  await assertMalformedTicket({ matchId: '  ', mode: 'quick', status: 'matching' }, /ID/)
+  await assertMalformedTicket(validMatched({ seat: 'p9' }), /座位/)
+  await assertMalformedTicket(validMatched({ expiresAt: Date.now() - 1 }), /过期时间/)
+  await assertMalformedTicket(validMatched({ gameTicket: '' }), /入桌凭证/)
+  await assertMalformedTicket(validMatched({ gameEndpoint: 'javascript:alert(1)' }), /WebSocket/)
+  await assertMalformedTicket(validMatched({ gameEndpoint: 'https://game.example/weapp' }), /WebSocket/)
+  await assertMalformedTicket(validMatched({ roomId: 'room-1' }), /六位数字/)
+  await assertMalformedTicket(validMatched({ gameEndpoint: 'ws://game.example/weapp' }), /非本机/)
+  await assertMalformedTicket(validMatched(), /必须使用 HTTPS\/WSS/, { gameEndpointPolicy: 'secure-only' })
+
+  const remoteTransport = { request: async () => ok({ match: validMatched({ gameEndpoint: 'ws://192.168.1.8:3002/weapp' }) }) }
+  const remoteGateways = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'allow-insecure',
+  }, remoteTransport)
+  assert.equal((await remoteGateways.matchmaking.getStatus('m1')).gameEndpoint, 'ws://192.168.1.8:3002/weapp')
+
+  const secureTransport = { request: async () => ok({ match: validMatched({ gameEndpoint: 'wss://game.example/weapp' }) }) }
+  const secureGateways = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, secureTransport)
+  assert.equal((await secureGateways.matchmaking.getStatus('m1')).gameEndpoint, 'wss://game.example/weapp')
+}
+
+const testOrderIdempotencyRecovery = async () => {
+  const keys = []
+  let riceCalls = 0
+  let soapCalls = 0
+  const gateways = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async input => {
+      assert.equal(new URL(input.url).pathname, '/api/v1/orders/redeem')
+      keys.push({ productId: input.body.productId, key: input.headers['Idempotency-Key'] })
+      if (input.body.productId === 'rice') {
+        riceCalls += 1
+        if (riceCalls === 1) throw new Error('response lost after commit')
+        return ok({ order: { orderId: 'committed-order', productId: 'rice', quantity: 1, totalPoints: 3200, status: 'paid' } })
+      }
+      soapCalls += 1
+      if (soapCalls === 1) return errorResponse(409, 'PRICE_CHANGED', '价格已变更')
+      return ok({ order: { orderId: 'new-order', productId: 'soap', quantity: 1, totalPoints: 600, status: 'paid' } })
+    },
+  })
+
+  await assert.rejects(gateways.shop.createOrder('rice', 1, 3200), error => error instanceof PlatformApiError && error.code === 'TRANSPORT_ERROR' && error.retryable)
+  assert.equal((await gateways.shop.createOrder('rice', 1, 3200)).orderId, 'committed-order')
+  assert.equal((await gateways.shop.createOrder('rice', 1, 3200)).orderId, 'committed-order')
+  const riceKeys = keys.filter(item => item.productId === 'rice').map(item => item.key)
+  assert.equal(riceKeys[0], riceKeys[1], 'an uncertain retry must reuse the original idempotency key')
+  assert.notEqual(riceKeys[1], riceKeys[2], 'a confirmed success must release the idempotency key')
+
+  await assert.rejects(gateways.shop.createOrder('soap', 1, 600), error => error instanceof PlatformApiError && error.status === 409)
+  await gateways.shop.createOrder('soap', 1, 600)
+  const soapKeys = keys.filter(item => item.productId === 'soap').map(item => item.key)
+  assert.notEqual(soapKeys[0], soapKeys[1], 'a definite 4xx must release the idempotency key')
+}
+
+const testMerchantIdempotencyRecovery = async () => {
+  const calls = []
+  let storeCalls = 0
+  let grantCalls = 0
+  const gateways = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async input => {
+      const route = new URL(input.url).pathname
+      calls.push({ route, key: input.headers['Idempotency-Key'], body: input.body })
+      if (route === '/api/v1/merchants/stores') {
+        storeCalls += 1
+        if (storeCalls === 1) throw new Error('store response lost after commit')
+        return ok({ store: { id: 'str-recovered', merchantId: 'mch1', name: '清水湾店', address: '', status: 'active', createdAt: 1000 } })
+      }
+      if (route === '/api/v1/merchants/points/grant') {
+        grantCalls += 1
+        if (grantCalls === 1) throw new Error('grant response lost after commit')
+        return ok({ grant: { id: 'mgr-recovered', merchantId: 'mch1', storeId: 'str1', operatorUserId: 'u1', recipientUserId: 'u3', amount: 20, note: '', status: 'posted', createdAt: 1100, duplicate: true } })
+      }
+      throw new Error(`unexpected route ${route}`)
+    },
+  })
+
+  await assert.rejects(gateways.merchant.createStore({ name: '清水湾店' }), error => error instanceof PlatformApiError && error.retryable)
+  assert.equal((await gateways.merchant.createStore({ name: '清水湾店' })).id, 'str-recovered')
+  await gateways.merchant.createStore({ name: '清水湾店' })
+  const storeKeys = calls.filter(item => item.route === '/api/v1/merchants/stores').map(item => item.key)
+  assert.equal(storeKeys[0], storeKeys[1], 'uncertain store retry must reuse its idempotency key')
+  assert.notEqual(storeKeys[1], storeKeys[2], 'confirmed store response must release its idempotency key')
+
+  await assert.rejects(gateways.merchant.grantPoints({ storeId: 'str1', recipientUserId: 'u3', amount: 20 }), error => error instanceof PlatformApiError && error.retryable)
+  assert.equal((await gateways.merchant.grantPoints({ storeId: 'str1', recipientUserId: 'u3', amount: 20 })).duplicate, true)
+  const grantKeys = calls.filter(item => item.route === '/api/v1/merchants/points/grant').map(item => item.key)
+  assert.equal(grantKeys[0], grantKeys[1], 'uncertain point grant retry must reuse its idempotency key')
+
+  const callsBeforeInvalidInput = calls.length
+  await assert.rejects(gateways.merchant.createStore({ name: '   ' }), error => error instanceof PlatformApiError && error.code === 'INVALID_MERCHANT_INPUT')
+  await assert.rejects(gateways.merchant.grantPoints({ storeId: 'str1', recipientUserId: 'u3', amount: 0 }), error => error instanceof PlatformApiError && error.code === 'INVALID_MERCHANT_INPUT')
+  assert.equal(calls.length, callsBeforeInvalidInput, 'invalid merchant forms must be rejected before network writes')
+}
+
+const testMalformedCollections = async () => {
+  const products = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok({ products: null }),
+  })
+  await assert.rejects(products.shop.listProducts(), error => error instanceof PlatformApiError && error.code === 'MALFORMED_RESPONSE')
+
+  const badProduct = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok({ products: [{ id: 'p1', name: '商品', pointsPrice: -1, stock: 1 }] }),
+  })
+  await assert.rejects(badProduct.shop.listProducts(), error => error instanceof PlatformApiError && /积分价格/.test(error.message))
+
+  const badTournament = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok({ tournaments: [{ id: 't1', status: 'mystery', entryPoints: 1, queueId: 'quick' }] }),
+  })
+  await assert.rejects(badTournament.tournaments.listTournaments(), error => error instanceof PlatformApiError && /赛事状态/.test(error.message))
+
+  const badTournamentFormat = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok({ tournaments: [validFixedTournament({ format: 'knockout' })] }),
+  })
+  await assert.rejects(badTournamentFormat.tournaments.listTournaments(), error => error instanceof PlatformApiError && /赛制/.test(error.message))
+
+  const badTournamentState = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok(validTournamentState({ viewerEntry: { enrolled: true, checkedIn: 'yes', rosterLocked: true } })),
+  })
+  await assert.rejects(badTournamentState.tournaments.getState('t16'), error => error instanceof PlatformApiError && /布尔值/.test(error.message))
+
+  const badAssignmentState = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok(validTournamentState({ assignment: { assignmentId: 'bad', roundNumber: 1, tableNumber: 1, status: 'waiting' } })),
+  })
+  await assert.rejects(badAssignmentState.tournaments.checkIn('t16'), error => error instanceof PlatformApiError && /分配状态/.test(error.message))
+
+  const badQualification = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok({
+      tournament: { id: 't1', title: '周末赛', status: 'running', entryFee: 0, queueId: 'weekend_cup', enrolled: true },
+      standings: [validTournamentStanding({ qualificationStatus: 'maybe' })],
+      provisional: true,
+      cutoffRank: 8,
+      viewerStanding: null,
+    }),
+  })
+  await assert.rejects(badQualification.tournaments.getStandings('t1'), error => error instanceof PlatformApiError && /晋级状态/.test(error.message))
+
+  const badWallet = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok({ wallet: { balance: -1 } }),
+  })
+  await assert.rejects(badWallet.wallet.getWallet(), error => error instanceof PlatformApiError && /钱包积分/.test(error.message))
+
+  const badLogin = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'regression-device', allowDevelopmentLogin: true }, {
+    request: async () => ok({ accessToken: '   ' }),
+  })
+  await assert.rejects(badLogin.wallet.getWallet(), error => error instanceof PlatformApiError && error.code === 'MALFORMED_RESPONSE')
+
+  const badMerchantStatus = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok(validMerchantConsole({ merchant: { ...validMerchantConsole().merchant, status: 'mystery' } })),
+  })
+  await assert.rejects(badMerchantStatus.merchant.getConsole(), error => error instanceof PlatformApiError && /商户资料状态/.test(error.message))
+
+  const foreignMerchantData = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok(validMerchantConsole({ stores: [{ ...validMerchantConsole().stores[0], merchantId: 'mch-other' }] })),
+  })
+  await assert.rejects(foreignMerchantData.merchant.getConsole(), error => error instanceof PlatformApiError && /其他商户/.test(error.message))
+
+  const malformedMerchantCollections = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok(validMerchantConsole({ employees: null })),
+  })
+  await assert.rejects(malformedMerchantCollections.merchant.getConsole(), error => error instanceof PlatformApiError && /员工列表/.test(error.message))
+
+  const stringMerchantLimit = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+    request: async () => ok(validMerchantConsole({ merchant: { ...validMerchantConsole().merchant, dailyPointLimit: '5000' } })),
+  })
+  await assert.rejects(stringMerchantLimit.merchant.getConsole(), error => error instanceof PlatformApiError && /非负整数/.test(error.message))
+}
+
+;(async () => {
+  await testDevelopmentTournamentState()
+  await testBasicGateways()
+  await testWechatLoginBody()
+  await testErrorMetadata()
+  await testConcurrentUnauthorizedRefresh()
+  await testTicketValidation()
+  await testOrderIdempotencyRecovery()
+  await testMerchantIdempotencyRecovery()
+  await testMalformedCollections()
+  process.stdout.write('platform API regression checks passed\n')
+})().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})

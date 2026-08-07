@@ -73,8 +73,9 @@ const advance = (state: EngineState): EngineState => {
 
 export const playCards = (state: EngineState, playerId: PlayerId, cards: Card[]): EngineState => {
   if (state.currentTurn !== playerId) throw new Error('未轮到该玩家出牌')
-  if (!getPlayInfo(cards) || !canPlay(cards, state.lastValidPlay)) throw new Error('不合法的出牌')
-  const action: PlayAction = { playerId, cards, type: getPlayInfo(cards)!.type }
+  const resolution = getPlayInfo(cards)
+  if (!resolution || !canPlay(cards, state.lastValidPlay)) throw new Error('不合法的出牌')
+  const action: PlayAction = { playerId, cards, type: resolution.type, resolution }
   const hand = state.players[playerId].hand.filter(card => !cards.some(selected => selected.id === card.id))
   const finishedPlayers = hand.length === 0 && !state.finishedPlayers.includes(playerId) ? [...state.finishedPlayers, playerId] : state.finishedPlayers
   return advance({ ...state, players: { ...state.players, [playerId]: { ...state.players[playerId], hand } }, playArea: [...state.playArea, action], lastValidPlay: action, finishedPlayers })

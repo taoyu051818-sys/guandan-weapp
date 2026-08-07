@@ -3,10 +3,19 @@
 /temp/
 /local/
 /build/
-/profiles/
+/profiles/*
+!/profiles/v2/
+/profiles/v2/*
+!/profiles/v2/packages/
+/profiles/v2/packages/*
+!/profiles/v2/packages/web-desktop.json
+!/profiles/v2/packages/wechatgame.json
 /native/engine/android/**/*/assets
 
 # Dependencies and editor workspace files
 node_modules/
 .vscode/
 .idea/
+
+# Re-downloadable archives; extracted sources and selected assets are retained.
+/work-downloads/

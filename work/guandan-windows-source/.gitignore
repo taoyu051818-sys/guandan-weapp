@@ -15,6 +15,8 @@ release/
 release-win/
 reports/
 .tmp-sim/
+var/weapp-rooms.json*
+var/spectator-outbox.json*
 
 # Editor directories and files
 .vscode/*

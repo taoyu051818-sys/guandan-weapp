@@ -1,0 +1,219 @@
+import assert from 'node:assert/strict'
+import { createPlatformRuntime } from '../platform-server.js'
+import { GameTicketService } from './crypto.js'
+import { GameResultReporter } from './result-reporter.js'
+
+const accessSecret = 'tournament-access-secret-with-at-least-thirty-two-characters'
+const ticketSecret = 'tournament-ticket-secret-with-at-least-thirty-two-characters'
+const resultSecret = 'tournament-result-secret-with-at-least-thirty-two-characters'
+const spectatorSecret = 'tournament-spectator-secret-with-at-least-thirty-two-characters'
+const tournamentId = 'lingshui-16-cup'
+const queueId = 'lingshui_16_cup'
+
+const listen = async (runtime) => {
+  await new Promise(resolve => runtime.server.listen(0, '127.0.0.1', resolve))
+  const { port } = runtime.server.address()
+  return `http://127.0.0.1:${port}`
+}
+const close = runtime => new Promise(resolve => runtime.server.close(resolve))
+const call = async (baseUrl, path, { method = 'GET', token, body, headers = {} } = {}) => {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: {
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+  return { status: response.status, payload: await response.json() }
+}
+
+const runtime = await createPlatformRuntime({
+  env: {
+    NODE_ENV: 'test',
+    PLATFORM_ENABLE_DEV_LOGIN: 'true',
+    PLATFORM_ACCESS_SECRET: accessSecret,
+    GAME_TICKET_SECRET: ticketSecret,
+    GAME_RESULT_SECRET: resultSecret,
+    GAME_SPECTATOR_EVENT_SECRET: spectatorSecret,
+    GAME_ENDPOINT: 'ws://127.0.0.1:39999/weapp',
+  },
+  wxCodeVerifier: { async verify () { throw new Error('本测试不使用微信登录') } },
+  logger: { error () {} },
+})
+let platformNow = Date.now()
+runtime.service.now = () => platformNow
+runtime.service.gameTickets = new GameTicketService({
+  secret: ticketSecret,
+  gameEndpoint: 'ws://127.0.0.1:39999/weapp',
+  ttlMs: 1_000,
+  now: () => platformNow,
+})
+const baseUrl = await listen(runtime)
+
+try {
+  assert.equal((await call(baseUrl, `/api/v1/tournaments/${tournamentId}/state`)).status, 401, '赛事状态必须登录后读取')
+
+  const players = []
+  for (let index = 1; index <= 16; index += 1) {
+    const login = await call(baseUrl, '/api/v1/auth/dev-login', {
+      method: 'POST',
+      body: { deviceId: `tournament-device-${index}`, displayName: `赛事玩家${String(index).padStart(2, '0')}` },
+    })
+    assert.equal(login.status, 200)
+    const player = { token: login.payload.data.accessToken, userId: login.payload.data.user.id }
+    players.push(player)
+    const enrollment = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/enroll`, {
+      method: 'POST',
+      token: player.token,
+      body: { expectedEntryPoints: 0 },
+      headers: { 'idempotency-key': `enroll-${index}` },
+    })
+    assert.equal(enrollment.status, 200)
+    const checkedIn = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/check-in`, { method: 'POST', token: player.token })
+    assert.equal(checkedIn.status, 200)
+    assert.equal(checkedIn.payload.data.checkedInCount, index)
+    if (index < 16) {
+      assert.equal(checkedIn.payload.data.phase, 'check-in')
+      assert.equal(checkedIn.payload.data.roundNumber, 0)
+    } else {
+      assert.equal(checkedIn.payload.data.phase, 'round-active')
+      assert.equal(checkedIn.payload.data.roundNumber, 1)
+    }
+  }
+
+  const duplicateCheckIn = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/check-in`, { method: 'POST', token: players[0].token })
+  assert.equal(duplicateCheckIn.payload.data.checkedInCount, 16, '重复检录必须幂等')
+
+  const unassignedJoin = await call(baseUrl, '/api/v1/match/join', {
+    method: 'POST', token: players[0].token, body: { mode: queueId },
+  })
+  assert.equal(unassignedJoin.status, 409)
+  assert.equal(unassignedJoin.payload.error.code, 'TOURNAMENT_ASSIGNMENT_REQUIRED')
+
+  const reporter = new GameResultReporter({ endpoint: `${baseUrl}/api/v1/game/results`, secret: resultSecret, maxAttempts: 1 })
+  let verifiedExpiredTicketRecovery = false
+  const playRound = async (roundNumber) => {
+    const entries = []
+    for (const player of players) {
+      const state = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/state`, { token: player.token })
+      assert.equal(state.status, 200)
+      assert.equal(state.payload.data.phase, 'round-active')
+      assert.equal(state.payload.data.roundNumber, roundNumber)
+      entries.push({ ...player, assignment: state.payload.data.assignment })
+    }
+
+    const groups = new Map()
+    entries.forEach(entry => {
+      assert.equal(entry.assignment.roundNumber, roundNumber)
+      const group = groups.get(entry.assignment.assignmentId) || []
+      group.push(entry)
+      groups.set(entry.assignment.assignmentId, group)
+    })
+    assert.equal(groups.size, 4)
+    assert.ok([...groups.values()].every(group => group.length === 4))
+
+    const tableResults = []
+    for (const [assignmentId, group] of groups) {
+      const wrongAssignment = await call(baseUrl, '/api/v1/match/join', {
+        method: 'POST',
+        token: group[0].token,
+        body: { mode: queueId, tournamentId, assignmentId: `${assignmentId}-wrong` },
+      })
+      assert.equal(wrongAssignment.status, 409)
+      assert.equal(wrongAssignment.payload.error.code, 'TOURNAMENT_ASSIGNMENT_MISMATCH')
+
+      let matchId = ''
+      for (const player of group) {
+        const joined = await call(baseUrl, '/api/v1/match/join', {
+          method: 'POST',
+          token: player.token,
+          body: { mode: queueId, tournamentId, assignmentId },
+        })
+        assert.equal(joined.status, 200)
+        matchId = joined.payload.data.match.matchId
+      }
+      const views = []
+      for (const player of group) {
+        const status = await call(baseUrl, `/api/v1/match/status?matchId=${encodeURIComponent(matchId)}`, { token: player.token })
+        assert.equal(status.payload.data.match.status, 'matched')
+        assert.equal(status.payload.data.match.assignmentId, assignmentId)
+        assert.equal(status.payload.data.match.roundNumber, roundNumber)
+        views.push(status.payload.data.match)
+      }
+      if (!verifiedExpiredTicketRecovery) {
+        const original = views[0]
+        platformNow += 1_100
+        const recovered = await call(baseUrl, '/api/v1/match/join', {
+          method: 'POST',
+          token: group[0].token,
+          body: { mode: queueId, tournamentId, assignmentId },
+        })
+        assert.equal(recovered.status, 200)
+        assert.equal(recovered.payload.data.match.status, 'matched')
+        assert.equal(recovered.payload.data.match.matchId, original.matchId, '门票过期后必须回到同一赛事牌桌')
+        assert.equal(recovered.payload.data.match.roomId, original.roomId)
+        assert.equal(recovered.payload.data.match.seat, original.seat)
+        assert.notEqual(recovered.payload.data.match.gameTicket, original.gameTicket, '门票过期后必须签发新票')
+        assert.ok(recovered.payload.data.match.expiresAt > original.expiresAt)
+        views[0] = recovered.payload.data.match
+        verifiedExpiredTicketRecovery = true
+      }
+      tableResults.push({
+        matchId,
+        roomId: views[0].roomId,
+        usersBySeat: Object.fromEntries(views.map((view, index) => [view.seat, group[index].userId])),
+      })
+    }
+
+    for (let index = 0; index < tableResults.length; index += 1) {
+      const table = tableResults[index]
+      await reporter.report({
+        eventId: `game:${table.matchId}:1`,
+        matchId: table.matchId,
+        roomId: table.roomId,
+        ranking: ['p1', 'p2', 'p3', 'p4'],
+        userIdsBySeat: table.usersBySeat,
+        winnerTeam: 'teamA',
+        finishedAt: Date.now(),
+      })
+      const state = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/state`, { token: players[0].token })
+      if (index < 3) {
+        assert.equal(state.payload.data.roundNumber, roundNumber, '前三桌结算不得提前推进轮次')
+        assert.equal(state.payload.data.tablesSettled, index + 1)
+      } else if (roundNumber < 3) {
+        assert.equal(state.payload.data.roundNumber, roundNumber + 1, '第四桌结算后必须推进一次')
+        assert.equal(state.payload.data.tablesSettled, 0)
+      } else {
+        assert.equal(state.payload.data.phase, 'finished')
+        assert.equal(state.payload.data.roundNumber, 3)
+      }
+    }
+  }
+
+  await playRound(1)
+  await playRound(2)
+  await playRound(3)
+
+  const finalState = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/state`, { token: players[15].token })
+  assert.equal(finalState.payload.data.phase, 'finished')
+  assert.equal(finalState.payload.data.assignment, null)
+  assert.equal(finalState.payload.data.viewerStanding.userId, players[15].userId)
+
+  const standings = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/standings`, { token: players[15].token })
+  assert.equal(standings.payload.data.provisional, false)
+  assert.equal(standings.payload.data.cutoffRank, 8)
+  assert.equal(standings.payload.data.standings.length, 16)
+  assert.equal(standings.payload.data.standings.filter(item => item.qualificationStatus === 'qualified').length, 8)
+  assert.equal(standings.payload.data.standings.filter(item => item.advanced).length, 8)
+  assert.equal(standings.payload.data.viewerStanding.userId, players[15].userId)
+
+  const snapshot = await runtime.store.read(state => state)
+  assert.equal(Object.keys(snapshot.tournamentPlayerRoundResults).length, 48, '每名玩家每轮只能有一条赛事结果')
+  assert.equal(snapshot.tournamentRuns[tournamentId].rounds.flatMap(round => round.assignments).filter(item => item.status === 'completed').length, 12)
+} finally {
+  await close(runtime)
+}
+
+console.log('fixed 16-player tournament live contract passed')

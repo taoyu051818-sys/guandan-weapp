@@ -12,7 +12,10 @@
     "preview": "vite preview",
     "check": "tsc --noEmit",
     "server:weapp": "node server/weapp-ws.js",
-    "test:weapp-server": "node server/weapp-ws.smoke.mjs"
+    "server:platform": "node server/platform-server.js",
+    "test:platform": "node server/platform/tournament-pairing.test.mjs && node server/platform/tournament-orchestrator.test.mjs && node server/platform/tournament-live.test.mjs && node server/platform/spectator-outbox.test.mjs && node server/platform/platform.test.mjs",
+    "test:weapp-server": "node server/game-stats.test.mjs && node server/friend-room-settings.test.mjs && node server/master-bot-policy.test.mjs && node server/room-state-store.test.mjs && node server/weapp-ws.smoke.mjs && node server/weapp-bots.smoke.mjs && node server/weapp-room-settings.smoke.mjs && node server/weapp-ticket.smoke.mjs && node server/weapp-round-state.smoke.mjs && node server/weapp-persistence.smoke.mjs",
+    "test:server": "npm run test:platform && npm run test:weapp-server"
   },
   "dependencies": {
     "astral-regex": "^2.0.0",

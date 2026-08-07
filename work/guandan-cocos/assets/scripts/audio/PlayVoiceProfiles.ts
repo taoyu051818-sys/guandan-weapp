@@ -1,0 +1,76 @@
+import { PlayType, type PlayAction } from '../core/generated'
+
+export type PlayVoiceProfile = Readonly<{
+  /** Keys below game-assets/audio/voices, ordered from preferred to fallback. */
+  assetKeys: readonly string[]
+  volumeScale: number
+}>
+
+const voiceProfile = (assetKeys: readonly string[], volumeScale = 0.92): PlayVoiceProfile =>
+  Object.freeze({ assetKeys: Object.freeze([...assetKeys]), volumeScale })
+
+const singleVoices: Readonly<Record<string, PlayVoiceProfile>> = Object.freeze({
+  '2': voiceProfile(['niuma/single_2', 'licensed/single_2']),
+  '3': voiceProfile(['niuma/single_3']),
+  '4': voiceProfile(['niuma/single_4']),
+  '5': voiceProfile(['niuma/single_5', 'licensed/single_5_female', 'licensed/single_5_male']),
+  '6': voiceProfile(['niuma/single_6', 'licensed/single_6']),
+  '7': voiceProfile(['niuma/single_7']),
+  '8': voiceProfile(['niuma/single_8']),
+  '9': voiceProfile(['niuma/single_9', 'licensed/single_9']),
+  '10': voiceProfile(['niuma/single_10']),
+  J: voiceProfile(['niuma/single_j', 'licensed/single_j']),
+  Q: voiceProfile(['niuma/single_q']),
+  K: voiceProfile(['niuma/single_k', 'licensed/single_k']),
+  A: voiceProfile(['niuma/single_a', 'licensed/single_a']),
+  Small: voiceProfile(['niuma/single_small_joker', 'licensed/single_small_joker']),
+  Big: voiceProfile(['niuma/single_big_joker', 'licensed/single_big_joker']),
+})
+
+const pairVoices: Readonly<Record<string, PlayVoiceProfile>> = Object.freeze({
+  '2': voiceProfile(['niuma/pair_2', 'licensed/pair_2']),
+  '3': voiceProfile(['niuma/pair_3', 'licensed/pair_3']),
+  '4': voiceProfile(['niuma/pair_4', 'licensed/pair_4']),
+  '5': voiceProfile(['niuma/pair_5', 'licensed/pair_5']),
+  '6': voiceProfile(['niuma/pair_6', 'licensed/pair_6']),
+  '7': voiceProfile(['niuma/pair_7', 'licensed/pair_7']),
+  '8': voiceProfile(['niuma/pair_8']),
+  '9': voiceProfile(['niuma/pair_9', 'licensed/pair_9']),
+  '10': voiceProfile(['niuma/pair_10']),
+  J: voiceProfile(['niuma/pair_j', 'licensed/pair_j']),
+  Q: voiceProfile(['niuma/pair_q']),
+  K: voiceProfile(['niuma/pair_k', 'licensed/pair_k']),
+  A: voiceProfile(['niuma/pair_a']),
+  Small: voiceProfile(['licensed/pair_small_joker', 'niuma/pair_joker_generic']),
+  Big: voiceProfile(['niuma/pair_joker_generic']),
+})
+
+const straightVoice = voiceProfile(['niuma/straight', 'licensed/straight'])
+const tripleVoice = voiceProfile(['niuma/triple'])
+const tripleWithPairVoice = voiceProfile(['niuma/triple_with_pair'])
+const tubeVoice = voiceProfile(['niuma/tube'])
+const straightFlushVoice = voiceProfile(['niuma/straight_flush'])
+const bombVoice = voiceProfile(['niuma/bomb'])
+const kingBombVoice = voiceProfile(['niuma/king_bomb'])
+
+/**
+ * Resolves only unambiguous announcements. The curated Female matrix covers all
+ * physical single/pair ranks, while wildcard-resolved singles/pairs stay silent
+ * rather than announcing the red-heart level card as its represented rank.
+ */
+export const resolvePlayVoiceProfile = (action: PlayAction): PlayVoiceProfile | null => {
+  if (action.type === PlayType.Straight) return straightVoice
+  if (action.type === PlayType.Triple) return tripleVoice
+  if (action.type === PlayType.TripleWithPair) return tripleWithPairVoice
+  if (action.type === PlayType.Tube) return tubeVoice
+  if (action.type === PlayType.StraightFlush) return straightFlushVoice
+  if (action.type === PlayType.Bomb) return bombVoice
+  if (action.type === PlayType.Rocket) return kingBombVoice
+  if (action.type !== PlayType.Single && action.type !== PlayType.Pair) return null
+  if (action.resolution?.wildcardUsages?.length) return null
+  const ranks = new Set(action.cards.map(card => String(card.rank)))
+  if (ranks.size !== 1) return null
+  const rank = ranks.values().next().value as string | undefined
+  if (!rank) return null
+  return action.type === PlayType.Single ? singleVoices[rank] ?? null : pairVoices[rank] ?? null
+}

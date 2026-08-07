@@ -1,0 +1,51 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const { pathToFileURL } = require('node:url')
+
+const projectRoot = path.resolve(__dirname, '..')
+const mapperPath = path.join(projectRoot, 'assets/scripts/ui/CardPresentationMapper.ts')
+const mapperMetaPath = `${mapperPath}.meta`
+const handPath = path.join(projectRoot, 'assets/scripts/ui/HandController.ts')
+const playAreaPath = path.join(projectRoot, 'assets/scripts/ui/PlayAreaController.ts')
+const effectTypesPath = path.join(projectRoot, 'assets/scripts/effects/EffectTypes.ts')
+const vfxSnapshotPath = path.join(projectRoot, 'assets/scripts/effects/VfxCardSnapshot.ts')
+
+const read = filePath => fs.readFileSync(filePath, 'utf8')
+const card = (suit, rank) => ({ id: `${suit}-${rank}`, suit, rank, value: 0, isLevelCard: false })
+
+async function verifyMappings () {
+  const { mapCardToPresentation } = await import(`${pathToFileURL(mapperPath).href}?regression=${Date.now()}`)
+  assert.deepEqual(mapCardToPresentation(card('spade', 'A')), { rank: 'A', suit: '♠', red: false })
+  assert.deepEqual(mapCardToPresentation(card('heart', 10)), { rank: '10', suit: '♥', red: true })
+  assert.deepEqual(mapCardToPresentation(card('club', 'K')), { rank: 'K', suit: '♣', red: false })
+  assert.deepEqual(mapCardToPresentation(card('diamond', 2)), { rank: '2', suit: '♦', red: true })
+  assert.deepEqual(mapCardToPresentation(card('joker', 'Small')), { rank: '小王', suit: '王', red: false })
+  assert.deepEqual(mapCardToPresentation(card('joker', 'Big')), { rank: '大王', suit: '王', red: true })
+}
+
+function verifyOneMappingBoundary () {
+  assert.equal(fs.existsSync(mapperMetaPath), true, 'the canonical presentation mapper needs Cocos metadata')
+  const hand = read(handPath)
+  const playArea = read(playAreaPath)
+  const effects = read(effectTypesPath)
+  const vfx = read(vfxSnapshotPath)
+
+  for (const [name, source] of [['hand', hand], ['play area', playArea]]) {
+    assert.match(source, /import \{ mapCardToPresentation \} from '\.\/CardPresentationMapper'/, `${name} must import the canonical mapper`)
+    assert.match(source, /\.\.\.mapCardToPresentation\(card\)/, `${name} must bind the canonical presentation`)
+    assert.doesNotMatch(source, /card\.suit === 'joker' \?/, `${name} must not retain a private joker presentation path`)
+  }
+  assert.match(effects, /export \{ mapCardToPresentation as cardDisplay \} from '\.\.\/ui\/CardPresentationMapper'/, 'VFX compatibility must alias the canonical mapper')
+  assert.doesNotMatch(effects, /card\.suit ===/, 'EffectTypes must not retain a second card-face mapper')
+  assert.match(vfx, /resolveClassicCardPlan\(cardDisplay\(card\)\)/, 'VFX snapshots must consume the canonical mapper alias')
+}
+
+Promise.resolve()
+  .then(verifyMappings)
+  .then(verifyOneMappingBoundary)
+  .then(() => console.log('card presentation mapper regression checks passed'))
+  .catch(error => {
+    console.error(error)
+    process.exitCode = 1
+  })
