@@ -16,12 +16,13 @@ const card = (suit, rank) => ({ id: `${suit}-${rank}`, suit, rank, value: 0, isL
 
 async function verifyMappings () {
   const { mapCardToPresentation } = await import(`${pathToFileURL(mapperPath).href}?regression=${Date.now()}`)
-  assert.deepEqual(mapCardToPresentation(card('spade', 'A')), { rank: 'A', suit: '♠', red: false })
-  assert.deepEqual(mapCardToPresentation(card('heart', 10)), { rank: '10', suit: '♥', red: true })
-  assert.deepEqual(mapCardToPresentation(card('club', 'K')), { rank: 'K', suit: '♣', red: false })
-  assert.deepEqual(mapCardToPresentation(card('diamond', 2)), { rank: '2', suit: '♦', red: true })
-  assert.deepEqual(mapCardToPresentation(card('joker', 'Small')), { rank: '小王', suit: '王', red: false })
-  assert.deepEqual(mapCardToPresentation(card('joker', 'Big')), { rank: '大王', suit: '王', red: true })
+  assert.deepEqual(mapCardToPresentation(card('spade', 'A')), { rank: 'A', suit: '♠', red: false, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('heart', 10)), { rank: '10', suit: '♥', red: true, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('club', 'K')), { rank: 'K', suit: '♣', red: false, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('diamond', 2)), { rank: '2', suit: '♦', red: true, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('joker', 'Small')), { rank: '小王', suit: '王', red: false, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('joker', 'Big')), { rank: '大王', suit: '王', red: true, levelCard: false })
+  assert.equal(mapCardToPresentation({ ...card('heart', 7), isLevelCard: true }).levelCard, true)
 }
 
 function verifyOneMappingBoundary () {

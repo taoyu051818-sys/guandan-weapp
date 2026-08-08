@@ -6,6 +6,7 @@ const projectRoot = path.resolve(__dirname, '..')
 const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
 const arrangementPath = path.join(projectRoot, 'assets/scripts/game/HandArrangement.ts')
 const groupingPath = path.join(projectRoot, 'assets/scripts/game/HandGrouping.ts')
+const workspacePath = path.join(projectRoot, 'assets/scripts/game/HandWorkspace.ts')
 const gameManagerPath = path.join(projectRoot, 'assets/scripts/game/GameManager.ts')
 const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
 
@@ -116,6 +117,7 @@ function verifyLockAndBottomSelection () {
 
 function verifyTableIntegration () {
   const scene = fs.readFileSync(gameScenePath, 'utf8')
+  const workspace = fs.readFileSync(workspacePath, 'utf8')
   const manager = fs.readFileSync(gameManagerPath, 'utf8')
   const suitHandlerStart = scene.indexOf('private handleTableHudSuit')
   const suitHandlerEnd = scene.indexOf('private handleTableHudHandLock', suitHandlerStart)
@@ -123,11 +125,11 @@ function verifyTableIntegration () {
   assert.notEqual(suitHandlerEnd, -1, 'the suit handler must remain a bounded interaction method')
   const suitHandler = scene.slice(suitHandlerStart, suitHandlerEnd)
 
-  assert.match(scene, /availableSuits: this\.handGrouping\.getStraightFlushAvailability/, 'the four-suit HUD must receive authoritative availability')
-  assert.match(suitHandler, /selectStraightFlush\(suit/, 'pressing a lit suit must resolve its exact five-card candidate')
-  assert.match(suitHandler, /suggestion\.cardIds\.forEach\(cardId => this\.manualGroupingSelection\.add\(cardId\)\)/, 'one suit press must select all five cards')
-  assert.doesNotMatch(suitHandler, /handGrouping\.arrange/, 'suit controls must not reorder the whole hand')
-  assert.match(scene, /getStackSelectionForBottomCard\(cardId\)[\s\S]*replaceSelectedCards\(stackIsExactSelection \? \[\] : stackCardIds\)/, 'the visible bottom card must toggle the complete locked stack in one snapshot')
+  assert.match(scene, /availableSuits: this\.handWorkspace\.straightFlushAvailability/, 'the four-suit HUD must receive authoritative availability')
+  assert.match(suitHandler, /handWorkspace\.selectStraightFlush\(suit/, 'pressing a lit suit must delegate its exact candidate to the hand transaction')
+  assert.match(workspace, /suggestion\.cardIds\.forEach\(cardId => this\.manualSelection\.add\(cardId\)\)/, 'one suit press must select all five cards')
+  assert.doesNotMatch(suitHandler, /\.arrange/, 'suit controls must not reorder the whole hand')
+  assert.match(scene, /stackSelectionForBottomCard\(cardId\)[\s\S]*replaceSelectedCards\(stackIsExactSelection \? \[\] : stackCardIds\)/, 'the visible bottom card must toggle the complete stack in one snapshot')
   assert.match(manager, /public replaceSelectedCards \(cardIds: readonly string\[\]\): void/, 'GameManager must expose an atomic stack-selection entry point')
   assert.match(manager, /this\.selectedCardIds = new Set\(requested\)[\s\S]*diagnosePlay\(cards, this\.state\.lastValidPlay\)/, 'batch selection must use the same authoritative play diagnosis as ordinary taps')
 }

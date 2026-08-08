@@ -14,6 +14,7 @@ const playVoiceProfilesPath = path.join(projectRoot, 'assets/scripts/audio/PlayV
 const gameManagerPath = path.join(projectRoot, 'assets/scripts/game/GameManager.ts')
 const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
 const frontPagePath = path.join(projectRoot, 'assets/scripts/scenes/FrontPageController.ts')
+const effectLabPageDomainPath = path.join(projectRoot, 'assets/scripts/scenes/front-pages/EffectLabPageDomain.ts')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
 const ts = require(compilerPath)
@@ -103,6 +104,7 @@ const source = read(effectLabPath)
 const gameManagerSource = read(gameManagerPath)
 const gameSceneSource = read(gameScenePath)
 const frontPageSource = read(frontPagePath)
+const effectLabPageDomainSource = read(effectLabPageDomainPath)
 assert.doesNotMatch(source, /location|URLSearchParams|searchParams|localStorage|sessionStorage/i, 'the effect lab must not expose a URL or persisted production bypass')
 assert.match(source, /import \{ DEBUG, DEV \} from 'cc\/env'/, 'availability must use Cocos compile-time development/debug flags')
 assert.doesNotMatch(source, /export class DevelopmentEffectLab/, 'the ungated implementation must not be publicly constructible')
@@ -110,19 +112,26 @@ assert.match(gameManagerSource, /applyDevelopmentFixtureState/, 'fixed matches m
 assert.match(gameManagerSource, /if \(!this\.developmentFixtureActive\)[\s\S]*recordRound/, 'fixed-match settlement must not write player progression')
 assert.doesNotMatch(gameSceneSource, /document\.createElement|guandan-effect-lab-bridge|guandan-effect-lab-more|guandan-effect-lab-menu/, 'EffectLab must not install a visible DOM control over the lobby or table')
 assert.match(frontPageSource, /private showMoreMenu \(\): void[\s\S]*listEffectLabFixtures\(\)\.length\) entries\.push\(\['牌桌特效测试', \(\) => this\.openEffectLabTable\(\)\]\)/, 'EffectLab must be a module inside the existing More page')
-const openEffectLabTableSource = frontPageSource.slice(frontPageSource.indexOf('public openEffectLabTable'), frontPageSource.indexOf('public showEffectLab'))
+assert.match(frontPageSource, /public openEffectLabTable \(\): void \{ this\.effectLabPage\.openTable\(\) \}/, 'the scene-facing compatibility method must delegate to the page domain')
+const openEffectLabTableSource = effectLabPageDomainSource.slice(effectLabPageDomainSource.indexOf('public openTable'), effectLabPageDomainSource.indexOf('public show'))
 assert.match(openEffectLabTableSource, /fixture\.id === 'match-opening'/, 'the table entry must reject builds without the deterministic opening fixture')
-assert.match(openEffectLabTableSource, /previewEffectLabFixture\('match-opening', 'full'\)/, 'opening the EffectLab must start the deterministic table fixture first')
-assert.match(openEffectLabTableSource, /scheduleOnce\([\s\S]*showEffectLab\(0\)/, 'the EffectLab drawer must mount only after the fixed table has been entered')
-assert.ok(openEffectLabTableSource.indexOf("previewEffectLabFixture('match-opening', 'full')") < openEffectLabTableSource.indexOf('showEffectLab(0)'), 'the table fixture must be requested before the drawer')
-const effectLabDrawerSource = frontPageSource.slice(frontPageSource.indexOf('public showEffectLab'), frontPageSource.indexOf('private async showMerchantConsole'))
-assert.match(effectLabDrawerSource, /router\.open\('effect-lab'\)[\s\S]*牌桌特效测试[\s\S]*结束测试[\s\S]*showMenu\(\)/, 'the EffectLab controls must be a table drawer with an explicit exit')
+assert.match(openEffectLabTableSource, /previewFixture\('match-opening', 'full'\)/, 'opening the EffectLab must start the deterministic table fixture first')
+assert.match(openEffectLabTableSource, /scheduleOnce\([\s\S]*this\.show\(0\)/, 'the EffectLab drawer must mount only after the fixed table has been entered')
+assert.ok(openEffectLabTableSource.indexOf("previewFixture('match-opening', 'full')") < openEffectLabTableSource.indexOf('this.show(0)'), 'the table fixture must be requested before the drawer')
+const effectLabDrawerSource = effectLabPageDomainSource.slice(effectLabPageDomainSource.indexOf('public show'), effectLabPageDomainSource.indexOf('public reflow'))
+assert.match(effectLabDrawerSource, /router\.open\('effect-lab'\)[\s\S]*牌桌特效测试[\s\S]*结束测试[\s\S]*showMenu/, 'the EffectLab controls must be a table drawer with an explicit exit')
 assert.doesNotMatch(effectLabDrawerSource, /返回更多功能/, 'the table drawer must not masquerade as a standalone More subpage')
 assert.match(effectLabDrawerSource, /ui\.panel\('EffectLabDrawer'[\s\S]*drawer\.addComponent\(BlockInputEvents\)/, 'the table drawer must visually isolate its controls and block touches from reaching the table HUD')
-assert.match(frontPageSource, /router\.current === 'effect-lab'\) this\.showEffectLab\(this\.effectLabPage\)/, 'the table drawer must reflow after viewport and safe-area changes')
+assert.match(effectLabPageDomainSource, /public reflow[\s\S]*router\.current === 'effect-lab'[\s\S]*this\.show\(this\.page\)/, 'the table drawer must reflow after viewport and safe-area changes')
+assert.match(frontPageSource, /router\.current === 'effect-lab'\) this\.effectLabPage\.reflow\(\)/, 'the front-page resize route must delegate drawer reflow')
 const networkChatSection = gameSceneSource.slice(gameSceneSource.indexOf('private applyNetworkChat'), gameSceneSource.indexOf('private ensureFallbackUi'))
 assert.match(networkChatSection, /this\.chat\?\.isBlocked\(viewerId, packet\.playerId\)/, 'network voice playback must consult the local sender block')
 assert.match(networkChatSection, /decision\?\.accepted && !blocked/, 'a blocked sender must not play quick-chat voice audio')
+const quickChatPanelSection = gameSceneSource.slice(gameSceneSource.indexOf('private toggleChatPanel'), gameSceneSource.indexOf('private arrangeTableHudHand'))
+assert.match(gameSceneSource, /onChat: \(\) => this\.toggleChatPanel\(\)/, 'the table HUD quick-chat action must open the scene panel')
+assert.match(quickChatPanelSection, /QUICK_CHAT_PHRASES\.forEach[\s\S]*Node\.EventType\.TOUCH_END[\s\S]*this\.sendQuickChat\(phrase\)/, 'each visible phrase button must dispatch its selected phrase')
+assert.match(quickChatPanelSection, /if \(this\.session\?\.snapshot\.isMultiplayer\)[\s\S]*this\.lobby\?\.chat\(phrase\.text\)[\s\S]*return[\s\S]*this\.chat\?\.send\(humanId, phrase\)/, 'multiplayer chat must await the authoritative echo while local games use ChatController directly')
+assert.match(gameSceneSource, /this\.ownChatLabel\.string = this\.chat\?\.get\(humanId\)\?\.message \?\? ''[\s\S]*this\.ownChatLabel\.node\.active = Boolean\(this\.ownChatLabel\.string\)/, 'an accepted local or echoed phrase must render visibly for the sending player')
 
 const productionLabModule = loadPureTs(effectLabPath, { ...effectLabDependencies, 'cc/env': { DEV: false, DEBUG: false } })
 assert.equal(productionLabModule.isEffectLabAvailable(), false)
@@ -294,5 +303,31 @@ assert.match(chatControllerSource, /public block \(viewerId: PlayerId, senderId:
 assert.match(chatControllerSource, /public unblock \(viewerId: PlayerId, senderId: PlayerId\)/)
 assert.match(chatControllerSource, /this\.policy\.expire\(\)/, 'seat bubbles must expire through the policy')
 assert.doesNotMatch(read(quickChatPolicyPath), /from\s+['"].*(network|LobbyController|GameManager)/, 'presentation blocking must stay outside rules and networking')
+
+const scheduledChatClears = []
+class MockComponent {
+  scheduleOnce (callback, delaySeconds) { scheduledChatClears.push({ callback, delaySeconds }) }
+}
+class MockEventTarget {
+  constructor () { this.listeners = new Map() }
+  on (type, listener) {
+    const listeners = this.listeners.get(type) ?? []
+    listeners.push(listener)
+    this.listeners.set(type, listeners)
+  }
+  emit (type, payload) { for (const listener of this.listeners.get(type) ?? []) listener(payload) }
+}
+const chatRuntime = loadPureTs(chatControllerPath, {
+  cc: { _decorator: { ccclass: () => value => value }, Component: MockComponent, EventTarget: MockEventTarget },
+  './QuickChatPolicy': quickChat,
+})
+const controller = new chatRuntime.ChatController()
+const emittedChats = []
+controller.events.on('guandan:chat', chat => emittedChats.push(chat))
+const localDecision = controller.send('p1', quickChat.QUICK_CHAT_PHRASES[4])
+assert.equal(localDecision.accepted, true, 'clicking a local phrase must be accepted by ChatController')
+assert.equal(controller.get('p1').message, '谢谢', 'the local sender bubble must be available to GameScene rendering')
+assert.deepEqual(emittedChats, [localDecision.bubble], 'accepted local chat must request an immediate scene render')
+assert.equal(scheduledChatClears.length, 1, 'accepted chat must schedule its visible bubble expiry')
 
 console.log('effect lab and quick chat regression passed')

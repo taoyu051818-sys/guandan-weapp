@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..')
 const handController = fs.readFileSync(path.join(root, 'assets/scripts/ui/HandController.ts'), 'utf8')
 
 assert.doesNotMatch(handController, /selectedStacks/, 'a selected grouped card must never raise or reorder its locked stack')
-assert.match(handController, /const leftSelectedLoose = !left\.slot\.stackId && left\.selected/, 'only ungrouped cards may receive selected-card z-order')
+assert.doesNotMatch(handController, /leftSelectedLoose|rightSelectedLoose/, 'selection must not alter z-order for any hand card')
 assert.match(
   handController,
   /laneDifference[\s\S]*?left\.slot\.stackIndex[\s\S]*?right\.slot\.stackIndex/,
@@ -20,9 +20,6 @@ assert.doesNotMatch(
 
 const orderCards = entries => {
   return entries.slice().sort((left, right) => {
-    const leftSelectedLoose = !left.stackId && left.selected
-    const rightSelectedLoose = !right.stackId && right.selected
-    if (leftSelectedLoose !== rightSelectedLoose) return leftSelectedLoose ? 1 : -1
     const laneDifference = left.laneIndex - right.laneIndex
     if (laneDifference) return laneDifference
     return left.stackIndex - right.stackIndex
@@ -45,8 +42,8 @@ assert.deepEqual(
 const looseSelection = stackWithCoveredSelection.map(entry => ({ ...entry, selected: entry.id === 'loose-left' }))
 assert.deepEqual(
   orderCards(looseSelection),
-  ['stack-top', 'stack-cover-1', 'stack-cover-2', 'loose-right', 'loose-left'],
-  'a selected loose card must still render above unrelated cards and stacks',
+  ['loose-left', 'stack-top', 'stack-cover-1', 'stack-cover-2', 'loose-right'],
+  'a selected loose card must retain its ordinary lane order',
 )
 
 console.log('card stack z-order regression checks passed')

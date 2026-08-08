@@ -94,13 +94,15 @@ function verifySourceConversions () {
   assert.match(cardView, /Node\.EventType\.TOUCH_MOVE/, 'card hit areas must forward continuous touch movement on mobile')
   assert.match(cardView, /public hitTestScreenPoint[\s\S]*?\.hitTest\(point\)/, 'the dedicated hit area must support screen-space swipe resolution')
   assert.match(handController, /new HandDragSelectionPolicy\(\)/, 'one hand-level policy must own the active pointer gesture')
+  assert.match(handController, /LONG_PRESS_SELECTION_SECONDS = 0\.3[\s\S]*scheduleOnce\(this\.activateLongPressSelection/, 'a stationary long press must activate mobile sweep selection')
+  assert.doesNotMatch(handController, /leftSelectedLoose|rightSelectedLoose/, 'selection must never move a card to a higher render layer')
   assert.match(handController, /sampleHandDragSegment[\s\S]*?findTopCardAt/, 'fast movement must be sampled across every crossed card hit area')
   assert.match(handController, /right\[1\]\.getSiblingIndex\(\) - left\[1\]\.getSiblingIndex\(\)/, 'overlaps must resolve to the visually topmost hand card')
   assert.match(cardView, /Math\.max\(1, Math\.min\(visibleWidth, spacing\)\)/, 'narrow-screen hit targets must not overlap their fan spacing')
   assert.match(gameScene, /roomStatus === 'ready'/, 'multiplayer countdown and actions must wait for room recovery')
   assert.match(gameScene, /this\.actionCountdownKey = ''[\s\S]*?this\.actionCountdown = 20/, 'leaving the table must reset countdown identity and value')
   assert.match(gameScene, /if \(this\.hintLabel\) this\.hintLabel\.node\.active = false/, 'persistent engine hint chrome must remain retired')
-  assert.match(gameScene, /if \(this\.ownChatLabel\) this\.ownChatLabel\.node\.active = false/, 'the local quick-chat echo must not cover the hand/action lane')
+  assert.match(gameScene, /this\.ownChatLabel\?\.node\.setPosition\(new Vec3\(this\.screen\?\.safeLeftX\(220\)[\s\S]*this\.screen\?\.safeTopY\(235\)/, 'the visible local quick-chat echo must stay in the upper-left table lane, clear of the hand and actions')
   assert.match(gameScene, /const safeTop = this\.screen\?\.safeTopY\(158\)[\s\S]*const safeBottom = this\.screen\?\.safeBottomY\(260\)[\s\S]*Math\.min\(560, safeWidth - 32\)/, 'short-lived table feedback must be constrained to its central safe corridor')
   assert.doesNotMatch(gameScene, /statusLaneWidth|statusLaneY/, 'retired persistent side status rails must not continue reserving or overlapping space')
   const connectivityStart = gameScene.indexOf('private syncSeatConnections')
@@ -148,15 +150,15 @@ function verifyOffTurnGroupingIsolation () {
   assert.notEqual(handlerStart, -1, 'the card-toggle handler must exist')
   assert.notEqual(handlerEnd, -1, 'the card-toggle handler must remain bounded')
   const handler = gameScene.slice(handlerStart, handlerEnd)
-  assert.match(handler, /tapMode === 'grouping'[\s\S]*this\.manualGroupingMode = true[\s\S]*this\.manualGroupingSelection\.clear\(\)/, 'an off-turn tap must enter presentation-only grouping')
+  assert.match(handler, /tapMode === 'grouping'[\s\S]*this\.handWorkspace\.beginManualSelection\(\)/, 'an off-turn tap must enter the presentation-only hand transaction')
   const groupingStart = handler.indexOf("tapMode === 'grouping'")
-  const ruleSelectionStart = handler.indexOf('if (!this.manualGroupingMode)', groupingStart)
+  const ruleSelectionStart = handler.indexOf('if (!this.handWorkspace.isManualSelectionActive)', groupingStart)
   const groupingEntry = handler.slice(groupingStart, ruleSelectionStart)
   assert.doesNotMatch(groupingEntry, /gameManager|selectedCardIds|toggleCard|replaceSelectedCards|clearSelected/, 'off-turn grouping entry must not mutate rule selection')
   assert.match(handler, /if \(!this\.canInteractWithHand\(snapshot, humanId\)\) return[\s\S]*manager\?\.toggleCard\(cardId\)/, 'only the authoritative action path may reach normal rule selection')
   assert.match(gameScene, /playingTapMode !== 'blocked' \|\| this\.canInteractWithHand/, 'off-turn grouping must make the hand interactive without enabling a rule action')
   assert.match(gameScene, /clearCurrentTurnRuleSelection[\s\S]*canSelectPlayingHand\(snapshot\.state, humanId, snapshot\.actionPending\)[\s\S]*gameManager\?\.clearRuleSelection\(\)/, 'switching modes may clear rule selection only while the local player can legally act')
-  assert.match(gameScene, /snapshot\.phase !== 'playing' && this\.manualGroupingMode[\s\S]*cancelManualGrouping\(false\)/, 'tribute and settlement phases must retire presentation-only lock selection')
+  assert.match(gameScene, /snapshot\.phase !== 'playing' && this\.handWorkspace\.isManualSelectionActive[\s\S]*cancelManualGrouping\(false\)/, 'tribute and settlement phases must retire presentation-only lock selection')
 }
 
 function verifySelectionSnapshotSemantics () {
@@ -194,6 +196,17 @@ function verifyDragSelectionPolicy () {
   assert.equal(policy.claim('card-b'), false, 'the starting intent must apply consistently across the gesture')
   assert.equal(policy.move(99, { x: 80, y: 0 }), null, 'another finger must not steal the active gesture')
   assert.equal(policy.end(8), null, 'a completed drag must not also emit a tap')
+
+  policy.begin(9, 'card-hold', false, { x: 12, y: 18 })
+  assert.deepEqual(
+    policy.activateLongPress(9),
+    { from: { x: 12, y: 18 }, to: { x: 12, y: 18 } },
+    'a long press must activate selection without requiring initial movement',
+  )
+  assert.equal(policy.claim('card-hold'), true, 'the held starting card must join the sweep')
+  assert.deepEqual(policy.move(9, { x: 52, y: 18 }), { from: { x: 12, y: 18 }, to: { x: 52, y: 18 } })
+  assert.equal(policy.claim('card-next'), true, 'dragging after the hold must select every newly crossed card')
+  assert.equal(policy.end(9), null, 'a long-press sweep must not emit an extra tap')
 
   const samples = sampleHandDragSegment({ from: { x: 0, y: 0 }, to: { x: 81, y: 0 } })
   assert.deepEqual(samples[0], { x: 0, y: 0 })

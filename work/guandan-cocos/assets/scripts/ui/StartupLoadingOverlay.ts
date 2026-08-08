@@ -1,6 +1,6 @@
 import { BlockInputEvents, Color, Graphics, Label, Node, Sprite, SpriteFrame, Texture2D, Tween, UIOpacity, UITransform, Vec3, tween } from 'cc'
 import type { TableViewport } from './ScreenAdapter'
-import { applyForegroundTextStyle } from './RuntimeUiFactory'
+import { applyForegroundTextStyle, RUNTIME_MIN_TEXT_SIZE } from './RuntimeUiFactory'
 
 const FALLBACK_VIEWPORT: TableViewport = {
   width: 1280,
@@ -14,20 +14,20 @@ const FALLBACK_VIEWPORT: TableViewport = {
 }
 
 const createLabel = (parent: Node, name: string, fontSize: number, color: Color): Label => {
+  const resolvedFontSize = Math.max(RUNTIME_MIN_TEXT_SIZE, Math.round(fontSize))
   const node = new Node(name)
   node.parent = parent
   const transform = node.addComponent(UITransform)
-  transform.setContentSize(600, 34)
+  transform.setContentSize(600, Math.max(38, resolvedFontSize + 14))
   const label = node.addComponent(Label)
-  label.fontSize = fontSize
-  label.lineHeight = fontSize + 6
+  label.fontSize = resolvedFontSize
+  label.lineHeight = resolvedFontSize + 6
   label.color = color
   label.overflow = Label.Overflow.SHRINK
   label.enableWrapText = false
   label.horizontalAlign = Label.HorizontalAlign.CENTER
   label.verticalAlign = Label.VerticalAlign.CENTER
-  transform.setContentSize(600, 34)
-  return applyForegroundTextStyle(label, new Color(19, 32, 32, 255), fontSize <= 16 ? 1 : 2)
+  return applyForegroundTextStyle(label, new Color(19, 32, 32, 255), 2)
 }
 
 /**
@@ -95,9 +95,9 @@ export class StartupLoadingOverlay {
 
     this.titleLabel = createLabel(bandNode, 'LoadingTitle', 27, new Color(255, 245, 220, 255))
     this.titleLabel.string = '正在准备牌桌'
-    this.statusLabel = createLabel(bandNode, 'LoadingStatus', 16, new Color(225, 229, 226, 255))
+    this.statusLabel = createLabel(bandNode, 'LoadingStatus', 18, new Color(225, 229, 226, 255))
     this.statusLabel.string = '正在检查游戏资源...'
-    this.percentLabel = createLabel(bandNode, 'LoadingPercent', 15, new Color(255, 211, 102, 255))
+    this.percentLabel = createLabel(bandNode, 'LoadingPercent', 18, new Color(255, 211, 102, 255))
     this.percentLabel.string = '0%'
 
     const trackNode = new Node('ProgressTrack')

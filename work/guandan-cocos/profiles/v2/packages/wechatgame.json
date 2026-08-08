@@ -43,6 +43,46 @@
         "separateEngine": false,
         "highPerformanceMode": false,
         "__version__": "1.0.4"
+      },
+      "1786174911012": {
+        "orientation": "landscapeRight",
+        "appid": "wx3695323aed721e9d",
+        "buildOpenDataContextTemplate": "",
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1786180181144": {
+        "orientation": "landscapeRight",
+        "appid": "wx3695323aed721e9d",
+        "buildOpenDataContextTemplate": "",
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1786180945289": {
+        "orientation": "landscapeRight",
+        "appid": "wx3695323aed721e9d",
+        "buildOpenDataContextTemplate": "",
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1786181650622": {
+        "orientation": "landscapeRight",
+        "appid": "wx3695323aed721e9d",
+        "buildOpenDataContextTemplate": "",
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
+      },
+      "1786193987284": {
+        "orientation": "landscapeRight",
+        "appid": "wx3695323aed721e9d",
+        "buildOpenDataContextTemplate": "",
+        "separateEngine": false,
+        "highPerformanceMode": false,
+        "__version__": "1.0.4"
       }
     },
     "__version__": "1.3.9"

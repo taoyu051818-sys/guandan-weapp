@@ -14,6 +14,7 @@ import {
 } from './CardView'
 
 const { ccclass, property } = _decorator
+const LONG_PRESS_SELECTION_SECONDS = 0.3
 
 @ccclass('HandController')
 export class HandController extends Component {
@@ -24,6 +25,7 @@ export class HandController extends Component {
   private readonly dragSelection = new HandDragSelectionPolicy()
   private selectedCardIds = new Set<string>()
   private interactive = false
+  private longPressPointerId: number | null = null
 
   protected onLoad (): void {
     this.node.on(HAND_CARD_TOUCH_START, this.handleCardTouchStart, this)
@@ -33,6 +35,7 @@ export class HandController extends Component {
   }
 
   protected onDestroy (): void {
+    this.cancelLongPressSelection()
     this.dragSelection.cancel()
     this.node.off(HAND_CARD_TOUCH_START, this.handleCardTouchStart, this)
     this.node.off(HAND_CARD_TOUCH_MOVE, this.handleCardTouchMove, this)
@@ -99,7 +102,10 @@ export class HandController extends Component {
     const selectedIds = new Set(selectedCardIds)
     this.selectedCardIds = selectedIds
     this.interactive = interactive
-    if (!interactive) this.dragSelection.cancel()
+    if (!interactive) {
+      this.cancelLongPressSelection()
+      this.dragSelection.cancel()
+    }
     const entranceCompletions: Promise<void>[] = []
     displayHand.forEach((card, index) => {
       let node = this.cards.get(card.id)
@@ -132,15 +138,11 @@ export class HandController extends Component {
         if (completion) entranceCompletions.push(completion)
       }
     })
-    // A locked stack keeps its lane and internal cover order regardless of
-    // selection. Only an ungrouped selected card receives top render priority.
+    // Selection is a filter/outline only. It must never alter hand draw order.
     const renderEntries = displayHand
-      .map((card, displayIndex) => ({ node: this.cards.get(card.id), selected: selectedIds.has(card.id), displayIndex, slot: slotByCard.get(card.id) }))
-      .filter((entry): entry is { node: Node, selected: boolean, displayIndex: number, slot: ReturnType<typeof createHandStackLayout>['slots'][number] } => Boolean(entry.node && entry.slot))
+      .map(card => ({ node: this.cards.get(card.id), slot: slotByCard.get(card.id) }))
+      .filter((entry): entry is { node: Node, slot: ReturnType<typeof createHandStackLayout>['slots'][number] } => Boolean(entry.node && entry.slot))
     const orderedNodes = renderEntries.sort((left, right) => {
-      const leftSelectedLoose = !left.slot.stackId && left.selected
-      const rightSelectedLoose = !right.slot.stackId && right.selected
-      if (leftSelectedLoose !== rightSelectedLoose) return leftSelectedLoose ? 1 : -1
       const laneDifference = left.slot.laneIndex - right.slot.laneIndex
       if (laneDifference) return laneDifference
       // Cocos renders the larger sibling index on top. Later downward cards
@@ -158,17 +160,24 @@ export class HandController extends Component {
 
   private handleCardTouchStart (detail: HandCardTouch): void {
     if (!this.interactive) return
+    this.cancelLongPressSelection()
     this.dragSelection.begin(detail.pointerId, detail.cardId, this.selectedCardIds.has(detail.cardId), detail.screenPoint)
+    this.longPressPointerId = detail.pointerId
+    this.scheduleOnce(this.activateLongPressSelection, LONG_PRESS_SELECTION_SECONDS)
   }
 
   private handleCardTouchMove (detail: HandCardTouch): void {
     if (!this.interactive) return
     const segment = this.dragSelection.move(detail.pointerId, detail.screenPoint)
-    if (segment) this.applyDragSegment(segment)
+    if (segment) {
+      this.cancelLongPressSelection()
+      this.applyDragSegment(segment)
+    }
   }
 
   private handleCardTouchEnd (detail: HandCardTouch): void {
     if (!this.interactive) return
+    this.cancelLongPressSelection()
     const finalSegment = this.dragSelection.move(detail.pointerId, detail.screenPoint)
     if (finalSegment) this.applyDragSegment(finalSegment)
     const tap = this.dragSelection.end(detail.pointerId)
@@ -176,7 +185,21 @@ export class HandController extends Component {
   }
 
   private handleCardTouchCancel (detail: HandCardTouch): void {
+    this.cancelLongPressSelection()
     this.dragSelection.cancel(detail.pointerId)
+  }
+
+  private readonly activateLongPressSelection = (): void => {
+    const pointerId = this.longPressPointerId
+    this.longPressPointerId = null
+    if (pointerId === null || !this.interactive) return
+    const segment = this.dragSelection.activateLongPress(pointerId)
+    if (segment) this.applyDragSegment(segment)
+  }
+
+  private cancelLongPressSelection (): void {
+    this.unschedule(this.activateLongPressSelection)
+    this.longPressPointerId = null
   }
 
   private applyDragSegment (segment: Parameters<typeof sampleHandDragSegment>[0]): void {

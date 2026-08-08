@@ -1,7 +1,7 @@
 import { _decorator, BlockInputEvents, Color, Component, game, Graphics, Label, Node, Sprite, SpriteFrame, sys, Texture2D, Tween, UIOpacity, UITransform, Vec3, tween } from 'cc'
 import { GameManager, playValidationHint, type GameSnapshot } from '../game/GameManager'
 import { canSelectPlayingHand, resolvePlayingHandTapMode, type PlayingHandTapMode } from '../game/HandInteractionPolicy'
-import { HandGrouping, type HandGroupingSnapshot } from '../game/HandGrouping'
+import { HandWorkspace } from '../game/HandWorkspace'
 import { HandController } from '../ui/HandController'
 import { GameSession } from '../session/GameSession'
 import { LobbyController, type FriendRoomSettings, type LobbyNetworkResult, type LobbySnapshot, type NetworkDeadlineAction, type NetworkDissolveVote, type NetworkRoundEndedPacket, type NetworkRoundPacket, type NetworkStatePacket } from '../network/LobbyController'
@@ -9,11 +9,11 @@ import { PlayerSeatController } from '../ui/PlayerSeatController'
 import { PlayAreaController } from '../ui/PlayAreaController'
 import { CocosAudioController } from '../audio/CocosAudioController'
 import { ChatController, QUICK_CHAT_PHRASES, type QuickChat } from '../ui/ChatController'
-import { type PlayerId, type Rank } from '../core/generated'
+import type { PlayerId } from '../core/generated'
 import { ScreenAdapter, type TableViewport } from '../ui/ScreenAdapter'
 import { EffectController, type EffectAssetAudit, type EffectRuntimeDiagnostics } from '../effects/EffectController'
 import { RuntimeUiFactory } from '../ui/RuntimeUiFactory'
-import { TABLE_GAME_HUD_COUNTER_RANKS, TableGameHud, type TableGameHudCounterRank, type TableGameHudSeatPlace, type TableGameHudSuit } from '../ui/TableGameHud'
+import { TableGameHud, type TableGameHudSeatPlace, type TableGameHudSuit } from '../ui/TableGameHud'
 import { tableHintToast } from '../ui/TablePromptPolicy'
 import { createDevelopmentGateways, type FrontPageGateways, type MatchTicket } from '../services/DevelopmentApis'
 import { ensureGameAssetBundle, loadGameAsset, loadGameAssetAsync, type GameAssetBundleProgress } from '../services/GameAssetLoader'
@@ -135,9 +135,6 @@ export class GameScene extends Component {
   private readonly backdropSourceSizes = new Map<BackdropMode, Readonly<{ width: number, height: number }>>()
   private backdropSourceSize = { width: BACKDROP_ASSETS.lobby.width, height: BACKDROP_ASSETS.lobby.height }
   private chat: ChatController | null = null
-  private chatButton: Node | null = null
-  private arrangeButton: Node | null = null
-  private arrangeNodes: Node[] = []
   private trusteeButton: Node | null = null
   private ownChatLabel: Label | null = null
   private chatNodes: Node[] = []
@@ -145,14 +142,11 @@ export class GameScene extends Component {
   private screen: ScreenAdapter | null = null
   private ui: RuntimeUiFactory | null = null
   private tableHud: TableGameHud | null = null
-  private tableHudCounterExpanded = true
-  private tableHudSelectedSuit: TableGameHudSuit | null = null
   private tableTimerArtworkRequested = false
   private tableAvatarArtworkRequested = false
   private frontPages: FrontPageController | null = null
   private lastPhase: GameSnapshot['phase'] | null = null
   private lastTurn: PlayerId | null = null
-  private tableHomeButton: Node | null = null
   private levelLabel: Label | null = null
   private countdownLabel: Label | null = null
   private finishToastLabel: Label | null = null
@@ -170,13 +164,7 @@ export class GameScene extends Component {
   private effects: EffectController | null = null
   private skipEffectButton: Node | null = null
   private suppressNextSettlementEffect = false
-  private readonly handGrouping = new HandGrouping()
-  private tableHudArrangementBaseline: HandGroupingSnapshot | null = null
-  private handGroupingSignature = ''
-  private manualGroupingMode = false
-  private readonly manualGroupingSelection = new Set<string>()
-  private groupEditMode = false
-  private activeHandGroupId: string | null = null
+  private readonly handWorkspace = new HandWorkspace()
   private handStackRise = 0
   private quickChatMuted = false
   private effectLab: EffectLabApi | null = null
@@ -590,28 +578,21 @@ export class GameScene extends Component {
   private render (snapshot: GameSnapshot): void {
     this.latestSnapshot = snapshot
     const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
-    if (snapshot.phase !== 'playing' && this.manualGroupingMode) this.cancelManualGrouping(false)
-    if (snapshot.phase !== 'playing' && this.groupEditMode) this.cancelGroupEditing(false)
+    if (snapshot.phase !== 'playing' && this.handWorkspace.isManualSelectionActive) this.cancelManualGrouping(false)
     this.chat?.setViewer(humanId)
     const humanHand = snapshot.state.players[humanId].hand
     const friendRoomSettings = this.activeFriendRoomSettings()
     const handSortOrder = this.effectiveHandSortOrder()
-    const handSignature = `${String(snapshot.state.currentLevel)}\u0000${humanHand.map(card => card.id).sort().join('\u0000')}`
-    if (handSignature !== this.handGroupingSignature) {
-      this.handGroupingSignature = handSignature
-      this.tableHudArrangementBaseline = null
-      this.cancelManualGrouping(false)
-      this.cancelGroupEditing(false)
-      this.handGrouping.syncAuthoritativeHand(humanHand, { levelRank: snapshot.state.currentLevel })
-      if (!friendRoomSettings || friendRoomSettings.autoSort) this.handGrouping.arrange({ direction: handSortOrder })
-    }
-    const grouping = this.handGrouping.getSnapshot()
-    const activeGroup = grouping.groups.find(group => group.id === this.activeHandGroupId)
-    if (this.activeHandGroupId && !activeGroup) this.cancelGroupEditing(false)
+    this.handWorkspace.syncAuthoritativeHand(humanHand, {
+      levelRank: snapshot.state.currentLevel,
+      direction: handSortOrder,
+      autoSort: !friendRoomSettings || friendRoomSettings.autoSort,
+    })
+    const grouping = this.handWorkspace.snapshot
     const playingTapMode = this.playingHandTapMode(snapshot, humanId)
-    const selectedCardIds = this.groupEditMode
-      ? activeGroup?.cardIds.slice(0, 1) ?? []
-      : this.manualGroupingMode ? Array.from(this.manualGroupingSelection) : snapshot.selectedCardIds
+    const selectedCardIds = this.handWorkspace.isManualSelectionActive
+      ? this.handWorkspace.selectedCardIds
+      : snapshot.selectedCardIds
     this.handStackRise = this.hand?.render(
       humanHand,
       selectedCardIds,
@@ -664,14 +645,6 @@ export class GameScene extends Component {
       this.trusteeButton.active = Boolean(this.session?.snapshot.isMultiplayer && snapshot.phase !== 'settlement')
       this.effects?.playTrusteeState(Boolean(trustee), this.trusteeButton)
     }
-    if (this.arrangeButton) {
-      const label = this.arrangeButton.getComponentInChildren(Label)
-      const activeIndex = grouping.groups.findIndex(group => group.id === this.activeHandGroupId)
-      if (label) label.string = this.manualGroupingMode
-        ? `分组 ${this.manualGroupingSelection.size}`
-        : this.groupEditMode ? (activeIndex >= 0 ? `牌组 ${activeIndex + 1}` : '选牌组') : '理牌'
-    }
-
     const isPlaying = snapshot.phase === 'playing'
     const isTribute = snapshot.phase === 'tribute'
     const isSettlement = snapshot.phase === 'settlement'
@@ -710,9 +683,10 @@ export class GameScene extends Component {
       }
     }
     if (snapshot.state.currentTurn !== this.lastTurn) this.lastTurn = snapshot.state.currentTurn
-    // The sender already has immediate audio/input feedback. Repeating their
-    // own phrase across the hand/action lane adds no information and can hide cards.
-    if (this.ownChatLabel) this.ownChatLabel.node.active = false
+    if (this.ownChatLabel) {
+      this.ownChatLabel.string = this.chat?.get(humanId)?.message ?? ''
+      this.ownChatLabel.node.active = Boolean(this.ownChatLabel.string)
+    }
   }
 
   /** Projects only actionable engine feedback onto the short-lived toast lane. */
@@ -754,15 +728,14 @@ export class GameScene extends Component {
       turnSeconds: this.tableHudTurnSeconds(),
       turnDurationSeconds: this.tableTurnDurationSeconds(),
       turnPlace: this.tableHudTurnPlace(snapshot, humanId),
-      counterExpanded: this.tableHudCounterExpanded,
-      cardCounts: this.tableHudCardCounts(snapshot, humanId),
       seats,
-      availableSuits: this.handGrouping.getStraightFlushAvailability({
+      availableSuits: this.handWorkspace.straightFlushAvailability({
         allowAceLowStraight: this.session?.snapshot.settings.rulePreset !== 'tournament',
       }).filter(item => item.available).map(item => item.suit),
-      selectedSuit: this.tableHudSelectedSuit,
-      handLocked: this.manualGroupingMode,
-      arrangeRestoreAvailable: this.tableHudArrangementBaseline !== null,
+      selectedSuit: this.handWorkspace.selectedSuit,
+      handLocked: this.handWorkspace.isManualSelectionActive,
+      handLockSelectionValid: this.handWorkspace.canLockSelection(),
+      arrangeRestoreAvailable: this.handWorkspace.canRestoreArrangement,
     })
   }
 
@@ -774,19 +747,6 @@ export class GameScene extends Component {
 
   private effectiveHandSortOrder (): 'asc' | 'desc' {
     return this.activeFriendRoomSettings()?.sortOrder ?? this.session?.snapshot.settings.sortOrder ?? 'desc'
-  }
-
-  /** Counts publicly unseen cards: two decks minus the viewer hand and all played cards. */
-  private tableHudCardCounts (snapshot: GameSnapshot, humanId: PlayerId): Record<TableGameHudCounterRank, number> {
-    const counts = {} as Record<TableGameHudCounterRank, number>
-    TABLE_GAME_HUD_COUNTER_RANKS.forEach(rank => { counts[rank] = rank === '小王' || rank === '大王' ? 2 : 8 })
-    const remove = (rank: Rank): void => {
-      const key = rank === 'Small' ? '小王' : rank === 'Big' ? '大王' : String(rank) as TableGameHudCounterRank
-      counts[key] = Math.max(0, counts[key] - 1)
-    }
-    snapshot.state.players[humanId].hand.forEach(card => remove(card.rank))
-    snapshot.state.playArea.forEach(action => action.cards.forEach(card => remove(card.rank)))
-    return counts
   }
 
   private tableHudTurnPlace (snapshot: GameSnapshot, humanId: PlayerId): TableGameHudSeatPlace {
@@ -822,7 +782,7 @@ export class GameScene extends Component {
   private playingHandTapMode (snapshot: GameSnapshot, humanId: PlayerId): PlayingHandTapMode {
     if (snapshot.phase !== 'playing') return 'blocked'
     if (this.session?.snapshot.isMultiplayer && this.lobby?.snapshot.trustees?.[humanId]) return 'blocked'
-    return resolvePlayingHandTapMode(snapshot.state, humanId, snapshot.actionPending, this.manualGroupingMode)
+    return resolvePlayingHandTapMode(snapshot.state, humanId, snapshot.actionPending, this.handWorkspace.isManualSelectionActive)
   }
 
   private canEnterHandGrouping (snapshot: GameSnapshot, humanId: PlayerId): boolean {
@@ -842,23 +802,13 @@ export class GameScene extends Component {
     const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
     if (!snapshot) return
     const tapMode = this.playingHandTapMode(snapshot, humanId)
-    if (this.groupEditMode) {
-      if (tapMode === 'blocked') return
-      const group = this.handGrouping.getSnapshot().groups.find(candidate => candidate.cardIds.includes(cardId))
-      this.activeHandGroupId = group?.id ?? null
-      if (!group) this.showFinishToast('这张牌尚未成组，请选择向下错层的牌组')
-      this.refreshHandGroupingView()
-      return
-    }
     if (snapshot.phase === 'playing' && tapMode === 'blocked') return
-    if (snapshot.phase === 'playing' && tapMode === 'grouping' && !this.manualGroupingMode) {
-      this.manualGroupingMode = true
-      this.manualGroupingSelection.clear()
-      this.tableHudSelectedSuit = null
+    if (snapshot.phase === 'playing' && tapMode === 'grouping' && !this.handWorkspace.isManualSelectionActive) {
+      this.handWorkspace.beginManualSelection()
     }
-    if (!this.manualGroupingMode) {
+    if (!this.handWorkspace.isManualSelectionActive) {
       if (!this.canInteractWithHand(snapshot, humanId)) return
-      const stackCardIds = this.handGrouping.getStackSelectionForBottomCard(cardId)
+      const stackCardIds = this.handWorkspace.stackSelectionForBottomCard(cardId)
       const manager = this.gameManager
       if (manager && stackCardIds.length > 0) {
         const stackIsExactSelection = manager.selectedCardIds.size === stackCardIds.length &&
@@ -870,14 +820,10 @@ export class GameScene extends Component {
       return
     }
     if (tapMode !== 'grouping') return
-    const hand = snapshot.state.players[humanId].hand
-    if (!hand.some(card => card.id === cardId)) {
-      this.manualGroupingSelection.delete(cardId)
-      this.refreshHandGroupingView()
-      return
+    const result = this.handWorkspace.toggleManualCard(cardId)
+    if (result === 'locked') {
+      this.showFinishToast('该牌已锁定，请先拆分牌组')
     }
-    if (this.manualGroupingSelection.has(cardId)) this.manualGroupingSelection.delete(cardId)
-    else this.manualGroupingSelection.add(cardId)
     this.refreshHandGroupingView()
   }
 
@@ -895,7 +841,7 @@ export class GameScene extends Component {
     this.frontPages?.hideAll()
     this.setTableVisible(true)
     if (packet.effectSync.mode === 'recovery') this.prepareRecoveryVisualBaseline(packet.state, 'playing')
-    if (packet.effectSync.mode === 'recovery') this.handGroupingSignature = ''
+    if (packet.effectSync.mode === 'recovery') this.handWorkspace.invalidateAuthoritativeHand()
     this.gameManager?.applyServerState(packet.state, packet.state.currentTurn === (this.session?.snapshot.myPlayerId ?? 'p1') ? '轮到你出牌' : '等待其他玩家')
   }
 
@@ -913,8 +859,7 @@ export class GameScene extends Component {
     }
     if (isLiveNextRound) this.audio?.playRoundStart()
     this.cancelManualGrouping(false)
-    this.cancelGroupEditing(false)
-    this.handGroupingSignature = ''
+    this.handWorkspace.invalidateAuthoritativeHand()
     this.gameManager?.applyNetworkRoundPrepared(packet.state, packet.tribute)
     if (shouldPlayOpening) this.effects?.playRoundOpening(`本局打 ${String(packet.state.currentLevel)}`)
   }
@@ -1088,19 +1033,12 @@ export class GameScene extends Component {
     this.countdownLabel.node.getComponent(UITransform)?.setContentSize(100, 38)
     this.countdownLabel.node.active = false
     this.overlayLabel ??= this.makeLabel('Overlay', 0, 42, 30)
-    this.passButton ??= this.makeButton('PassButton', '不要', -185, 112)
-    this.hintButton ??= this.makeButton('HintButton', '提示', -62, 112)
-    this.playButton ??= this.makeButton('PlayButton', '出牌', 62, 112)
+    this.passButton ??= this.makeButton('PassButton', '不要', -185, 112, 54, 28)
+    this.hintButton ??= this.makeButton('HintButton', '提示', -62, 112, 54, 28)
+    this.playButton ??= this.makeButton('PlayButton', '出牌', 70, 128, 58, 28)
     this.confirmTributeButton ??= this.makeButton('ConfirmTributeButton', '确认贡牌', 0)
     this.finishTributeButton ??= this.makeButton('FinishTributeButton', '开始本局', 0)
     this.nextRoundButton ??= this.makeButton('NextRoundButton', '下一局', 0)
-    this.tableHomeButton ??= this.makeButton('TableHomeButton', '‹ 返回大厅', -535, 142)
-    this.tableHomeButton.on(Node.EventType.TOUCH_END, this.requestLeaveTable, this)
-    this.chatButton ??= this.makeButton('ChatButton', '快捷语', -535, 168)
-    this.chatButton.setPosition(new Vec3(-535, -205, 0))
-    this.chatButton.on(Node.EventType.TOUCH_END, this.toggleChatPanel, this)
-    this.arrangeButton ??= this.makeButton('ArrangeButton', '理牌', 535, 92, 48, 20)
-    this.arrangeButton.on(Node.EventType.TOUCH_END, this.toggleArrangePanel, this)
     this.trusteeButton ??= this.makeButton('TrusteeButton', '托管', 535, 112, 44, 18)
     this.trusteeButton.active = false
     this.trusteeButton.on(Node.EventType.TOUCH_END, this.toggleTrustee, this)
@@ -1126,7 +1064,6 @@ export class GameScene extends Component {
     if (this.tableHud) return
     const hud = new TableGameHud({
       onBack: () => this.requestLeaveTable(),
-      onCounterVisibilityChange: expanded => { this.tableHudCounterExpanded = expanded },
       onSuitSelect: suit => this.handleTableHudSuit(suit),
       onHandLockChange: locked => this.handleTableHudHandLock(locked),
       onArrange: () => this.arrangeTableHudHand(),
@@ -1143,7 +1080,6 @@ export class GameScene extends Component {
     // These fallback nodes still own timing/navigation behavior; their visual
     // presentation is replaced by the table HUD.
     ;[this.levelLabel, this.countdownLabel].forEach(label => { if (label) label.enabled = false })
-    ;[this.tableHomeButton, this.chatButton, this.arrangeButton].forEach(node => { if (node) node.active = false })
     this.playerSeats.forEach(seat => {
       const panel = seat.node.getComponent(Graphics)
       if (panel) panel.enabled = false
@@ -1251,7 +1187,7 @@ export class GameScene extends Component {
       this.actionCountdownKey = ''
       this.actionCountdown = 20
       this.lastPresentedTableHint = ''
-      this.tableHudArrangementBaseline = null
+      this.handWorkspace.resetForTableExit()
       this.playArea?.clearPresentation()
     }
     if (!visible) this.clearNodes(this.chatNodes)
@@ -1264,9 +1200,7 @@ export class GameScene extends Component {
     if (!visible) {
       ;[this.playButton, this.passButton, this.hintButton].forEach(node => { if (node) node.active = false })
     }
-    if (!visible) this.clearNodes(this.arrangeNodes)
     if (!visible) this.cancelManualGrouping(false)
-    if (!visible) this.cancelGroupEditing(false)
   }
 
   private setFriendRoomWaitingVisible (visible: boolean): void {
@@ -1324,8 +1258,6 @@ export class GameScene extends Component {
   /** Raises the operation lane when a downward cascade starts above the hand. */
   private syncStackAwareControls (): void {
     const controlsY = this.tableControlsY()
-    this.chatButton?.setPosition(new Vec3(this.screen?.safeLeftX(110) ?? -530, controlsY, 0))
-    this.arrangeButton?.setPosition(new Vec3(this.screen?.safeRightX(70) ?? 570, controlsY, 0))
     this.trusteeButton?.setPosition(new Vec3(this.screen?.safeRightX(70) ?? 570, controlsY + 54, 0))
   }
 
@@ -1361,12 +1293,10 @@ export class GameScene extends Component {
     this.confirmTributeButton?.setPosition(new Vec3(0, controlsY, 0))
     this.finishTributeButton?.setPosition(new Vec3(0, controlsY, 0))
     this.nextRoundButton?.setPosition(new Vec3(0, controlsY, 0))
-    this.tableHomeButton?.setPosition(new Vec3(this.screen?.safeLeftX(86) ?? -554, this.screen?.safeTopY(40) ?? 320, 0))
     this.levelLabel?.node.setPosition(new Vec3(this.screen?.safeLeftX(165) ?? -475, this.screen?.safeTopY(92) ?? 268, 0))
     this.levelLabel?.node.getComponent(UITransform)?.setContentSize(300, 38)
     if (this.levelLabel) this.levelLabel.horizontalAlign = Label.HorizontalAlign.LEFT
-    this.chatButton?.setPosition(new Vec3(this.screen?.safeLeftX(110) ?? -530, controlsY, 0))
-    this.arrangeButton?.setPosition(new Vec3(this.screen?.safeRightX(70) ?? 570, controlsY, 0))
+    this.ownChatLabel?.node.setPosition(new Vec3(this.screen?.safeLeftX(220) ?? -420, this.screen?.safeTopY(235) ?? 125, 0))
     this.trusteeButton?.setPosition(new Vec3(this.screen?.safeRightX(70) ?? 570, controlsY + 54, 0))
     this.skipEffectButton?.setPosition(new Vec3(this.screen?.safeRightX(90) ?? 550, this.screen?.safeTopY(40) ?? 320, 0))
     this.clearNodes(this.chatNodes)
@@ -1739,7 +1669,6 @@ export class GameScene extends Component {
     this.suppressNextSettlementEffect = false
     this.effects?.resetForRecovery(0)
     this.cancelManualGrouping(false)
-    this.cancelGroupEditing(false)
     if (multiplayer) this.lobby?.safeExit()
     else this.session?.leaveToMenu()
     this.frontPages?.showMenu()
@@ -1789,18 +1718,7 @@ export class GameScene extends Component {
     QUICK_CHAT_PHRASES.forEach((phrase, index) => {
       const node = this.makeChatButton(phrase.text, this.screen?.safeLeftX(220) ?? -415, chatPanelTop - index * 48)
       node.on(Node.EventType.TOUCH_END, () => {
-        if (this.activeFriendRoomSettings()?.disableInteraction) {
-          this.clearNodes(this.chatNodes)
-          this.showFinishToast('本好友房已禁止互动')
-          return
-        }
-        const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
-        const decision = this.chat?.send(humanId, phrase)
-        if (decision?.accepted) {
-          if (this.session?.snapshot.isMultiplayer) this.lobby?.chat(phrase.text)
-          this.audio?.playVoice(phrase.voice)
-          this.playChatPulseFor(humanId)
-        }
+        this.sendQuickChat(phrase)
         this.clearNodes(this.chatNodes)
       }, this)
       this.chatNodes.push(node)
@@ -1819,101 +1737,32 @@ export class GameScene extends Component {
     this.chatNodes.push(mute)
   }
 
-  private toggleArrangePanel (): void {
-    if (this.arrangeNodes.length) { this.clearNodes(this.arrangeNodes); return }
-    const top = this.screen?.safeBottomY(475) ?? 115
-    const actions: Array<[string, () => void]> = [
-      ['智能理牌', () => {
-        this.cancelManualGrouping(false)
-        this.cancelGroupEditing(false)
-        this.handGrouping.arrange({ direction: this.effectiveHandSortOrder() })
-        this.handGrouping.autoGroup({ allowAceLowStraight: this.session?.snapshot.settings.rulePreset !== 'tournament' })
-        this.refreshHandGroupingView()
-      }],
-      [this.manualGroupingMode ? `确认成组（${this.manualGroupingSelection.size}）` : '手选成组', () => {
-        if (!this.manualGroupingMode) {
-          const snapshot = this.latestSnapshot
-          const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
-          if (!snapshot || !this.canEnterHandGrouping(snapshot, humanId)) {
-            this.showFinishToast('当前阶段不能锁牌')
-            return
-          }
-          this.cancelGroupEditing(false)
-          this.manualGroupingMode = true
-          this.manualGroupingSelection.clear()
-          this.clearCurrentTurnRuleSelection(snapshot, humanId)
-          this.showFinishToast('请点选要归为一组的手牌，再打开理牌确认')
-          this.refreshHandGroupingView()
-          return
-        }
-        const selected = Array.from(this.manualGroupingSelection)
-        if (selected.length < 2) { this.showNotice('无法成组', '请至少选择两张手牌，或取消手选。'); return }
-        try {
-          this.handGrouping.createGroup(selected)
-          this.cancelManualGrouping(false)
-          this.refreshHandGroupingView()
-        } catch (error) { this.showNotice('无法成组', error instanceof Error ? error.message : '手牌状态已变更') }
-      }],
-      [this.groupEditMode ? (this.activeHandGroupId ? '重新选择牌组' : '取消牌组调整') : '调整牌组', () => {
-        this.cancelManualGrouping(false)
-        if (this.groupEditMode && !this.activeHandGroupId) {
-          this.cancelGroupEditing(true)
-          return
-        }
-        this.groupEditMode = true
-        this.activeHandGroupId = null
-        this.gameManager?.clearRuleSelection()
-        this.showFinishToast('请点一组向下错层的牌，再打开理牌进行移动或拆分')
-        this.refreshHandGroupingView()
-      }],
-      ['撤销理牌', () => {
-        if (!this.handGrouping.undo()) this.showNotice('没有可撤销的理牌操作')
-        this.reconcileActiveHandGroup()
-        this.refreshHandGroupingView()
-      }],
-      ['重做理牌', () => {
-        if (!this.handGrouping.redo()) this.showNotice('没有可重做的理牌操作')
-        this.reconcileActiveHandGroup()
-        this.refreshHandGroupingView()
-      }],
-      ['恢复默认', () => {
-        this.cancelManualGrouping(false)
-        this.cancelGroupEditing(false)
-        this.handGrouping.restoreDefault({ direction: this.effectiveHandSortOrder() })
-        this.refreshHandGroupingView()
-      }],
-    ]
-    if (this.groupEditMode && this.activeHandGroupId) {
-      actions.splice(3, 0,
-        ['牌组前移', () => this.moveActiveHandGroup(-1)],
-        ['牌组后移', () => this.moveActiveHandGroup(1)],
-        ['拆分牌组', () => this.splitActiveHandGroup()],
-      )
+  private sendQuickChat (phrase: (typeof QUICK_CHAT_PHRASES)[number]): void {
+    if (this.activeFriendRoomSettings()?.disableInteraction) {
+      this.showFinishToast('本好友房已禁止互动')
+      return
     }
-    if (this.manualGroupingMode) actions.push(['取消手选', () => this.cancelManualGrouping(true)])
-    actions.forEach(([label, action], index) => {
-      const column = index % 2
-      const row = Math.floor(index / 2)
-      const rightX = this.screen?.safeRightX(96) ?? 544
-      const node = this.makeArrangeMenuButton(label, rightX - (1 - column) * 188, top - row * 48)
-      node.on(Node.EventType.TOUCH_END, () => { action(); this.clearNodes(this.arrangeNodes) }, this)
-      this.arrangeNodes.push(node)
-    })
+    const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
+    if (this.session?.snapshot.isMultiplayer) {
+      if ((this.lobby?.chat(phrase.text) ?? null) === null) this.showFinishToast('快捷语发送失败，请检查网络连接')
+      return
+    }
+    const decision = this.chat?.send(humanId, phrase)
+    if (!decision?.accepted) {
+      const retrySeconds = Math.max(1, Math.ceil((decision?.retryAfterMs ?? 0) / 1000))
+      this.showFinishToast(decision?.reason === 'unknown-phrase' ? '快捷语不可用' : `请 ${retrySeconds} 秒后再发送快捷语`)
+      return
+    }
+    this.audio?.playVoice(phrase.voice)
+    this.playChatPulseFor(humanId)
   }
 
   private arrangeTableHudHand (): void {
     if (!this.latestSnapshot) return
-    this.cancelManualGrouping(false)
-    this.cancelGroupEditing(false)
-    if (this.tableHudArrangementBaseline) {
-      this.handGrouping.restoreSnapshot(this.tableHudArrangementBaseline)
-      this.tableHudArrangementBaseline = null
-      this.refreshHandGroupingView()
-      return
-    }
-    this.tableHudArrangementBaseline = this.handGrouping.getSnapshot()
-    this.handGrouping.arrange({ direction: this.effectiveHandSortOrder() })
-    this.handGrouping.autoGroup({ allowAceLowStraight: this.session?.snapshot.settings.rulePreset !== 'tournament' })
+    this.handWorkspace.toggleArrangement({
+      direction: this.effectiveHandSortOrder(),
+      allowAceLowStraight: this.session?.snapshot.settings.rulePreset !== 'tournament',
+    })
     this.refreshHandGroupingView()
   }
 
@@ -1927,25 +1776,19 @@ export class GameScene extends Component {
     const snapshot = this.latestSnapshot
     const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
     if (!snapshot || !this.canEnterHandGrouping(snapshot, humanId)) {
-      this.tableHudSelectedSuit = null
+      this.handWorkspace.cancelManualSelection()
       this.showFinishToast('当前阶段不能选择同花顺锁牌')
       this.refreshHandGroupingView()
       return
     }
-    const suggestion = this.handGrouping.selectStraightFlush(suit, {
+    const selected = this.handWorkspace.selectStraightFlush(suit, {
       allowAceLowStraight: this.session?.snapshot.settings.rulePreset !== 'tournament',
     })
-    if (!suggestion) {
-      this.cancelManualGrouping(false)
+    if (!selected) {
       this.showFinishToast('当前花色没有可组成的同花顺')
       this.refreshHandGroupingView()
       return
     }
-    this.cancelGroupEditing(false)
-    this.manualGroupingMode = true
-    this.manualGroupingSelection.clear()
-    suggestion.cardIds.forEach(cardId => this.manualGroupingSelection.add(cardId))
-    this.tableHudSelectedSuit = suit
     this.clearCurrentTurnRuleSelection(snapshot, humanId)
     this.refreshHandGroupingView()
   }
@@ -1960,31 +1803,20 @@ export class GameScene extends Component {
         this.showFinishToast('当前阶段不能锁牌')
         return
       }
-      this.cancelGroupEditing(false)
-      this.manualGroupingMode = true
-      this.manualGroupingSelection.clear()
+      this.handWorkspace.beginManualSelection()
       this.clearCurrentTurnRuleSelection(this.latestSnapshot, humanId)
       this.refreshHandGroupingView()
       return
     }
-    const selected = Array.from(this.manualGroupingSelection)
-    if (selected.length < 2) {
+    if (!this.handWorkspace.canLockSelection()) {
       this.cancelManualGrouping(false)
       this.refreshHandGroupingView()
       return
     }
     try {
-      const suitSuggestion = this.tableHudSelectedSuit
-        ? this.handGrouping.selectStraightFlush(this.tableHudSelectedSuit, {
-            allowAceLowStraight: this.session?.snapshot.settings.rulePreset !== 'tournament',
-          })
-        : null
-      const isSelectedStraightFlush = Boolean(suitSuggestion &&
-        suitSuggestion.cardIds.length === selected.length &&
-        suitSuggestion.cardIds.every(cardId => this.manualGroupingSelection.has(cardId)))
-      if (suitSuggestion && isSelectedStraightFlush) this.handGrouping.applySuggestion(suitSuggestion)
-      else this.handGrouping.createGroup(selected)
-      this.cancelManualGrouping(false)
+      this.handWorkspace.commitManualSelection({
+        allowAceLowStraight: this.session?.snapshot.settings.rulePreset !== 'tournament',
+      })
     } catch (error) {
       this.cancelManualGrouping(false)
       this.showNotice('无法锁牌', error instanceof Error ? error.message : '手牌状态已变更')
@@ -1993,43 +1825,8 @@ export class GameScene extends Component {
   }
 
   private cancelManualGrouping (refresh = true): void {
-    this.manualGroupingMode = false
-    this.manualGroupingSelection.clear()
-    this.tableHudSelectedSuit = null
+    this.handWorkspace.cancelManualSelection()
     if (refresh) this.refreshHandGroupingView()
-  }
-
-  private cancelGroupEditing (refresh = true): void {
-    this.groupEditMode = false
-    this.activeHandGroupId = null
-    if (refresh) this.refreshHandGroupingView()
-  }
-
-  private reconcileActiveHandGroup (): void {
-    if (!this.activeHandGroupId) return
-    if (!this.handGrouping.getSnapshot().groups.some(group => group.id === this.activeHandGroupId)) this.activeHandGroupId = null
-  }
-
-  private moveActiveHandGroup (direction: -1 | 1): void {
-    const snapshot = this.handGrouping.getSnapshot()
-    const index = snapshot.groups.findIndex(group => group.id === this.activeHandGroupId)
-    if (index < 0) { this.cancelGroupEditing(true); return }
-    if (direction < 0) {
-      if (index === 0) { this.showNotice('已经是最前面的牌组'); return }
-      this.handGrouping.moveGroup(snapshot.groups[index].id, snapshot.groups[index - 1].id)
-    } else {
-      if (index === snapshot.groups.length - 1) { this.showNotice('已经是最后面的牌组'); return }
-      this.handGrouping.moveGroup(snapshot.groups[index].id, snapshot.groups[index + 2]?.id)
-    }
-    this.refreshHandGroupingView()
-  }
-
-  private splitActiveHandGroup (): void {
-    if (!this.activeHandGroupId || !this.handGrouping.splitGroup(this.activeHandGroupId)) {
-      this.showNotice('没有可拆分的牌组')
-      return
-    }
-    this.cancelGroupEditing(true)
   }
 
   private refreshHandGroupingView (): void {
@@ -2152,10 +1949,4 @@ export class GameScene extends Component {
     return this.ui.quickChatButton(text, x, y)
   }
 
-  private makeArrangeMenuButton (text: string, x: number, y: number): Node {
-    if (!this.ui) throw new Error('Runtime UI factory is not initialized')
-    const node = this.ui.button('ArrangeMenu', text, x, 176, 42, 17)
-    node.setPosition(new Vec3(x, y, 0))
-    return node
-  }
 }

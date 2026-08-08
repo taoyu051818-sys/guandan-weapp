@@ -3,7 +3,7 @@ import { getCachedClassicCardFrames, requestClassicCardFrames } from './ClassicC
 import { resolveClassicCardPlan } from './CardSkinResolver'
 import type { ClassicCardPlan } from './CardSkinResolver'
 
-export type CardPresentation = { id: string, rank: string, suit: string, red: boolean, selected: boolean, interactive?: boolean }
+export type CardPresentation = { id: string, rank: string, suit: string, red: boolean, levelCard: boolean, selected: boolean, interactive?: boolean }
 
 export const HAND_CARD_TOUCH_START = 'guandan:hand-card-touch-start'
 export const HAND_CARD_TOUCH_MOVE = 'guandan:hand-card-touch-move'
@@ -28,6 +28,7 @@ export class CardView extends Component {
   private inputBound = false
   private surface: Graphics | null = null
   private selectionOverlay: Graphics | null = null
+  private levelFilter: Graphics | null = null
   private opacity: UIOpacity | null = null
   private bombReactionRoot: Node | null = null
   private visualRoot: Node | null = null
@@ -74,9 +75,11 @@ export class CardView extends Component {
     this.opacity = this.getComponent(UIOpacity) ?? this.addComponent(UIOpacity)
     this.redrawSurface()
     this.createClassicVisuals(visualRoot)
+    this.createLevelFilter(visualRoot)
     this.createSelectionOverlay(visualRoot)
     if (this.card) {
       this.applyCard(++this.artworkRequestId)
+      this.redrawLevelFilter(this.card.levelCard)
       this.applySelectionVisual(this.card.selected)
     }
     this.syncInputBinding()
@@ -100,6 +103,7 @@ export class CardView extends Component {
     const requestId = ++this.artworkRequestId
     this.card = card
     this.applyCard(requestId)
+    this.redrawLevelFilter(card.levelCard)
     this.applySelectionVisual(card.selected)
     this.syncInputBinding()
   }
@@ -207,6 +211,15 @@ export class CardView extends Component {
     node.addComponent(UITransform).setContentSize(86, 122)
     this.selectionOverlay = node.addComponent(Graphics)
     this.redrawSelectionOverlay(false)
+  }
+
+  private createLevelFilter (parent: Node): void {
+    const node = new Node('CardLevelYellowFilter')
+    node.parent = parent
+    node.setPosition(new Vec3(0, 0, 7))
+    node.addComponent(UITransform).setContentSize(80, 116)
+    this.levelFilter = node.addComponent(Graphics)
+    this.redrawLevelFilter(false)
   }
 
   private createClassicSprite (parent: Node, name: string, width: number, height: number, x: number, y: number, z: number): Sprite {
@@ -366,6 +379,19 @@ export class CardView extends Component {
     this.selectionOverlay.lineWidth = 4
     this.selectionOverlay.roundRect(-40, -58, 80, 116, 9)
     this.selectionOverlay.stroke()
+  }
+
+  private redrawLevelFilter (isLevelCard: boolean): void {
+    if (!this.levelFilter) return
+    this.levelFilter.clear()
+    if (!isLevelCard) return
+    this.levelFilter.fillColor = new Color(255, 190, 28, 54)
+    this.levelFilter.roundRect(-38, -56, 76, 112, 8)
+    this.levelFilter.fill()
+    this.levelFilter.strokeColor = new Color(255, 205, 67, 210)
+    this.levelFilter.lineWidth = 2
+    this.levelFilter.roundRect(-38, -56, 76, 112, 8)
+    this.levelFilter.stroke()
   }
 
   private applySelectionVisual (selected: boolean): void {

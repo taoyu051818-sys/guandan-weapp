@@ -1,6 +1,6 @@
 import { Color, Graphics, Label, Node, UITransform, Vec3 } from 'cc'
 import type { ReplaySeatAction, ReplaySeatId, ReplayTimelineState } from '../replay/ReplayTimeline'
-import { applyForegroundTextStyle, RuntimeUiFactory } from './RuntimeUiFactory'
+import { applyForegroundTextStyle, RUNTIME_MIN_TEXT_SIZE, RuntimeUiFactory } from './RuntimeUiFactory'
 
 const SEATS: ReplaySeatId[] = ['p1', 'p2', 'p3', 'p4']
 const SEAT_POSITIONS: Record<ReplaySeatId, Readonly<{ x: number, y: number, side: string }>> = {
@@ -70,13 +70,14 @@ const createPanel = (parent: Node, name: string, x: number, y: number, width: nu
 }
 
 const createText = (parent: Node, text: string, fontSize: number, color: Color, width: number, height: number): Label => {
+  const resolvedFontSize = Math.max(RUNTIME_MIN_TEXT_SIZE, Math.round(fontSize))
   const node = new Node('ReplayText')
   node.parent = parent
   node.addComponent(UITransform).setContentSize(width, height)
   const label = node.addComponent(Label)
   label.string = text
-  label.fontSize = fontSize
-  label.lineHeight = fontSize + 5
+  label.fontSize = resolvedFontSize
+  label.lineHeight = resolvedFontSize + 5
   label.overflow = Label.Overflow.SHRINK
   label.enableWrapText = true
   label.horizontalAlign = Label.HorizontalAlign.CENTER
@@ -85,7 +86,7 @@ const createText = (parent: Node, text: string, fontSize: number, color: Color, 
   const outline = color.r + color.g + color.b < 330
     ? new Color(255, 249, 230, 255)
     : new Color(20, 38, 35, 255)
-  return applyForegroundTextStyle(label, outline, fontSize <= 13 ? 1 : 2)
+  return applyForegroundTextStyle(label, outline, 2)
 }
 
 const renderSeat = (
@@ -123,17 +124,17 @@ const renderCards = (parent: Node, state: ReplayTimelineState): void => {
     const rowStart = row * maximumPerRow
     const cardsInRow = Math.min(maximumPerRow, cards.length - rowStart)
     const column = index - rowStart
-    const x = (column - (cardsInRow - 1) / 2) * 37
-    const y = rowCount === 1 ? -2 : 26 - row * 57
+    const x = (column - (cardsInRow - 1) / 2) * 41
+    const y = rowCount === 1 ? -2 : 29 - row * 62
     const cardNode = new Node(`ReplayCard-${index}`)
     cardNode.parent = parent
     cardNode.setPosition(new Vec3(x, y, index + 1))
-    cardNode.addComponent(UITransform).setContentSize(34, 48)
+    cardNode.addComponent(UITransform).setContentSize(38, 56)
     const graphics = cardNode.addComponent(Graphics)
     graphics.fillColor = new Color(249, 246, 233, 255)
     graphics.strokeColor = new Color(179, 147, 78, 255)
     graphics.lineWidth = 1.5
-    graphics.roundRect(-17, -24, 34, 48, 5)
+    graphics.roundRect(-19, -28, 38, 56, 5)
     graphics.fill()
     graphics.stroke()
     const text = createText(
@@ -141,8 +142,8 @@ const renderCards = (parent: Node, state: ReplayTimelineState): void => {
       `${String(card.rank)}\n${suitGlyph(card.suit)}`,
       13,
       isRedSuit(card.suit) ? new Color(188, 39, 50) : new Color(31, 43, 48),
-      29,
-      42,
+      34,
+      52,
     )
     text.node.setPosition(new Vec3(0, 0, 2))
   })

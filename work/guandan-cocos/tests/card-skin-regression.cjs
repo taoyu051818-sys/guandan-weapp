@@ -115,6 +115,7 @@ function verifySingleRendererBoundary () {
   assert.match(handController, /private entranceCompletion: Promise<void> \| null = null/, 'deal animation completion must remain owned by HandController')
   assert.match(handController, /public consumeEntranceCompletion \(\): Promise<void> \| null \{[\s\S]*this\.entranceCompletion = null[\s\S]*return completion/, 'the deal barrier must still be consumed once')
   assert.match(cardView, /const bombReactionRoot = new Node\('BombReactionRoot'\)[\s\S]*visualRoot\.parent = bombReactionRoot/, 'bomb motion must retain a wrapper outside the selection root')
+  assert.match(cardView, /CardLevelYellowFilter[\s\S]*new Color\(255, 190, 28, 54\)/, 'level cards must receive a dedicated yellow filter above the classic artwork')
   assert.equal((cardView.match(/emit\('guandan:card-toggle'/g) || []).length, 0, 'CardView must forward raw touch input without maintaining another selection state machine')
   assert.equal((handController.match(/this\.node\.emit\('guandan:card-toggle', cardId\)/g) || []).length, 1, 'HandController must retain exactly one authoritative selection event emission')
   assert.match(cardView, /private inputTargets \(\): Node\[\] \{\s*return this\.hitArea \? \[this\.hitArea\] : \[\]/, 'only the dedicated visible-card hit area may own selection input')

@@ -5,7 +5,7 @@ const path = require('node:path')
 const projectRoot = path.resolve(__dirname, '..')
 const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
 const presentationPath = path.join(projectRoot, 'assets/scripts/services/MatchWaitingPresentation.ts')
-const frontPagePath = path.join(projectRoot, 'assets/scripts/scenes/FrontPageController.ts')
+const matchmakingPagePath = path.join(projectRoot, 'assets/scripts/scenes/front-pages/MatchmakingPageDomain.ts')
 const ts = require(compilerPath)
 
 require.extensions['.ts'] = (module, filePath) => {
@@ -20,7 +20,7 @@ require.extensions['.ts'] = (module, filePath) => {
 }
 
 const { formatMatchElapsed, matchWaitingText } = require(presentationPath)
-const source = fs.readFileSync(frontPagePath, 'utf8')
+const source = fs.readFileSync(matchmakingPagePath, 'utf8')
 
 assert.equal(formatMatchElapsed(-1), '00:00')
 assert.equal(formatMatchElapsed(12_999), '00:12')

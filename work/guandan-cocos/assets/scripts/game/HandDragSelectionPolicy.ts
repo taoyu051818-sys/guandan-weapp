@@ -59,6 +59,15 @@ export class HandDragSelectionPolicy {
     return segment
   }
 
+  /** Activates sweep selection after a stationary mobile long press. */
+  public activateLongPress (pointerId: number): HandDragSegment | null {
+    const gesture = this.gesture
+    if (!gesture || gesture.pointerId !== pointerId || gesture.dragging) return null
+    gesture.dragging = true
+    gesture.previous = gesture.start
+    return { from: gesture.start, to: gesture.start }
+  }
+
   /** Returns the drag's target state once per card, otherwise null. */
   public claim (cardId: string): boolean | null {
     const gesture = this.gesture

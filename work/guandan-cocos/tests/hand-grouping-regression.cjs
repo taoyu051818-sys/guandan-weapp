@@ -6,6 +6,7 @@ const projectRoot = path.resolve(__dirname, '..')
 const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
 const arrangementPath = path.join(projectRoot, 'assets/scripts/game/HandArrangement.ts')
 const groupingPath = path.join(projectRoot, 'assets/scripts/game/HandGrouping.ts')
+const workspacePath = path.join(projectRoot, 'assets/scripts/game/HandWorkspace.ts')
 const stackLayoutPath = path.join(projectRoot, 'assets/scripts/game/HandStackLayout.ts')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
@@ -29,6 +30,7 @@ const {
   suggestHandGroups,
 } = require(arrangementPath)
 const { HandGrouping } = require(groupingPath)
+const { HandWorkspace } = require(workspacePath)
 const { createHandStackLayout, handStackRise } = require(stackLayoutPath)
 
 const rankValue = rank => ({ J: 11, Q: 12, K: 13, A: 14, Small: 16, Big: 17 }[rank] ?? Number(rank))
@@ -150,6 +152,87 @@ function verifyOneKeyRestoreSnapshot () {
 
   grouping.replaceHandFromServer(hand.slice(0, -1))
   assert.equal(grouping.restoreSnapshot(baseline), false, 'restore must reject a checkpoint from an older authoritative hand')
+}
+
+function verifyMatchingRankStacksAndCompleteRestore () {
+  const hand = [
+    card('rank-9-spade', 9, 'spade'),
+    card('rank-9-heart', 9, 'heart'),
+    card('rank-K-spade', 'K', 'spade'),
+    card('rank-K-club', 'K', 'club'),
+    card('rank-4-single', 4, 'diamond'),
+  ]
+  const grouping = new HandGrouping(hand)
+  const untouched = grouping.getSnapshot()
+  const stacked = grouping.stackMatchingRanks()
+  let snapshot = grouping.getSnapshot()
+  assert.equal(stacked.length, 2, 'every repeated physical rank must receive one default stack')
+  assert.deepEqual(snapshot.groups.map(group => group.kind), ['rank-stack', 'rank-stack'], 'default same-rank stacks must remain editable presentation units')
+  assert.deepEqual(snapshot.groups.map(group => group.cardIds), [
+    ['rank-K-spade', 'rank-K-club'],
+    ['rank-9-spade', 'rank-9-heart'],
+  ])
+  assert.deepEqual(snapshot.ungroupedCardIds, ['rank-4-single'])
+  assert.equal(grouping.restoreSnapshot(untouched), true)
+  assert.deepEqual(grouping.getSnapshot().displayCardIds, untouched.displayCardIds, 'restore must recover every formerly loose card')
+
+  const originalGroupId = grouping.createGroup(['rank-9-spade', 'rank-9-heart'])
+  const mixedBaseline = grouping.getSnapshot()
+  grouping.arrange({ direction: 'asc' })
+  grouping.stackMatchingRanks()
+  snapshot = grouping.getSnapshot()
+  assert.equal(snapshot.groups.length, 2)
+  assert.equal(grouping.restoreSnapshot(mixedBaseline), true)
+  snapshot = grouping.getSnapshot()
+  assert.deepEqual(snapshot.groups.map(group => group.id), [originalGroupId], 'pre-existing groups must survive restore exactly')
+  assert.deepEqual(snapshot.ungroupedCardIds, mixedBaseline.ungroupedCardIds, 'all cards outside the original group must recover their baseline order')
+
+  grouping.replaceHandFromServer(hand.slice().reverse())
+  assert.equal(grouping.restoreSnapshot(mixedBaseline), true, 'the same authoritative card set may be restored even if transport order changes')
+}
+
+function verifyWorkspaceTransactionBoundary () {
+  const hand = [
+    card('workspace-9-spade', 9, 'spade'),
+    card('workspace-9-heart', 9, 'heart'),
+    card('workspace-9-club', 9, 'club'),
+    card('workspace-9-diamond', 9, 'diamond'),
+    card('workspace-A', 'A', 'spade'),
+    card('workspace-3', 3, 'club'),
+  ]
+  const workspace = new HandWorkspace()
+  assert.equal(workspace.syncAuthoritativeHand(hand, { levelRank: 2, direction: 'desc', autoSort: true }), true)
+  assert.equal(workspace.syncAuthoritativeHand(hand.slice().reverse(), { levelRank: 2, direction: 'desc', autoSort: true }), false, 'transport order alone must not reset presentation state')
+  assert.deepEqual(workspace.snapshot.groups.map(group => group.kind), ['rank-stack'])
+
+  workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
+  assert.equal(workspace.snapshot.groups.some(group => group.kind === 'bomb'), true, 'smart arrangement must consume editable default stacks')
+  assert.equal(workspace.canRestoreArrangement, true)
+  workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
+  assert.deepEqual(workspace.snapshot.groups.map(group => group.kind), ['rank-stack'], 'restore must recover the complete pre-arrangement stack state')
+
+  workspace.beginManualSelection()
+  assert.equal(workspace.toggleManualCard('workspace-9-spade'), 'selected')
+  assert.equal(workspace.toggleManualCard('workspace-9-heart'), 'selected')
+  assert.equal(workspace.canLockSelection(), true, 'cards in a default rank stack must remain selectable for a legal lock')
+  assert.equal(workspace.commitManualSelection(), true)
+  const locked = workspace.snapshot.groups.find(group => group.cardIds.includes('workspace-9-spade'))
+  assert.ok(locked)
+  assert.notEqual(locked.kind, 'rank-stack')
+
+  const lockedSnapshot = JSON.parse(JSON.stringify(locked))
+  workspace.toggleArrangement({ direction: 'asc', allowAceLowStraight: true })
+  assert.deepEqual(
+    workspace.snapshot.groups.find(group => group.id === locked.id),
+    lockedSnapshot,
+    'one-key arrangement must preserve an explicit locked group byte-for-byte',
+  )
+  workspace.toggleArrangement({ direction: 'asc', allowAceLowStraight: true })
+  assert.deepEqual(workspace.snapshot.groups.find(group => group.id === locked.id), lockedSnapshot)
+
+  workspace.beginManualSelection()
+  assert.equal(workspace.toggleManualCard('workspace-9-spade'), 'locked', 'an explicit lock must reject later manual selection')
+  assert.equal(workspace.canLockSelection(), false)
 }
 
 function verifySuggestions () {
@@ -370,10 +453,12 @@ function verifyDownwardStackLayout () {
 function verifyArchitectureBoundary () {
   const arrangementSource = fs.readFileSync(arrangementPath, 'utf8')
   const groupingSource = fs.readFileSync(groupingPath, 'utf8')
-  for (const sourcePath of [arrangementPath, groupingPath, stackLayoutPath]) {
+  const workspaceSource = fs.readFileSync(workspacePath, 'utf8')
+  for (const sourcePath of [arrangementPath, groupingPath, workspacePath, stackLayoutPath]) {
     assert.equal(fs.existsSync(`${sourcePath}.meta`), true, `missing Cocos metadata for ${sourcePath}`)
   }
   assert.doesNotMatch(groupingSource, /selectedCardIds|GameScene|GameManager|HandController/, 'grouping must remain independent from selection and scene state')
+  assert.doesNotMatch(workspaceSource, /from 'cc'|GameScene|GameManager|HandController|TableGameHud/, 'the hand transaction must remain independent from Cocos and UI state')
   assert.doesNotMatch(arrangementSource, /\.sort\(.*hand\)/, 'arrangement must sort a copy, never the rule hand itself')
   assert.match(groupingSource, /syncAuthoritativeHand/)
   assert.match(groupingSource, /undoStack/)
@@ -382,21 +467,20 @@ function verifyArchitectureBoundary () {
 
 function verifyRuntimeIntegration () {
   const sceneSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts'), 'utf8')
+  const workspaceSource = fs.readFileSync(workspacePath, 'utf8')
   const handSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/HandController.ts'), 'utf8')
-  assert.match(sceneSource, /private readonly handGrouping = new HandGrouping\(\)/, 'the table scene must own one presentation-only grouping state')
-  assert.match(sceneSource, /handSignature !== this\.handGroupingSignature[\s\S]*syncAuthoritativeHand\(humanHand, \{ levelRank: snapshot\.state\.currentLevel \}\)/, 'an authoritative hand update must pass the current level into grouping state')
-  assert.match(sceneSource, /this\.handGrouping\.autoGroup/, 'the table must expose smart grouping')
-  assert.match(sceneSource, /this\.handGrouping\.createGroup\(selected\)/, 'the table must expose manual selected-card grouping')
-  assert.match(sceneSource, /this\.handGrouping\.undo\(\)/, 'the table must expose grouping undo')
-  assert.match(sceneSource, /this\.handGrouping\.redo\(\)/, 'the table must expose grouping redo')
-  assert.match(sceneSource, /this\.handGrouping\.splitGroup\(this\.activeHandGroupId\)/, 'the table must expose group splitting')
-  assert.match(sceneSource, /this\.handGrouping\.moveGroup/, 'the table must expose group movement')
+  assert.match(sceneSource, /private readonly handWorkspace = new HandWorkspace\(\)/, 'the table scene must own one presentation-side hand transaction')
+  assert.match(sceneSource, /this\.handWorkspace\.syncAuthoritativeHand\(humanHand, \{[\s\S]*levelRank: snapshot\.state\.currentLevel/, 'an authoritative hand update must pass the current level into the hand workspace')
+  assert.match(workspaceSource, /this\.grouping\.autoGroup/, 'the hand workspace must own smart grouping')
+  assert.match(workspaceSource, /this\.grouping\.stackMatchingRanks\(\)/, 'default table presentation must stack repeated ranks')
+  assert.match(workspaceSource, /this\.grouping\.createLockedGroup\(selected\)/, 'the hand workspace must own legal manual locking')
   assert.match(sceneSource, /this\.handStackRise > 32 \? -47 : 47/, 'a raised hand stack must move the countdown below the action row')
-  assert.match(sceneSource, /private readonly manualGroupingSelection = new Set<string>\(\)/, 'manual grouping must own a presentation-only selection')
-  assert.match(sceneSource, /if \(!this\.manualGroupingMode\)[\s\S]*?(?:this\.gameManager|manager)\?\.toggleCard\(cardId\)/, 'normal taps must still route to the rule selection')
-  assert.match(sceneSource, /getStackSelectionForBottomCard\(cardId\)[\s\S]*manager\.replaceSelectedCards/, 'a locked stack bottom must route through atomic rule selection')
+  assert.match(workspaceSource, /private readonly manualSelection = new Set<string>\(\)/, 'manual grouping must own one presentation-only selection')
+  assert.match(sceneSource, /if \(!this\.handWorkspace\.isManualSelectionActive\)[\s\S]*?(?:this\.gameManager|manager)\?\.toggleCard\(cardId\)/, 'normal taps must still route to the rule selection')
+  assert.match(sceneSource, /stackSelectionForBottomCard\(cardId\)[\s\S]*manager\.replaceSelectedCards/, 'a stack bottom must route through atomic rule selection')
   assert.match(sceneSource, /playingTapMode !== 'blocked' \|\| this\.canInteractWithHand/, 'manual grouping must remain interactive outside the local turn without bypassing pending actions')
   assert.doesNotMatch(sceneSource, /const selected = \[\.\.\.\(this\.gameManager\?\.selectedCardIds/, 'manual grouping must not reuse the play-selection set')
+  assert.doesNotMatch(sceneSource, /toggleArrangePanel|ArrangeMenu|arrangeNodes|groupEditMode|activeHandGroupId/, 'retired hidden grouping controls must not remain in the live scene')
   assert.match(handSource, /displayCardIds\?: readonly string\[\]/, 'HandController must accept the presentation order without mutating rule cards')
   assert.match(handSource, /createHandStackLayout/, 'arranged groups must use the downward cascade layout')
   assert.match(handSource, /configureStackHitArea/, 'covered cards must only receive input on their exposed rank/suit strip')
@@ -415,6 +499,8 @@ verifyRuntimeIntegration()
 verifyArrangement()
 verifyLevelRankPropagation()
 verifyOneKeyRestoreSnapshot()
+verifyMatchingRankStacksAndCompleteRestore()
+verifyWorkspaceTransactionBoundary()
 verifySuggestions()
 verifyGroupingLifecycle()
 verifyAutoGrouping()

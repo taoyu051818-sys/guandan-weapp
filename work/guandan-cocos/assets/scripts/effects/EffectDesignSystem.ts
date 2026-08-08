@@ -52,7 +52,7 @@ export type EffectTypeToken = Readonly<{
 }>
 
 export const EFFECT_TYPE_SCALE: Readonly<Record<EffectTypeRole, EffectTypeToken>> = Object.freeze({
-  micro: Object.freeze({ fontSize: 18, lineHeight: 24, outlineWidth: 2, defaultWidth: 240 }),
+  micro: Object.freeze({ fontSize: 20, lineHeight: 26, outlineWidth: 2, defaultWidth: 260 }),
   caption: Object.freeze({ fontSize: 24, lineHeight: 30, outlineWidth: 2, defaultWidth: 360 }),
   badge: Object.freeze({ fontSize: 34, lineHeight: 42, outlineWidth: 2, defaultWidth: 560 }),
   title: Object.freeze({ fontSize: 46, lineHeight: 54, outlineWidth: 3, defaultWidth: 720 }),

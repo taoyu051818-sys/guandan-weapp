@@ -1,4 +1,4 @@
-import type { Card } from '../core/generated'
+import { diagnosePlay, type Card } from '../core/generated'
 import {
   arrangeHandCardIds,
   assertUniqueCardIds,
@@ -19,7 +19,7 @@ import {
 } from './HandArrangement'
 
 export type HandGroupId = string
-export type HandGroupClassification = HandGroupKind | 'manual'
+export type HandGroupClassification = HandGroupKind | 'manual' | 'rank-stack'
 
 export interface HandGroup {
   id: HandGroupId
@@ -114,6 +114,8 @@ const insertBefore = (items: readonly string[], item: string, beforeItem?: strin
   return result
 }
 
+const isLockedGroup = (group: Pick<HandGroup, 'kind'>): boolean => group.kind !== 'rank-stack'
+
 /**
  * Pure card-id grouping state. It owns presentation data only: rule cards and
  * selected-card state are deliberately outside this class.
@@ -162,7 +164,7 @@ export class HandGrouping {
   public getStraightFlushAvailability (
     options: Partial<Pick<HandSuggestionOptions, 'allowAceLowStraight'>> = {},
   ): StraightFlushSuitAvailability[] {
-    return getStraightFlushSuitAvailability(this.cards, options)
+    return getStraightFlushSuitAvailability(this.editableCards(), options)
   }
 
   /** The exact five card ids to select when one highlighted suit is pressed. */
@@ -170,7 +172,7 @@ export class HandGrouping {
     suit: StraightFlushSuit,
     options: Partial<Pick<HandSuggestionOptions, 'allowAceLowStraight'>> = {},
   ): HandGroupSuggestion | null {
-    const suggestion = selectStraightFlushForSuit(this.cards, suit, options)
+    const suggestion = selectStraightFlushForSuit(this.editableCards(), suit, options)
     return suggestion
       ? { ...suggestion, cardIds: suggestion.cardIds.slice(), wildcardUsages: suggestion.wildcardUsages.map(usage => ({ ...usage })) }
       : null
@@ -190,6 +192,27 @@ export class HandGrouping {
   public getGroupForCard (cardId: CardId): HandGroup | null {
     const group = this.state.groups.find(candidate => candidate.cardIds.includes(cardId))
     return group ? cloneGroup(group) : null
+  }
+
+  /** Default rank stacks are editable presentation units; every other group is an explicit lock. */
+  public isCardLocked (cardId: CardId): boolean {
+    const group = this.state.groups.find(candidate => candidate.cardIds.includes(cardId))
+    return Boolean(group && isLockedGroup(group))
+  }
+
+  /** One authoritative legality check for every UI route that creates a locked group. */
+  public canCreateLockedGroup (cardIds: readonly CardId[]): boolean {
+    const requested = distinctCardIds(cardIds)
+    if (requested.length !== cardIds.length || requested.length < 2) return false
+    const requestedSet = new Set(requested)
+    if (requested.some(cardId => this.isCardLocked(cardId))) return false
+    const cards = this.cards.filter(card => requestedSet.has(card.id))
+    return cards.length === requested.length && diagnosePlay(cards, null).canPlay
+  }
+
+  public createLockedGroup (cardIds: readonly CardId[], groupIndex?: number): HandGroupId {
+    if (!this.canCreateLockedGroup(cardIds)) throw new Error('Selected cards do not form an unlocked legal combination')
+    return this.createGroup(cardIds, groupIndex)
   }
 
   /**
@@ -270,16 +293,15 @@ export class HandGrouping {
   }
 
   /**
-   * Appends deterministic smart groups from the loose lane only. Existing
-   * groups are locked presentation units: their ids, kinds, card order, and
-   * relative order must survive every automatic arrangement pass.
+   * Appends deterministic smart groups from every editable card. Explicit
+   * locks survive unchanged; default same-rank stacks are dissolved first.
    */
   public autoGroup (options: Partial<HandSuggestionOptions> = {}): HandGroupSuggestion[] {
-    const looseCardIds = new Set(this.state.ungroupedCardIds)
-    const looseCards = this.cards.filter(card => looseCardIds.has(card.id))
-    const applied = selectNonOverlappingSuggestions(suggestHandGroups(looseCards, options))
+    const editableCards = this.editableCards()
+    const applied = selectNonOverlappingSuggestions(suggestHandGroups(editableCards, options))
     this.commit(draft => {
       const used = new Set<CardId>()
+      draft.groups = draft.groups.filter(isLockedGroup)
       const appendedGroups = applied.map(suggestion => {
         const group: HandGroup = {
           id: `hand-group-${draft.nextGroupSequence}`,
@@ -291,10 +313,39 @@ export class HandGrouping {
         return group
       })
       draft.groups.push(...appendedGroups)
-      draft.ungroupedCardIds = arrangeHandCardIds(looseCards, draft.arrangement)
+      draft.ungroupedCardIds = arrangeHandCardIds(editableCards, draft.arrangement)
         .filter(cardId => !used.has(cardId))
     })
     return applied
+  }
+
+  /** Stacks loose cards with the same physical rank without turning them into explicit locks. */
+  public stackMatchingRanks (): HandGroupId[] {
+    const cardById = new Map(this.cards.map(card => [card.id, card]))
+    const rankBuckets = new Map<string, CardId[]>()
+    for (const cardId of this.state.ungroupedCardIds) {
+      const card = cardById.get(cardId)
+      if (!card) continue
+      const key = String(card.rank)
+      const bucket = rankBuckets.get(key) ?? []
+      bucket.push(cardId)
+      rankBuckets.set(key, bucket)
+    }
+    const stacks = Array.from(rankBuckets.values()).filter(cardIds => cardIds.length >= 2)
+    if (!stacks.length) return []
+
+    const groupIds: HandGroupId[] = []
+    this.commit(draft => {
+      const used = new Set(stacks.flat())
+      for (const cardIds of stacks) {
+        const groupId = `hand-group-${draft.nextGroupSequence}`
+        draft.nextGroupSequence += 1
+        groupIds.push(groupId)
+        draft.groups.push({ id: groupId, kind: 'rank-stack', cardIds: cardIds.slice() })
+      }
+      draft.ungroupedCardIds = draft.ungroupedCardIds.filter(cardId => !used.has(cardId))
+    })
+    return groupIds
   }
 
   public splitGroup (groupId: HandGroupId): boolean {
@@ -382,18 +433,23 @@ export class HandGrouping {
 
   /** Restores a presentation snapshot only while it still describes the authoritative hand. */
   public restoreSnapshot (snapshot: HandGroupingSnapshot): boolean {
-    if (!equalArrays(snapshot.handCardIds, this.handCardIds)) return false
+    const authoritativeIds = new Set(this.handCardIds)
+    const snapshotIds = snapshot.groups.flatMap(group => group.cardIds).concat(snapshot.ungroupedCardIds)
+    if (snapshotIds.length !== authoritativeIds.size ||
+        new Set(snapshotIds).size !== snapshotIds.length ||
+        snapshotIds.some(cardId => !authoritativeIds.has(cardId))) return false
     const restored = this.normalizeState({
       groups: snapshot.groups.map(cloneGroup),
       ungroupedCardIds: snapshot.ungroupedCardIds.slice(),
       arrangement: cloneArrangement(snapshot.arrangement),
       nextGroupSequence: this.state.nextGroupSequence,
     })
-    return this.commit(draft => {
+    this.commit(draft => {
       draft.groups = restored.groups.map(cloneGroup)
       draft.ungroupedCardIds = restored.ungroupedCardIds.slice()
       draft.arrangement = cloneArrangement(restored.arrangement)
     })
+    return true
   }
 
   public undo (): boolean {
@@ -428,7 +484,17 @@ export class HandGrouping {
     )
   }
 
-  private classifyGroup (cardIds: readonly CardId[]): HandGroupClassification {
+  private editableCards (): Card[] {
+    const lockedCardIds = new Set(this.state.groups.filter(isLockedGroup).flatMap(group => group.cardIds))
+    return this.cards.filter(card => !lockedCardIds.has(card.id))
+  }
+
+  private classifyGroup (cardIds: readonly CardId[], requestedKind?: HandGroupClassification): HandGroupClassification {
+    if (requestedKind === 'rank-stack') {
+      const requested = new Set(cardIds)
+      const ranks = new Set(this.cards.filter(card => requested.has(card.id)).map(card => String(card.rank)))
+      if (ranks.size === 1) return 'rank-stack'
+    }
     return recognizeHandGroup(this.cards, cardIds)?.kind ?? 'manual'
   }
 
@@ -444,7 +510,7 @@ export class HandGrouping {
       if (cardIds.length < 2) continue
       groupIds.add(rawGroup.id)
       cardIds.forEach(cardId => claimed.add(cardId))
-      groups.push({ id: rawGroup.id, kind: this.classifyGroup(cardIds), cardIds })
+      groups.push({ id: rawGroup.id, kind: this.classifyGroup(cardIds, rawGroup.kind), cardIds })
     }
 
     const requestedUngrouped = distinctCardIds(rawState.ungroupedCardIds)

@@ -92,6 +92,7 @@ export const createOutlinedEffectLabel = (parent: Node, style: EffectStyle, opti
   label.overflow = Label.Overflow.SHRINK
   label.enableWrapText = false
   label.color = rgba(style.palette[options.tone ?? 'primary'])
+  label.isBold = true
   label.enableOutline = true
   label.outlineColor = rgba(EFFECT_PALETTES.ink.primary, 224)
   label.outlineWidth = token.outlineWidth

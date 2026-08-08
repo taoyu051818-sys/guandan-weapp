@@ -36,15 +36,22 @@ export type RuntimeButtonStyle = RuntimePanelStyle & {
 
 const imageFrames = new Map<string, SpriteFrame>()
 
+export const RUNTIME_MIN_TEXT_SIZE = 20
+export const RUNTIME_MIN_BUTTON_TEXT_SIZE = 22
+
+const readableFontSize = (fontSize: number, minimum = RUNTIME_MIN_TEXT_SIZE): number => Math.max(minimum, Math.round(fontSize))
+
 /** Keeps runtime text legible over illustrated tables without adding wrapper cards. */
 export const applyForegroundTextStyle = (
   label: Label,
   outlineColor = new Color(27, 37, 34, 255),
   outlineWidth = 2,
 ): Label => {
+  label.isBold = true
   label.enableOutline = true
   label.outlineColor = outlineColor
-  label.outlineWidth = Math.max(1, outlineWidth)
+  const minimumOutline = label.fontSize >= 30 ? 4 : label.fontSize >= 24 ? 3 : 2
+  label.outlineWidth = Math.max(minimumOutline, outlineWidth)
   return label
 }
 
@@ -59,22 +66,24 @@ export class RuntimeUiFactory {
   public get parent (): Node { return this.root }
 
   public label (name: string, x: number, y: number, fontSize: number): Label {
+    const resolvedFontSize = readableFontSize(fontSize)
     const node = new Node(name)
     node.parent = this.root
     node.setPosition(new Vec3(x, y, 0))
     node.addComponent(UITransform).setContentSize(1100, 80)
     const label = node.addComponent(Label)
-    label.fontSize = fontSize
-    label.lineHeight = fontSize + 8
+    label.fontSize = resolvedFontSize
+    label.lineHeight = resolvedFontSize + 8
     label.color = new Color(245, 239, 215)
     label.horizontalAlign = Label.HorizontalAlign.CENTER
     return applyForegroundTextStyle(label)
   }
 
   public menuLabel (text: string, x: number, y: number, fontSize: number): Label {
+    const resolvedFontSize = readableFontSize(fontSize)
     const lines = text.split('\n')
     const lineWidth = (line: string): number => Array.from(line).reduce(
-      (width, character) => width + (/^[\u0000-\u00ff]$/.test(character) ? fontSize * 0.58 : fontSize),
+      (width, character) => width + (/^[\u0000-\u00ff]$/.test(character) ? resolvedFontSize * 0.58 : resolvedFontSize),
       0,
     )
     const rootWidth = this.root.getComponent(UITransform)?.contentSize.width ?? 1280
@@ -82,7 +91,12 @@ export class RuntimeUiFactory {
     const width = text.length
       ? Math.min(maxWidth, Math.max(120, Math.ceil(Math.max(...lines.map(lineWidth)) + 34)))
       : Math.min(760, maxWidth)
-    const height = Math.max(fontSize + 18, lines.length * (fontSize + 7) + 14)
+    const contentWidth = Math.max(1, width - 22)
+    const renderedLineCount = lines.reduce(
+      (count, line) => count + Math.max(1, Math.ceil(lineWidth(line) / contentWidth)),
+      0,
+    )
+    const height = Math.max(resolvedFontSize + 18, renderedLineCount * (resolvedFontSize + 7) + 14)
     const container = new Node('MenuLabelBacking')
     container.parent = this.root
     container.setPosition(new Vec3(x, y - 10, 0))
@@ -97,8 +111,8 @@ export class RuntimeUiFactory {
     textNode.addComponent(UITransform).setContentSize(width - 22, height - 8)
     const label = textNode.addComponent(Label)
     label.string = text
-    label.fontSize = fontSize
-    label.lineHeight = fontSize + 7
+    label.fontSize = resolvedFontSize
+    label.lineHeight = resolvedFontSize + 7
     label.overflow = Label.Overflow.SHRINK
     label.enableWrapText = true
     label.horizontalAlign = Label.HorizontalAlign.CENTER
@@ -107,7 +121,7 @@ export class RuntimeUiFactory {
     label.isBold = true
     label.enableOutline = true
     label.outlineColor = new Color(38, 26, 17, 255)
-    label.outlineWidth = fontSize >= 28 ? 3 : 2
+    label.outlineWidth = resolvedFontSize >= 30 ? 4 : resolvedFontSize >= 24 ? 3 : 2
     const opacity = container.addComponent(UIOpacity)
     opacity.opacity = 0
     tween(opacity).to(0.2, { opacity: 255 }).start()
@@ -116,14 +130,15 @@ export class RuntimeUiFactory {
   }
 
   public outlinedLabel (text: string, x: number, y: number, fontSize: number, style: RuntimeLabelStyle = {}): Label {
+    const resolvedFontSize = readableFontSize(fontSize)
     const node = new Node('OutlinedLabel')
     node.parent = style.parent ?? this.root
     node.setPosition(new Vec3(x, y, 0))
-    node.addComponent(UITransform).setContentSize(style.width ?? 500, style.height ?? Math.max(54, fontSize + 16))
+    node.addComponent(UITransform).setContentSize(style.width ?? 500, style.height ?? Math.max(54, resolvedFontSize + 16))
     const label = node.addComponent(Label)
     label.string = text
-    label.fontSize = fontSize
-    label.lineHeight = fontSize + 6
+    label.fontSize = resolvedFontSize
+    label.lineHeight = resolvedFontSize + 6
     label.overflow = Label.Overflow.SHRINK
     label.horizontalAlign = Label.HorizontalAlign.CENTER
     label.verticalAlign = Label.VerticalAlign.CENTER
@@ -205,6 +220,7 @@ export class RuntimeUiFactory {
   }
 
   public button (name: string, text: string, x: number, width = 244, height = 56, fontSize = 25, style: RuntimeButtonStyle = {}): Node {
+    const resolvedFontSize = readableFontSize(fontSize, RUNTIME_MIN_BUTTON_TEXT_SIZE)
     const node = new Node(name)
     node.parent = this.root
     node.setPosition(new Vec3(x, -205, 0))
@@ -219,7 +235,7 @@ export class RuntimeUiFactory {
         : pressed ? (style.pressedFill ?? new Color(96, 68, 28, 245)) : (style.fill ?? new Color(74, 50, 21, 235))
       graphics.strokeColor = style.stroke ?? new Color(218, 179, 79, 255)
       graphics.lineWidth = style.lineWidth ?? 2
-      graphics.roundRect(-halfWidth, -halfHeight, width, height, style.radius ?? Math.min(16, halfHeight / 2))
+      graphics.roundRect(-halfWidth, -halfHeight, width, height, style.radius ?? halfHeight)
       graphics.fill()
       if ((style.lineWidth ?? 2) > 0) graphics.stroke()
     }
@@ -229,8 +245,8 @@ export class RuntimeUiFactory {
     textNode.parent = node
     textNode.addComponent(UITransform).setContentSize(width - 14, height - 6)
     const label = textNode.addComponent(Label)
-    label.fontSize = fontSize
-    label.lineHeight = fontSize + 5
+    label.fontSize = resolvedFontSize
+    label.lineHeight = resolvedFontSize + 5
     label.overflow = Label.Overflow.SHRINK
     label.horizontalAlign = Label.HorizontalAlign.CENTER
     label.verticalAlign = Label.VerticalAlign.CENTER
@@ -270,15 +286,15 @@ export class RuntimeUiFactory {
     graphics.fillColor = new Color(20, 42, 39, 245)
     graphics.strokeColor = new Color(188, 143, 57, 220)
     graphics.lineWidth = 1
-    graphics.roundRect(-190, -21, 380, 42, 12)
+    graphics.roundRect(-190, -21, 380, 42, 21)
     graphics.fill()
     graphics.stroke()
     const textNode = new Node('QuickChatText')
     textNode.parent = node
     textNode.addComponent(UITransform).setContentSize(360, 38)
     const label = textNode.addComponent(Label)
-    label.fontSize = 17
-    label.lineHeight = 23
+    label.fontSize = RUNTIME_MIN_BUTTON_TEXT_SIZE
+    label.lineHeight = RUNTIME_MIN_BUTTON_TEXT_SIZE + 6
     label.horizontalAlign = Label.HorizontalAlign.CENTER
     label.verticalAlign = Label.VerticalAlign.CENTER
     label.string = text
@@ -312,24 +328,27 @@ export class RuntimeUiFactory {
     const inputTransform = inputText.addComponent(UITransform)
     inputTransform.setContentSize(width - 50, height - 12)
     inputTransform.setAnchorPoint(0, 1)
+    const resolvedInputFontSize = readableFontSize(options.fontSize ?? 22, RUNTIME_MIN_BUTTON_TEXT_SIZE)
     const textLabel = inputText.addComponent(Label)
-    textLabel.fontSize = options.fontSize ?? 22
-    textLabel.lineHeight = (options.fontSize ?? 22) + 6
+    textLabel.fontSize = resolvedInputFontSize
+    textLabel.lineHeight = resolvedInputFontSize + 6
     textLabel.horizontalAlign = Label.HorizontalAlign.CENTER
     textLabel.verticalAlign = Label.VerticalAlign.CENTER
     textLabel.color = new Color(245, 239, 215)
     textLabel.string = ''
+    applyForegroundTextStyle(textLabel, new Color(24, 37, 34, 255), 2)
     const placeholder = new Node('PLACEHOLDER_LABEL')
     placeholder.parent = editNode
     const placeholderTransform = placeholder.addComponent(UITransform)
     placeholderTransform.setContentSize(width - 50, height - 12)
     placeholderTransform.setAnchorPoint(0, 1)
     const placeholderLabel = placeholder.addComponent(Label)
-    placeholderLabel.fontSize = Math.max(14, (options.fontSize ?? 22) - 2)
-    placeholderLabel.lineHeight = (options.fontSize ?? 22) + 4
+    placeholderLabel.fontSize = Math.max(RUNTIME_MIN_TEXT_SIZE, resolvedInputFontSize - 2)
+    placeholderLabel.lineHeight = resolvedInputFontSize + 4
     placeholderLabel.horizontalAlign = Label.HorizontalAlign.CENTER
     placeholderLabel.verticalAlign = Label.VerticalAlign.CENTER
     placeholderLabel.color = new Color(160, 180, 176)
+    applyForegroundTextStyle(placeholderLabel, new Color(24, 37, 34, 255), 2)
     const edit = editNode.addComponent(EditBox)
     edit.maxLength = options.maxLength ?? 80
     edit.inputMode = options.inputMode ?? EditBox.InputMode.ANY

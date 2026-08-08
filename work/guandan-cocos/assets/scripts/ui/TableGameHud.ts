@@ -3,9 +3,9 @@ import { resolveSafePriorityRects } from './SafeAreaLayout'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
 
 export const TABLE_GAME_HUD_DESIGN_SIZE = Object.freeze({ width: 1280, height: 720 })
-export const TABLE_GAME_HUD_COUNTER_RANKS = ['大王', '小王', '2', 'A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3'] as const
+/** Card counter is intentionally unmounted while its product design is retired. */
+export const TABLE_GAME_HUD_CARD_COUNTER_STATUS = 'temporarily-retired' as const
 
-export type TableGameHudCounterRank = typeof TABLE_GAME_HUD_COUNTER_RANKS[number]
 export type TableGameHudSeatPlace = 'bottom' | 'right' | 'top' | 'left'
 export type TableGameHudSuit = 'spade' | 'heart' | 'club' | 'diamond'
 
@@ -34,18 +34,16 @@ export type TableGameHudState = Readonly<{
   turnSeconds: number
   turnDurationSeconds: number
   turnPlace: TableGameHudSeatPlace
-  counterExpanded: boolean
-  cardCounts: Readonly<Partial<Record<TableGameHudCounterRank, number>>>
   seats: readonly TableGameHudSeatState[]
   availableSuits: readonly TableGameHudSuit[]
   selectedSuit: TableGameHudSuit | null
   handLocked: boolean
+  handLockSelectionValid: boolean
   arrangeRestoreAvailable: boolean
 }>
 
 export type TableGameHudActions = Readonly<{
   onBack?: () => void
-  onCounterVisibilityChange?: (expanded: boolean) => void
   onSuitSelect?: (suit: TableGameHudSuit | null) => void
   onHandLockChange?: (locked: boolean) => void
   onArrange?: () => void
@@ -58,11 +56,6 @@ type SeatView = {
   avatarSprite: Sprite
   nameLabel: Label
   rankLabel: Label
-}
-
-type CounterCell = {
-  rankLabel: Label
-  countLabel: Label
 }
 
 type ButtonView = {
@@ -84,9 +77,19 @@ type HudLayout = {
   bottom: number
 }
 
-const BASE_COUNTER_WIDTH = 596
-const BASE_COUNTER_OPEN_HEIGHT = 76
-const BASE_COUNTER_CLOSED_HEIGHT = 38
+const BASE_TOOLBAR_WIDTH = 420
+const MIN_HUD_SCALE = 0.78
+const MIN_HUD_FONT_SIZE = 20
+const EXPANDED_BACK_SIZE = 60
+const EXPANDED_ROUND_WIDTH = 272
+const EXPANDED_ROUND_HEIGHT = 84
+const EXPANDED_SEAT_WIDTH = 280
+const EXPANDED_SEAT_HEIGHT = 100
+const EXPANDED_SUIT_BAR_WIDTH = 480
+const EXPANDED_SUIT_BAR_HEIGHT = 68
+const EXPANDED_TOOLBAR_WIDTH = 540
+const EXPANDED_TOOLBAR_HEIGHT = 70
+const BOTTOM_GROUP_GAP = 8
 const SEAT_PLACES: readonly TableGameHudSeatPlace[] = ['bottom', 'right', 'top', 'left']
 const SUITS: readonly TableGameHudSuit[] = ['spade', 'heart', 'club', 'diamond']
 const SUIT_TEXT: Readonly<Record<TableGameHudSuit, string>> = Object.freeze({ spade: '♠', heart: '♥', club: '♣', diamond: '♦' })
@@ -104,7 +107,7 @@ const TURN_OPERATION_ANCHORS: Readonly<Record<TableGameHudSeatPlace, Readonly<{ 
   left: Object.freeze({ x: -300, y: 0 }),
 })
 
-type DraggableOverlay = 'counter' | 'operations'
+type DraggableOverlay = 'operations'
 
 const freshState = (): TableGameHudState => ({
   matchLabel: '本局打 2',
@@ -113,18 +116,22 @@ const freshState = (): TableGameHudState => ({
   turnSeconds: 15,
   turnDurationSeconds: 15,
   turnPlace: 'bottom',
-  counterExpanded: true,
-  cardCounts: {},
   seats: SEAT_PLACES.map(place => ({ place, name: DEFAULT_SEAT_NAMES[place], status: '剩27张' })),
   availableSuits: [],
   selectedSuit: null,
   handLocked: false,
+  handLockSelectionValid: false,
   arrangeRestoreAvailable: false,
 })
 
 const clamp = (value: number, minimum: number, maximum: number): number => Math.min(maximum, Math.max(minimum, value))
 
 const finiteOr = (value: number | undefined, fallback: number): number => Number.isFinite(value) ? Number(value) : fallback
+
+const compactHudText = (value: string, maximumCharacters: number): string => {
+  const characters = Array.from(value.trim())
+  return characters.length <= maximumCharacters ? characters.join('') : `${characters.slice(0, maximumCharacters - 1).join('')}…`
+}
 
 const normalizeAvailableSuits = (suits: readonly TableGameHudSuit[] | undefined): readonly TableGameHudSuit[] => {
   const requested = new Set(suits ?? [])
@@ -137,6 +144,23 @@ const configureTransform = (node: Node, width: number, height: number): UITransf
   return transform
 }
 
+const nodeContentSize = (node: Node | null | undefined, fallbackWidth: number, fallbackHeight: number): Readonly<{ width: number, height: number }> => {
+  const contentSize = node?.getComponent(UITransform)?.contentSize
+  return {
+    width: Math.max(1, contentSize?.width ?? fallbackWidth),
+    height: Math.max(1, contentSize?.height ?? fallbackHeight),
+  }
+}
+
+const configureLabelMetrics = (label: Label | null, width: number, height: number, fontSize: number, x: number, y: number): void => {
+  if (!label) return
+  configureTransform(label.node, width, height)
+  label.node.setPosition(new Vec3(x, y, 1))
+  label.fontSize = Math.max(MIN_HUD_FONT_SIZE, Math.round(fontSize))
+  label.lineHeight = label.fontSize + 6
+  applyForegroundTextStyle(label, new Color(18, 38, 43, 255), label.fontSize >= 30 ? 4 : 3)
+}
+
 const createLabel = (
   parent: Node,
   name: string,
@@ -147,19 +171,20 @@ const createLabel = (
   x = 0,
   y = 0,
 ): Label => {
+  const resolvedFontSize = Math.max(MIN_HUD_FONT_SIZE, Math.round(fontSize))
   const node = new Node(name)
   node.parent = parent
   node.setPosition(new Vec3(x, y, 1))
   configureTransform(node, width, height)
   const label = node.addComponent(Label)
-  label.fontSize = fontSize
-  label.lineHeight = fontSize + 5
+  label.fontSize = resolvedFontSize
+  label.lineHeight = resolvedFontSize + 5
   label.overflow = Label.Overflow.SHRINK
   label.horizontalAlign = Label.HorizontalAlign.CENTER
   label.verticalAlign = Label.VerticalAlign.CENTER
   label.color = color
   label.string = ''
-  return applyForegroundTextStyle(label, new Color(18, 38, 43, 255), fontSize <= 14 ? 1 : 2)
+  return applyForegroundTextStyle(label, new Color(18, 38, 43, 255), resolvedFontSize >= 24 ? 3 : 2)
 }
 
 const drawPanel = (graphics: Graphics, width: number, height: number, radius = 8, active = false): void => {
@@ -185,6 +210,7 @@ export class TableGameHud {
   private visible = true
 
   private roundPanel: Node | null = null
+  private roundGraphics: Graphics | null = null
   private roundLabel: Label | null = null
   private levelLabel: Label | null = null
   private backButton: ButtonView | null = null
@@ -195,17 +221,10 @@ export class TableGameHud {
   private timerLabel: Label | null = null
   private defaultAvatarFrame: SpriteFrame | null = null
 
-  private counterPanel: Node | null = null
-  private counterGraphics: Graphics | null = null
-  private counterTitle: Label | null = null
-  private counterToggleLabel: Label | null = null
-  private counterHitArea: Node | null = null
-  private counterDragHandle: Node | null = null
-  private readonly counterCells = new Map<TableGameHudCounterRank, CounterCell>()
-
   private readonly seatViews = new Map<TableGameHudSeatPlace, SeatView>()
   private suitBar: Node | null = null
   private suitBarGraphics: Graphics | null = null
+  private suitTitleLabel: Label | null = null
   private readonly suitButtons = new Map<TableGameHudSuit, SuitButtonView>()
   private pressedSuit: TableGameHudSuit | null = null
   private operationOverlay: Node | null = null
@@ -238,10 +257,10 @@ export class TableGameHud {
     this.createBackButton(root)
     this.createRoundPanel(root)
     this.createTimer(root)
-    this.createCounter(root)
     this.createSeats(root)
     this.createSuitBar(root)
     this.createToolbar(root)
+    this.applyExpandedHudMetrics()
     this.renderViews()
     this.layout(this.viewport)
     return root
@@ -252,7 +271,6 @@ export class TableGameHud {
     const availableSuits = normalizeAvailableSuits(state.availableSuits)
     this.state = {
       ...state,
-      cardCounts: { ...state.cardCounts },
       seats: state.seats.map(seat => ({ ...seat })),
       availableSuits,
       selectedSuit: state.selectedSuit && availableSuits.includes(state.selectedSuit) ? state.selectedSuit : null,
@@ -270,13 +288,11 @@ export class TableGameHud {
     this.state = {
       ...this.state,
       ...patch,
-      cardCounts: patch.cardCounts ? { ...patch.cardCounts } : this.state.cardCounts,
       seats: patch.seats ? patch.seats.map(seat => ({ ...seat })) : this.state.seats,
       availableSuits,
       selectedSuit: proposedSelectedSuit && availableSuits.includes(proposedSelectedSuit) ? proposedSelectedSuit : null,
     }
     this.renderViews()
-    if (patch.counterExpanded !== undefined) this.layout(this.viewport)
   }
 
   public setActions (actions: TableGameHudActions): void { this.actions = actions }
@@ -331,49 +347,50 @@ export class TableGameHud {
     configureTransform(this.root, this.viewport.width, this.viewport.height)
     this.root.setPosition(Vec3.ZERO)
 
-    const counterHeight = this.state.counterExpanded ? BASE_COUNTER_OPEN_HEIGHT : BASE_COUNTER_CLOSED_HEIGHT
+    const backSize = nodeContentSize(this.backButton?.node, 44, 44)
+    const roundSize = nodeContentSize(this.roundPanel, 208, 64)
+    const safePixelWidth = Math.max(1, layout.right - layout.left - 16)
+    const topGap = 12
+    const canShowRound = (backSize.width + roundSize.width + topGap * 2) * layout.scale <= safePixelWidth
+    const backX = layout.left + 8 + backSize.width * layout.scale / 2
+    const roundX = backX + (backSize.width + roundSize.width) * layout.scale / 2 + topGap * layout.scale
     const topPlacements = resolveSafePriorityRects({ left: layout.left + 8, right: layout.right - 8, top: layout.top - 6, bottom: layout.bottom + 8 }, [
-      { id: 'back', x: layout.left + 32 * layout.scale, y: layout.top - 38 * layout.scale, width: 44 * layout.scale, height: 44 * layout.scale, priority: 90, canHide: false },
-      { id: 'round', x: layout.left + 163 * layout.scale, y: layout.top - 38 * layout.scale, width: 208 * layout.scale, height: 64 * layout.scale, priority: 60, shiftAxis: 'x', shiftStep: 20 * layout.scale, maxShift: 100 * layout.scale },
+      { id: 'back', x: backX, y: layout.top - 6 - backSize.height * layout.scale / 2, width: backSize.width * layout.scale, height: backSize.height * layout.scale, priority: 90, canHide: false },
+      { id: 'round', x: roundX, y: layout.top - 6 - roundSize.height * layout.scale / 2, width: roundSize.width * layout.scale, height: roundSize.height * layout.scale, priority: 60, shiftAxis: 'x', shiftStep: 20 * layout.scale, maxShift: 100 * layout.scale, canHide: true },
     ], 4)
     const topPlace = (id: string) => topPlacements.find(item => item.id === id)
     const back = topPlace('back')
     const round = topPlace('round')
     if (this.backButton?.node && back) this.backButton.node.active = back.visible
-    if (this.roundPanel && round) this.roundPanel.active = round.visible
+    if (this.roundPanel && round) this.roundPanel.active = canShowRound && round.visible
     this.place(this.backButton?.node, back?.x ?? 0, back?.y ?? 0, layout.scale, 20)
     this.place(this.roundPanel, round?.x ?? 0, round?.y ?? 0, layout.scale, 20)
 
-    // Floating HUD groups are clamped independently and never displace lower
-    // seats, play areas or hand controls through safe-layout collision rules.
-    const counterDefault = {
-      x: layout.right - BASE_COUNTER_WIDTH * layout.scale / 2,
-      y: layout.top - counterHeight * layout.scale / 2,
-    }
-    const counterPosition = this.clampOverlayPosition(this.overlayPositions.counter ?? counterDefault, BASE_COUNTER_WIDTH, counterHeight, layout)
-    this.overlayPositions.counter = counterPosition
-    if (this.counterPanel) this.counterPanel.active = true
-    this.place(this.counterPanel, counterPosition.x, counterPosition.y, layout.scale, 80)
-
     const turnAnchor = TURN_OPERATION_ANCHORS[this.state.turnPlace]
+    const seatSize = nodeContentSize(this.seatViews.get('bottom')?.node, 210, 76)
+    const sideSeatX = seatSize.width * layout.scale / 2 + 12
+    const bottomSeatY = layout.bottom + seatSize.height * layout.scale / 2 + 38 * layout.scale
+    const topSeatX = -seatSize.width * layout.scale / 2 - 70 * layout.scale
+    const topSeatPlacement = seatSize.width <= 210
+      ? { id: 'seat-top', x: -220, y: TURN_OPERATION_ANCHORS.top.y, width: 210 * layout.scale, height: 76 * layout.scale, priority: 80, shiftAxis: 'x' as const, shiftStep: 16 * layout.scale, maxShift: 160 * layout.scale, canHide: false }
+      : { id: 'seat-top', x: topSeatX, y: TURN_OPERATION_ANCHORS.top.y, width: seatSize.width * layout.scale, height: seatSize.height * layout.scale, priority: 80, shiftAxis: 'x' as const, shiftStep: 16 * layout.scale, maxShift: 160 * layout.scale, canHide: false }
     const operationPlacements = resolveSafePriorityRects({ left: layout.left + 8, right: layout.right - 8, top: layout.top - 8, bottom: layout.bottom + 8 }, [
-      { id: 'seat-top', x: -220, y: TURN_OPERATION_ANCHORS.top.y, width: 190 * layout.scale, height: 70 * layout.scale, priority: 80, shiftAxis: 'x' as const, shiftStep: 16 * layout.scale, maxShift: 160 * layout.scale, canHide: false },
-      { id: 'seat-bottom', x: layout.left + 100 * layout.scale, y: layout.bottom + 86 * layout.scale, width: 190 * layout.scale, height: 70 * layout.scale, priority: 75, shiftAxis: 'x' as const, shiftStep: 16 * layout.scale, maxShift: 160 * layout.scale, canHide: false },
-      { id: 'seat-right', x: layout.right - 100 * layout.scale, y: 16, width: 190 * layout.scale, height: 70 * layout.scale, priority: 70, shiftAxis: 'y' as const, shiftStep: 18 * layout.scale, maxShift: 216 * layout.scale, canHide: false },
-      { id: 'seat-left', x: layout.left + 100 * layout.scale, y: 16, width: 190 * layout.scale, height: 70 * layout.scale, priority: 70, shiftAxis: 'y' as const, shiftStep: 18 * layout.scale, maxShift: 216 * layout.scale, canHide: false },
+      topSeatPlacement,
+      { id: 'seat-bottom', x: layout.left + sideSeatX, y: bottomSeatY, width: seatSize.width * layout.scale, height: seatSize.height * layout.scale, priority: 75, shiftAxis: 'x' as const, shiftStep: 16 * layout.scale, maxShift: 160 * layout.scale, canHide: false },
+      { id: 'seat-right', x: layout.right - sideSeatX, y: 16, width: seatSize.width * layout.scale, height: seatSize.height * layout.scale, priority: 70, shiftAxis: 'y' as const, shiftStep: 18 * layout.scale, maxShift: 216 * layout.scale, canHide: false },
+      { id: 'seat-left', x: layout.left + sideSeatX, y: 16, width: seatSize.width * layout.scale, height: seatSize.height * layout.scale, priority: 70, shiftAxis: 'y' as const, shiftStep: 18 * layout.scale, maxShift: 216 * layout.scale, canHide: false },
     ], 4)
     const operationPlace = (id: string) => operationPlacements.find(item => item.id === id)
     const bottomSeat = operationPlace('seat-bottom')
     const rightSeat = operationPlace('seat-right')
     const topSeat = operationPlace('seat-top')
     const leftSeat = operationPlace('seat-left')
-    this.place(this.seatViews.get('bottom')?.node, bottomSeat?.x ?? layout.left + 100 * layout.scale, bottomSeat?.y ?? layout.bottom + 86 * layout.scale, layout.scale, 10)
-    this.place(this.seatViews.get('right')?.node, rightSeat?.x ?? layout.right - 100 * layout.scale, rightSeat?.y ?? 16, layout.scale, 10)
-    this.place(this.seatViews.get('top')?.node, topSeat?.x ?? -220, topSeat?.y ?? TURN_OPERATION_ANCHORS.top.y, layout.scale, 10)
-    this.place(this.seatViews.get('left')?.node, leftSeat?.x ?? layout.left + 100 * layout.scale, leftSeat?.y ?? 16, layout.scale, 10)
+    this.place(this.seatViews.get('bottom')?.node, bottomSeat?.x ?? layout.left + sideSeatX, bottomSeat?.y ?? bottomSeatY, layout.scale, 10)
+    this.place(this.seatViews.get('right')?.node, rightSeat?.x ?? layout.right - sideSeatX, rightSeat?.y ?? 16, layout.scale, 10)
+    this.place(this.seatViews.get('top')?.node, topSeat?.x ?? topSeatX, topSeat?.y ?? TURN_OPERATION_ANCHORS.top.y, layout.scale, 10)
+    this.place(this.seatViews.get('left')?.node, leftSeat?.x ?? layout.left + sideSeatX, leftSeat?.y ?? 16, layout.scale, 10)
 
-    this.place(this.suitBar, 0, layout.bottom + 28 * layout.scale, layout.scale, 20)
-    this.place(this.toolbar, layout.right - 175 * layout.scale, layout.bottom + 28 * layout.scale, layout.scale, 30)
+    this.layoutBottomHudGroups(layout)
 
     const humanTurnTimer = this.state.turnVisible && this.state.turnPlace === 'bottom'
     if (this.timerNode && this.root && this.operationOverlay) {
@@ -394,7 +411,6 @@ export class TableGameHud {
     const operationPosition = this.clampOverlayPosition(this.overlayPositions.operations ?? operationDefault, operationSize.width, operationSize.height, layout)
     this.overlayPositions.operations = operationPosition
     this.place(this.operationOverlay, operationPosition.x, operationPosition.y, layout.scale, 80)
-    this.counterPanel?.setSiblingIndex(this.root.children.length - 1)
     this.operationOverlay?.setSiblingIndex(this.root.children.length - 1)
     if (this.timerNode?.parent === this.root) this.timerNode.setSiblingIndex(this.root.children.length - 1)
   }
@@ -403,6 +419,7 @@ export class TableGameHud {
     this.root?.destroy()
     this.root = null
     this.roundPanel = null
+    this.roundGraphics = null
     this.roundLabel = null
     this.levelLabel = null
     this.backButton = null
@@ -410,14 +427,9 @@ export class TableGameHud {
     this.timerGraphics = null
     this.timerArtwork = null
     this.timerLabel = null
-    this.counterPanel = null
-    this.counterGraphics = null
-    this.counterTitle = null
-    this.counterToggleLabel = null
-    this.counterHitArea = null
-    this.counterDragHandle = null
     this.suitBar = null
     this.suitBarGraphics = null
+    this.suitTitleLabel = null
     this.pressedSuit = null
     this.operationOverlay = null
     this.toolbar = null
@@ -427,7 +439,6 @@ export class TableGameHud {
     this.chatButton = null
     this.seatViews.clear()
     this.suitButtons.clear()
-    this.counterCells.clear()
     this.activeDrag = null
   }
 
@@ -440,7 +451,7 @@ export class TableGameHud {
     const safeHeight = Math.max(1, viewport.height - safeTop - safeBottom)
     const fit = Math.min(safeWidth / TABLE_GAME_HUD_DESIGN_SIZE.width, safeHeight / TABLE_GAME_HUD_DESIGN_SIZE.height)
     return {
-      scale: clamp(fit, 0.55, 1.4),
+      scale: clamp(fit, MIN_HUD_SCALE, 1.4),
       left: -viewport.width / 2 + safeLeft,
       right: viewport.width / 2 - safeRight,
       top: viewport.height / 2 - safeTop,
@@ -472,6 +483,37 @@ export class TableGameHud {
     }
   }
 
+  private layoutBottomHudGroups (layout: HudLayout): void {
+    const suitSize = nodeContentSize(this.suitBar, 382, 54)
+    const toolbarSize = nodeContentSize(this.toolbar, BASE_TOOLBAR_WIDTH, 56)
+    const seatSize = nodeContentSize(this.seatViews.get('bottom')?.node, 210, 76)
+    const laneLeft = layout.left + 8 + seatSize.width * layout.scale + BOTTOM_GROUP_GAP
+    const laneRight = layout.right - 8
+    const laneWidth = Math.max(1, laneRight - laneLeft)
+    const singleRowScale = Math.min(
+      layout.scale,
+      laneWidth / (suitSize.width + toolbarSize.width + BOTTOM_GROUP_GAP),
+    )
+    const splitRows = singleRowScale < layout.scale * 0.82
+
+    if (!splitRows) {
+      const rowHeight = Math.max(suitSize.height, toolbarSize.height) * singleRowScale
+      const y = layout.bottom + 8 + rowHeight / 2
+      const toolbarX = laneRight - toolbarSize.width * singleRowScale / 2
+      const suitX = toolbarX - toolbarSize.width * singleRowScale / 2 - BOTTOM_GROUP_GAP * singleRowScale - suitSize.width * singleRowScale / 2
+      this.place(this.suitBar, suitX, y, singleRowScale, 20)
+      this.place(this.toolbar, toolbarX, y, singleRowScale, 30)
+      return
+    }
+
+    const splitScale = Math.min(layout.scale, laneWidth / Math.max(suitSize.width, toolbarSize.width))
+    const toolbarY = layout.bottom + 8 + toolbarSize.height * splitScale / 2
+    const suitY = toolbarY + toolbarSize.height * splitScale / 2 + BOTTOM_GROUP_GAP + suitSize.height * splitScale / 2
+    const laneCenter = (laneLeft + laneRight) / 2
+    this.place(this.toolbar, laneCenter, toolbarY, splitScale, 30)
+    this.place(this.suitBar, laneCenter, suitY, splitScale, 20)
+  }
+
   private layoutHumanOperationRow (humanTurnTimer: boolean): Readonly<{ width: number, height: number }> {
     const minimum = { width: 112, height: 112 }
     if (!this.operationOverlay) return minimum
@@ -497,12 +539,59 @@ export class TableGameHud {
     return { width, height: minimum.height }
   }
 
+  private applyExpandedHudMetrics (): void {
+    if (this.backButton) {
+      configureTransform(this.backButton.node, EXPANDED_BACK_SIZE, EXPANDED_BACK_SIZE)
+      configureLabelMetrics(this.backButton.label, 52, 52, 40, 0, 2)
+      this.drawToolButton(this.backButton, false, false)
+    }
+
+    if (this.roundPanel) {
+      configureTransform(this.roundPanel, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT)
+      configureLabelMetrics(this.roundLabel, 252, 40, 30, 0, 19)
+      configureLabelMetrics(this.levelLabel, 258, 34, 26, 0, -21)
+      if (this.roundGraphics) drawPanel(this.roundGraphics, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT, EXPANDED_ROUND_HEIGHT / 2)
+    }
+
+    this.seatViews.forEach(view => {
+      configureTransform(view.node, EXPANDED_SEAT_WIDTH, EXPANDED_SEAT_HEIGHT)
+      configureTransform(view.avatarSprite.node, 68, 68)
+      view.avatarSprite.node.setPosition(new Vec3(-96, 0, 2))
+      configureLabelMetrics(view.nameLabel, 170, 40, 28, 38, 21)
+      configureLabelMetrics(view.rankLabel, 174, 34, 24, 40, -22)
+    })
+
+    if (this.suitBar) configureTransform(this.suitBar, EXPANDED_SUIT_BAR_WIDTH, EXPANDED_SUIT_BAR_HEIGHT)
+    configureLabelMetrics(this.suitTitleLabel, 126, 52, 28, -174, 0)
+    this.suitButtons.forEach((view, suit) => {
+      const index = SUITS.indexOf(suit)
+      configureTransform(view.node, 62, 58)
+      view.node.setPosition(new Vec3(-66 + index * 70, 0, 2))
+      configureLabelMetrics(view.label, 58, 54, 38, 0, 0)
+    })
+
+    if (this.toolbar) configureTransform(this.toolbar, EXPANDED_TOOLBAR_WIDTH, EXPANDED_TOOLBAR_HEIGHT)
+    this.configureToolbarButton(this.lockButton, -190, 150, 64, 30)
+    this.configureToolbarButton(this.arrangeButton, 0, 210, 64, 32)
+    this.configureToolbarButton(this.chatButton, 190, 150, 64, 30)
+
+  }
+
+  private configureToolbarButton (view: ButtonView | null, x: number, width: number, height: number, fontSize: number): void {
+    if (!view) return
+    configureTransform(view.node, width, height)
+    view.node.setPosition(new Vec3(x, 0, 1))
+    configureLabelMetrics(view.label, width - 20, height - 10, fontSize, 0, 0)
+    this.drawToolButton(view, false, false)
+  }
+
   private createRoundPanel (parent: Node): void {
     const node = new Node('MatchSummary')
     node.parent = parent
     configureTransform(node, 208, 64)
-    this.roundLabel = createLabel(node, 'RoundLabel', 188, 28, 19, new Color(239, 248, 247), 0, 14)
-    this.levelLabel = createLabel(node, 'TeamLevelLabel', 198, 25, 17, new Color(255, 205, 77), 0, -15)
+    this.roundGraphics = node.addComponent(Graphics)
+    this.roundLabel = createLabel(node, 'RoundLabel', 188, 30, 22, new Color(239, 248, 247), 0, 14)
+    this.levelLabel = createLabel(node, 'TeamLevelLabel', 198, 27, 20, new Color(255, 205, 77), 0, -15)
     this.roundPanel = node
   }
 
@@ -521,57 +610,21 @@ export class TableGameHud {
     this.timerNode = node
   }
 
-  private createCounter (parent: Node): void {
-    const panel = new Node('CardCounter')
-    panel.parent = parent
-    configureTransform(panel, BASE_COUNTER_WIDTH, BASE_COUNTER_OPEN_HEIGHT)
-    this.counterGraphics = panel.addComponent(Graphics)
-    this.counterTitle = createLabel(panel, 'CounterTitle', 64, 42, 15, new Color(244, 248, 239), -264, 0)
-    this.counterTitle.string = '记牌器'
-    this.counterToggleLabel = createLabel(panel, 'CounterToggle', 48, 38, 13, new Color(255, 205, 77), 270, 0)
-
-    const dragHandle = new Node('CounterDragHandle')
-    dragHandle.parent = panel
-    dragHandle.setPosition(new Vec3(-264, 0, 4))
-    configureTransform(dragHandle, 68, BASE_COUNTER_OPEN_HEIGHT)
-    this.bindDragHandle(dragHandle, 'counter')
-    this.counterDragHandle = dragHandle
-
-    TABLE_GAME_HUD_COUNTER_RANKS.forEach((rank, index) => {
-      const x = -218 + index * 31.5
-      const rankLabel = createLabel(panel, `CounterRank-${rank}`, 30, 25, rank.length > 1 ? 12 : 14, new Color(236, 244, 241), x, 14)
-      const countLabel = createLabel(panel, `CounterCount-${rank}`, 30, 25, 14, new Color(218, 235, 231), x, -14)
-      this.counterCells.set(rank, { rankLabel, countLabel })
-    })
-
-    const hitArea = new Node('CounterToggleHitArea')
-    hitArea.parent = panel
-    hitArea.setPosition(new Vec3(270, 0, 4))
-    configureTransform(hitArea, 52, 38)
-    this.bindPress(hitArea, () => {}, () => {
-      const expanded = !this.state.counterExpanded
-      this.update({ counterExpanded: expanded })
-      this.actions.onCounterVisibilityChange?.(expanded)
-    })
-    this.counterHitArea = hitArea
-    this.counterPanel = panel
-  }
-
   private createSeats (parent: Node): void {
     SEAT_PLACES.forEach(place => {
       const node = new Node(`Seat-${place}`)
       node.parent = parent
-      configureTransform(node, 190, 70)
+      configureTransform(node, 210, 76)
       const graphics = node.addComponent(Graphics)
       const avatarNode = new Node('DefaultAvatar')
       avatarNode.parent = node
-      avatarNode.setPosition(new Vec3(-58, 0, 2))
+      avatarNode.setPosition(new Vec3(-68, 0, 2))
       configureTransform(avatarNode, 46, 46)
       const avatarSprite = avatarNode.addComponent(Sprite)
       avatarSprite.sizeMode = Sprite.SizeMode.CUSTOM
       avatarSprite.node.active = false
-      const nameLabel = createLabel(node, 'PlayerName', 112, 25, 17, new Color(240, 246, 243), 29, 15)
-      const rankLabel = createLabel(node, 'PlayerRank', 104, 20, 12, new Color(255, 216, 105), 34, -14)
+      const nameLabel = createLabel(node, 'PlayerName', 130, 30, 22, new Color(240, 246, 243), 31, 16)
+      const rankLabel = createLabel(node, 'PlayerRank', 122, 26, 20, new Color(255, 216, 105), 36, -16)
       this.seatViews.set(place, { node, graphics, avatarSprite, nameLabel, rankLabel })
     })
   }
@@ -581,9 +634,10 @@ export class TableGameHud {
     bar.parent = parent
     configureTransform(bar, 382, 54)
     this.suitBarGraphics = bar.addComponent(Graphics)
-    const title = createLabel(bar, 'SuitBarTitle', 96, 36, 18, new Color(235, 243, 237), -138, 0)
+    const title = createLabel(bar, 'SuitBarTitle', 102, 38, 22, new Color(235, 243, 237), -138, 0)
     title.string = '同花顺'
     title.isBold = true
+    this.suitTitleLabel = title
 
     SUITS.forEach((suit, index) => {
       const node = new Node(`Suit-${suit}`)
@@ -619,12 +673,12 @@ export class TableGameHud {
 
     const toolbar = new Node('BottomTableToolbar')
     toolbar.parent = parent
-    configureTransform(toolbar, 350, 48)
-    this.lockButton = this.createButton(toolbar, 'LockHand', '锁牌', -118, 98, 42, 16)
-    this.arrangeButton = this.createButton(toolbar, 'ArrangeHand', '一键理牌', 0, 122, 42, 16)
-    this.chatButton = this.createButton(toolbar, 'QuickChat', '快捷语', 118, 92, 42, 16)
+    configureTransform(toolbar, BASE_TOOLBAR_WIDTH, 56)
+    this.lockButton = this.createButton(toolbar, 'LockHand', '锁牌', -150, 116, 50, 24)
+    this.arrangeButton = this.createButton(toolbar, 'ArrangeHand', '一键理牌', 0, 164, 50, 26)
+    this.chatButton = this.createButton(toolbar, 'QuickChat', '快捷语', 150, 116, 50, 24)
 
-    this.bindPress(this.lockButton.node, pressed => this.drawToolButton(this.lockButton, this.state.handLocked, pressed), () => {
+    this.bindPress(this.lockButton.node, pressed => this.drawToolButton(this.lockButton, this.state.handLocked && this.state.handLockSelectionValid, pressed), () => {
       const locked = !this.state.handLocked
       this.update({ handLocked: locked })
       this.actions.onHandLockChange?.(locked)
@@ -638,7 +692,7 @@ export class TableGameHud {
     handle.on(Node.EventType.TOUCH_START, () => { if (canStart()) this.activeDrag = overlay })
     handle.on(Node.EventType.TOUCH_MOVE, (event: EventTouch) => {
       if (this.activeDrag !== overlay) return
-      const target = overlay === 'counter' ? this.counterPanel : this.operationOverlay
+      const target = this.operationOverlay
       if (!target) return
       const delta = event.getUIDelta()
       const current = target.position
@@ -677,12 +731,11 @@ export class TableGameHud {
     if (this.roundLabel) this.roundLabel.string = this.state.matchLabel
     if (this.levelLabel) this.levelLabel.string = this.state.levelLabel
     this.renderTimer()
-    this.renderCounter()
     this.renderSeats()
     this.renderSuitButtons()
     if (this.lockButton) {
-      this.lockButton.label.string = this.state.handLocked ? '确认锁牌' : '锁牌'
-      this.drawToolButton(this.lockButton, this.state.handLocked, false)
+      this.lockButton.label.string = !this.state.handLocked || this.state.handLockSelectionValid ? '锁牌' : '恢复'
+      this.drawToolButton(this.lockButton, this.state.handLocked && this.state.handLockSelectionValid, false)
     }
     if (this.arrangeButton) this.arrangeButton.label.string = this.state.arrangeRestoreAvailable ? '复原' : '一键理牌'
   }
@@ -713,48 +766,6 @@ export class TableGameHud {
     this.timerLabel.color = warning ? new Color(255, 126, 105) : new Color(255, 255, 255)
   }
 
-  private renderCounter (): void {
-    if (!this.counterPanel || !this.counterGraphics || !this.counterTitle || !this.counterToggleLabel || !this.counterHitArea) return
-    const expanded = this.state.counterExpanded
-    const height = expanded ? BASE_COUNTER_OPEN_HEIGHT : BASE_COUNTER_CLOSED_HEIGHT
-    configureTransform(this.counterPanel, BASE_COUNTER_WIDTH, height)
-    drawPanel(this.counterGraphics, BASE_COUNTER_WIDTH, height, 8)
-    const headerY = 0
-    this.counterTitle.node.setPosition(new Vec3(-264, headerY, 1))
-    this.counterToggleLabel.node.setPosition(new Vec3(270, headerY, 1))
-    this.counterToggleLabel.string = expanded ? '收起' : '展开'
-    this.counterHitArea.setPosition(new Vec3(270, headerY, 4))
-    if (this.counterDragHandle) {
-      this.counterDragHandle.setPosition(new Vec3(-264, headerY, 4))
-      configureTransform(this.counterDragHandle, 68, height)
-    }
-    if (expanded) {
-      const tableLeft = -233.75
-      const tableRight = 238.25
-      this.counterGraphics.strokeColor = new Color(90, 145, 154, 130)
-      this.counterGraphics.lineWidth = 1
-      this.counterGraphics.moveTo(tableLeft, 0)
-      this.counterGraphics.lineTo(tableRight, 0)
-      for (let index = 0; index <= TABLE_GAME_HUD_COUNTER_RANKS.length; index += 1) {
-        const x = tableLeft + index * 31.5
-        this.counterGraphics.moveTo(x, -31)
-        this.counterGraphics.lineTo(x, 31)
-      }
-      this.counterGraphics.stroke()
-    }
-    this.counterCells.forEach((cell, rank) => {
-      cell.rankLabel.node.active = expanded
-      cell.countLabel.node.active = expanded
-      const raw = this.state.cardCounts[rank]
-      const count = raw === undefined ? null : Math.max(0, Math.trunc(finiteOr(raw, 0)))
-      cell.rankLabel.string = rank
-      cell.countLabel.string = String(count ?? '-')
-      const color = count === 0 ? new Color(111, 139, 143) : count !== null && count <= 2 ? new Color(255, 201, 89) : new Color(218, 235, 231)
-      cell.rankLabel.color = color
-      cell.countLabel.color = color
-    })
-  }
-
   private renderSeats (): void {
     const byPlace = new Map(this.state.seats.map(seat => [seat.place, seat]))
     SEAT_PLACES.forEach(place => {
@@ -763,22 +774,35 @@ export class TableGameHud {
       if (!view) return
       const offline = Boolean(seat.offline)
       const active = Boolean(seat.active) && !offline
+      const size = nodeContentSize(view.node, EXPANDED_SEAT_WIDTH, EXPANDED_SEAT_HEIGHT)
+      const avatarSize = Math.min(72, size.height - 20)
+      const avatarX = -size.width / 2 + avatarSize / 2 + 8
+      const textLeft = avatarX + avatarSize / 2 + 12
+      const textRight = size.width / 2 - 8
+      const textWidth = Math.max(96, textRight - textLeft)
+      const textX = (textLeft + textRight) / 2
+      const statusHeight = Math.min(44, size.height * 0.34)
+      const statusY = -size.height * 0.23
       view.graphics.clear()
       view.graphics.fillColor = offline ? new Color(71, 82, 84) : AVATAR_COLORS[place]
       view.graphics.strokeColor = active ? new Color(255, 218, 104) : new Color(221, 236, 232)
       view.graphics.lineWidth = active ? 2.5 : 1.5
-      view.graphics.roundRect(-85, -27, 54, 54, 8)
+      view.graphics.roundRect(avatarX - avatarSize / 2, -avatarSize / 2, avatarSize, avatarSize, 16)
       view.graphics.fill()
       view.graphics.stroke()
       view.graphics.fillColor = active ? new Color(98, 70, 20, 245) : new Color(31, 60, 68, 245)
-      view.graphics.roundRect(-20, -24, 108, 20, 6)
+      view.graphics.roundRect(textLeft, statusY - statusHeight / 2, textWidth, statusHeight, statusHeight / 2)
       view.graphics.fill()
+      configureTransform(view.avatarSprite.node, avatarSize - 8, avatarSize - 8)
+      view.avatarSprite.node.setPosition(new Vec3(avatarX, 0, 2))
+      configureLabelMetrics(view.nameLabel, textWidth, 40, 28, textX, size.height * 0.22)
+      configureLabelMetrics(view.rankLabel, textWidth - 8, statusHeight, 24, textX, statusY)
       view.avatarSprite.spriteFrame = this.defaultAvatarFrame
       view.avatarSprite.node.active = Boolean(this.defaultAvatarFrame)
       view.avatarSprite.color = offline ? new Color(150, 156, 154) : new Color(255, 255, 255)
-      view.nameLabel.string = seat.name || DEFAULT_SEAT_NAMES[place]
+      view.nameLabel.string = compactHudText(seat.name || DEFAULT_SEAT_NAMES[place], 6)
       view.nameLabel.color = offline ? new Color(148, 163, 163) : new Color(240, 246, 243)
-      view.rankLabel.string = seat.status
+      view.rankLabel.string = compactHudText(seat.status, 7)
     })
   }
 
@@ -789,11 +813,17 @@ export class TableGameHud {
   private renderSuitButtons (): void {
     if (!this.suitBarGraphics) return
     const graphics = this.suitBarGraphics
+    const barSize = nodeContentSize(this.suitBar, 382, 54)
+    const expandedMetrics = barSize.width > 382
     graphics.clear()
     graphics.fillColor = new Color(8, 33, 43, 232)
     graphics.strokeColor = new Color(93, 173, 187, 230)
     graphics.lineWidth = 1.75
-    graphics.roundRect(-82, -23, 244, 46, 12)
+    if (expandedMetrics) {
+      graphics.roundRect(-116, -29, 326, 58, 18)
+    } else {
+      graphics.roundRect(-82, -23, 244, 46, 12)
+    }
     graphics.fill()
     graphics.stroke()
 
@@ -804,7 +834,7 @@ export class TableGameHud {
       const selected = available && this.state.selectedSuit === suit
       const pressed = available && this.pressedSuit === suit
       const redSuit = suit === 'heart' || suit === 'diamond'
-      const x = -48 + index * 58
+      const x = expandedMetrics ? -66 + index * 70 : -48 + index * 58
 
       if (available) {
         const accent = selected
@@ -813,19 +843,32 @@ export class TableGameHud {
             ? new Color(255, 104, 102, 245)
             : new Color(94, 231, 214, 245)
         graphics.strokeColor = accent
-        graphics.lineWidth = selected ? 4 : 2.5
-        graphics.moveTo(x - (selected ? 18 : 14), -17)
-        graphics.lineTo(x + (selected ? 18 : 14), -17)
-        graphics.stroke()
-        if (selected) {
-          graphics.fillColor = new Color(accent.r, accent.g, accent.b, pressed ? 72 : 48)
-          graphics.circle(x, 1, pressed ? 17 : 19)
-          graphics.fill()
+        graphics.lineWidth = selected ? 5 : 3.5
+        if (expandedMetrics) {
+          graphics.moveTo(x - (selected ? 22 : 18), -22)
+          graphics.lineTo(x + (selected ? 22 : 18), -22)
+          graphics.stroke()
+          if (selected) {
+            graphics.fillColor = new Color(accent.r, accent.g, accent.b, pressed ? 72 : 48)
+            graphics.circle(x, 1, pressed ? 20 : 22)
+            graphics.fill()
+          }
+        } else {
+          graphics.moveTo(x - (selected ? 18 : 14), -17)
+          graphics.lineTo(x + (selected ? 18 : 14), -17)
+          graphics.stroke()
+          if (selected) {
+            graphics.fillColor = new Color(accent.r, accent.g, accent.b, pressed ? 72 : 48)
+            graphics.circle(x, 1, pressed ? 17 : 19)
+            graphics.fill()
+          }
         }
       }
 
+      // Unavailable suits use a low-saturation, low-brightness tint instead of
+      // competing with the lit candidates.
       view.label.color = !available
-        ? new Color(91, 112, 114, 170)
+        ? new Color(62, 69, 70, 145)
         : selected
           ? new Color(255, 232, 122, 255)
           : redSuit
@@ -851,7 +894,7 @@ export class TableGameHud {
         : new Color(17, 57, 69, 240)
     graphics.strokeColor = active ? new Color(255, 220, 104, 255) : new Color(101, 180, 192, 230)
     graphics.lineWidth = active ? 2.5 : 1.5
-    graphics.roundRect(-width / 2, -height / 2, width, height, 7)
+    graphics.roundRect(-width / 2, -height / 2, width, height, height / 2)
     graphics.fill()
     graphics.stroke()
   }

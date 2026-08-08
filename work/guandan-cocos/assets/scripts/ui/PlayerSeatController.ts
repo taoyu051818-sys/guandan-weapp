@@ -27,25 +27,25 @@ export class PlayerSeatController extends Component {
     labelNode.parent = this.node
     labelNode.addComponent(UITransform).setContentSize(166, 56)
     this.label = labelNode.addComponent(Label)
-    this.label!.fontSize = 17
-    this.label!.lineHeight = 22
+    this.label!.fontSize = 20
+    this.label!.lineHeight = 26
     this.label!.horizontalAlign = Label.HorizontalAlign.CENTER
     this.label!.verticalAlign = Label.VerticalAlign.CENTER
     applyForegroundTextStyle(this.label!, new Color(18, 31, 34, 255), 2)
     const connectionStatus = new Node('ConnectionStatus')
     connectionStatus.parent = this.node
     connectionStatus.setPosition(new Vec3(52, 22, 2))
-    connectionStatus.addComponent(UITransform).setContentSize(64, 24)
+    connectionStatus.addComponent(UITransform).setContentSize(72, 30)
     this.connectionStatusGraphics = connectionStatus.addComponent(Graphics)
     const connectionText = new Node('ConnectionStatusText')
     connectionText.parent = connectionStatus
-    connectionText.addComponent(UITransform).setContentSize(60, 22)
+    connectionText.addComponent(UITransform).setContentSize(68, 28)
     this.connectionStatusLabel = connectionText.addComponent(Label)
-    this.connectionStatusLabel.fontSize = 14
-    this.connectionStatusLabel.lineHeight = 18
+    this.connectionStatusLabel.fontSize = 20
+    this.connectionStatusLabel.lineHeight = 25
     this.connectionStatusLabel.horizontalAlign = Label.HorizontalAlign.CENTER
     this.connectionStatusLabel.verticalAlign = Label.VerticalAlign.CENTER
-    applyForegroundTextStyle(this.connectionStatusLabel, new Color(20, 34, 34, 255), 1)
+    applyForegroundTextStyle(this.connectionStatusLabel, new Color(20, 34, 34, 255), 2)
     connectionStatus.active = false
     this.connectionStatus = connectionStatus
     const bubble = new Node('ChatBubble')
@@ -63,12 +63,12 @@ export class PlayerSeatController extends Component {
     chatText.parent = bubble
     chatText.addComponent(UITransform).setContentSize(260, 42)
     this.chatLabel = chatText.addComponent(Label)
-    this.chatLabel.fontSize = 16
-    this.chatLabel.lineHeight = 22
+    this.chatLabel.fontSize = 20
+    this.chatLabel.lineHeight = 26
     this.chatLabel.horizontalAlign = Label.HorizontalAlign.CENTER
     this.chatLabel.verticalAlign = Label.VerticalAlign.CENTER
     this.chatLabel.color = new Color(43, 48, 49)
-    applyForegroundTextStyle(this.chatLabel, new Color(255, 249, 229, 255), 1)
+    applyForegroundTextStyle(this.chatLabel, new Color(255, 249, 229, 255), 2)
     bubble.active = false
     this.chatBubble = bubble
   }

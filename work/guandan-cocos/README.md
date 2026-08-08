@@ -156,7 +156,7 @@ node tests/platform-live-contract.cjs
 /Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator --project "$PWD" --build "platform=web-desktop;debug=false;useSplashScreen=false"
 
 # Cocos 微信小游戏构建后检查首包、子包和加载页
-/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator --project "$PWD" --build "platform=wechatgame;debug=false;useSplashScreen=false"
+/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator --project "$PWD" --build "platform=wechatgame;debug=false;sourceMaps=false;useSplashScreen=false"
 node scripts/verify-wechat-build.mjs
 
 # Creator 某些 CLI 构建仍会回填默认开屏；发布前强制收口并验证构建产物

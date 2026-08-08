@@ -6,6 +6,8 @@ const projectRoot = path.resolve(__dirname, '..')
 const sourcePath = path.join(projectRoot, 'assets/scripts/ui/TableGameHud.ts')
 const metaPath = `${sourcePath}.meta`
 const scenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
+const workspacePath = path.join(projectRoot, 'assets/scripts/game/HandWorkspace.ts')
+const groupingPath = path.join(projectRoot, 'assets/scripts/game/HandGrouping.ts')
 const playAreaPath = path.join(projectRoot, 'assets/scripts/ui/PlayAreaController.ts')
 const timerArtPath = path.join(projectRoot, 'assets/game-assets/ui/table/chicken-timer-frame.png')
 const avatarArtPath = path.join(projectRoot, 'assets/game-assets/ui/common/default-avatar.jpg')
@@ -17,6 +19,8 @@ assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compil
 
 const source = fs.readFileSync(sourcePath, 'utf8')
 const scene = fs.readFileSync(scenePath, 'utf8')
+const workspace = fs.readFileSync(workspacePath, 'utf8')
+const grouping = fs.readFileSync(groupingPath, 'utf8')
 const playArea = fs.readFileSync(playAreaPath, 'utf8')
 const metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'))
 const ts = require(compilerPath)
@@ -42,26 +46,30 @@ assert.match(source, /public setTurnActionNodes \(nodes: readonly \(Node \| null
 assert.match(source, /public setTimerArtwork \(artwork: Node \| null\): void/)
 assert.match(source, /public setDefaultAvatarFrame \(frame: SpriteFrame \| null\): void/)
 assert.match(source, /TABLE_GAME_HUD_DESIGN_SIZE = Object\.freeze\(\{ width: 1280, height: 720 \}\)/)
+assert.match(source, /TABLE_GAME_HUD_CARD_COUNTER_STATUS = 'temporarily-retired'/, 'the removed card counter must keep an explicit retirement marker')
+assert.doesNotMatch(source, /new Node\('CardCounter'\)|createCounter|renderCounter|CounterDragHandle|counterExpanded|cardCounts/, 'the retired card counter must remain unmounted and disconnected from HUD state')
+assert.doesNotMatch(scene, /tableHudCardCounts|tableHudCounterExpanded|onCounterVisibilityChange|TABLE_GAME_HUD_COUNTER_RANKS/, 'the game scene must not compute or update the retired card counter')
+assert.match(source, /const BASE_TOOLBAR_WIDTH = 420/, 'the enlarged table tools need their reserved toolbar width')
+assert.match(source, /const MIN_HUD_SCALE = 0\.78/, 'responsive HUD layout must not shrink text below its legible presentation scale')
+assert.match(source, /const MIN_HUD_FONT_SIZE = 20/, 'all HUD labels must retain an explicit 20px floor')
+assert.match(source, /const createLabel[\s\S]*const resolvedFontSize = Math\.max\(MIN_HUD_FONT_SIZE, Math\.round\(fontSize\)\)[\s\S]*label\.fontSize = resolvedFontSize[\s\S]*return applyForegroundTextStyle\(label,[\s\S]*resolvedFontSize >= 24 \? 3 : 2\)/, 'HUD labels must combine the minimum font size with the shared heavy outline')
 assert.match(source, /safeLeft[\s\S]*safeRight[\s\S]*safeTop[\s\S]*safeBottom/)
 assert.match(source, /safeWidth \/ TABLE_GAME_HUD_DESIGN_SIZE\.width/)
 assert.match(source, /safeHeight \/ TABLE_GAME_HUD_DESIGN_SIZE\.height/)
 
-for (const control of ['TableBack', 'MatchSummary', 'CircularTurnTimer', 'CardCounter', 'StraightFlushSuitBar', 'LockHand', 'ArrangeHand', 'QuickChat']) {
+for (const control of ['TableBack', 'MatchSummary', 'CircularTurnTimer', 'StraightFlushSuitBar', 'LockHand', 'ArrangeHand', 'QuickChat']) {
   assert.equal(source.includes(`'${control}'`) || source.includes(`\`${control}\``), true, `missing HUD control: ${control}`)
 }
 assert.match(source, /SEAT_PLACES: readonly TableGameHudSeatPlace\[\] = \['bottom', 'right', 'top', 'left'\]/)
-for (const stateField of ['matchLabel', 'levelLabel', 'turnVisible', 'turnSeconds', 'turnDurationSeconds', 'turnPlace', 'availableSuits']) {
+for (const stateField of ['matchLabel', 'levelLabel', 'turnVisible', 'turnSeconds', 'turnDurationSeconds', 'turnPlace', 'availableSuits', 'handLockSelectionValid']) {
   assert.match(source, new RegExp(`${stateField}:`), `missing authoritative HUD state: ${stateField}`)
 }
 assert.doesNotMatch(source, /roundNumber|totalRounds|multiplier: number|points: number|scoreLabel|teamScore|formatScore/, 'HUD must not invent match scores or player economy fields')
 assert.match(source, /new Node\(`Seat-\$\{place\}`\)/, 'all four seat panels must share the same generated structure')
-for (const callback of ['onBack', 'onCounterVisibilityChange', 'onSuitSelect', 'onHandLockChange', 'onArrange', 'onChat']) {
+for (const callback of ['onBack', 'onSuitSelect', 'onHandLockChange', 'onArrange', 'onChat']) {
   assert.match(source, new RegExp(`${callback}\\?\\.`), `HUD action must be emitted: ${callback}`)
 }
-for (const rank of ['大王', '小王', '2', 'A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3']) {
-  assert.equal(source.includes(`'${rank}'`), true, `card counter must include ${rank}`)
-}
-for (const label of ['本局打', '我方 2级 · 对方 2级', '记牌器', '同花顺', '锁牌', '确认锁牌', '一键理牌', '复原', '快捷语']) {
+for (const label of ['本局打', '我方 2级 · 对方 2级', '同花顺', '锁牌', '恢复', '一键理牌', '复原', '快捷语']) {
   assert.equal(source.includes(label), true, `HUD must render ${label}`)
 }
 assert.doesNotMatch(source, /比分|PlayerPoints|TimerCaption|turnCaption/, 'the table must show levels only and the chicken timer must show seconds only')
@@ -96,6 +104,8 @@ assert.match(source, /TURN_OPERATION_ANCHORS[\s\S]*bottom: Object\.freeze\(\{ x:
 assert.match(source, /const turnAnchor = TURN_OPERATION_ANCHORS\[this\.state\.turnPlace\]/)
 assert.match(source, /humanTurnTimer[\s\S]*desiredParent = humanTurnTimer \? this\.operationOverlay : this\.root/, 'the human timer must join the draggable operation row only on the human turn')
 assert.match(source, /clampOverlayPosition\(turnAnchor, 112, 112, layout\)/, 'other players timers must remain independently clamped at their operation anchors')
+assert.match(source, /this\.place\(this\.timerNode, timerPosition\.x, timerPosition\.y, layout\.scale, 80\)/, 'every seat timer must use the same scale as the human timer')
+assert.doesNotMatch(source, /NON_HUMAN_TIMER_SCALE/, 'other seats must not apply a separate timer scale')
 assert.match(source, /id: 'seat-top', x: -220, y: TURN_OPERATION_ANCHORS\.top\.y/, 'the opposite seat must sit fully left of the top operation area')
 assert.match(scene, /new Vec3\(-220, 218, 0\)/, 'the legacy seat origin used for card flights must agree with the opposite HUD seat')
 assert.match(scene, /private tableHudTurnPlace[\s\S]*activePlayerId[\s\S]*places\[\(order\.indexOf\(activePlayerId\) - order\.indexOf\(humanId\) \+ 4\) % 4\]/, 'the active player must be projected into the viewer-relative operation place')
@@ -103,32 +113,27 @@ assert.match(scene, /private tableHudTurnVisible[\s\S]*snapshot\.phase === 'play
 assert.match(scene, /private tableHudTurnSeconds[\s\S]*this\.countdownLabel\?\.node\.active \? this\.actionCountdown : this\.tableTurnDurationSeconds\(\)/, 'non-human local turns must start from the configured turn duration')
 assert.match(playArea, /relativePlaces = \[new Vec3\(0, -82, 0\), new Vec3\(300, 0, 0\), new Vec3\(0, 218, 0\), new Vec3\(-300, 0, 0\)\]/, 'the opposite player play area must move into the top table lane')
 
-const topLayout = source.slice(source.indexOf('const topPlacements'), source.indexOf('const turnAnchor'))
-assert.doesNotMatch(topLayout, /id: 'counter'/, 'the floating counter must not participate in lower safe-area collision resolution')
 const operationLayout = source.slice(source.indexOf('const operationPlacements'), source.indexOf('const humanTurnTimer'))
 assert.doesNotMatch(operationLayout, /id: 'turn-timer'/, 'the floating timer must not participate in lower seat collision resolution')
 assert.match(source, /new Node\('FloatingOperationGroup'\)/, 'timer and operation buttons need one draggable top-layer group')
 assert.doesNotMatch(source, /OperationDragHandle|operationDragHandle|handleWidth/, 'the obsolete standalone operation drag icon must not be created or laid out')
 assert.match(source, /bindDragHandle\(this\.timerNode, 'operations',[\s\S]*this\.timerNode\?\.parent === this\.operationOverlay/, 'dragging the chicken timer itself must move the entire operation group')
-assert.match(source, /new Node\('CounterDragHandle'\)[\s\S]*bindDragHandle\(dragHandle, 'counter'\)/, 'the counter needs its own drag handle')
 assert.match(source, /private bindDragHandle[\s\S]*EventType\.TOUCH_MOVE[\s\S]*event\.getUIDelta\(\)[\s\S]*this\.layout\(this\.viewport\)/, 'dragging must persist and reclamp the overlay position')
 assert.match(source, /private clampOverlayPosition[\s\S]*layout\.left[\s\S]*layout\.right[\s\S]*layout\.bottom[\s\S]*layout\.top/, 'floating groups must stay inside the current safe bounds')
 assert.match(source, /const operationDefault = \{[\s\S]*x: TURN_OPERATION_ANCHORS\.bottom\.x,[\s\S]*y: TURN_OPERATION_ANCHORS\.bottom\.y/, 'the draggable turn-action row must default to the human operation area')
 assert.match(source, /toolbar\.parent = parent/, 'lock, arrange and chat tools must remain outside the draggable turn-action row')
+assert.match(source, /const toolbarX = laneRight - toolbarSize\.width \* singleRowScale \/ 2[\s\S]*const suitX = toolbarX - toolbarSize\.width \* singleRowScale \/ 2 - BOTTOM_GROUP_GAP \* singleRowScale - suitSize\.width \* singleRowScale \/ 2/, 'the straight-flush group must sit immediately beside the lock toolbar instead of anchoring to the far left')
 assert.match(source, /this\.turnActionNodes\.forEach\(node => \{ node\.parent = this\.operationOverlay \}\)/, 'authoritative action buttons must be reparented without replacing their callbacks')
 assert.match(source, /visibleActions = this\.turnActionNodes\.filter\(node => node\.isValid && node\.active\)/, 'the row must include only currently valid action buttons')
 assert.match(source, /this\.place\(this\.timerNode, cursor \+ timerWidth \/ 2, 0, 1, 2\)/, 'the human timer must occupy the first slot of the shared turn-action row')
 assert.match(source, /Tween\.stopAllByTarget\(node\)[\s\S]*this\.place\(node, cursor \+ actionWidth \/ 2, 0, 1, 3\)/, 'HUD positioning must cancel stale fallback tweens before laying out action buttons')
 assert.match(scene, /hud\.setTurnActionNodes\(\[this\.hintButton, this\.passButton, this\.playButton\]\)/, 'the scene must supply the fixed 提示/不要/出牌 controls in display order')
+assert.match(scene, /makeButton\('PassButton', '不要', -185, 112, 54, 28\)/, '不要 must use the same 28px type setting as 出牌')
+assert.match(scene, /makeButton\('HintButton', '提示', -62, 112, 54, 28\)/, '提示 must use the same 28px type setting as 出牌')
+assert.match(scene, /makeButton\('PlayButton', '出牌', 70, 128, 58, 28\)/, '出牌 must remain the most prominent table action')
 assert.doesNotMatch(scene, /resetButton|ResetButton|'重置'/, 'the table reset control and all of its visibility logic must be retired')
 assert.doesNotMatch(scene, /selectedCardIds\.length && this\.resetButton|playValidation\.canPlay && this\.playButton/, 'selected cards and play diagnosis must not resize the action row')
 assert.match(scene, /visible\.forEach[\s\S]*node\.active = true[\s\S]*if \(this\.tableHud\) return[\s\S]*tween\(node\)/, 'fallback action tweens must not fight the HUD-owned row')
-
-assert.match(source, /TABLE_GAME_HUD_COUNTER_RANKS = \['大王', '小王', '2', 'A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3'\]/, 'large cards must occupy the left side of the compact counter')
-assert.match(source, /new Map<TableGameHudCounterRank, CounterCell>/, 'each counter column must keep separate rank and count rows')
-assert.match(source, /`CounterRank-\$\{rank\}`[\s\S]*`CounterCount-\$\{rank\}`/, 'counter row one must contain ranks and row two counts')
-assert.match(source, /cell\.rankLabel\.string = rank[\s\S]*cell\.countLabel\.string = String\(count \?\? '-'\)/)
-assert.match(source, /moveTo\(tableLeft, 0\)[\s\S]*for \(let index = 0; index <= TABLE_GAME_HUD_COUNTER_RANKS\.length/, 'the compact two-row counter must be drawn as one shared table')
 
 assert.match(source, /availableSuits: readonly TableGameHudSuit\[\]/, 'the HUD state must receive the authoritative straight-flush suit candidates')
 assert.match(source, /normalizeAvailableSuits[\s\S]*SUITS\.filter\(suit => requested\.has\(suit\)\)/, 'available suits must be normalized in stable display order')
@@ -140,13 +145,20 @@ assert.match(suitConstruction, /if \(!this\.isSuitAvailable\(suit\)\) return[\s\
 const suitRendering = source.slice(source.indexOf('private isSuitAvailable'), source.indexOf('private drawToolButton'))
 assert.match(suitRendering, /roundRect\(-82, -23, 244, 46, 12\)/, 'the four suits must sit inside one common rounded frame')
 assert.doesNotMatch(suitRendering, /drawButtonSurface|roundRect\([^,\n]+,[^,\n]+,\s*(?:44|48)\s*,/, 'suit rendering must not draw an individual box per glyph')
-assert.match(suitRendering, /!available[\s\S]*new Color\(91, 112, 114, 170\)/, 'unavailable suits must be visibly dimmed')
+assert.match(suitRendering, /!available[\s\S]*new Color\(62, 69, 70, 145\)/, 'unavailable suits must use a low-saturation, low-brightness filter')
 assert.match(suitRendering, /graphics\.moveTo\(x - \(selected \? 18 : 14\), -17\)[\s\S]*graphics\.lineTo/, 'available suits need a saturated underline cue')
 assert.match(suitRendering, /selected[\s\S]*graphics\.circle\(x, 1, pressed \? 17 : 19\)/, 'the selected suit needs a stronger halo cue')
-assert.match(source, /this\.lockButton\.label\.string = this\.state\.handLocked \? '确认锁牌' : '锁牌'/, 'active lock mode must clearly ask the player to confirm grouping')
+assert.match(source, /this\.lockButton\.label\.string = !this\.state\.handLocked \|\| this\.state\.handLockSelectionValid \? '锁牌' : '恢复'/, 'invalid lock selections must switch the action to restore')
+assert.match(grouping, /canCreateLockedGroup[\s\S]*diagnosePlay\(cards, null\)\.canPlay/, 'locking must reuse one authoritative legal-combination diagnosis')
 assert.match(source, /this\.arrangeButton\.label\.string = this\.state\.arrangeRestoreAvailable \? '复原' : '一键理牌'/, 'one-key arrangement must expose a direct restore toggle')
-assert.match(scene, /tableHudArrangementBaseline = this\.handGrouping\.getSnapshot\(\)[\s\S]*handGrouping\.arrange[\s\S]*handGrouping\.autoGroup/, 'the first click must checkpoint and arrange the hand')
-assert.match(scene, /if \(this\.tableHudArrangementBaseline\)[\s\S]*restoreSnapshot\(this\.tableHudArrangementBaseline\)[\s\S]*tableHudArrangementBaseline = null/, 'the second click must restore the pre-arrangement snapshot')
+const toolbarConstruction = source.slice(source.indexOf('private createToolbar'), source.indexOf('private createButton'))
+assert.match(toolbarConstruction, /configureTransform\(toolbar, BASE_TOOLBAR_WIDTH, 56\)/, 'the taller tool labels need a 56px toolbar container')
+assert.match(toolbarConstruction, /createButton\(toolbar, 'LockHand', '锁牌', -150, 116, 50, 24\)/, 'lock and restore text must keep its enlarged 24px treatment')
+assert.match(toolbarConstruction, /createButton\(toolbar, 'ArrangeHand', '一键理牌', 0, 164, 50, 26\)/, 'arrange and restore text must keep its enlarged 26px treatment')
+assert.match(toolbarConstruction, /createButton\(toolbar, 'QuickChat', '快捷语', 150, 116, 50, 24\)/, 'quick chat must align visually with the arrangement tools at 24px')
+assert.match(workspace, /this\.arrangementBaseline = this\.grouping\.getSnapshot\(\)[\s\S]*this\.grouping\.arrange[\s\S]*this\.grouping\.autoGroup/, 'the first click must checkpoint and arrange the hand')
+assert.match(workspace, /if \(this\.arrangementBaseline\)[\s\S]*restoreSnapshot\(this\.arrangementBaseline\)[\s\S]*this\.arrangementBaseline = null/, 'the second click must restore the complete pre-arrangement snapshot')
+assert.doesNotMatch(scene, /['"](?:TableHomeButton|ChatButton|ArrangeButton)['"]|toggleArrangePanel/, 'HUD-replaced fallback buttons and their hidden panel must stay retired')
 
 const passPresentation = playArea.slice(playArea.indexOf("if (action.type === 'Pass')"), playArea.indexOf('const spacing = resolvePlayedCardSpacing'))
 assert.match(passPresentation, /text\.string = '不要'/)
@@ -155,4 +167,4 @@ assert.match(passPresentation, /expiredPassKeys\.add\(key\)[\s\S]*actionNodes\.d
 assert.match(playArea, /if \(lastValidPlay === null\) this\.visibleActionStart = actions\.length/, 'starting a new trick must immediately retire previous action text')
 assert.match(playArea, /public clearPresentation \(\): void[\s\S]*actionNodes\.forEach\(node => this\.destroyNode\(node\)\)/, 'round/table teardown must clear every transient action node')
 
-process.stdout.write('table game HUD regression checks passed (straight-flush availability, shared suit frame, turn-area timer, compact counter)\n')
+process.stdout.write('table game HUD regression checks passed (retired counter, straight-flush availability, shared suit frame, equal turn timers)\n')
