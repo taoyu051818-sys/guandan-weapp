@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { createPlatformRuntime } from '../platform-server.js'
-import { GameTicketService } from './crypto.js'
+import { GameTicketService, GameTicketVerifier } from './crypto.js'
 import { GameResultReporter } from './result-reporter.js'
+import { SpectatorEventReporter } from './spectator-event-reporter.js'
 
 const accessSecret = 'tournament-access-secret-with-at-least-thirty-two-characters'
 const ticketSecret = 'tournament-ticket-secret-with-at-least-thirty-two-characters'
@@ -93,6 +94,12 @@ try {
   assert.equal(unassignedJoin.payload.error.code, 'TOURNAMENT_ASSIGNMENT_REQUIRED')
 
   const reporter = new GameResultReporter({ endpoint: `${baseUrl}/api/v1/game/results`, secret: resultSecret, maxAttempts: 1 })
+  const spectatorReporter = new SpectatorEventReporter({
+    endpoint: `${baseUrl}/api/v1/game/spectator-events`,
+    secret: spectatorSecret,
+    lifecycleSecret: resultSecret,
+    maxAttempts: 1,
+  })
   let verifiedExpiredTicketRecovery = false
   const playRound = async (roundNumber) => {
     const entries = []
@@ -142,9 +149,52 @@ try {
         assert.equal(status.payload.data.match.roundNumber, roundNumber)
         views.push(status.payload.data.match)
       }
+      const fixedTicketVerifier = new GameTicketVerifier({ secret: ticketSecret, required: true, now: () => platformNow })
+      for (const view of views) {
+        assert.match(view.entryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
+        const claims = fixedTicketVerifier.inspect(view.gameTicket)
+        assert.equal(claims.roomKind, 'match')
+        assert.equal(claims.purpose, 'entry')
+        assert.equal(claims.entryAttemptId, view.entryAttemptId, '固定赛票据必须绑定平台持久的原席位 attempt')
+      }
       if (!verifiedExpiredTicketRecovery) {
         const original = views[0]
         platformNow += 1_100
+        const forbiddenCancellation = await call(baseUrl, '/api/v1/match/cancel', {
+          method: 'POST',
+          token: group[0].token,
+          body: { matchId: original.matchId },
+        })
+        assert.equal(forbiddenCancellation.status, 409)
+        assert.equal(forbiddenCancellation.payload.error.code, 'MATCH_ALREADY_ASSIGNED', '固定赛事 assignment 不能被通用票据过期取消')
+        const retainedAssignment = await runtime.store.read(state => {
+          const run = state.tournamentRuns[tournamentId]
+          return run.rounds.flatMap(round => round.assignments).find(item => item.assignmentId === assignmentId)
+        })
+        assert.equal(retainedAssignment.status, 'matched')
+        assert.equal(retainedAssignment.matchId, original.matchId)
+        const retainedCloseEvent = {
+          eventId: `spectate:${original.matchId}:1`,
+          matchId: original.matchId,
+          roomId: original.roomId,
+          sequence: 1,
+          at: platformNow,
+          type: 'room-closed',
+          roundSequence: 1,
+          reason: 'entry-timeout',
+        }
+        const retainedLocalExpiry = await spectatorReporter.report(retainedCloseEvent)
+        assert.equal(retainedLocalExpiry.ignored, true)
+        assert.equal(retainedLocalExpiry.assignmentRetained, true, '固定赛本地等待房间过期不能阻断平台 assignment')
+        const retainedMatch = await runtime.store.read(state => ({
+          status: state.matches[original.matchId].status,
+          feed: state.spectatorFeeds[original.matchId],
+          receipt: state.spectatorEventReceipts[`spectate:${original.matchId}:1`],
+        }))
+        assert.equal(retainedMatch.status, 'matched')
+        assert.equal(retainedMatch.feed.abortedAt, undefined)
+        assert.equal(retainedMatch.feed.events.length, 0)
+        assert.equal(retainedMatch.receipt, undefined, '被丢弃的本地等待超时不能占用重建房间的 sequence')
         const recovered = await call(baseUrl, '/api/v1/match/join', {
           method: 'POST',
           token: group[0].token,
@@ -157,6 +207,25 @@ try {
         assert.equal(recovered.payload.data.match.seat, original.seat)
         assert.notEqual(recovered.payload.data.match.gameTicket, original.gameTicket, '门票过期后必须签发新票')
         assert.ok(recovered.payload.data.match.expiresAt > original.expiresAt)
+        assert.equal(recovered.payload.data.match.entryAttemptId, original.entryAttemptId, '固定 assignment 重签必须保留稳定 attempt')
+        assert.equal(
+          fixedTicketVerifier.inspect(recovered.payload.data.match.gameTicket).entryAttemptId,
+          original.entryAttemptId,
+        )
+        const claimedAfterRecreate = await spectatorReporter.claimStart({
+          eventId: `spectate:${original.matchId}:1`,
+          matchId: original.matchId,
+          roomId: original.roomId,
+          sequence: 1,
+          at: platformNow,
+          type: 'game-start',
+          roundSequence: 1,
+        })
+        assert.equal(claimedAfterRecreate.lifecycleClaim.status, 'playing', '重建同一固定赛牌桌后必须能从 sequence 1 正常 claim')
+        const staleCloseRetry = await spectatorReporter.report(retainedCloseEvent)
+        assert.equal(staleCloseRetry.ignored, true)
+        assert.equal(staleCloseRetry.assignmentRetained, true, '旧等待房间回调重试不得覆盖新房间已经成功的开局 claim')
+        assert.equal((await runtime.store.read(state => state.matches[original.matchId].status)), 'playing')
         views[0] = recovered.payload.data.match
         verifiedExpiredTicketRecovery = true
       }

@@ -2,7 +2,7 @@ export type ClassicCardSuit = 'spade' | 'heart' | 'club' | 'diamond' | 'joker'
 
 export type CardSkinInput = {
   rank: string
-  suit: string
+  suit: ClassicCardSuit
   red: boolean
 }
 
@@ -13,21 +13,6 @@ export type ClassicCardPlan = {
   cornerSuit?: string
   center?: string
   joker?: string
-}
-
-const SUIT_BY_DISPLAY: Readonly<Record<string, ClassicCardSuit>> = {
-  '♠': 'spade',
-  '♥': 'heart',
-  '♣': 'club',
-  '♦': 'diamond',
-  '王': 'joker',
-}
-
-const SUIT_ROLE_INDEX: Readonly<Record<Exclude<ClassicCardSuit, 'joker'>, number>> = {
-  diamond: 0,
-  club: 1,
-  heart: 2,
-  spade: 3,
 }
 
 const RANK_NUMBER: Readonly<Record<string, number>> = {
@@ -46,7 +31,7 @@ const RANK_NUMBER: Readonly<Record<string, number>> = {
   K: 13,
 }
 
-/** Complete 49-file manifest used by the table bootstrap preloader. */
+/** Complete 37-file manifest used by the table bootstrap preloader. */
 export const ALL_CLASSIC_CARD_ASSET_NAMES: readonly string[] = Object.freeze([
   'bg_front',
   'black_joker',
@@ -77,18 +62,6 @@ export const ALL_CLASSIC_CARD_ASSET_NAMES: readonly string[] = Object.freeze([
   'num_red_11',
   'num_red_12',
   'num_red_13',
-  'role_0_J',
-  'role_0_Q',
-  'role_0_K',
-  'role_1_J',
-  'role_1_Q',
-  'role_1_K',
-  'role_2_J',
-  'role_2_Q',
-  'role_2_K',
-  'role_3_J',
-  'role_3_Q',
-  'role_3_K',
   'shape_spade',
   'shape_spade_s',
   'shape_heart',
@@ -105,28 +78,28 @@ export const ALL_CLASSIC_CARD_ASSET_NAMES: readonly string[] = Object.freeze([
  * state so changing a skin cannot alter selection behaviour.
  */
 export function resolveClassicCardPlan (card: CardSkinInput): ClassicCardPlan | null {
-  const suit = SUIT_BY_DISPLAY[card.suit]
-  if (!suit) return null
+  const suit = card.suit
 
   if (suit === 'joker') {
-    if (card.rank !== '大王' && card.rank !== '小王') return null
+    if (card.rank !== 'Big' && card.rank !== 'Small') return null
     return {
-      key: `joker:${card.rank === '大王' ? 'Big' : 'Small'}`,
+      key: `joker:${card.rank}`,
       background: 'bg_front',
-      joker: card.rank === '大王' ? 'red_joker' : 'black_joker',
+      joker: card.rank === 'Big' ? 'red_joker' : 'black_joker',
     }
   }
+
+  if (suit !== 'spade' && suit !== 'heart' && suit !== 'club' && suit !== 'diamond') return null
 
   const number = RANK_NUMBER[card.rank]
   if (!number) return null
   const color = suit === 'heart' || suit === 'diamond' ? 'red' : 'black'
-  const face = card.rank === 'J' || card.rank === 'Q' || card.rank === 'K'
   return {
     key: `${suit}:${card.rank}`,
     background: 'bg_front',
     cornerRank: `num_${color}_${number}`,
     cornerSuit: `shape_${suit}_s`,
-    center: face ? `role_${SUIT_ROLE_INDEX[suit]}_${card.rank}` : `shape_${suit}`,
+    center: `shape_${suit}`,
   }
 }
 

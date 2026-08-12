@@ -34,21 +34,36 @@ export class SpectatorEventReporter {
   get configured () { return Boolean(this.endpoint) }
 
   enqueue (event) {
+    try { return this.stage(event) } catch (error) { return Promise.reject(error) }
+  }
+
+  /** Synchronously stages the durable record, then returns its ordered delivery promise. */
+  stage (event) {
     if (!this.configured) return Promise.resolve({ skipped: true })
     const key = String(event?.matchId || '')
     const stopped = this.stopped.get(key)
-    if (stopped) return Promise.reject(stopped)
+    if (stopped) throw stopped
     if (this.outbox) {
-      try {
-        this.outbox.add(event)
-      } catch (error) {
-        this.stop(key, error)
-        return Promise.reject(error)
-      }
+      // A local durable-write failure is retryable. Do not poison the match's
+      // network-delivery queue; the caller retains the event in its room snapshot
+      // and may stage the exact event again after storage recovers.
+      this.outbox.add(event)
       const existingOperation = this.operationsByEventId.get(String(event?.eventId || ''))
       if (existingOperation) return existingOperation
     }
     return this.schedule(key, event)
+  }
+
+  /**
+   * Bounded, synchronous lifecycle claim. The game server must await this
+   * acknowledgement before dealing; ordinary timeline delivery remains queued.
+   */
+  async claimStart (event) {
+    if (event?.type !== 'game-start') throw new TypeError('claimStart 只接受 game-start 事件')
+    if (!this.lifecycleSecret) throw new TypeError('claimStart 需要 lifecycleSecret')
+    const accepted = await this.report(event)
+    if (accepted?.lifecycleClaim?.accepted !== true) throw new Error('平台未确认牌局开始')
+    return accepted
   }
 
   restorePending () {
@@ -134,7 +149,7 @@ export class SpectatorEventReporter {
           'x-spectator-timestamp': timestamp,
           'x-spectator-signature': spectatorEventSignature(rawBody, this.secret, timestamp),
         }
-        if (event.type === 'room-closed' && this.lifecycleSecret) {
+        if ((event.type === 'game-start' || event.type === 'match-ended' || event.type === 'seat-left' || event.type === 'room-closed') && this.lifecycleSecret) {
           headers['x-game-event-id'] = event.eventId
           headers['x-game-timestamp'] = timestamp
           headers['x-game-signature'] = gameResultSignature(rawBody, this.lifecycleSecret, timestamp)
@@ -146,7 +161,13 @@ export class SpectatorEventReporter {
           signal: AbortSignal.timeout(this.timeoutMs),
         })
         const payload = await response.json().catch(() => null)
-        if (!response.ok || !payload?.ok) throw new Error(payload?.error?.message || `观战事件回调失败：HTTP ${response.status}`)
+        if (!response.ok || !payload?.ok) {
+          const error = new Error(payload?.error?.message || `观战事件回调失败：HTTP ${response.status}`)
+          error.code = payload?.error?.code
+          error.status = response.status
+          error.details = payload?.error?.details
+          throw error
+        }
         return payload.data.event
       } catch (error) {
         lastError = error

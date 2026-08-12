@@ -4,12 +4,6 @@
   "authorization": "Project authorization confirmed by the user on 2026-08-04.",
   "assets": [
     {
-      "label": "同花顺",
-      "key": "licensed/straight_flush",
-      "file": "straight_flush.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/9f/9f6d19fa-01ee-4668-913a-8c0b80345ba8.f5861.mp3"
-    },
-    {
       "label": "顺子",
       "key": "licensed/straight",
       "file": "straight.mp3",
@@ -32,13 +26,6 @@
       "key": "licensed/single_small_joker",
       "file": "single_small_joker.mp3",
       "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3e/3eb574c7-3cd1-4217-afb9-b08bce88c607.12cfb.mp3"
-    },
-    {
-      "label": "等等，轿夫抬杠子对A",
-      "key": "licensed/pair_a_phrase",
-      "file": "pair_a_phrase.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/74/740f86a0-e430-4635-93a8-a80446351c6c.d7ceb.mp3",
-      "usage": "download-only-until-label-is-confirmed"
     },
     {
       "label": "单张A",
@@ -165,6 +152,22 @@
       "key": "licensed/pair_6",
       "file": "pair_6.mp3",
       "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/c2/c2d7d6ba-c33a-4ae3-97fb-b215dff3aebe.47c39.mp3"
+    }
+  ],
+  "archived": [
+    {
+      "label": "同花顺",
+      "key": "licensed/straight_flush",
+      "file": "straight_flush.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/9f/9f6d19fa-01ee-4668-913a-8c0b80345ba8.f5861.mp3",
+      "reason": "Superseded by the single canonical NiuMa straight-flush announcement."
+    },
+    {
+      "label": "等等，轿夫抬杠子对A",
+      "key": "licensed/pair_a_phrase",
+      "file": "pair_a_phrase.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/74/740f86a0-e430-4635-93a8-a80446351c6c.d7ceb.mp3",
+      "reason": "Meaning is unconfirmed; retained for source audit only."
     }
   ],
   "excluded": [

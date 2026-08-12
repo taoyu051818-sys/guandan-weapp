@@ -4,8 +4,8 @@ const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
 const sourcePath = path.join(projectRoot, 'assets/scripts/ui/TablePromptPolicy.ts')
-const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
-const ts = require(compilerPath)
+const { compilerPath, loadTypeScript } = require('./support/typescript.cjs')
+const ts = loadTypeScript()
 const source = fs.readFileSync(sourcePath, 'utf8')
 const result = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },

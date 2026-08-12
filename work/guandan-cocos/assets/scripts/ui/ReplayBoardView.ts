@@ -1,14 +1,10 @@
 import { Color, Graphics, Label, Node, UITransform, Vec3 } from 'cc'
 import type { ReplaySeatAction, ReplaySeatId, ReplayTimelineState } from '../replay/ReplayTimeline'
 import { applyForegroundTextStyle, RUNTIME_MIN_TEXT_SIZE, RuntimeUiFactory } from './RuntimeUiFactory'
-
-const SEATS: ReplaySeatId[] = ['p1', 'p2', 'p3', 'p4']
-const SEAT_POSITIONS: Record<ReplaySeatId, Readonly<{ x: number, y: number, side: string }>> = {
-  p1: { x: 0, y: -118, side: '我方' },
-  p2: { x: 310, y: 0, side: '右家' },
-  p3: { x: 0, y: 128, side: '对家' },
-  p4: { x: -310, y: 0, side: '左家' },
-}
+import { CardView } from './CardView'
+import type { CardPresentation } from './CardView'
+import type { ClassicCardSuit } from './CardSkinResolver'
+import { projectReplaySeats, replayWinnerLabel, type ReplaySeatPlacement, type ReplayViewpoint } from './ReplayViewpoint'
 
 const PLAY_TYPE_LABELS: Readonly<Record<string, string>> = {
   Single: '单牌',
@@ -34,6 +30,24 @@ const PHASE_LABELS: Readonly<Record<ReplayTimelineState['phase'], string>> = {
   'room-closed': '牌桌已终止',
 }
 
+const replayCardPresentation = (
+  card: Readonly<{ rank: string, suit: string }>,
+  index: number,
+): CardPresentation => {
+  const suit: ClassicCardSuit = card.suit === 'spade' || card.suit === 'heart' || card.suit === 'club' || card.suit === 'diamond'
+    ? card.suit
+    : 'joker'
+  return {
+    id: `replay-${index}-${card.rank}-${suit}`,
+    rank: card.rank,
+    suit,
+    red: suit === 'heart' || suit === 'diamond' || (suit === 'joker' && card.rank === 'Big'),
+    levelCard: false,
+    selected: false,
+    interactive: false,
+  }
+}
+
 const actionLabel = (action: ReplaySeatAction | null): string => {
   if (!action) return '等待动作'
   if (action.type === 'tribute') return '已进贡'
@@ -42,17 +56,6 @@ const actionLabel = (action: ReplaySeatAction | null): string => {
   const playType = PLAY_TYPE_LABELS[action.playType ?? ''] ?? action.playType ?? '出牌'
   return `${playType} · ${action.cards.length}张${action.automatic ? ' · 自动' : ''}`
 }
-
-const suitGlyph = (suit: string): string => {
-  if (suit === 'spade') return '♠'
-  if (suit === 'heart') return '♥'
-  if (suit === 'club') return '♣'
-  if (suit === 'diamond') return '♦'
-  if (suit === 'joker') return '王'
-  return suit
-}
-
-const isRedSuit = (suit: string): boolean => suit === 'heart' || suit === 'diamond'
 
 const createPanel = (parent: Node, name: string, x: number, y: number, width: number, height: number, active = false): Node => {
   const node = new Node(name)
@@ -95,8 +98,8 @@ const renderSeat = (
   action: ReplaySeatAction | null,
   participants: Readonly<Record<string, string>>,
   active: boolean,
+  position: ReplaySeatPlacement,
 ): void => {
-  const position = SEAT_POSITIONS[seat]
   const node = createPanel(parent, `ReplaySeat-${seat}`, position.x, position.y, 178, 58, active)
   const displayName = participants[seat]?.trim() || seat.toUpperCase()
   const label = createText(
@@ -129,30 +132,16 @@ const renderCards = (parent: Node, state: ReplayTimelineState): void => {
     const cardNode = new Node(`ReplayCard-${index}`)
     cardNode.parent = parent
     cardNode.setPosition(new Vec3(x, y, index + 1))
-    cardNode.addComponent(UITransform).setContentSize(38, 56)
-    const graphics = cardNode.addComponent(Graphics)
-    graphics.fillColor = new Color(249, 246, 233, 255)
-    graphics.strokeColor = new Color(179, 147, 78, 255)
-    graphics.lineWidth = 1.5
-    graphics.roundRect(-19, -28, 38, 56, 5)
-    graphics.fill()
-    graphics.stroke()
-    const text = createText(
-      cardNode,
-      `${String(card.rank)}\n${suitGlyph(card.suit)}`,
-      13,
-      isRedSuit(card.suit) ? new Color(188, 39, 50) : new Color(31, 43, 48),
-      34,
-      52,
-    )
-    text.node.setPosition(new Vec3(0, 0, 2))
+    const cardView = cardNode.addComponent(CardView)
+    cardView.bind(replayCardPresentation(card, index))
+    cardNode.setScale(new Vec3(0.48, 0.48, 1))
   })
 }
 
-const resultText = (state: ReplayTimelineState): string => {
+const resultText = (state: ReplayTimelineState, viewpoint: ReplayViewpoint): string => {
   if (state.phase === 'round-ended') {
     const rank = state.ranking.length ? ` · ${state.ranking.join(' > ')}` : ''
-    const winner = state.winnerTeam ? ` · ${state.winnerTeam === 'teamA' ? '我方队' : '对方队'}胜` : ''
+    const winner = state.winnerTeam ? ` · ${replayWinnerLabel(state.winnerTeam, viewpoint)}` : ''
     return `本局结算${winner}${rank}`
   }
   if (state.phase === 'room-closed') return `牌桌终止 · ${state.closedReason ?? '未说明原因'}`
@@ -166,6 +155,7 @@ export const renderReplayBoard = (
   ui: RuntimeUiFactory,
   state: ReplayTimelineState,
   participants: Readonly<Record<string, string>> = {},
+  viewpoint: ReplayViewpoint,
 ): void => {
   const board = createPanel(ui.parent, 'ReplayBoard', 0, 10, 790, 330)
   const surface = board.getComponent(Graphics)
@@ -181,8 +171,8 @@ export const renderReplayBoard = (
     surface.ellipse(0, 0, 250, 100)
     surface.stroke()
   }
-  SEATS.forEach(seat => renderSeat(board, seat, state.seatActions[seat], participants, state.tablePlayerId === seat))
+  projectReplaySeats(viewpoint).forEach(position => renderSeat(board, position.seat, state.seatActions[position.seat], participants, state.tablePlayerId === position.seat, position))
   renderCards(board, state)
-  const phase = createText(board, resultText(state), 16, new Color(255, 224, 132), 560, 34)
+  const phase = createText(board, resultText(state, viewpoint), 16, new Color(255, 224, 132), 560, 34)
   phase.node.setPosition(new Vec3(0, 78, 20))
 }

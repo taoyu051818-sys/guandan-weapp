@@ -7,8 +7,8 @@ const fs = require('node:fs')
 const projectRoot = path.resolve(__dirname, '..')
 const platformSource = path.join(projectRoot, 'assets/scripts/services/PlatformApi.ts')
 const serverEntry = path.resolve(projectRoot, '../guandan-windows-source/server/platform-server.js')
-const typescriptPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript'
-const ts = require(typescriptPath)
+const { loadTypeScript } = require('./support/typescript.cjs')
+const ts = loadTypeScript()
 
 function loadPlatformClient () {
   const compiled = ts.transpileModule(fs.readFileSync(platformSource, 'utf8'), {

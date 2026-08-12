@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { once } from 'node:events'
+import { sendProtocolCommand } from './weapp-smoke-protocol.mjs'
 
 const port = 39108
 const stateDir = mkdtempSync(join(tmpdir(), 'guandan-room-settings-'))
@@ -66,7 +67,7 @@ const waitFor = (socket, type, predicate = () => true, timeoutMs = 5000) => new 
   socket.addEventListener('message', handler)
 })
 const send = (socket, type, payload, requestId = nextRequestId++) => {
-  socket.send(JSON.stringify({ type, requestId, payload }))
+  sendProtocolCommand(socket, type, payload, requestId)
   return requestId
 }
 const addBot = async (socket, roomId, playerId) => {
@@ -91,9 +92,6 @@ const fullSettings = {
   sortOrder: 'asc',
   authoritativeValidation: true,
 }
-
-const player = (id, team, hand) => ({ id, name: id, isAI: false, team, hand, role: 'normal' })
-const card = (id, suit, rank, value) => ({ id, suit, rank, value, isLevelCard: false })
 
 try {
   launch()
@@ -186,36 +184,6 @@ try {
   const timedEnd = await matchEndedPromise
   assert.equal(timedEnd.phase, 'settlement')
   assert.equal(timedEnd.turnDeadlineAt, null)
-
-  const forcedHost = await connect()
-  const forcedRoomId = '727272'
-  const forcedState = {
-    currentLevel: 2,
-    players: {
-      p1: player('p1', 'teamA', [card('last-3', 'spade', 3, 3)]),
-      p2: player('p2', 'teamB', [card('p2-4', 'club', 4, 4)]),
-      p3: player('p3', 'teamA', []),
-      p4: player('p4', 'teamB', [card('p4-5', 'diamond', 5, 5)]),
-    },
-    turnOrder: ['p1', 'p2', 'p3', 'p4'],
-    currentTurn: 'p1',
-    playArea: [],
-    lastValidPlay: null,
-    finishedPlayers: ['p3'],
-  }
-  const forcedSettings = { ...fullSettings, rounds: 4, scoreVisibility: 'live', totalTimeMinutes: 0 }
-  const forcedCreateId = nextRequestId++
-  const forcedCreatedPromise = waitFor(forcedHost, 'roomCreated', packet => packet.requestId === forcedCreateId)
-  send(forcedHost, 'createRoom', { roomId: forcedRoomId, hostName: '结算设置', roomSettings: forcedSettings, state: forcedState }, forcedCreateId)
-  await forcedCreatedPromise
-  const playId = nextRequestId++
-  const roundEndedPromise = waitFor(forcedHost, 'roundEnded', packet => packet.roomId === forcedRoomId)
-  send(forcedHost, 'play', { roomId: forcedRoomId, cardIds: ['last-3'] }, playId)
-  const roundEnded = await roundEndedPromise
-  assert.equal(roundEnded.result.levelUp, 4, '双下 4 分必须修正权威结算')
-  assert.equal(roundEnded.result.currentLevel, 6)
-  assert.equal(roundEnded.matchEnded, null)
-  assert.equal(roundEnded.scoreboard.roundsPlayed, 1)
 
   process.stdout.write('weapp friend room settings integration passed\n')
 } finally {

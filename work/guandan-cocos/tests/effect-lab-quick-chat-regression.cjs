@@ -3,8 +3,10 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
-const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
+const { compilerPath, loadTypeScript } = require('./support/typescript.cjs')
 const effectLabPath = path.join(projectRoot, 'assets/scripts/development/EffectLab.ts')
+const effectLabSceneHostPath = path.join(projectRoot, 'assets/scripts/development/EffectLabSceneHost.ts')
+const effectLabPreviewRunnerPath = path.join(projectRoot, 'assets/scripts/development/EffectLabPreviewRunner.ts')
 const fixedMatchPath = path.join(projectRoot, 'assets/scripts/development/FixedMatchFixtures.ts')
 const quickChatPolicyPath = path.join(projectRoot, 'assets/scripts/ui/QuickChatPolicy.ts')
 const chatControllerPath = path.join(projectRoot, 'assets/scripts/ui/ChatController.ts')
@@ -12,12 +14,14 @@ const effectResolverPath = path.join(projectRoot, 'assets/scripts/effects/Effect
 const audioProfilesPath = path.join(projectRoot, 'assets/scripts/audio/AudioProfiles.ts')
 const playVoiceProfilesPath = path.join(projectRoot, 'assets/scripts/audio/PlayVoiceProfiles.ts')
 const gameManagerPath = path.join(projectRoot, 'assets/scripts/game/GameManager.ts')
+const localMatchEventControllerPath = path.join(projectRoot, 'assets/scripts/game/LocalMatchEventController.ts')
 const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
+const tableOverlayControllerPath = path.join(projectRoot, 'assets/scripts/scenes/TableOverlayController.ts')
 const frontPagePath = path.join(projectRoot, 'assets/scripts/scenes/FrontPageController.ts')
 const effectLabPageDomainPath = path.join(projectRoot, 'assets/scripts/scenes/front-pages/EffectLabPageDomain.ts')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
-const ts = require(compilerPath)
+const ts = loadTypeScript()
 const read = filePath => fs.readFileSync(filePath, 'utf8')
 const loadPureTs = (filePath, dependencies = {}) => {
   const result = ts.transpileModule(read(filePath), {
@@ -36,7 +40,7 @@ const loadPureTs = (filePath, dependencies = {}) => {
   return module.exports
 }
 
-for (const filePath of [effectLabPath, fixedMatchPath, quickChatPolicyPath]) {
+for (const filePath of [effectLabPath, effectLabSceneHostPath, effectLabPreviewRunnerPath, fixedMatchPath, quickChatPolicyPath, tableOverlayControllerPath]) {
   assert.equal(fs.existsSync(filePath), true, `missing ${filePath}`)
   assert.equal(fs.existsSync(`${filePath}.meta`), true, `missing Cocos metadata for ${filePath}`)
 }
@@ -101,16 +105,27 @@ const effectLabDependencies = {
 }
 
 const source = read(effectLabPath)
+const sceneHostSource = read(effectLabSceneHostPath)
+const previewRunnerSource = read(effectLabPreviewRunnerPath)
 const gameManagerSource = read(gameManagerPath)
+const localMatchEventControllerSource = read(localMatchEventControllerPath)
 const gameSceneSource = read(gameScenePath)
+const tableOverlaySource = read(tableOverlayControllerPath)
 const frontPageSource = read(frontPagePath)
 const effectLabPageDomainSource = read(effectLabPageDomainPath)
 assert.doesNotMatch(source, /location|URLSearchParams|searchParams|localStorage|sessionStorage/i, 'the effect lab must not expose a URL or persisted production bypass')
 assert.match(source, /import \{ DEBUG, DEV \} from 'cc\/env'/, 'availability must use Cocos compile-time development/debug flags')
 assert.doesNotMatch(source, /export class DevelopmentEffectLab/, 'the ungated implementation must not be publicly constructible')
 assert.match(gameManagerSource, /applyDevelopmentFixtureState/, 'fixed matches must enter through an explicit development adapter')
-assert.match(gameManagerSource, /if \(!this\.developmentFixtureActive\)[\s\S]*recordRound/, 'fixed-match settlement must not write player progression')
+assert.match(gameManagerSource, /recordProgress: !this\.developmentFixtureActive/, 'fixed matches must disable progression at the event-controller boundary')
+assert.match(localMatchEventControllerSource, /if \(context\.recordProgress\)[\s\S]*recordRound/, 'the event controller must guard progression writes for fixed matches')
 assert.doesNotMatch(gameSceneSource, /document\.createElement|guandan-effect-lab-bridge|guandan-effect-lab-more|guandan-effect-lab-menu/, 'EffectLab must not install a visible DOM control over the lobby or table')
+assert.match(gameSceneSource, /new EffectLabSceneHost\(/, 'GameScene must compose the EffectLab host instead of implementing its previews')
+assert.doesNotMatch(gameSceneSource, /private previewLab(Action|Tribute|Settlement|Flow|Sequence|Diagnostic)/, 'development preview methods must stay outside the production scene coordinator')
+assert.match(sceneHostSource, /createEffectLab\([\s\S]*playAction:[\s\S]*playSequence:[\s\S]*runDiagnostic:/, 'the extracted host must wire every visual preview driver')
+assert.match(sceneHostSource, /public installDebugBridge \(\)[\s\S]*__guandanEffectLab = bridge[\s\S]*public dispose \(\)[\s\S]*delete globalHost\.__guandanEffectLab/, 'the extracted host must own the complete debug bridge lifecycle')
+assert.match(sceneHostSource, /new EffectLabPreviewRunner\(/, 'the host must delegate preview execution to its lifecycle owner')
+assert.match(previewRunnerSource, /const generation = this\.generation[\s\S]*if \(!this\.isCurrent\(generation\)\) return[\s\S]*step\.delayMs \/ 1000/, 'scheduled sequence steps must be inert after preview cancellation or scene disposal')
 assert.match(frontPageSource, /private showMoreMenu \(\): void[\s\S]*listEffectLabFixtures\(\)\.length\) entries\.push\(\['牌桌特效测试', \(\) => this\.openEffectLabTable\(\)\]\)/, 'EffectLab must be a module inside the existing More page')
 assert.match(frontPageSource, /public openEffectLabTable \(\): void \{ this\.effectLabPage\.openTable\(\) \}/, 'the scene-facing compatibility method must delegate to the page domain')
 const openEffectLabTableSource = effectLabPageDomainSource.slice(effectLabPageDomainSource.indexOf('public openTable'), effectLabPageDomainSource.indexOf('public show'))
@@ -123,15 +138,103 @@ assert.match(effectLabDrawerSource, /router\.open\('effect-lab'\)[\s\S]*牌桌�
 assert.doesNotMatch(effectLabDrawerSource, /返回更多功能/, 'the table drawer must not masquerade as a standalone More subpage')
 assert.match(effectLabDrawerSource, /ui\.panel\('EffectLabDrawer'[\s\S]*drawer\.addComponent\(BlockInputEvents\)/, 'the table drawer must visually isolate its controls and block touches from reaching the table HUD')
 assert.match(effectLabPageDomainSource, /public reflow[\s\S]*router\.current === 'effect-lab'[\s\S]*this\.show\(this\.page\)/, 'the table drawer must reflow after viewport and safe-area changes')
-assert.match(frontPageSource, /router\.current === 'effect-lab'\) this\.effectLabPage\.reflow\(\)/, 'the front-page resize route must delegate drawer reflow')
-const networkChatSection = gameSceneSource.slice(gameSceneSource.indexOf('private applyNetworkChat'), gameSceneSource.indexOf('private ensureFallbackUi'))
-assert.match(networkChatSection, /this\.chat\?\.isBlocked\(viewerId, packet\.playerId\)/, 'network voice playback must consult the local sender block')
-assert.match(networkChatSection, /decision\?\.accepted && !blocked/, 'a blocked sender must not play quick-chat voice audio')
-const quickChatPanelSection = gameSceneSource.slice(gameSceneSource.indexOf('private toggleChatPanel'), gameSceneSource.indexOf('private arrangeTableHudHand'))
-assert.match(gameSceneSource, /onChat: \(\) => this\.toggleChatPanel\(\)/, 'the table HUD quick-chat action must open the scene panel')
+assert.match(frontPageSource, /(?:router\.current|route) === 'effect-lab'\) this\.effectLabPage\.reflow\(\)/, 'the front-page resize route must delegate drawer reflow')
+const networkChatSection = tableOverlaySource.slice(tableOverlaySource.indexOf('private readonly applyNetworkChat'), tableOverlaySource.indexOf('private readonly handleChatChanged'))
+assert.match(networkChatSection, /this\.dependencies\.chat\.isBlocked\(viewerId, packet\.playerId\)/, 'network voice playback must consult the local sender block')
+assert.match(networkChatSection, /decision\.accepted && !blocked/, 'a blocked sender must not play quick-chat voice audio')
+const quickChatPanelSection = tableOverlaySource.slice(tableOverlaySource.indexOf('public toggleQuickChatPanel'), tableOverlaySource.indexOf('private createModalShade'))
+assert.match(gameSceneSource, /onChat: \(\) => this\.tableOverlays\?\.toggleQuickChatPanel\(\)/, 'the table HUD quick-chat action must open the extracted overlay panel')
 assert.match(quickChatPanelSection, /QUICK_CHAT_PHRASES\.forEach[\s\S]*Node\.EventType\.TOUCH_END[\s\S]*this\.sendQuickChat\(phrase\)/, 'each visible phrase button must dispatch its selected phrase')
-assert.match(quickChatPanelSection, /if \(this\.session\?\.snapshot\.isMultiplayer\)[\s\S]*this\.lobby\?\.chat\(phrase\.text\)[\s\S]*return[\s\S]*this\.chat\?\.send\(humanId, phrase\)/, 'multiplayer chat must await the authoritative echo while local games use ChatController directly')
-assert.match(gameSceneSource, /this\.ownChatLabel\.string = this\.chat\?\.get\(humanId\)\?\.message \?\? ''[\s\S]*this\.ownChatLabel\.node\.active = Boolean\(this\.ownChatLabel\.string\)/, 'an accepted local or echoed phrase must render visibly for the sending player')
+assert.match(quickChatPanelSection, /if \(this\.dependencies\.isMultiplayer\(\)\)[\s\S]*this\.dependencies\.lobby\.chat\(phrase\.text\)[\s\S]*return[\s\S]*this\.dependencies\.chat\.send\(humanId, phrase\)/, 'multiplayer chat must await the authoritative echo while local games use ChatController directly')
+assert.match(tableOverlaySource, /const message = this\.dependencies\.chat\.get\(humanId\)\?\.message \?\? ''[\s\S]*this\.ownChatLabel\.node\.active = this\.tableVisible && Boolean\(message\)/, 'an accepted local or echoed phrase must render visibly for the sending player')
+
+let capturedHostDriver = null
+const scheduledHostCallbacks = []
+const hostEffectCalls = []
+const hostLab = {
+  list: () => Object.freeze([{ id: 'play-bomb-small', label: 'bomb', kind: 'play', description: 'fixture' }]),
+  inspect: () => ({ action: { cards: [] }, quality: 'full' }),
+  trigger: id => id === 'play-bomb-small' ? { fixture: { id } } : null,
+}
+class MockVec3 {
+  static ZERO = new MockVec3(0, 0, 0)
+  constructor (x, y, z) { this.x = x; this.y = y; this.z = z }
+  clone () { return new MockVec3(this.x, this.y, this.z) }
+}
+class MockUITransform {}
+const sceneHostCocos = { Node: class {}, UITransform: MockUITransform, Vec3: MockVec3 }
+const previewRunnerModule = loadPureTs(effectLabPreviewRunnerPath, { cc: sceneHostCocos })
+const sceneHostModule = loadPureTs(effectLabSceneHostPath, {
+  './EffectLabPreviewRunner': previewRunnerModule,
+  './EffectLab': {
+    createEffectLab: driver => {
+      capturedHostDriver = driver
+      return hostLab
+    },
+  },
+})
+const hostEffects = {
+  skipAll: () => hostEffectCalls.push('skip'),
+  diagnostics: () => ({ registeredRendererKeys: [] }),
+  auditRuntimeAssets: async () => ({ loaded: 0, bundled: 0, migrationCandidates: 0, rejected: 0, missing: [] }),
+  resetForRecovery: count => hostEffectCalls.push(['reset', count]),
+  previewAction: () => hostEffectCalls.push('preview-action'),
+  previewFlow: () => hostEffectCalls.push('preview-flow'),
+  playTribute: () => hostEffectCalls.push('tribute'),
+  playSettlement: () => hostEffectCalls.push('settlement'),
+}
+const hostAudioCalls = []
+let hostOpened = 0
+let fixedMatchesStarted = 0
+const host = new sceneHostModule.EffectLabSceneHost({
+  effects: hostEffects,
+  audio: {
+    playEvent: event => hostAudioCalls.push(['event', event]),
+    playCountdown: remaining => hostAudioCalls.push(['countdown', remaining]),
+    playVoice: voice => hostAudioCalls.push(['voice', voice]),
+  },
+  flightRoot: { active: false },
+  topEffectRoot: { active: false, getComponent: () => ({ convertToWorldSpaceAR: point => point.clone() }) },
+  getEffectQuality: () => 'full',
+  hasLiveTableSnapshot: () => false,
+  openEffectLabTable: () => { hostOpened += 1 },
+  startFixedMatch: () => { fixedMatchesStarted += 1 },
+  scheduleOnce: callback => scheduledHostCallbacks.push(callback),
+  showNotice: () => {},
+})
+assert.deepEqual(host.list().map(fixture => fixture.id), ['play-bomb-small'])
+assert.equal(host.trigger('play-bomb-small'), true)
+assert.equal(host.trigger('missing'), false)
+host.installDebugBridge()
+assert.ok(global.__guandanEffectLab, 'development host must install its automation bridge')
+const retainedBridge = global.__guandanEffectLab
+retainedBridge.open()
+assert.equal(hostOpened, 1)
+global.__guandanEffectLab.skip()
+assert.deepEqual(hostEffectCalls, ['skip'])
+capturedHostDriver.playAudio('round-start')
+capturedHostDriver.playCountdown(3)
+capturedHostDriver.playQuickChat({ voice: 'thanks' })
+assert.deepEqual(hostAudioCalls, [['event', 'round-start'], ['countdown', 3], ['voice', 'thanks']])
+capturedHostDriver.playSequence({ mode: 'rapid', steps: [{ fixtureId: 'play-bomb-small', delayMs: 0 }] })
+const callsBeforeDispose = hostEffectCalls.length
+host.dispose()
+assert.equal(global.__guandanEffectLab, undefined, 'disposing the scene host must remove only its bridge')
+scheduledHostCallbacks.forEach(callback => callback())
+assert.equal(hostEffectCalls.length, callsBeforeDispose, 'scheduled previews must not fire after disposal')
+retainedBridge.open()
+retainedBridge.skip()
+retainedBridge.trigger('play-bomb-small')
+capturedHostDriver.playAudio('round-start')
+capturedHostDriver.playCountdown(2)
+capturedHostDriver.playQuickChat({ voice: 'thanks' })
+capturedHostDriver.startFixedMatch({}, {})
+assert.equal(hostOpened, 1, 'a retained debug bridge must be inert after disposal')
+assert.equal(hostEffectCalls.length, callsBeforeDispose, 'a retained debug bridge must not reach effects after disposal')
+assert.deepEqual(hostAudioCalls, [['event', 'round-start'], ['countdown', 3], ['voice', 'thanks']], 'a retained driver must not reach audio after disposal')
+assert.equal(fixedMatchesStarted, 0, 'a retained driver must not start a fixed match after disposal')
+assert.deepEqual(host.list(), [], 'the public host API must be inert after disposal')
+assert.equal(host.trigger('play-bomb-small'), false)
 
 const productionLabModule = loadPureTs(effectLabPath, { ...effectLabDependencies, 'cc/env': { DEV: false, DEBUG: false } })
 assert.equal(productionLabModule.isEffectLabAvailable(), false)

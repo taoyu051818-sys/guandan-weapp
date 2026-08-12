@@ -1,31 +1,18 @@
 import { _decorator, Component, Node, Sprite, SpriteFrame, UIOpacity, UITransform, Vec3 } from 'cc'
 import type { Card } from '../core/generated'
 import { getCachedClassicCardFrames, preloadClassicCardFrames, requestClassicCardFrames } from '../ui/ClassicCardFrameStore'
+import { CLASSIC_CARD_JOKER_GEOMETRY, CLASSIC_CARD_LAYER_GEOMETRY, CLASSIC_CARD_REFERENCE_SIZE } from '../ui/ClassicCardGeometry'
+import type { ClassicCardLayer } from '../ui/ClassicCardGeometry'
 import { resolveClassicCardPlan } from '../ui/CardSkinResolver'
 import type { ClassicCardPlan } from '../ui/CardSkinResolver'
 import { cardDisplay } from './EffectTypes'
 
 const { ccclass } = _decorator
 
-const DEFAULT_WIDTH = 82
-const DEFAULT_HEIGHT = 118
+const DEFAULT_WIDTH: number = CLASSIC_CARD_REFERENCE_SIZE.width
+const DEFAULT_HEIGHT: number = CLASSIC_CARD_REFERENCE_SIZE.height
 
-type SnapshotLayer = 'background' | 'cornerRank' | 'cornerSuit' | 'center'
-
-type LayerGeometry = Readonly<{
-  width: number
-  height: number
-  x: number
-  y: number
-  z: number
-}>
-
-const BASE_LAYER_GEOMETRY: Readonly<Record<SnapshotLayer, LayerGeometry>> = Object.freeze({
-  background: Object.freeze({ width: 76, height: 112, x: 0, y: 0, z: 0 }),
-  cornerRank: Object.freeze({ width: 20, height: 28, x: -26, y: 39, z: 2 }),
-  cornerSuit: Object.freeze({ width: 18, height: 19, x: -26, y: 14, z: 2 }),
-  center: Object.freeze({ width: 43, height: 45, x: 7, y: -15, z: 1 }),
-})
+type SnapshotLayer = ClassicCardLayer
 
 function planForCard (card: Card): ClassicCardPlan | null {
   return resolveClassicCardPlan(cardDisplay(card))
@@ -130,7 +117,7 @@ export class VfxCardSnapshot extends Component {
     const scaleX = this.width / DEFAULT_WIDTH
     const scaleY = this.height / DEFAULT_HEIGHT
     for (const [layer, sprite] of this.layers) {
-      const geometry = BASE_LAYER_GEOMETRY[layer]
+      const geometry = CLASSIC_CARD_LAYER_GEOMETRY[layer]
       sprite.node.setPosition(new Vec3(geometry.x * scaleX, geometry.y * scaleY, geometry.z))
       sprite.node.getComponent(UITransform)?.setContentSize(geometry.width * scaleX, geometry.height * scaleY)
     }
@@ -152,17 +139,9 @@ export class VfxCardSnapshot extends Component {
     if (!center || !transform) return
     const scaleX = this.width / DEFAULT_WIDTH
     const scaleY = this.height / DEFAULT_HEIGHT
-    if (plan.joker) {
-      center.setPosition(new Vec3(0, 0, 1))
-      transform.setContentSize(72 * scaleX, 106 * scaleY)
-    } else if (plan.center?.startsWith('role_')) {
-      center.setPosition(new Vec3(7 * scaleX, -9 * scaleY, 1))
-      transform.setContentSize(63 * scaleX, 87 * scaleY)
-    } else {
-      const geometry = BASE_LAYER_GEOMETRY.center
-      center.setPosition(new Vec3(geometry.x * scaleX, geometry.y * scaleY, geometry.z))
-      transform.setContentSize(geometry.width * scaleX, geometry.height * scaleY)
-    }
+    const geometry = plan.joker ? CLASSIC_CARD_JOKER_GEOMETRY : CLASSIC_CARD_LAYER_GEOMETRY.center
+    center.setPosition(new Vec3(geometry.x * scaleX, geometry.y * scaleY, geometry.z))
+    transform.setContentSize(geometry.width * scaleX, geometry.height * scaleY)
   }
 
   private setLayerFrame (layer: SnapshotLayer, frame: SpriteFrame | null): void {

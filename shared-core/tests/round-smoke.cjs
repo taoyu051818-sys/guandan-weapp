@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict')
 const core = require('../dist')
+const classic = core.getRuleProfile('classic')
 
 require('./rules-regression.cjs')
 require('./tribute-regression.cjs')
@@ -27,54 +28,28 @@ const next = core.dealNextRound(doubleDown, 5, 'p1')
 assert.equal(next.currentTurn, 'p1')
 assert.ok(allHandsHave(next, 27), '下一局必须重新发牌')
 
-let tributeGame
-let tribute
-for (let attempt = 0; attempt < 200; attempt += 1) {
-  tributeGame = core.createGame(2)
-  tribute = core.createTribute(tributeGame, ['p1', 'p2', 'p3', 'p4'])
-  if (tribute && !tribute.isAntiTribute) break
-}
-assert.ok(tribute && !tribute.isAntiTribute, '应能构造非抗贡样本')
-const tributeCard = core.highestCard(tributeGame.players.p4.hand.filter(card => !(card.isLevelCard && card.suit === 'heart')))
-let tributeResult = core.giveTribute(tributeGame, tribute, 'p4', tributeCard.id)
-assert.equal(tributeResult.tribute.phase, 'returning')
-const returned = core.lowestCard(tributeResult.state.players.p1.hand.filter(card => card.value <= 10))
-tributeResult = core.returnTribute(tributeResult.state, tributeResult.tribute, 'p1', returned.id)
-assert.equal(tributeResult.tribute.phase, 'done')
-
 const highOnlyReturn = core.createGame(2)
 highOnlyReturn.players.p1.hand = [
   { id: 'high-j', suit: 'spade', rank: 'J', value: 11, isLevelCard: false },
   { id: 'high-q', suit: 'club', rank: 'Q', value: 12, isLevelCard: false },
 ]
-const highOnlyTribute = {
-  isDoubleDown: false,
-  isAntiTribute: false,
-  phase: 'returning',
-  actions: [{ from: 'p4', to: 'p1', card: highOnlyReturn.players.p4.hand[0], returnCard: null }],
-}
 assert.equal(core.automaticReturnCard([
   { id: 'normal-8', suit: 'heart', rank: 8, value: 8, isLevelCard: false },
   { id: 'normal-3', suit: 'diamond', rank: 3, value: 3, isLevelCard: false },
   { id: 'normal-j', suit: 'club', rank: 'J', value: 11, isLevelCard: false },
 ]).id, 'normal-3', '常规自动还贡必须从 <=10 的牌中选择最低牌')
 assert.equal(core.automaticReturnCard(highOnlyReturn.players.p1.hand).id, 'high-j', '整手均高于 10 时自动还贡必须回退到整手最低牌')
-assert.throws(
-  () => core.returnTribute(highOnlyReturn, highOnlyTribute, 'p1', 'high-q'),
-  /必须选择牌点最小/,
-  '整手均高于 10 时仍不得任意还高牌',
-)
-const highOnlyResult = core.returnTribute(highOnlyReturn, highOnlyTribute, 'p1', 'high-j')
-assert.equal(highOnlyResult.tribute.actions[0].returnCard.id, 'high-j', '整手均高于 10 时应允许还牌点最小的一张')
 
 // 用同一套策略驱动四个座位，验证回合推进、接风和结算不是只在单步中可用。
 let fullGame = core.createGame(2)
+const smokeAI = core.createAIEngine({ ruleProfile: fullGame.ruleProfile, seed: 20260811 })
 let turns = 0
 while (!core.isRoundOver(fullGame) && turns < 3000) {
   const id = fullGame.currentTurn
   const current = fullGame.players[id]
-  const cards = core.makeDecision(current.hand, fullGame.lastValidPlay, 'medium', current.team, fullGame.players, id, {
+  const cards = smokeAI.makeDecision(current.hand, fullGame.lastValidPlay, 'medium', current.team, fullGame.players, id, {
     currentLevel: fullGame.currentLevel, teamLevels: { teamA: 2, teamB: 2 }, roundMeta: null,
+    ruleProfile: fullGame.ruleProfile,
   })
   fullGame = cards && cards.length ? core.playCards(fullGame, id, cards) : core.passTurn(fullGame, id)
   turns += 1
@@ -89,9 +64,9 @@ const tube = [
   card('t4a', 'spade', 4, 4), card('t4b', 'club', 4, 4),
   card('t5a', 'spade', 5, 5), card('t5b', 'club', 5, 5),
 ]
-assert.equal(core.resolvePlay(tube).type, core.PlayType.Tube, '六张三连对不能误判为炸弹')
+assert.equal(core.resolvePlay(tube, classic).type, core.PlayType.Tube, '六张三连对不能误判为炸弹')
 const wildcard = card('wild-heart-2', 'heart', 2, 15, { isLevelCard: true, isRedJoker: true })
-const wildcardPair = core.resolvePlay([card('pair-9', 'spade', 9, 9), wildcard])
+const wildcardPair = core.resolvePlay([card('pair-9', 'spade', 9, 9), wildcard], classic)
 assert.equal(wildcardPair.type, core.PlayType.Pair)
 assert.equal(wildcardPair.wildcardUsages[0].cardId, wildcard.id)
 assert.equal(wildcardPair.wildcardUsages[0].representedValue, 9)

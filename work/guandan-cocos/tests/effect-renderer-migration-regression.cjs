@@ -4,7 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
-const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
+const { compilerPath, loadTypeScript } = require('./support/typescript.cjs')
 const effectHandlePath = path.join(projectRoot, 'assets/scripts/effects/EffectHandle.ts')
 const effectRendererPath = path.join(projectRoot, 'assets/scripts/effects/EffectRenderer.ts')
 const effectRenderContextPath = path.join(projectRoot, 'assets/scripts/effects/EffectRenderContext.ts')
@@ -20,6 +20,8 @@ const retiredRendererPaths = [
 ]
 const flowEffectTypesPath = path.join(projectRoot, 'assets/scripts/effects/FlowEffectTypes.ts')
 const effectControllerPath = path.join(projectRoot, 'assets/scripts/effects/EffectController.ts')
+const effectPlaybackPath = path.join(projectRoot, 'assets/scripts/effects/EffectPlaybackCoordinator.ts')
+const actionPresentationPath = path.join(projectRoot, 'assets/scripts/effects/EffectActionPresentationCoordinator.ts')
 const cardBlastReactionPath = path.join(projectRoot, 'assets/scripts/effects/CardBlastReaction.ts')
 const archivedPlayVisualsPath = path.join(projectRoot, 'assets/scripts/effects/ArchivedPlayVisuals.ts')
 const cardFlightPath = path.join(projectRoot, 'assets/scripts/effects/CardFlightController.ts')
@@ -35,7 +37,7 @@ const legacyManifestPath = path.join(projectRoot, 'third_party/legacy-effects/ma
 const legacyVerifierPath = path.join(projectRoot, 'scripts/verify-legacy-effect-assets.mjs')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
-const ts = require(compilerPath)
+const ts = loadTypeScript()
 const read = filePath => fs.readFileSync(filePath, 'utf8')
 
 function loadPureTs (filePath, dependencies = {}) {
@@ -394,7 +396,7 @@ function verifyLegacyManifest () {
 }
 
 async function main () {
-  const sourcePaths = [effectHandlePath, effectRendererPath, effectRenderContextPath, rendererRegistryPath, assetCatalogPath, effectRecipesPath, bombRendererPath, sixBombRendererPath, flowEffectTypesPath, cardBlastReactionPath, archivedPlayVisualsPath, playAreaControllerPath, handControllerPath, gameScenePath]
+  const sourcePaths = [effectHandlePath, effectRendererPath, effectRenderContextPath, rendererRegistryPath, assetCatalogPath, effectRecipesPath, bombRendererPath, sixBombRendererPath, flowEffectTypesPath, effectPlaybackPath, actionPresentationPath, cardBlastReactionPath, archivedPlayVisualsPath, playAreaControllerPath, handControllerPath, gameScenePath]
   for (const sourcePath of sourcePaths) {
     assert.equal(fs.existsSync(sourcePath), true, `missing migration source: ${sourcePath}`)
     assert.equal(fs.existsSync(`${sourcePath}.meta`), true, `missing Cocos metadata: ${sourcePath}.meta`)
@@ -413,6 +415,8 @@ async function main () {
   const sixBombSource = read(sixBombRendererPath)
   const flowEffectTypesSource = read(flowEffectTypesPath)
   const controllerSource = read(effectControllerPath)
+  const effectPlaybackSource = read(effectPlaybackPath)
+  const actionPresentationSource = read(actionPresentationPath)
   const effectRenderContextSource = read(effectRenderContextPath)
   const cardBlastReactionSource = read(cardBlastReactionPath)
   const cardFlightSource = read(cardFlightPath)
@@ -485,6 +489,7 @@ async function main () {
     bombSource,
     sixBombSource,
     controllerSource,
+    effectPlaybackSource,
     effectNodePoolSource,
     vfxCardSnapshotSource,
     read(path.join(projectRoot, 'assets/scripts/effects/EffectPrimitives.ts')),
@@ -535,12 +540,12 @@ async function main () {
   assert.match(registrySource, /isRejectedNonCommercialEffectKey\(key\)/, 'every registry instance must reject the permanent non-commercial inventory')
   assert.match(controllerSource, /if \(!isCommercialBombEffectKey\(profile\.key\)\) return EffectHandle\.completed\('unavailable'\)/, 'non-Bomb impact dispatch needs a second runtime guard')
   assert.doesNotMatch(controllerSource, /isArchivedPlayVisual|MajorEffectTitle|addTextureBurst|common\.light-sweep|createOutlinedEffectLabel|straight-flush|king-bomb/, 'live dispatch must not retain retired visual branches')
-  assert.match(controllerSource, /rendererOwnsBombFlight = isBombEffectKey\(profile\.key\)/, 'normal bombs must delegate flight timing to their renderer')
-  assert.match(controllerSource, /!rendererOwnsBombFlight && profile\.sound/, 'non-bomb sound must wait for card impact')
-  assert.match(controllerSource, /flightHandle = this\.flight\.play\([\s\S]*?renderImpact,[\s\S]*?playEvent\.onCardArrive\?\.\(card, cardIndex\)/, 'non-bomb cards must bind impact and per-card reveal to the owned flight handle')
-  assert.match(controllerSource, /cardFramesReady = await this\.withQuality\(effectQuality, \(\) => this\.preparePlayImpact\(profile, playEvent, wildcardUsed\)\)[\s\S]*flightHandle = this\.flight\.play/, 'cold impact assets must settle before the visible projectile begins')
+  assert.match(effectPlaybackSource, /rendererOwnsBombFlight = isBombEffectKey\(profile\.key\)/, 'normal bombs must delegate flight timing to their renderer')
+  assert.match(effectPlaybackSource, /!rendererOwnsBombFlight && profile\.sound/, 'non-bomb sound must wait for card impact')
+  assert.match(effectPlaybackSource, /flightHandle = flight\.play\([\s\S]*?renderImpact,[\s\S]*?playEvent\.onCardArrive\?\.\(card, cardIndex\)/, 'non-bomb cards must bind impact and per-card reveal to the owned flight handle')
+  assert.match(effectPlaybackSource, /cardFramesReady = await this\.dependencies\.withQuality\(effectQuality, \(\) => this\.dependencies\.preparePlayImpact\(profile, playEvent, wildcardUsed\)\)[\s\S]*flightHandle = flight\.play/, 'cold impact assets must settle before the visible projectile begins')
   assert.match(controllerSource, /this\.renderers\.prepare\(context\)/, 'impact preflight must delegate through the renderer contract')
-  assert.match(controllerSource, /impactHandle = this\.renderPlayImpact\(profile, playEvent, wildcardUsed\)/, 'all non-bomb semantic layers must share one owned post-flight impact handle')
+  assert.match(effectPlaybackSource, /impactHandle = this\.dependencies\.renderPlayImpact\(profile, playEvent, wildcardUsed\)/, 'all non-bomb semantic layers must share one owned post-flight impact handle')
   assert.match(cardFlightSource, /quadraticPoint\(/)
   assert.match(cardFlightSource, /\.update\(seconds,/, 'ordinary card flight must share the continuous Bezier motion grammar')
   assert.match(cardFlightSource, /preloadVfxCardFrames\(cards\)[\s\S]*this\.pool\.acquireCard\(card\)/, 'a cold cache must finish all card art before the projectile is acquired')
@@ -552,7 +557,7 @@ async function main () {
   assert.equal((cardFlightSource.match(/onCardArrive\?\.\(card, index\)/g) || []).length, 1, 'the per-card arrival callback must have one deterministic call site inside the card loop')
   assert.doesNotMatch(cardFlightSource, /if \(!ready\) \{[\s\S]{0,100}onArrive/, 'a missing projectile must cancel instead of fabricating an arrival')
   assert.doesNotMatch(cardFlightSource, /\.catch\(\(\) => \{[\s\S]{0,100}onArrive/, 'a failed projectile must not trigger an impact')
-  assert.match(controllerSource, /export type PlayEffectPresentation = Readonly<\{[\s\S]*deferAction: \(action: PlayAction, actionIndex: number\) => string[\s\S]*beginAction: \(action: PlayAction, actionIndex: number, ticket: string\) => void[\s\S]*revealCard: \(action: PlayAction, actionIndex: number, cardId: string, ticket: string\) => void[\s\S]*revealAction: \(action: PlayAction, actionIndex: number, ticket: string\) => void[\s\S]*resetPresentation: \(actionCount: number\) => void/, 'presentation ownership must use opaque tickets from defer through begin, card arrival and finish')
+  assert.match(actionPresentationSource, /export type PlayEffectPresentation = Readonly<\{[\s\S]*deferAction: \(action: PlayAction, actionIndex: number\) => string[\s\S]*beginAction: \(action: PlayAction, actionIndex: number, ticket: string\) => void[\s\S]*revealCard: \(action: PlayAction, actionIndex: number, cardId: string, ticket: string\) => void[\s\S]*revealAction: \(action: PlayAction, actionIndex: number, ticket: string\) => void[\s\S]*resetPresentation: \(actionCount: number\) => void/, 'presentation ownership must use opaque tickets from defer through begin, card arrival and finish')
   assert.match(playAreaControllerSource, /public deferAction \(action: PlayAction, actionIndex: number\): string[\s\S]*return ticket/, 'the table presentation must issue an opaque ticket for every deferred action')
   assert.match(playAreaControllerSource, /public beginAction \(action: PlayAction, actionIndex: number, ticket: string\): void[\s\S]*this\.presentedActionCount = Math\.max\(this\.presentedActionCount, actionIndex \+ 1\)[\s\S]*this\.renderPresentedActions\(\)/, 'the authoritative visible prefix must advance only when its flight actually begins')
   assert.match(playAreaControllerSource, /public revealCard \(action: PlayAction, actionIndex: number, cardId: string, ticket: string\): void[\s\S]*pending\.ticket !== ticket[\s\S]*node\.active = true/, 'each landed projectile must reveal only the card guarded by its current ticket')
@@ -560,11 +565,11 @@ async function main () {
   assert.match(playAreaControllerSource, /public resetPresentation \(actionCount: number\): void[\s\S]*this\.presentationEpoch \+= 1[\s\S]*this\.pendingCards\.clear\(\)/, 'recovery must invalidate every outstanding presentation ticket')
   assert.match(playAreaControllerSource, /this\.authoritativeActions\.slice\(0, Math\.min\(this\.presentedActionCount, this\.authoritativeActions\.length\)\)/, 'table rendering must consume only the committed authoritative prefix')
   assert.match(playAreaControllerSource, /node\.active = pending\?\.key !== key \|\| !pending\.cardIds\.has\(card\.id\)/, 'pending authoritative cards must remain inactive until their matching projectile lands')
-  assert.match(controllerSource, /const ticket = activePresentation\?\.deferAction\(action, actionIndex\) \?\? null[\s\S]*onFlightStart: \(\) => \{ if \(ticket\) activePresentation\?\.beginAction\(action, actionIndex, ticket\) \}[\s\S]*onCardArrive: card => \{ if \(ticket\) activePresentation\?\.revealCard\(action, actionIndex, card\.id, ticket\) \}[\s\S]*onFlightFinish: \(\) => \{ if \(ticket\) activePresentation\?\.revealAction\(action, actionIndex, ticket\) \}/, 'effect dispatch must carry one ticket through flight start, every card arrival and final recovery reveal')
+  assert.match(actionPresentationSource, /const ticket = activePresentation\?\.deferAction\(action, actionIndex\) \?\? null[\s\S]*onFlightStart: \(\) => \{ if \(ticket\) activePresentation\?\.beginAction\(action, actionIndex, ticket\) \}[\s\S]*onCardArrive: cardId => \{ if \(ticket\) activePresentation\?\.revealCard\(action, actionIndex, cardId, ticket\) \}[\s\S]*onFlightFinish: \(\) => \{ if \(ticket\) activePresentation\?\.revealAction\(action, actionIndex, ticket\) \}/, 'effect dispatch must carry one ticket through flight start, every card arrival and final recovery reveal')
   assert.doesNotMatch(controllerSource, /\bLandingPulse\b|\bshowLandingPulse\b/, 'the generic landing pulse must stay removed from the production pipeline')
-  assert.match(controllerSource, /const flightReason = await flightHandle\.finished[\s\S]*if \(flightReason !== 'completed'\) \{ handle\.cancel\(flightReason\); return \}[\s\S]*const impactReason = impactHandle\?\.isActive \? await impactHandle\.finished[\s\S]*if \(impactReason && impactReason !== 'completed'\) handle\.cancel\(impactReason\)[\s\S]*else handle\.complete\(\)/, 'the outer play handle and visible queue must own the complete flight and impact lifetimes')
+  assert.match(effectPlaybackSource, /const flightReason = await flightHandle\.finished[\s\S]*if \(flightReason !== 'completed'\) \{ handle\.cancel\(flightReason\); return \}[\s\S]*const impactReason = impactHandle\?\.isActive \? await impactHandle\.finished[\s\S]*if \(impactReason && impactReason !== 'completed'\) handle\.cancel\(impactReason\)[\s\S]*else handle\.complete\(\)/, 'the outer play handle and visible queue must own the complete flight and impact lifetimes')
   assert.match(controllerSource, /private renderFlow[\s\S]*kind === 'victory'[\s\S]*kind === 'defeat'[\s\S]*EffectHandle\.completed\('unavailable'\)/, 'retired flow visuals must stay unavailable while semantic settlement audio survives')
-  assert.match(controllerSource, /private enqueueVisibleEffect \(startEffect: \(\) => EffectHandle\)[\s\S]*settle\(await child\.finished\)/, 'authored card presentation barriers must retain the shared visible lane')
+  assert.match(effectPlaybackSource, /private enqueueVisibleEffect \(startEffect: \(\) => EffectHandle\)[\s\S]*const reason = child\.isActive \? await child\.finished[\s\S]*if \(reason === 'completed'\) handle\.complete\(\)/, 'authored card presentation barriers must retain the shared visible lane')
   assert.doesNotMatch(controllerSource, /allowArchivedVisuals|showSweep\(|PatternSweep/, 'EffectLab and live play must not retain a hidden path back to retired sweeps')
   assert.match(controllerSource, /(cancelAll|skipAll|clear)\(['"]recovery['"]\)/, 'recovery must use the unified renderer cleanup path')
   assert.match(controllerSource, /(cancelAll|skipAll|clear)\(['"]destroyed['"]\)/, 'scene destruction must use the unified renderer cleanup path')

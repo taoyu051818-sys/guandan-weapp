@@ -3,15 +3,17 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
-const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
+const { compilerPath, loadTypeScript } = require('./support/typescript.cjs')
 const arrangementPath = path.join(projectRoot, 'assets/scripts/game/HandArrangement.ts')
 const groupingPath = path.join(projectRoot, 'assets/scripts/game/HandGrouping.ts')
 const workspacePath = path.join(projectRoot, 'assets/scripts/game/HandWorkspace.ts')
 const gameManagerPath = path.join(projectRoot, 'assets/scripts/game/GameManager.ts')
+const localSelectionPath = path.join(projectRoot, 'assets/scripts/game/LocalHandSelectionController.ts')
 const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
+const handInteractionPath = path.join(projectRoot, 'assets/scripts/scenes/TableHandInteractionController.ts')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
-const ts = require(compilerPath)
+const ts = loadTypeScript()
 
 require.extensions['.ts'] = (module, filePath) => {
   const result = ts.transpileModule(fs.readFileSync(filePath, 'utf8'), {
@@ -107,6 +109,7 @@ function verifyLockAndBottomSelection () {
   assert.deepEqual(group.cardIds, ['locked-6', 'locked-7', 'locked-8', 'locked-9', 'locked-10'])
   assert.deepEqual(grouping.getStackSelectionForBottomCard('locked-10'), group.cardIds, 'the fully visible bottom card must select the whole stack')
   assert.deepEqual(grouping.getStackSelectionForBottomCard('locked-6'), [], 'a covered stack strip must not impersonate the bottom-card action')
+  assert.deepEqual(grouping.getPlaySelectionForCard('locked-6'), group.cardIds, 'every visible member of an explicit lock must select the complete combination')
 
   const copy = grouping.getGroupForCard('locked-8')
   assert.equal(copy.id, groupId)
@@ -117,21 +120,29 @@ function verifyLockAndBottomSelection () {
 
 function verifyTableIntegration () {
   const scene = fs.readFileSync(gameScenePath, 'utf8')
+  const handInteraction = fs.readFileSync(handInteractionPath, 'utf8')
   const workspace = fs.readFileSync(workspacePath, 'utf8')
   const manager = fs.readFileSync(gameManagerPath, 'utf8')
-  const suitHandlerStart = scene.indexOf('private handleTableHudSuit')
-  const suitHandlerEnd = scene.indexOf('private handleTableHudHandLock', suitHandlerStart)
-  assert.notEqual(suitHandlerStart, -1, 'the table scene must handle suit selection')
+  const localSelection = fs.readFileSync(localSelectionPath, 'utf8')
+  const suitHandlerStart = handInteraction.indexOf('public handleSuitIntent')
+  const suitHandlerEnd = handInteraction.indexOf('public handleLockAction', suitHandlerStart)
+  assert.notEqual(suitHandlerStart, -1, 'the hand interaction owner must handle suit selection')
   assert.notEqual(suitHandlerEnd, -1, 'the suit handler must remain a bounded interaction method')
-  const suitHandler = scene.slice(suitHandlerStart, suitHandlerEnd)
+  const suitHandler = handInteraction.slice(suitHandlerStart, suitHandlerEnd)
 
-  assert.match(scene, /availableSuits: this\.handWorkspace\.straightFlushAvailability/, 'the four-suit HUD must receive authoritative availability')
-  assert.match(suitHandler, /handWorkspace\.selectStraightFlush\(suit/, 'pressing a lit suit must delegate its exact candidate to the hand transaction')
-  assert.match(workspace, /suggestion\.cardIds\.forEach\(cardId => this\.manualSelection\.add\(cardId\)\)/, 'one suit press must select all five cards')
+  assert.match(scene, /onSuitSelect: suit => this\.tableHandInteraction\?\.handleSuitIntent\(suit\)/, 'the table HUD must forward suit intent to the hand interaction owner')
+  assert.match(handInteraction, /availableSuits: this\.workspace\.straightFlushAvailability/, 'the four-suit HUD must receive authoritative availability')
+  assert.match(suitHandler, /workspace\.selectStraightFlush\(suit/, 'pressing a lit suit must delegate its exact candidate to the hand transaction')
+  assert.match(workspace, /suggestion\.cardIds\.forEach\(cardId => createDraft\.selectedCardIds\.add\(cardId\)\)/, 'one suit press must select all five cards in the lock draft')
   assert.doesNotMatch(suitHandler, /\.arrange/, 'suit controls must not reorder the whole hand')
-  assert.match(scene, /stackSelectionForBottomCard\(cardId\)[\s\S]*replaceSelectedCards\(stackIsExactSelection \? \[\] : stackCardIds\)/, 'the visible bottom card must toggle the complete stack in one snapshot')
+  assert.match(
+    handInteraction,
+    /const stackCardIds = snapshot\.phase === 'playing'[\s\S]*playSelectionForCard\(cardId\)[\s\S]*const nextSelected = new Set\(selected\)[\s\S]*replaceSelectedCards\(Array\.from\(nextSelected\)\)/,
+    'playing stacks must accumulate atomically without leaking whole-stack selection into tribute',
+  )
   assert.match(manager, /public replaceSelectedCards \(cardIds: readonly string\[\]\): void/, 'GameManager must expose an atomic stack-selection entry point')
-  assert.match(manager, /this\.selectedCardIds = new Set\(requested\)[\s\S]*diagnosePlay\(cards, this\.state\.lastValidPlay\)/, 'batch selection must use the same authoritative play diagnosis as ordinary taps')
+  assert.match(manager, /this\.selection\.replaceFromInput\(cardIds, this\.selectionContext\)/, 'GameManager must delegate the atomic stack selection')
+  assert.match(localSelection, /this\.replace\(requested\)[\s\S]*diagnosePlay\(cards, context\.state\.lastValidPlay, context\.state\.ruleProfile\)/, 'batch selection must use the same authoritative play diagnosis as ordinary taps')
 }
 
 verifyEverySuitCanLight()

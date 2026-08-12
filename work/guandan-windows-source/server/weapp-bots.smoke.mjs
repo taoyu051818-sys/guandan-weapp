@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { once } from 'node:events'
 import { GameTicketService } from './platform/crypto.js'
+import { sendProtocolCommand } from './weapp-smoke-protocol.mjs'
 
 const port = 39107
 const friendRoomId = '618033'
@@ -72,7 +73,7 @@ const waitFor = (socket, type, predicate = () => true, timeoutMs = 5000) => new 
   socket.addEventListener('message', handler)
 })
 const send = (socket, type, payload, requestId = nextRequestId++) => {
-  socket.send(JSON.stringify({ type, requestId, payload }))
+  sendProtocolCommand(socket, type, payload, requestId)
   return requestId
 }
 const mutateBot = async (socket, type, playerId, expectedBotPlayerIds) => {
@@ -141,15 +142,20 @@ try {
   assert.match((await staleRejoinError).message, /机器人占用/, '机器人占座后旧重连凭证不能夺回该席位')
 
   const tickets = new GameTicketService({ secret, gameEndpoint: `ws://127.0.0.1:${port}/weapp` })
-  const gameTicket = tickets.issue({ userId: 'ticket-host', matchId: 'bot-ticket-check', roomId: ticketRoomId, seat: 'p1' }).gameTicket
+  const issuedTicket = tickets.issue({ userId: 'ticket-host', matchId: 'bot-ticket-check', roomId: ticketRoomId, seat: 'p1' })
   const ticketCreateId = nextRequestId++
   const ticketCreatedPromise = waitFor(ticketHost, 'roomCreated', packet => packet.requestId === ticketCreateId)
-  send(ticketHost, 'createRoom', { roomId: ticketRoomId, hostName: '票据房', gameTicket }, ticketCreateId)
+  send(ticketHost, 'createRoom', {
+    roomId: ticketRoomId,
+    hostName: '票据房',
+    gameTicket: issuedTicket.gameTicket,
+    entryAttemptId: issuedTicket.claims.entryAttemptId,
+  }, ticketCreateId)
   await ticketCreatedPromise
   const ticketBotId = nextRequestId++
   const ticketBotError = waitFor(ticketHost, 'error', packet => packet.requestId === ticketBotId)
   send(ticketHost, 'addBot', { roomId: ticketRoomId, playerId: 'p2' }, ticketBotId)
-  assert.match((await ticketBotError).message, /匹配票据房不允许/)
+  assert.match((await ticketBotError).message, /票据房不允许/)
   const ticketLeaveId = nextRequestId++
   const ticketLeftPromise = waitFor(ticketHost, 'roomLeft', packet => packet.requestId === ticketLeaveId)
   send(ticketHost, 'leaveRoom', { roomId: ticketRoomId }, ticketLeaveId)

@@ -1,117 +1,392 @@
-import type { Card, PlayerId, TributeAction, TributeState } from '../types/game'
-import type { EngineState } from './engine'
+import type { Card, PlayerId } from '../types/game'
+import { createDeck } from './deck'
+import type {
+  BeginPlayAfterTributeCommand,
+  GameEvent,
+  MatchState,
+  PrepareNextRoundCommand,
+  SelectReturnCardCommand,
+  SelectTributeCardCommand,
+} from './engine'
 
 const ids: PlayerId[] = ['p1','p2','p3','p4']
-export const createTribute = (state: EngineState, lastRank: PlayerId[]): TributeState | null => {
-  if (lastRank.length !== 4) return null
-  const [first, second, third, last] = lastRank
-  const doubleDown = state.players[first].team === state.players[second].team
-  const losers = doubleDown ? [third, last] : [last]
-  const jokers = losers.flatMap(id => state.players[id].hand).filter(card => card.suit === 'joker')
-  const anti = doubleDown ? jokers.length >= 4 || jokers.filter(card => card.rank === 'Big').length >= 2 : jokers.length >= 2
-  const actions: TributeAction[] = doubleDown ? [{ from: third, to: first, card: null, returnCard: null }, { from: last, to: second, card: null, returnCard: null }] : [{ from: last, to: first, card: null, returnCard: null }]
-  return { isDoubleDown: doubleDown, isAntiTribute: anti, actions, phase: anti ? 'done' : 'tributing' }
-}
-
-interface Transfer { from: PlayerId; to: PlayerId; card: Card }
-
-const escrowCard = (state: EngineState, from: PlayerId, card: Card): EngineState => ({
-  ...state,
-  players: {
-    ...state.players,
-    [from]: { ...state.players[from], hand: state.players[from].hand.filter(item => item.id !== card.id) },
-  },
-})
-
-/** Apply every transfer to one cloned player map so a double tribute becomes visible atomically. */
-const moveAll = (state: EngineState, transfers: Transfer[]): EngineState => {
-  const players = { ...state.players }
-  transfers.forEach(({ from, card }) => {
-    players[from] = { ...players[from], hand: players[from].hand.filter(item => item.id !== card.id) }
-  })
-  transfers.forEach(({ to, card }) => {
-    players[to] = { ...players[to], hand: [...players[to].hand, card].sort((a,b) => b.value-a.value) }
-  })
-  return { ...state, players }
-}
-
-const clockwiseRecipient = (state: EngineState, from: PlayerId, recipients: PlayerId[]): PlayerId => {
-  const order = state.turnOrder.length === ids.length ? state.turnOrder : ids
-  const start = order.indexOf(from)
-  if (start >= 0) {
-    for (let offset = 1; offset <= order.length; offset += 1) {
-      const candidate = order[(start + offset) % order.length]
-      if (recipients.includes(candidate)) return candidate
-    }
-  }
-  return recipients[0]
-}
-
-const resolveDoubleRecipients = (state: EngineState, actions: TributeAction[]): TributeAction[] => {
-  const [thirdAction, lastAction] = actions
-  if (!thirdAction?.card || !lastAction?.card) throw Error('双贡必须收齐两张贡牌后分配')
-
-  // createTribute keeps first/second in the provisional action destinations until
-  // both face-down cards arrive. Only then can their actual recipients be known.
-  const recipients: PlayerId[] = [thirdAction.to, lastAction.to]
-  if (thirdAction.card.value === lastAction.card.value) {
-    const clockwise = actions.map(action => ({
-      ...action,
-      to: clockwiseRecipient(state, action.from, recipients),
-    }))
-    if (new Set(clockwise.map(action => action.to)).size !== actions.length) throw Error('双贡顺时针映射无效')
-    return clockwise
-  }
-
-  const [first, second] = recipients
-  const thirdGetsFirst = thirdAction.card.value > lastAction.card.value
-  return [
-    { ...thirdAction, to: thirdGetsFirst ? first : second },
-    { ...lastAction, to: thirdGetsFirst ? second : first },
-  ]
-}
-
-export const giveTribute = (state: EngineState, tribute: TributeState, from: PlayerId, cardId: string): { state: EngineState; tribute: TributeState } => {
-  if (tribute.phase !== 'tributing') throw Error('当前不是进贡阶段')
-  const action = tribute.actions.find(item => item.from === from)
-  if (!action) throw Error('进贡牌无效')
-  if (action.card) throw Error('该玩家已经完成进贡')
-  const card = state.players[from].hand.find(item => item.id === cardId)
-  if (!card) throw Error('进贡牌无效')
-  // 与原版一致：红桃级牌为逢人配，不作为强制进贡的最大牌候选。
-  const eligible = state.players[from].hand.filter(item => !(item.isLevelCard && item.suit === 'heart'))
-  const required = highestCard(eligible.length ? eligible : state.players[from].hand)
-  if (required && card.id !== required.id) throw Error('进贡必须交出当前最大的牌')
-  const actions = tribute.actions.map(item => item.from === from ? { ...item, card } : item)
-  if (tribute.isDoubleDown && !actions.every(item => item.card)) {
-    return { state: escrowCard(state, from, card), tribute: { ...tribute, actions, phase: 'tributing' } }
-  }
-  const resolved = tribute.isDoubleDown ? resolveDoubleRecipients(state, actions) : actions
-  const next = moveAll(state, resolved.map(item => ({ from: item.from, to: item.to, card: item.card! })))
-  return { state: next, tribute: { ...tribute, actions: resolved, phase: 'returning' } }
-}
-export const returnTribute = (state: EngineState, tribute: TributeState, from: PlayerId, cardId: string): { state: EngineState; tribute: TributeState } => {
-  if (tribute.phase !== 'returning') throw Error('当前不是还贡阶段')
-  const action = tribute.actions.find(item => item.to === from); const card = state.players[from].hand.find(item => item.id === cardId)
-  if (!action || !card) throw Error('还贡牌无效')
-  if (action.returnCard) throw Error('该玩家已经完成还贡')
-  // 竞赛规则：通常可还任意一张牌点不高于 10 的牌；若整手牌点均高于
-  // 10，则必须还其中牌点最小的一张，避免极端发牌形成无合法动作。
-  const eligible = state.players[from].hand.filter(item => item.value <= 10)
-  if (eligible.length && card.value > 10) throw Error('还贡只能选择点数不高于 10 的牌')
-  if (!eligible.length && card.id !== automaticReturnCard(state.players[from].hand)?.id) throw Error('没有 10 以下牌时必须选择牌点最小的牌还贡')
-  const actions = tribute.actions.map(item => item.to === from ? { ...item, returnCard: card } : item); const next = moveAll(state, [{ from, to: action.from, card }])
-  return { state: next, tribute: { ...tribute, actions, phase: actions.every(item => item.returnCard) ? 'done' : 'returning' } }
-}
-export const tributeLeader = (tribute: TributeState, lastRank: PlayerId[], dealer: PlayerId): PlayerId => {
-  if (tribute.isAntiTribute) return dealer
-  const first = lastRank[0]
-  return tribute.actions.find(action => action.to === first)?.from || dealer
-}
 export const highestCard = (cards: Card[]) => [...cards].sort((a,b) => b.value-a.value)[0]
 export const lowestCard = (cards: Card[]) => [...cards].sort((a,b) => a.value-b.value)[0]
 /** 服务端托管还贡：优先选 <=10 的最低牌；无低牌时按竞赛规则选整手最低。 */
 export const automaticReturnCard = (cards: Card[]): Card | undefined => {
   const eligible = cards.filter(card => card.value <= 10)
   return lowestCard(eligible.length ? eligible : cards)
+}
+
+export type TributeMode = 'single' | 'double'
+export type MatchTributeStatus = 'selecting_tribute' | 'selecting_return' | 'ready' | 'resisted'
+
+export interface TributeExchange {
+  id: string
+  from: PlayerId
+  to: PlayerId
+  tributeCardId: string | null
+  returnCardId: string | null
+}
+
+/** Selection ids are authoritative but private; network projections must omit them for other seats. */
+export interface MatchTributeState {
+  mode: TributeMode
+  status: MatchTributeStatus
+  exchanges: TributeExchange[]
+}
+
+export type TributeOperationResult =
+  | { ok: true; state: MatchState; events: GameEvent[] }
+  | { ok: false; reason: string }
+
+const failure = (reason: string): TributeOperationResult => ({ ok: false, reason })
+
+const canonicalCardMatches = (actual: Card, expected: Card): boolean =>
+  actual.id === expected.id
+  && actual.suit === expected.suit
+  && actual.rank === expected.rank
+  && actual.value === expected.value
+  && actual.isLevelCard === expected.isLevelCard
+  && Boolean(actual.isRedJoker) === Boolean(expected.isRedJoker)
+
+const validateCanonicalHands = (
+  hands: Record<PlayerId, Card[]>,
+  currentLevel: MatchState['currentLevel'],
+): string | null => {
+  if (ids.some(id => !Array.isArray(hands[id]) || hands[id].length !== 27)) {
+    return 'INVALID_DEALT_HANDS'
+  }
+  const cards = ids.flatMap(id => hands[id])
+  if (new Set(cards.map(card => card.id)).size !== 108) return 'DUPLICATE_DEALT_CARD'
+  const canonicalById = new Map(createDeck(currentLevel).map(card => [card.id, card]))
+  if (cards.some(card => {
+    const canonical = canonicalById.get(card.id)
+    return !canonical || !canonicalCardMatches(card, canonical)
+  })) return 'INVALID_DEALT_CARD'
+  return null
+}
+
+const makeExchanges = (
+  mode: TributeMode,
+  rank: PlayerId[],
+  roundId: number,
+): TributeExchange[] => {
+  const [first, second, third, last] = rank
+  if (mode === 'single') {
+    return [{
+      id: `${roundId}:${last}:${first}`,
+      from: last,
+      to: first,
+      tributeCardId: null,
+      returnCardId: null,
+    }]
+  }
+  return [
+    {
+      id: `${roundId}:${third}:${first}`,
+      from: third,
+      to: first,
+      tributeCardId: null,
+      returnCardId: null,
+    },
+    {
+      id: `${roundId}:${last}:${second}`,
+      from: last,
+      to: second,
+      tributeCardId: null,
+      returnCardId: null,
+    },
+  ]
+}
+
+const hasAntiTribute = (
+  mode: TributeMode,
+  exchanges: TributeExchange[],
+  hands: Record<PlayerId, Card[]>,
+): boolean => {
+  const jokers = exchanges.flatMap(exchange => hands[exchange.from])
+    .filter(card => card.suit === 'joker')
+  return mode === 'single'
+    ? jokers.length >= 2
+    : jokers.length >= 4 || jokers.filter(card => card.rank === 'Big').length >= 2
+}
+
+export const prepareNextRound = (
+  state: MatchState,
+  command: PrepareNextRoundCommand,
+): TributeOperationResult => {
+  if (state.phase !== 'settled' || !state.settlement) return failure('MATCH_NOT_SETTLED')
+  if (state.settlement.isGameWon) return failure('MATCH_ALREADY_WON')
+  const handsError = validateCanonicalHands(command.dealtHands, state.settlement.currentLevel)
+  if (handsError) return failure(handsError)
+  if (state.lastRoundRank.length !== 4) return failure('ROUND_RANK_UNAVAILABLE')
+  const [first, second] = state.lastRoundRank
+  const mode: TributeMode = state.players[first].team === state.players[second].team
+    ? 'double'
+    : 'single'
+  const roundId = state.roundId + 1
+  const exchanges = makeExchanges(mode, state.lastRoundRank, roundId)
+  const resisted = hasAntiTribute(mode, exchanges, command.dealtHands)
+  const tribute: MatchTributeState = {
+    mode,
+    status: resisted ? 'resisted' : 'selecting_tribute',
+    exchanges,
+  }
+  const dealerId = state.lastRoundRank[0]
+  const players = cloneMatchPlayers(state)
+  ids.forEach(id => {
+    players[id] = {
+      ...players[id],
+      hand: command.dealtHands[id].map(card => ({ ...card })),
+      role: 'normal',
+    }
+  })
+  return {
+    ok: true,
+    state: {
+      ...state,
+      roundId,
+      phase: 'tribute',
+      currentLevel: state.settlement.currentLevel,
+      dealerId,
+      players,
+      currentTurn: dealerId,
+      trick: { winningPlay: null, passedPlayerIds: [] },
+      playArea: [],
+      playHistory: [],
+      lastValidPlay: null,
+      finishedPlayers: [],
+      settlement: null,
+      tribute,
+      roundMeta: { fromTribute: true, isAntiTribute: resisted },
+    },
+    events: [
+      { type: 'ROUND_PREPARED', roundId, mode, status: tribute.status },
+      ...(resisted ? [{ type: 'ANTI_TRIBUTE_DECLARED' as const, mode }] : []),
+    ],
+  }
+}
+
+const cloneMatchPlayers = (state: MatchState): MatchState['players'] => ({
+  p1: { ...state.players.p1, hand: [...state.players.p1.hand] },
+  p2: { ...state.players.p2, hand: [...state.players.p2.hand] },
+  p3: { ...state.players.p3, hand: [...state.players.p3.hand] },
+  p4: { ...state.players.p4, hand: [...state.players.p4.hand] },
+})
+
+const selectedCard = (
+  state: MatchState,
+  playerId: PlayerId,
+  cardId: string | null,
+): Card | null => cardId
+  ? state.players[playerId].hand.find(card => card.id === cardId) ?? null
+  : null
+
+const isEligibleTributeCard = (hand: Card[], cardId: string): boolean => {
+  const card = hand.find(item => item.id === cardId)
+  if (!card) return false
+  const withoutWildLevel = hand.filter(item => !(item.isLevelCard && item.suit === 'heart'))
+  const eligible = withoutWildLevel.length ? withoutWildLevel : hand
+  const maximum = Math.max(...eligible.map(item => item.value))
+  return eligible.some(item => item.id === cardId) && card.value === maximum
+}
+
+const isEligibleReturnCard = (hand: Card[], cardId: string): boolean => {
+  const card = hand.find(item => item.id === cardId)
+  if (!card) return false
+  const lowCards = hand.filter(item => item.value <= 10)
+  if (lowCards.length > 0) return card.value <= 10
+  const minimum = Math.min(...hand.map(item => item.value))
+  return card.value === minimum
+}
+
+const matchClockwiseRecipient = (
+  state: MatchState,
+  from: PlayerId,
+  recipients: PlayerId[],
+): PlayerId => {
+  const start = state.turnOrder.indexOf(from)
+  for (let offset = 1; offset <= state.turnOrder.length; offset += 1) {
+    const candidate = state.turnOrder[(start + offset) % state.turnOrder.length]
+    if (recipients.includes(candidate)) return candidate
+  }
+  return recipients[0]
+}
+
+const resolveRecipients = (
+  state: MatchState,
+  exchanges: TributeExchange[],
+): TributeExchange[] => {
+  if (exchanges.length !== 2) return exchanges
+  const [third, last] = exchanges
+  const thirdCard = selectedCard(state, third.from, third.tributeCardId)
+  const lastCard = selectedCard(state, last.from, last.tributeCardId)
+  if (!thirdCard || !lastCard) return exchanges
+  const recipients = exchanges.map(exchange => exchange.to)
+  if (thirdCard.value === lastCard.value) {
+    return exchanges.map(exchange => ({
+      ...exchange,
+      to: matchClockwiseRecipient(state, exchange.from, recipients),
+    }))
+  }
+  const [first, second] = recipients
+  const thirdGetsFirst = thirdCard.value > lastCard.value
+  return [
+    { ...third, to: thirdGetsFirst ? first : second },
+    { ...last, to: thirdGetsFirst ? second : first },
+  ]
+}
+
+const selectTributeCard = (
+  state: MatchState,
+  command: SelectTributeCardCommand,
+): TributeOperationResult => {
+  const tribute = state.tribute
+  if (!tribute || state.phase !== 'tribute') return failure('MATCH_NOT_IN_TRIBUTE')
+  if (tribute.status !== 'selecting_tribute') return failure('TRIBUTE_NOT_SELECTING')
+  const exchange = tribute.exchanges.find(candidate => candidate.from === command.playerId)
+  if (!exchange) return failure('NOT_TRIBUTE_GIVER')
+  if (exchange.tributeCardId) return failure('TRIBUTE_ALREADY_SELECTED')
+  if (!isEligibleTributeCard(state.players[command.playerId].hand, command.cardId)) {
+    return failure('INELIGIBLE_TRIBUTE_CARD')
+  }
+  let exchanges = tribute.exchanges.map(candidate => candidate.id === exchange.id
+    ? { ...candidate, tributeCardId: command.cardId }
+    : candidate)
+  const events: GameEvent[] = [{ type: 'TRIBUTE_CARD_SELECTED', playerId: command.playerId }]
+  if (!exchanges.every(candidate => candidate.tributeCardId !== null)) {
+    return {
+      ok: true,
+      state: { ...state, tribute: { ...tribute, exchanges } },
+      events,
+    }
+  }
+
+  exchanges = resolveRecipients(state, exchanges)
+  const players = cloneMatchPlayers(state)
+  for (const candidate of exchanges) {
+    const card = selectedCard(state, candidate.from, candidate.tributeCardId)
+    if (!card) return failure('TRIBUTE_CARD_NOT_IN_HAND')
+    players[candidate.from].hand = players[candidate.from].hand.filter(item => item.id !== card.id)
+  }
+  for (const candidate of exchanges) {
+    const card = selectedCard(state, candidate.from, candidate.tributeCardId)!
+    players[candidate.to].hand = [...players[candidate.to].hand, card].sort((a, b) => b.value - a.value)
+    events.push({
+      type: 'TRIBUTE_TRANSFERRED',
+      fromPlayerId: candidate.from,
+      toPlayerId: candidate.to,
+      cardId: card.id,
+    })
+  }
+  return {
+    ok: true,
+    state: {
+      ...state,
+      players,
+      tribute: { ...tribute, status: 'selecting_return', exchanges },
+    },
+    events,
+  }
+}
+
+const selectReturnCard = (
+  state: MatchState,
+  command: SelectReturnCardCommand,
+): TributeOperationResult => {
+  const tribute = state.tribute
+  if (!tribute || state.phase !== 'tribute') return failure('MATCH_NOT_IN_TRIBUTE')
+  if (tribute.status !== 'selecting_return') return failure('RETURN_NOT_SELECTING')
+  const exchange = tribute.exchanges.find(candidate => candidate.to === command.playerId)
+  if (!exchange) return failure('NOT_RETURN_GIVER')
+  if (exchange.returnCardId) return failure('RETURN_ALREADY_SELECTED')
+  if (!isEligibleReturnCard(state.players[command.playerId].hand, command.cardId)) {
+    return failure('INELIGIBLE_RETURN_CARD')
+  }
+  const exchanges = tribute.exchanges.map(candidate => candidate.id === exchange.id
+    ? { ...candidate, returnCardId: command.cardId }
+    : candidate)
+  const events: GameEvent[] = [{ type: 'RETURN_CARD_SELECTED', playerId: command.playerId }]
+  if (!exchanges.every(candidate => candidate.returnCardId !== null)) {
+    return {
+      ok: true,
+      state: { ...state, tribute: { ...tribute, exchanges } },
+      events,
+    }
+  }
+
+  const players = cloneMatchPlayers(state)
+  for (const candidate of exchanges) {
+    const card = selectedCard(state, candidate.to, candidate.returnCardId)
+    if (!card) return failure('RETURN_CARD_NOT_IN_HAND')
+    players[candidate.to].hand = players[candidate.to].hand.filter(item => item.id !== card.id)
+  }
+  for (const candidate of exchanges) {
+    const card = selectedCard(state, candidate.to, candidate.returnCardId)!
+    players[candidate.from].hand = [...players[candidate.from].hand, card].sort((a, b) => b.value - a.value)
+    events.push({
+      type: 'RETURN_TRANSFERRED',
+      fromPlayerId: candidate.to,
+      toPlayerId: candidate.from,
+      cardId: card.id,
+    })
+  }
+  events.push({ type: 'TRIBUTE_READY', mode: tribute.mode })
+  return {
+    ok: true,
+    state: {
+      ...state,
+      players,
+      tribute: { ...tribute, status: 'ready', exchanges },
+    },
+    events,
+  }
+}
+
+const postTributeLeader = (state: MatchState): PlayerId | null => {
+  const tribute = state.tribute
+  if (!tribute) return null
+  if (tribute.status === 'resisted') return state.dealerId
+  const first = state.lastRoundRank[0]
+  return tribute.exchanges.find(exchange => exchange.to === first)?.from ?? null
+}
+
+const beginPlayAfterTribute = (
+  state: MatchState,
+  command: BeginPlayAfterTributeCommand,
+): TributeOperationResult => {
+  const tribute = state.tribute
+  if (!tribute || state.phase !== 'tribute') return failure('MATCH_NOT_IN_TRIBUTE')
+  if (tribute.status !== 'ready' && tribute.status !== 'resisted') return failure('TRIBUTE_NOT_READY')
+  const leaderId = postTributeLeader(state)
+  if (!leaderId) return failure('TRIBUTE_LEADER_NOT_FOUND')
+  if (command.playerId !== leaderId) return failure('NOT_TRIBUTE_LEADER')
+  return {
+    ok: true,
+    state: {
+      ...state,
+      phase: 'playing',
+      currentTurn: leaderId,
+      trick: { winningPlay: null, passedPlayerIds: [] },
+      lastValidPlay: null,
+      tribute: null,
+    },
+    events: [{
+      type: 'PLAY_STARTED_AFTER_TRIBUTE',
+      leaderId,
+      wasResisted: tribute.status === 'resisted',
+    }],
+  }
+}
+
+export const executeTributeCommand = (
+  state: MatchState,
+  command: SelectTributeCardCommand | SelectReturnCardCommand | BeginPlayAfterTributeCommand,
+): TributeOperationResult => {
+  switch (command.type) {
+    case 'SELECT_TRIBUTE_CARD': return selectTributeCard(state, command)
+    case 'SELECT_RETURN_CARD': return selectReturnCard(state, command)
+    case 'BEGIN_PLAY_AFTER_TRIBUTE': return beginPlayAfterTribute(state, command)
+  }
 }

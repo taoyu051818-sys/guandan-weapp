@@ -1,55 +1,77 @@
-/**
- * 微信小程序原生 WebSocket 通道。
- * Socket.IO 保留给网页端；小程序不能假定 socket.io-client 可用，因此使用这一条 JSON/WSS 协议。
- */
+/** Cocos 客户端的权威 WebSocket 组合根；客户端只提交动作意图。 */
 import { createServer } from 'node:http'
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { GameTicketVerifier } from './platform/crypto.js'
 import { loadGameSecurityConfig } from './platform/config.js'
 import { GameResultReporter } from './platform/result-reporter.js'
 import { SpectatorEventReporter } from './platform/spectator-event-reporter.js'
 import { buildGameResultEvent, createGameStatsBySeat, ensureGameStatsBySeat, recordAuthoritativeAction } from './game-stats.js'
-import { JsonRoomStateStore, roomForPersistence, roomFromPersistence } from './room-state-store.js'
-import { adjustDoubleDownSettlement, hasReachedRoundLimit, normalizeFriendRoomSettings, spectatorPolicyFor } from './friend-room-settings.js'
-import { chooseMasterBotCards, MASTER_BOT_DIFFICULTY } from './master-bot-policy.js'
+import { JsonRoomStateStore, markSnapshotAcceptancesDurable, roomForPersistence, roomFromPersistence } from './room-state-store.js'
+import { normalizeFriendRoomSettings } from './friend-room-settings.js'
+import { createRoomBotPolicy } from './master-bot-policy.js'
+import { createInitialMatchState, migrateLegacyMatchState } from './game-session.js'
+import { sendProtocolMessage, upgradeToProtocolConnection } from './weapp-websocket-transport.js'
+import { createRoomPublisher, phaseForRoom } from './weapp-room-publisher.js'
+import { createCommandRouter } from './weapp-command-router.js'
+import { createGameCommandHandler, GAME_COMMAND_TYPES } from './weapp-game-command-handler.js'
+import { createLobbyCommandHandler, LOBBY_COMMAND_TYPES } from './weapp-lobby-command-handler.js'
+import { createEntryCommandHandler, ENTRY_COMMAND_TYPES } from './weapp-entry-command-handler.js'
+import { createCommandGateway } from './weapp-command-gateway.js'
+import { createWeAppMatchLifecycle } from './weapp-match-lifecycle.js'
+import { createWeAppGameStartCoordinator } from './weapp-game-start-coordinator.js'
+import { restoreWeAppRuntime } from './weapp-runtime-recovery.js'
+import { GLOBAL_OPERATION_KEY, createWeAppOperationScheduler, operationKeyForCommand } from './weapp-operation-scheduler.js'
+import { createAcceptedActionStore } from './weapp-accepted-action-store.js'
 
 const require = createRequire(import.meta.url)
-const { PlayType, createGame, dealNextRound, playCards, passTurn, isRoundOver, settle, createTribute, giveTribute, returnTribute, tributeLeader, highestCard, automaticReturnCard } = require('../../../shared-core/dist')
+const { PlayType, createGame, getRuleProfile } = require('../../../shared-core/dist')
+const { validateCommandRequestId, validateExpectedVersion } = require('../../../shared-core/dist/protocol')
 const ids = ['p1', 'p2', 'p3', 'p4']
 const rooms = new Map()
 const connections = new Map()
 const hostExpiryTimers = new Map()
 const emptyRoomExpiryTimers = new Map()
-const turnTimers = new Map()
 const dissolveTimers = new Map()
-const matchDurationTimers = new Map()
-const acceptedActions = new Map()
-const roomStateStore = new JsonRoomStateStore({ filePath: process.env.WEAPP_ROOM_STATE_FILE || '' })
+const sideEffectStageRetryTimers = new Map()
+const sideEffectCompletionHandlers = new Map()
+const maxAcceptedActions = 512
+const acceptedActionStore = createAcceptedActionStore({ maxEntries: maxAcceptedActions })
+const acceptedActions = acceptedActionStore.entries
+const closedRoomTombstones = new Map()
+const roomBotPolicies = new Map()
 const idempotentActionTypes = new Set([
   'startGame', 'setLobbyReady', 'cancelLobbyReady', 'kickMember', 'addBot', 'removeBot',
   'play', 'pass', 'nextRound', 'readyNextRound', 'roundReady', 'ready', 'cancelRoundReady', 'cancelReady',
   'setTrustee', 'cancelTrustee', 'proposeDissolve', 'dissolveVote', 'voteDissolve', 'chat',
-  'tribute', 'returnTribute', 'finishTribute',
+  'tribute', 'returnTribute', 'finishTribute', 'leaveRoom', 'safeExit',
 ])
-const maxAcceptedActions = 512
 let nextConnection = 1
+let shuttingDown = false
+const operationScheduler = createWeAppOperationScheduler()
+const roomOperationKey = roomId => `room:${roomId}`
 
-const TURN_TIMEOUT_MS = Math.max(100, Number(process.env.WEAPP_TURN_TIMEOUT_MS || 20000))
-const TRUSTEE_ACTION_DELAY_MS = Math.max(10, Number(process.env.WEAPP_TRUSTEE_ACTION_DELAY_MS || 500))
-const BOT_ACTION_DELAY_MS = Math.max(10, Number(process.env.WEAPP_BOT_ACTION_DELAY_MS || 500))
-const FRIEND_SECOND_MS = Math.max(1, Number(process.env.WEAPP_FRIEND_SECOND_MS || 1000))
-const TOTAL_MINUTE_MS = Math.max(100, Number(process.env.WEAPP_TOTAL_MINUTE_MS || 60000))
-const DISSOLVE_TIMEOUT_MS = Math.max(1000, Number(process.env.WEAPP_DISSOLVE_TIMEOUT_MS || 30000))
-const EMPTY_ROOM_TIMEOUT_MS = Math.max(100, Number(process.env.WEAPP_EMPTY_ROOM_TIMEOUT_MS || 60000))
-const MAX_MESSAGE_BYTES = Math.max(1024, Math.min(65535, Number(process.env.WEAPP_MAX_MESSAGE_BYTES || 65535)))
-const TIMEOUTS_BEFORE_TRUSTEE = 2
+const security = loadGameSecurityConfig()
+const TURN_TIMEOUT_MS = security.turnTimeoutMs
+const TRUSTEE_ACTION_DELAY_MS = security.trusteeActionDelayMs
+const BOT_ACTION_DELAY_MS = security.botActionDelayMs
+const FRIEND_SECOND_MS = security.friendSecondMs
+const TOTAL_MINUTE_MS = security.totalMinuteMs
+const DISSOLVE_TIMEOUT_MS = security.dissolveTimeoutMs
+const EMPTY_ROOM_TIMEOUT_MS = security.emptyRoomTimeoutMs
+const MAX_MESSAGE_BYTES = security.maxMessageBytes
+const MAX_CONNECTIONS = security.maxConnections
+const MAX_ROOMS = security.maxRooms
+const COMMAND_RATE_WINDOW_MS = security.commandRateWindowMs
+const COMMAND_RATE_LIMIT = security.commandRateLimit
+const MAX_PENDING_COMMANDS = security.maxPendingCommands
+const PERSIST_DEBOUNCE_MS = security.persistDebounceMs
 const QUICK_CHAT_INTERVAL_MS = 1200
 const QUICK_CHAT_REPEAT_MS = 8000
 const QUICK_CHAT_PHRASES = new Set(['请尽快出牌', '你的牌打得太好啦', '配合得好', '大家加油', '谢谢', '再来一局'])
-const security = loadGameSecurityConfig()
+const roomStateStore = new JsonRoomStateStore({ filePath: security.roomStateFile })
 const gameTicketVerifier = new GameTicketVerifier({ secret: security.gameTicketSecret, required: security.ticketRequired })
-const resultReporter = new GameResultReporter({ endpoint: security.resultEndpoint, secret: security.gameResultSecret })
+const resultReporter = new GameResultReporter({ endpoint: security.resultEndpoint, secret: security.gameResultSecret, outboxFilePath: security.resultOutboxFile })
 const spectatorEventReporter = new SpectatorEventReporter({
   endpoint: security.spectatorEventEndpoint,
   secret: security.spectatorEventSecret,
@@ -58,14 +80,63 @@ const spectatorEventReporter = new SpectatorEventReporter({
 })
 
 const createResumeToken = () => randomBytes(32).toString('hex')
+const createBotSeed = () => randomBytes(4).readUInt32BE(0)
+const cryptoRandom = () => randomInt(0x1_0000_0000) / 0x1_0000_0000
+const createTestRandom = value => {
+  if (process.env.NODE_ENV !== 'test' || !/^(?:0x[\da-f]+|\d+)$/i.test(String(value || ''))) return null
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 0xffff_ffff) return null
+  let seed = parsed >>> 0
+  return () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 0x1_0000_0000)
+}
+const shuffleRandom = createTestRandom(process.env.WEAPP_TEST_RANDOM_SEED) || cryptoRandom
 const sameToken = (actual, supplied) => {
   if (typeof actual !== 'string' || typeof supplied !== 'string') return false
   const actualBytes = Buffer.from(actual)
   const suppliedBytes = Buffer.from(supplied)
   return actualBytes.length === suppliedBytes.length && timingSafeEqual(actualBytes, suppliedBytes)
 }
-const phaseFor = (room) => room.matchEnded || room.roundResult ? 'settlement' : room.tribute ? 'tribute' : room.state ? 'playing' : 'lobby'
-const createRoomRecord = ({ roomId, hostName = '等待房主', hostConnectionId = null, state = null, ticketClaims = null, roomSettings = null }) => {
+const normalizeEntryAttemptId = value => {
+  if (value === undefined || value === null || value === '') return null
+  const attemptId = String(value)
+  return attemptId.length >= 22 && attemptId.length <= 128 && /^[A-Za-z0-9_-]+$/.test(attemptId)
+    ? attemptId
+    : undefined
+}
+const rulePresetForRoom = room => room?.rulePreset === 'tournament' ? 'tournament' : 'classic'
+const ruleProfileForRoom = room => getRuleProfile(rulePresetForRoom(room))
+const botSeedForRoom = room => {
+  if (Number.isSafeInteger(room.botSeed) && room.botSeed >= 0 && room.botSeed <= 0xffff_ffff) return room.botSeed
+  room.botSeed = createHash('sha256').update(`guandan-room-bot:${room.roomId}`).digest().readUInt32BE(0)
+  return room.botSeed
+}
+const botPolicyForRoom = room => {
+  const existing = roomBotPolicies.get(room.roomId)
+  if (existing) return existing
+  const policy = createRoomBotPolicy({
+    ruleProfile: ruleProfileForRoom(room),
+    seed: botSeedForRoom(room),
+    checkpoint: room.botPolicyCheckpoint || undefined,
+  })
+  roomBotPolicies.set(room.roomId, policy)
+  return policy
+}
+const resetRoomBotPolicy = room => {
+  roomBotPolicies.delete(room.roomId)
+  room.botPolicyCheckpoint = null
+}
+const checkpointRoomBotPolicy = room => {
+  const policy = roomBotPolicies.get(room.roomId)
+  if (policy) room.botPolicyCheckpoint = policy.checkpoint()
+}
+const phaseFor = phaseForRoom
+const entryKindForClaims = claims => claims?.roomKind === 'friend' ? 'friend' : 'match'
+const isMatchRoom = room => Boolean(room?.ticketBound && room.entryKind !== 'friend')
+const isFriendRoom = room => !isMatchRoom(room)
+const entryDeadlineForClaims = claims => claims?.roomKind === 'friend'
+  ? Number(claims.roomExpiresAt)
+  : Number(claims?.exp) * 1000
+const createRoomRecord = ({ roomId, hostName = '等待房主', hostConnectionId = null, ticketClaims = null, roomSettings = null }) => {
   const userIdsBySeat = { p1: null, p2: null, p3: null, p4: null }
   const ticketJtisBySeat = { p1: null, p2: null, p3: null, p4: null }
   const ticketExpiresAtBySeat = { p1: null, p2: null, p3: null, p4: null }
@@ -75,7 +146,8 @@ const createRoomRecord = ({ roomId, hostName = '等待房主', hostConnectionId 
   return {
     roomId,
     hostName,
-    roomSettings: normalizeFriendRoomSettings(roomSettings),
+    roomSettings: normalizeFriendRoomSettings(roomSettings ?? ticketClaims?.roomSettings),
+    rulePreset: 'classic',
     seats: { p1: hostConnectionId, p2: null, p3: null, p4: null },
     resumeTokens: { p1: hostConnectionId ? createResumeToken() : null, p2: null, p3: null, p4: null },
     userIdsBySeat,
@@ -83,15 +155,33 @@ const createRoomRecord = ({ roomId, hostName = '等待房主', hostConnectionId 
     ticketExpiresAtBySeat,
     matchId: ticketClaims?.matchId || null,
     ticketBound: Boolean(ticketClaims),
+    entryKind: ticketClaims ? entryKindForClaims(ticketClaims) : 'friend',
     botPlayerIds: [],
-    state,
+    botSeed: createBotSeed(),
+    botPolicyCheckpoint: null,
+    state: null,
     matchStartedAt: null,
     totalDeadlineAt: null,
     matchEnded: null,
     tribute: null,
     roundResult: null,
+    teamLevels: { teamA: 2, teamB: 2 },
+    aFailStreaks: { teamA: 0, teamB: 0 },
+    scores: { teamA: 0, teamB: 0 },
+    lastRoundRank: [],
     roundSequence: 0,
     spectatorSequence: 0,
+    pendingSpectatorEvents: [],
+    pendingResultEvent: null,
+    pendingRoundFinalization: null,
+    pendingGameStartEvent: null,
+    pendingGameStartRequest: null,
+    gameStartClaimedAt: null,
+    gameStartReconnectDeadlineAt: null,
+    entryDeadlineAt: ticketClaims ? entryDeadlineForClaims(ticketClaims) : null,
+    closingReason: null,
+    revokedFriendUserIds: [],
+    revokedTicketJtis: [],
     turnDeadlineAt: null,
     deadlinePlayerId: null,
     deadlineAction: null,
@@ -103,14 +193,50 @@ const createRoomRecord = ({ roomId, hostName = '等待房主', hostConnectionId 
     chatLastAcceptedAt: { p1: 0, p2: 0, p3: 0, p4: 0 },
     chatLastPhraseAt: { p1: {}, p2: {}, p3: {}, p4: {} },
     statsBySeat: createGameStatsBySeat(),
+    roundStatsBySeat: createGameStatsBySeat(),
     version: 0,
+    gameVersion: 0,
   }
 }
 
 const inspectEntryTicket = (payload, expected = {}) => gameTicketVerifier.inspectWithConsumptionStatus(payload.gameTicket, expected)
+const friendTicketMatchesRoom = (room, claims) => {
+  if (room.entryKind !== 'friend' || claims.roomKind !== 'friend') return false
+  if (!Number.isSafeInteger(claims.roomExpiresAt) || claims.roomExpiresAt !== room.entryDeadlineAt) return false
+  try {
+    return JSON.stringify(normalizeFriendRoomSettings(claims.roomSettings, { strict: true })) === JSON.stringify(normalizeFriendRoomSettings(room.roomSettings))
+  } catch {
+    return false
+  }
+}
 const ticketMatchesRoom = (room, claims) => {
   if (!claims) return !room.ticketBound
-  return (!room.ticketBound || room.matchId === claims.matchId) && room.roomId === String(claims.roomId)
+  return (!room.ticketBound || (
+    room.matchId === claims.matchId
+    && room.entryKind === entryKindForClaims(claims)
+    && (room.entryKind !== 'friend' || friendTicketMatchesRoom(room, claims))
+  ))
+    && room.roomId === String(claims.roomId)
+}
+const pruneClosedRoomTombstones = (now = Date.now()) => {
+  for (const [roomId, tombstone] of closedRoomTombstones) {
+    if (!Number.isSafeInteger(tombstone?.until) || tombstone.until <= now) closedRoomTombstones.delete(roomId)
+  }
+}
+const ticketBlockedByClosedRoom = claims => {
+  if (!claims) return false
+  pruneClosedRoomTombstones()
+  const tombstone = closedRoomTombstones.get(String(claims.roomId))
+  return Boolean(tombstone && tombstone.matchId === claims.matchId)
+}
+const pendingSeatReleaseFor = (room, claims) => claims?.roomKind === 'friend' && room?.pendingSpectatorEvents?.find(event => (
+  event.type === 'seat-left' && event.playerId === claims.seat
+))
+const rememberClosedRoomTombstone = room => {
+  if (!room.ticketBound || !room.matchId) return
+  const until = Number(room.entryDeadlineAt)
+  if (!Number.isSafeInteger(until) || until <= Date.now()) return
+  closedRoomTombstones.set(room.roomId, { roomId: room.roomId, matchId: room.matchId, until })
 }
 const reportCompletedGame = (room, result) => {
   if (!resultReporter.configured || !result.isGameWon) return
@@ -118,13 +244,12 @@ const reportCompletedGame = (room, result) => {
     console.warn(`Skip game result callback for ${room.roomId}: ticket user mapping is incomplete`)
     return
   }
-  void resultReporter.report(buildGameResultEvent(room, result)).catch(error => {
-    console.error(`Game result callback failed for ${room.roomId}:`, error instanceof Error ? error.message : error)
-  })
+  room.pendingResultEvent ||= buildGameResultEvent(room, result)
 }
 const publicCards = (cards) => (Array.isArray(cards) ? cards : []).map(card => ({ rank: card.rank, suit: card.suit }))
 const reportSpectatorEvent = (room, detail) => {
   if (!spectatorEventReporter.configured || !room.ticketBound || !room.matchId) return
+  room.pendingSpectatorEvents ||= []
   room.spectatorSequence = Math.max(0, Number(room.spectatorSequence) || 0) + 1
   const sequence = room.spectatorSequence
   const event = {
@@ -136,9 +261,8 @@ const reportSpectatorEvent = (room, detail) => {
     roundSequence: Math.max(1, Number(detail.roundSequence) || room.roundSequence + 1),
     ...detail,
   }
-  void spectatorEventReporter.enqueue(event).catch(error => {
-    console.error(`Spectator event callback failed for ${room.roomId}/${sequence}:`, error instanceof Error ? error.message : error)
-  })
+  room.pendingSpectatorEvents.push(event)
+  return event
 }
 const reportSpectatorAction = (room, { type, playerId, cards = [], automatic }) => {
   const detail = { type, playerId, automatic: Boolean(automatic) }
@@ -160,21 +284,13 @@ const reportSpectatorClosed = (room, reason) => {
   // 正常“过 A”已经通过结算回调进入 finished；随后全员离桌只是资源回收，
   // 不能再发 room-closed 把它伪装成异常终止。
   if (room.roundResult?.isGameWon) return
-  reportSpectatorEvent(room, {
+  return reportSpectatorEvent(room, {
     type: 'room-closed',
     roundSequence: Math.max(1, room.roundSequence || 1),
     reason,
   })
 }
-
-const frame = (text) => {
-  const data = Buffer.from(text)
-  if (data.length >= 65536) throw new Error('WebSocket 消息过大')
-  const header = data.length < 126 ? Buffer.from([0x81, data.length]) : Buffer.from([0x81, 126, data.length >> 8, data.length & 255])
-  return Buffer.concat([header, data])
-}
-
-const send = (connection, type, payload = {}) => connection.socket.write(frame(JSON.stringify({ type, ...payload })))
+const send = sendProtocolMessage
 const broadcast = (room, type, payload = {}, except = null) => ids.forEach((id) => {
   const connection = connections.get(room.seats[id])
   if (connection && connection !== except) send(connection, type, payload)
@@ -184,10 +300,8 @@ const clearRoomTimer = (timers, roomId) => {
   if (timer) clearTimeout(timer)
   timers.delete(roomId)
 }
-const clearTurnTimer = (roomId) => clearRoomTimer(turnTimers, roomId)
 const clearDissolveTimer = (roomId) => clearRoomTimer(dissolveTimers, roomId)
 const clearEmptyRoomExpiry = (roomId) => clearRoomTimer(emptyRoomExpiryTimers, roomId)
-const clearMatchDurationTimer = (roomId) => clearRoomTimer(matchDurationTimers, roomId)
 const ensureBotMetadata = (room) => {
   const supplied = Array.isArray(room.botPlayerIds) ? room.botPlayerIds : []
   room.botPlayerIds = ids.slice(1).filter(id => supplied.includes(id))
@@ -203,7 +317,12 @@ const isBotPlayer = (room, playerId) => {
   ensureBotMetadata(room)
   return room.botPlayerIds.includes(playerId)
 }
-const seatIsOccupied = (room, playerId) => Boolean(room.seats[playerId]) || isBotPlayer(room, playerId)
+const seatHasLiveConnection = (room, playerId) => {
+  const connection = connections.get(room.seats[playerId])
+  return Boolean(connection?.acceptingCommands && !connection.socket.destroyed)
+}
+const seatIsOccupied = (room, playerId) => seatHasLiveConnection(room, playerId) || isBotPlayer(room, playerId)
+const hasConnectedHuman = room => ids.some(id => seatHasLiveConnection(room, id))
 const ensureLobbyMetadata = (room) => {
   ensureBotMetadata(room)
   room.lobbyReady ||= { p1: false, p2: false, p3: false, p4: false }
@@ -222,7 +341,29 @@ const ensureLiveMetadata = (room) => {
   room.matchStartedAt ??= null
   room.totalDeadlineAt ??= null
   room.matchEnded ??= null
+  room.pendingSpectatorEvents = Array.isArray(room.pendingSpectatorEvents) ? room.pendingSpectatorEvents : []
+  room.pendingResultEvent ??= null
+  room.pendingRoundFinalization ??= null
+  room.pendingGameStartEvent ??= null
+  room.pendingGameStartRequest ??= null
+  room.gameStartClaimedAt = Number.isSafeInteger(room.gameStartClaimedAt) ? room.gameStartClaimedAt : null
+  room.gameStartReconnectDeadlineAt = Number.isSafeInteger(room.gameStartReconnectDeadlineAt)
+    ? room.gameStartReconnectDeadlineAt
+    : null
+  room.entryDeadlineAt ??= null
+  room.closingReason ??= null
+  room.entryKind = room.ticketBound && room.entryKind !== 'friend' ? 'match' : 'friend'
+  room.revokedFriendUserIds = Array.isArray(room.revokedFriendUserIds)
+    ? [...new Set(room.revokedFriendUserIds.filter(userId => typeof userId === 'string' && userId))]
+    : []
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  room.revokedTicketJtis = Array.isArray(room.revokedTicketJtis)
+    ? room.revokedTicketJtis.filter(item => (
+        item && typeof item.jti === 'string' && item.jti && Number.isFinite(item.exp) && item.exp > nowSeconds
+      ))
+    : []
   room.statsBySeat = ensureGameStatsBySeat(room.statsBySeat)
+  room.roundStatsBySeat = ensureGameStatsBySeat(room.roundStatsBySeat)
   room.roomSettings = normalizeFriendRoomSettings(room.roomSettings)
   if (room.state?.players) {
     ids.forEach(id => {
@@ -232,116 +373,69 @@ const ensureLiveMetadata = (room) => {
     })
   }
 }
-const lobbyMetadataFor = (room) => {
-  ensureLobbyMetadata(room)
-  return {
-    lobbyReadyRequired: !room.ticketBound,
-    lobbyReadyPlayerIds: ids.filter(id => room.lobbyReady[id]),
-    botPlayerIds: [...room.botPlayerIds],
-  }
-}
 const recordRoomAction = (room, playerId, action) => {
   room.statsBySeat = ensureGameStatsBySeat(room.statsBySeat)
-  return recordAuthoritativeAction(room.statsBySeat, playerId, action)
-}
-const liveMetadataFor = (room) => {
-  ensureLiveMetadata(room)
-  const roomSettings = normalizeFriendRoomSettings(room.roomSettings)
-  return {
-    turnDeadlineAt: room.turnDeadlineAt,
-    deadlinePlayerId: room.deadlinePlayerId,
-    deadlineAction: room.deadlineAction,
-    trustees: room.trustees,
-    consecutiveTimeouts: room.consecutiveTimeouts,
-    roundReadyPlayerIds: ids.filter(id => room.roundReady[id]),
-    dissolveVote: room.dissolveVote,
-    botPlayerIds: [...room.botPlayerIds],
-    roomSettings,
-    matchStartedAt: room.matchStartedAt,
-    totalDeadlineAt: room.totalDeadlineAt,
-    matchEnded: room.matchEnded,
-    spectatorPolicy: spectatorPolicyFor(roomSettings),
-    scoreboard: roomSettings.scoreVisibility === 'live'
-      ? {
-          roundsPlayed: Math.max(0, Number(room.roundSequence) || 0),
-          currentLevel: room.roundResult?.currentLevel ?? room.state?.currentLevel ?? 2,
-          teamLevels: room.teamLevels || { teamA: 2, teamB: 2 },
-        }
-      : null,
-  }
+  room.roundStatsBySeat = ensureGameStatsBySeat(room.roundStatsBySeat)
+  const profile = ruleProfileForRoom(room)
+  recordAuthoritativeAction(room.roundStatsBySeat, playerId, action, profile)
+  return recordAuthoritativeAction(room.statsBySeat, playerId, action, profile)
 }
 const restoreOfflineDissolveVote = (room, playerId) => {
   if (room.dissolveVote?.votes[playerId] !== 'offline') return false
   room.dissolveVote.votes[playerId] = 'pending'
   return true
 }
-const publishTurnStatus = (room) => broadcast(room, 'turnDeadline', {
-  roomId: room.roomId,
-  currentTurn: room.deadlineAction === 'play' ? room.deadlinePlayerId : null,
-  version: room.version,
-  ...liveMetadataFor(room),
-})
-const publishTrustees = (room) => broadcast(room, 'trusteeUpdated', { roomId: room.roomId, version: room.version, ...liveMetadataFor(room) })
-const publishRoundReady = (room) => broadcast(room, 'roundReadyUpdated', { roomId: room.roomId, version: room.version, ...liveMetadataFor(room) })
-const roomMembersPayload = (room) => ({
-  roomId: room.roomId,
-  memberPlayerIds: ids.filter(id => seatIsOccupied(room, id)),
-  version: room.version,
-  roomSettings: normalizeFriendRoomSettings(room.roomSettings),
-  ...lobbyMetadataFor(room),
-})
-const publishRoomMembers = (room) => broadcast(room, 'roomMembers', roomMembersPayload(room))
-const publishLobbyReady = (room) => broadcast(room, 'lobbyReadyUpdated', {
-  roomId: room.roomId,
-  version: room.version,
-  roomSettings: normalizeFriendRoomSettings(room.roomSettings),
-  ...lobbyMetadataFor(room),
-})
-const publishDissolveVote = (room, outcome = null) => broadcast(room, 'dissolveVoteUpdated', {
-  roomId: room.roomId,
-  version: room.version,
-  dissolveVote: room.dissolveVote,
-  outcome,
+const {
+  entryPayloadFor,
+  liveMetadataFor,
+  publishDissolveVote,
+  publishLobbyReady,
+  publishRoomMembers,
+  publishRoundEnded,
+  publishRoundReady,
+  publishState,
+  publishTribute,
+  publishTrustees,
+  publishTurnStatus,
+} = createRoomPublisher({
+  playerIds: ids,
+  connections,
+  send,
+  broadcast,
+  ensureLobbyMetadata,
+  ensureLiveMetadata,
+  isFriendRoom,
+  seatIsOccupied,
 })
 const clearHostExpiry = (roomId) => { const timer = hostExpiryTimers.get(roomId); if (timer) { clearTimeout(timer); hostExpiryTimers.delete(roomId) } }
 const scheduleEmptyRoomExpiry = (room) => {
   clearEmptyRoomExpiry(room.roomId)
-  if (!room.state || ids.some(id => room.seats[id])) return
+  if (!room.state || hasConnectedHuman(room)) return
   emptyRoomExpiryTimers.set(room.roomId, setTimeout(() => {
     emptyRoomExpiryTimers.delete(room.roomId)
-    if (!rooms.has(room.roomId) || ids.some(id => room.seats[id])) return
-    reportSpectatorClosed(room, 'empty-timeout')
-    clearTurnTimer(room.roomId)
-    clearMatchDurationTimer(room.roomId)
-    clearDissolveTimer(room.roomId)
-    clearHostExpiry(room.roomId)
-    rooms.delete(room.roomId)
-    broadcastRooms()
-    persistRuntimeState()
+    void enqueueServerOperation(() => closeRoomWithoutAck(room, 'empty-timeout'), `empty room expiry ${room.roomId}`, room.roomId)
   }, EMPTY_ROOM_TIMEOUT_MS))
 }
 const scheduleHostExpiry = (roomId, timeoutMs = 15000) => {
   clearHostExpiry(roomId)
   hostExpiryTimers.set(roomId, setTimeout(() => {
-    const room = rooms.get(roomId)
-    if (room && !room.seats.p1) {
-      room.version += 1
-      broadcast(room, 'hostLeft', { roomId, version: room.version })
-      reportSpectatorClosed(room, 'entry-timeout')
-      clearTurnTimer(roomId)
-      clearMatchDurationTimer(roomId)
-      clearDissolveTimer(roomId)
-      clearEmptyRoomExpiry(roomId)
-      rooms.delete(roomId)
-      broadcastRooms()
-      persistRuntimeState()
-    }
     hostExpiryTimers.delete(roomId)
+    const room = rooms.get(roomId)
+    if (room && !seatHasLiveConnection(room, 'p1')) {
+      void enqueueServerOperation(() => closeRoomWithoutAck(room, 'host-left', 'hostLeft'), `host expiry ${roomId}`, roomId)
+    }
   }, timeoutMs))
 }
-const listRooms = () => [...rooms.entries()].filter(([, room]) => room.seats.p1).map(([roomId, room]) => ({ roomId, hostName: room.hostName, playerCount: ids.filter(id => seatIsOccupied(room, id)).length, roomSettings: normalizeFriendRoomSettings(room.roomSettings), version: room.version }))
+const listRooms = () => [...rooms.entries()].filter(([, room]) => !room.ticketBound && seatHasLiveConnection(room, 'p1')).map(([roomId, room]) => ({ roomId, hostName: room.hostName, playerCount: ids.filter(id => seatIsOccupied(room, id)).length, roomSettings: normalizeFriendRoomSettings(room.roomSettings), version: room.version }))
 const broadcastRooms = () => connections.forEach(connection => send(connection, 'roomList', { rooms: listRooms() }))
 const playerIn = (room, connectionId) => ids.find(id => room.seats[id] === connectionId) || null
+const membershipsFor = connection => [...rooms.values()].filter(room => playerIn(room, connection.id))
+const syncConnectionRoomId = connection => {
+  const memberships = membershipsFor(connection)
+  connection.roomId = memberships.length === 1 ? memberships[0].roomId : null
+  return memberships
+}
+const entryConflictFor = (connection, requestedRoomId) => membershipsFor(connection).find(room => room.roomId !== requestedRoomId) || null
 const resumeTokenFor = (room, connection) => {
   const playerId = room && playerIn(room, connection.id)
   return playerId ? room.resumeTokens[playerId] : null
@@ -350,836 +444,463 @@ const actionCacheKey = (room, connection, requestId) => {
   const resumeToken = resumeTokenFor(room, connection)
   return resumeToken && Number.isSafeInteger(requestId) ? `${resumeToken}:${requestId}` : null
 }
-const rememberAccepted = (cacheKey, payload) => {
-  if (!cacheKey) return
-  acceptedActions.set(cacheKey, payload)
-  if (acceptedActions.size > maxAcceptedActions) {
-    const oldest = acceptedActions.keys().next().value
-    if (oldest !== undefined) acceptedActions.delete(oldest)
+const canonicalize = value => {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalize(value[key])]))
+}
+const actionFingerprint = (type, payload) => createHash('sha256').update(JSON.stringify(canonicalize({ type, payload }))).digest('hex')
+const rememberAccepted = (...args) => acceptedActionStore.remember(...args)
+const rotateAcceptedActionIdentity = (...args) => acceptedActionStore.rotateToken(...args)
+const persistedRuntimeSnapshot = () => ({
+  rooms: [...rooms.values()].map(room => {
+    checkpointRoomBotPolicy(room)
+    return roomForPersistence(room)
+  }),
+  acceptedActions: [...acceptedActions.entries()].slice(-maxAcceptedActions),
+  closedRoomTombstones: [...closedRoomTombstones.values()],
+})
+let runtimeDirty = false
+let persistTimer = null
+const markAllAcceptedActionsDurable = () => {
+  for (const [key, accepted] of acceptedActions) acceptedActions.set(key, { ...accepted, pendingDurability: false })
+}
+const schedulePersistRetry = () => {
+  if (!roomStateStore.configured || persistTimer || shuttingDown) return
+  persistTimer = setTimeout(() => { void flushRuntimeState() }, Math.max(100, PERSIST_DEBOUNCE_MS))
+  persistTimer.unref?.()
+}
+const flushRuntimeState = async ({ throwOnError = false } = {}) => {
+  if (!roomStateStore.configured) { markAllAcceptedActionsDurable(); return }
+  if (!runtimeDirty) return
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = null
+  runtimeDirty = false
+  const snapshot = persistedRuntimeSnapshot()
+  const writtenAcceptances = new Map(snapshot.acceptedActions.map(([key, accepted]) => [key, accepted]))
+  try {
+    await roomStateStore.save(snapshot)
+    markSnapshotAcceptancesDurable(acceptedActions, writtenAcceptances)
+  } catch (error) {
+    runtimeDirty = true
+    console.error('Failed to persist WeApp room state:', error instanceof Error ? error.message : error)
+    schedulePersistRetry()
+    if (throwOnError) throw error
   }
 }
-const persistedRuntimeSnapshot = () => ({
-  rooms: [...rooms.values()].map(roomForPersistence),
-  acceptedActions: [...acceptedActions.entries()].slice(-maxAcceptedActions),
-})
 const persistRuntimeState = () => {
   if (!roomStateStore.configured) return
-  try { roomStateStore.save(persistedRuntimeSnapshot()) } catch (error) {
-    console.error('Failed to persist WeApp room state:', error instanceof Error ? error.message : error)
-  }
+  runtimeDirty = true
+  if (persistTimer) return
+  persistTimer = setTimeout(() => { void flushRuntimeState() }, PERSIST_DEBOUNCE_MS)
+  persistTimer.unref?.()
 }
-const stateFor = (state, viewerId) => {
-  const copy = JSON.parse(JSON.stringify(state))
-  ids.filter(id => id !== viewerId).forEach(id => {
-    copy.players[id].hand = copy.players[id].hand.map((_, index) => ({ id: `hidden-${id}-${index}` }))
-  })
-  return copy
+const enqueueServerOperation = (operation, label = 'server operation', roomId = null) => {
+  const queued = roomId
+    ? operationScheduler.enqueue(roomOperationKey(roomId), operation, label)
+    : operationScheduler.enqueueGlobal(operation, label)
+  void queued.catch(error => console.error(`${label} failed:`, error instanceof Error ? error.message : error))
+  return queued
 }
-const publishState = (room) => ids.forEach(id => {
-  const connection = connections.get(room.seats[id])
-  if (connection) send(connection, 'gameState', { roomId: room.roomId, state: stateFor(room.state, id), version: room.version, phase: phaseFor(room), tribute: room.tribute || null, roundResult: room.roundResult || null, ...liveMetadataFor(room) })
-})
-const publishTribute = (room, type = 'tributeUpdated') => ids.forEach(id => {
-  const connection = connections.get(room.seats[id])
-  if (connection) send(connection, type, { roomId: room.roomId, state: stateFor(room.state, id), tribute: room.tribute, roundResult: room.roundResult || null, phase: phaseFor(room), version: room.version, ...liveMetadataFor(room) })
-})
-const markMatchEnded = (room, reason, endedAt = Date.now()) => {
-  if (room.matchEnded) return false
-  clearTurnTimer(room.roomId)
-  clearMatchDurationTimer(room.roomId)
-  room.turnDeadlineAt = null
-  room.deadlinePlayerId = null
-  room.deadlineAction = null
-  room.matchEnded = {
-    reason,
-    endedAt,
-    roundsPlayed: Math.max(0, Number(room.roundSequence) || 0),
-    configuredRounds: normalizeFriendRoomSettings(room.roomSettings).rounds,
-  }
-  return true
-}
-const expireMatchDuration = (room, expectedDeadline) => {
-  if (!rooms.has(room.roomId) || room.matchEnded || room.totalDeadlineAt !== expectedDeadline) return
-  if (!markMatchEnded(room, 'time-limit', expectedDeadline)) return
-  room.version += 1
-  broadcast(room, 'matchEnded', { roomId: room.roomId, phase: phaseFor(room), version: room.version, ...liveMetadataFor(room) })
-  publishState(room)
-  persistRuntimeState()
-}
-const armMatchDuration = (room) => {
-  clearMatchDurationTimer(room.roomId)
-  ensureLiveMetadata(room)
-  const totalTimeMinutes = normalizeFriendRoomSettings(room.roomSettings).totalTimeMinutes
-  if (!room.state || room.matchEnded || totalTimeMinutes === 0) {
-    if (totalTimeMinutes === 0) room.totalDeadlineAt = null
-    return
-  }
-  if (!Number.isFinite(room.matchStartedAt)) room.matchStartedAt = Date.now()
-  if (!Number.isFinite(room.totalDeadlineAt)) room.totalDeadlineAt = room.matchStartedAt + totalTimeMinutes * TOTAL_MINUTE_MS
-  const expectedDeadline = room.totalDeadlineAt
-  matchDurationTimers.set(room.roomId, setTimeout(
-    () => expireMatchDuration(room, expectedDeadline),
-    Math.max(0, expectedDeadline - Date.now()),
-  ))
-}
-const settleRoundIfNeeded = (room) => {
-  if (!isRoundOver(room.state)) return null
-  clearTurnTimer(room.roomId)
-  room.turnDeadlineAt = null
-  room.deadlinePlayerId = null
-  room.deadlineAction = null
-  const previousTeamLevels = room.teamLevels || { teamA: 2, teamB: 2 }
-  const roomSettings = normalizeFriendRoomSettings(room.roomSettings)
-  let result = settle(room.state, previousTeamLevels, room.aFailStreaks || { teamA: 0, teamB: 0 })
-  if (!result) return null
-  result = adjustDoubleDownSettlement({ result, state: room.state, previousTeamLevels, roomSettings })
-  room.teamLevels = result.teamLevels
-  room.aFailStreaks = result.aFailStreaks
-  room.roundResult = result
-  room.lastRoundRank = result.fullRank
-  room.roundSequence += 1
-  if (result.isGameWon) markMatchEnded(room, 'passed-a')
-  else if (!room.ticketBound && hasReachedRoundLimit(room.roundSequence, roomSettings)) markMatchEnded(room, 'round-limit')
-  else if (!room.ticketBound && Number.isFinite(room.totalDeadlineAt) && Date.now() >= room.totalDeadlineAt) markMatchEnded(room, 'time-limit', room.totalDeadlineAt)
-  room.roundReady = room.matchEnded
-    ? { p1: false, p2: false, p3: false, p4: false }
-    : Object.fromEntries(ids.map(id => [id, !room.seats[id]]))
-  reportSpectatorRoundEnd(room, result)
-  reportCompletedGame(room, result)
-  return result
-}
-const deadlineStepFor = (room) => {
-  if (!room.state || room.roundResult || room.matchEnded) return null
-  if (room.tribute) {
-    const lastRank = room.lastRoundRank
-    if (!Array.isArray(lastRank) || lastRank.length !== 4) return null
-    if (room.tribute.isAntiTribute || room.tribute.phase === 'done') {
-      return { playerId: tributeLeader(room.tribute, lastRank, lastRank[0]), action: 'finishTribute' }
-    }
-    if (room.tribute.phase === 'tributing') {
-      const action = room.tribute.actions.find(item => !item.card)
-      return action ? { playerId: action.from, action: 'tribute' } : null
-    }
-    if (room.tribute.phase === 'returning') {
-      const action = room.tribute.actions.find(item => !item.returnCard)
-      return action ? { playerId: action.to, action: 'returnTribute' } : null
-    }
-    return null
-  }
-  if (isRoundOver(room.state)) return null
-  return { playerId: room.state.currentTurn, action: 'play' }
-}
-const finishTributeState = (room) => {
-  const lastRank = room.lastRoundRank
-  if (!room.tribute || !Array.isArray(lastRank) || lastRank.length !== 4) throw new Error('上一局名次缺失')
-  if (!room.tribute.isAntiTribute && room.tribute.phase !== 'done') throw new Error('贡还尚未完成')
-  room.state = { ...room.state, currentTurn: tributeLeader(room.tribute, lastRank, lastRank[0]), lastValidPlay: null }
-  room.tribute = null
-  reportSpectatorEvent(room, { type: 'play-start', roundSequence: room.roundSequence + 1 })
-}
-const chooseBotCards = (room, playerId) => {
-  return chooseMasterBotCards({ state: room.state, teamLevels: room.teamLevels, playerId })
-}
-const automatedDeadline = (room, expectedPlayerId, expectedAction, expectedDeadline) => {
-  if (!rooms.has(room.roomId) || room.turnDeadlineAt !== expectedDeadline || room.deadlinePlayerId !== expectedPlayerId || room.deadlineAction !== expectedAction) return
-  ensureLiveMetadata(room)
-  const isBot = isBotPlayer(room, expectedPlayerId)
-  const roomSettings = normalizeFriendRoomSettings(room.roomSettings)
-  const autoTrusteeEnabled = room.ticketBound || roomSettings.trusteeSeconds > 0
-  const wasTrustee = Boolean(room.trustees[expectedPlayerId])
-  if (!isBot && !wasTrustee) {
-    room.consecutiveTimeouts[expectedPlayerId] += 1
-    if (autoTrusteeEnabled && room.consecutiveTimeouts[expectedPlayerId] >= TIMEOUTS_BEFORE_TRUSTEE) {
-      room.trustees[expectedPlayerId] = { reason: 'timeout', since: Date.now() }
-    }
-  }
-  let recordedKind = expectedAction
-  let recordedPlayType = null
-  try {
-    if (expectedAction === 'play') {
-      const cards = isBot
-        ? chooseBotCards(room, expectedPlayerId)
-        : (room.state.lastValidPlay ? [] : [room.state.players[expectedPlayerId].hand.at(-1)])
-      const isPass = !cards || cards.length === 0
-      room.state = isPass
-        ? passTurn(room.state, expectedPlayerId)
-        : playCards(room.state, expectedPlayerId, cards)
-      recordedKind = isPass ? 'pass' : 'play'
-      recordedPlayType = isPass ? null : room.state.playArea.at(-1)?.type || null
-      reportSpectatorAction(room, { type: isPass ? 'pass' : 'play', playerId: expectedPlayerId, cards, automatic: true })
-    } else if (expectedAction === 'tribute') {
-      const hand = room.state.players[expectedPlayerId].hand
-      const eligible = hand.filter(card => !(card.isLevelCard && card.suit === 'heart'))
-      const card = highestCard(eligible.length ? eligible : hand)
-      if (!card) throw new Error('没有可进贡的牌')
-      const result = giveTribute(room.state, room.tribute, expectedPlayerId, card.id)
-      room.state = result.state
-      room.tribute = result.tribute
-      reportSpectatorEvent(room, { type: 'tribute', playerId: expectedPlayerId, roundSequence: room.roundSequence + 1 })
-    } else if (expectedAction === 'returnTribute') {
-      const hand = room.state.players[expectedPlayerId].hand
-      const card = automaticReturnCard(hand)
-      if (!card) throw new Error('没有可还贡的牌')
-      const result = returnTribute(room.state, room.tribute, expectedPlayerId, card.id)
-      room.state = result.state
-      room.tribute = result.tribute
-      reportSpectatorEvent(room, { type: 'return-tribute', playerId: expectedPlayerId, roundSequence: room.roundSequence + 1 })
-    } else if (expectedAction === 'finishTribute') finishTributeState(room)
-    else throw new Error('未知自动动作')
-  } catch (error) {
-    console.error(`Automated deadline failed for ${room.roomId}/${expectedPlayerId}/${expectedAction}:`, error instanceof Error ? error.message : error)
-    room.turnDeadlineAt = null
-    room.deadlinePlayerId = null
-    room.deadlineAction = null
-    clearTurnTimer(room.roomId)
-    publishTurnStatus(room)
+const attachSideEffectCompletion = (key, operation, complete, roomId) => {
+  if (sideEffectCompletionHandlers.has(key)) return
+  const completion = operation.then(result => enqueueServerOperation(async () => {
+    await complete(result)
     persistRuntimeState()
-    return
+    await flushRuntimeState({ throwOnError: true })
+  }, `side effect completion ${key}`, roomId)).catch(error => {
+    if (!shuttingDown) console.error(`Side effect ${key} failed:`, error instanceof Error ? error.message : error)
+  }).finally(() => sideEffectCompletionHandlers.delete(key))
+  sideEffectCompletionHandlers.set(key, completion)
+}
+const scheduleSideEffectStageRetry = (room, delay = 500) => {
+  if (shuttingDown || !rooms.has(room.roomId) || sideEffectStageRetryTimers.has(room.roomId)) return
+  const timer = setTimeout(() => {
+    sideEffectStageRetryTimers.delete(room.roomId)
+    void enqueueServerOperation(async () => {
+      if (!rooms.has(room.roomId)) return
+      try {
+        if (room.closingReason) await closeRoomWithoutAck(room, room.closingReason)
+        else stagePendingSideEffects(room)
+      } catch (error) {
+        scheduleSideEffectStageRetry(room, Math.min(5000, delay * 2))
+        throw error
+      }
+    }, `side effect stage retry ${room.roomId}`, room.roomId)
+  }, delay)
+  timer.unref?.()
+  sideEffectStageRetryTimers.set(room.roomId, timer)
+}
+const stagePendingSideEffects = room => {
+  try {
+    ensureLiveMetadata(room)
+    for (const event of room.pendingSpectatorEvents) {
+      const operation = spectatorEventReporter.stage(event)
+      attachSideEffectCompletion(`spectator:${event.eventId}`, operation, async accepted => {
+        const current = rooms.get(room.roomId)
+        if (!current) return
+        const legacyRevocation = {
+          jti: accepted?.seatRelease?.revokedTicketJti,
+          exp: accepted?.seatRelease?.revokedTicketExp,
+        }
+        const revocations = [
+          ...(Array.isArray(accepted?.seatRelease?.revokedTickets) ? accepted.seatRelease.revokedTickets : []),
+          legacyRevocation,
+        ].filter(item => item && typeof item.jti === 'string' && Number.isFinite(item.exp))
+        if (event.type === 'seat-left' && revocations.length) {
+          current.revokedTicketJtis ||= []
+          for (const revoked of revocations) {
+            if (!current.revokedTicketJtis.some(item => item.jti === revoked.jti)) {
+              current.revokedTicketJtis.push({ jti: revoked.jti, exp: revoked.exp })
+            }
+          }
+        }
+        current.pendingSpectatorEvents = current.pendingSpectatorEvents.filter(item => item.eventId !== event.eventId)
+      }, room.roomId)
+    }
+    if (room.pendingResultEvent) {
+      const event = room.pendingResultEvent
+      const operation = resultReporter.stage(event)
+      attachSideEffectCompletion(`result:${event.eventId}`, operation, async () => {
+        const current = rooms.get(room.roomId)
+        if (current?.pendingResultEvent?.eventId === event.eventId) current.pendingResultEvent = null
+      }, room.roomId)
+    }
+    const retryTimer = sideEffectStageRetryTimers.get(room.roomId)
+    if (retryTimer) clearTimeout(retryTimer)
+    sideEffectStageRetryTimers.delete(room.roomId)
+  } catch (error) {
+    scheduleSideEffectStageRetry(room)
+    throw error
   }
-  recordRoomAction(room, expectedPlayerId, {
-    kind: recordedKind,
-    playType: recordedPlayType,
-    timedOut: !isBot,
-    trustee: !isBot && Boolean(room.trustees[expectedPlayerId]),
-  })
-  room.version += 1
-  const result = expectedAction === 'play' ? settleRoundIfNeeded(room) : null
-  if (!result) armTurnDeadline(room)
-  broadcast(room, isBot ? 'botAction' : 'turnTimedOut', {
-    roomId: room.roomId,
-    playerId: expectedPlayerId,
-    action: expectedAction,
-    ...(isBot
-        ? { difficulty: MASTER_BOT_DIFFICULTY }
-      : { enteredTrustee: !wasTrustee && Boolean(room.trustees[expectedPlayerId]) }),
-    version: room.version,
-    ...liveMetadataFor(room),
-  })
-  if (expectedAction === 'play' || expectedAction === 'finishTribute') publishState(room)
-  else publishTribute(room)
-  if (result) broadcast(room, 'roundEnded', { roomId: room.roomId, result, phase: phaseFor(room), version: room.version, ...liveMetadataFor(room) })
+}
+const commitRuntimeState = async () => {
   persistRuntimeState()
+  await flushRuntimeState({ throwOnError: true })
 }
-const armTurnDeadline = (room) => {
-  clearTurnTimer(room.roomId)
-  ensureLiveMetadata(room)
-  const step = deadlineStepFor(room)
-  if (!step) {
-    room.turnDeadlineAt = null
-    room.deadlinePlayerId = null
-    room.deadlineAction = null
-    return
-  }
-  const roomSettings = normalizeFriendRoomSettings(room.roomSettings)
-  const delay = isBotPlayer(room, step.playerId)
-    ? Math.min(BOT_ACTION_DELAY_MS, roomSettings.turnSeconds * FRIEND_SECOND_MS)
-    : room.ticketBound
-    ? (room.trustees[step.playerId] ? TRUSTEE_ACTION_DELAY_MS : TURN_TIMEOUT_MS)
-    : (room.trustees[step.playerId] && roomSettings.trusteeSeconds > 0
-        ? roomSettings.trusteeSeconds * FRIEND_SECOND_MS
-        : roomSettings.turnSeconds * FRIEND_SECOND_MS)
-  const deadline = Date.now() + delay
-  room.turnDeadlineAt = deadline
-  room.deadlinePlayerId = step.playerId
-  room.deadlineAction = step.action
-  turnTimers.set(room.roomId, setTimeout(() => automatedDeadline(room, step.playerId, step.action, deadline), delay))
-  publishTurnStatus(room)
-}
-const prepareNextRound = (room, incrementVersion = true) => {
-  const result = room.roundResult
-  room.state = dealNextRound(room.state, result.currentLevel, result.fullRank[0])
-  room.tribute = createTribute(room.state, result.fullRank)
-  room.roundResult = null
-  room.roundReady = { p1: false, p2: false, p3: false, p4: false }
-  if (incrementVersion) room.version += 1
-  reportSpectatorEvent(room, { type: 'round-start', roundSequence: room.roundSequence + 1 })
-  reportSpectatorEvent(room, {
-    type: room.tribute?.isAntiTribute ? 'anti-tribute' : 'tribute-start',
-    roundSequence: room.roundSequence + 1,
-  })
-  armTurnDeadline(room)
-  publishTribute(room, 'roundPrepared')
-}
-const markOfflineReady = (room, playerId) => {
-  if (!room.roundResult || room.roundResult.isGameWon) return false
-  ensureLiveMetadata(room)
-  room.roundReady[playerId] = true
-  if (ids.every(id => room.roundReady[id])) {
-    prepareNextRound(room, false)
-    return true
-  }
-  publishRoundReady(room)
-  return false
-}
-const dissolveRoom = (room, reason = 'vote-approved') => {
-  reportSpectatorClosed(room, 'dissolved')
-  clearTurnTimer(room.roomId)
-  clearMatchDurationTimer(room.roomId)
+const matchLifecycle = createWeAppMatchLifecycle({
+  playerIds: ids, rooms, connections,
+  turnTimeoutMs: TURN_TIMEOUT_MS,
+  trusteeActionDelayMs: TRUSTEE_ACTION_DELAY_MS,
+  botActionDelayMs: BOT_ACTION_DELAY_MS,
+  friendSecondMs: FRIEND_SECOND_MS,
+  totalMinuteMs: TOTAL_MINUTE_MS,
+  testMatchEndPersistFailures: process.env.NODE_ENV === 'test' && process.env.WEAPP_TEST_FAIL_MATCH_END_PERSIST_ONCE === '1' ? 1 : 0,
+  testRoundFinalizationPersistFailures: process.env.NODE_ENV === 'test' && process.env.WEAPP_TEST_FAIL_ROUND_FINALIZATION_PERSIST_ONCE === '1' ? 1 : 0,
+  isShuttingDown: () => shuttingDown,
+  enqueueServerOperation, ensureLiveMetadata, isFriendRoom, isMatchRoom, isBotPlayer,
+  botPolicyForRoom, existingBotPolicyForRoom: room => roomBotPolicies.get(room.roomId), shuffleRandom,
+  persistRuntimeState, commitRuntimeState, stagePendingSideEffects,
+  broadcast, send, phaseFor, liveMetadataFor, publishTurnStatus, publishState, publishTribute, publishRoundEnded,
+  recordRoomAction, reportSpectatorEvent, reportSpectatorAction, reportSpectatorRoundEnd, reportCompletedGame,
+  closeRoomWithoutAck: (...args) => closeRoomWithoutAck(...args),
+})
+const {
+  applyRoomSettlementPolicy, armMatchDuration, armTurnDeadline, clearMatchDurationTimer, clearTurnTimer,
+  consumeRoundSettlement, finalizePendingRound, finishTributeState, markOfflineReady, prepareNextRound,
+  restoreTurnDeadline, schedulePendingRoundFinalization, syncRoomFromMatchState,
+} = matchLifecycle
+const finalizeRemovedRoom = (room, reason = 'vote-approved', eventType = 'roomDissolved') => {
   clearDissolveTimer(room.roomId)
   clearHostExpiry(room.roomId)
   clearEmptyRoomExpiry(room.roomId)
+  matchLifecycle.removeRoom(room.roomId)
+  gameStartCoordinator.removeRoom(room)
   room.turnDeadlineAt = null
   room.deadlinePlayerId = null
   room.deadlineAction = null
-  room.version += 1
-  broadcast(room, 'roomDissolved', { roomId: room.roomId, reason, version: room.version })
-  ids.forEach(id => {
-    const connection = connections.get(room.seats[id])
-    if (connection) connection.roomId = null
-  })
-  rooms.delete(room.roomId)
+  for (const token of Object.values(room.resumeTokens || {})) acceptedActionStore.deleteToken(token)
+  broadcast(room, eventType, { roomId: room.roomId, reason, version: room.version })
+  const affectedConnections = ids.map(id => connections.get(room.seats[id])).filter(Boolean)
+  roomBotPolicies.delete(room.roomId)
+  affectedConnections.forEach(syncConnectionRoomId)
   broadcastRooms()
-  persistRuntimeState()
+}
+const closeRoomWithoutAck = async (room, reason, eventType = 'roomDissolved', spectatorReason = reason) => {
+  if (!rooms.has(room.roomId)) return
+  if (reason === 'empty-timeout' && hasConnectedHuman(room)) return
+  rememberClosedRoomTombstone(room)
+  if (!room.closingReason) {
+    room.version += 1
+    room.closingReason = reason
+    reportSpectatorClosed(room, spectatorReason)
+    await commitRuntimeState()
+  }
+  stagePendingSideEffects(room)
+  rooms.delete(room.roomId)
+  try {
+    await commitRuntimeState()
+  } catch (error) {
+    rooms.set(room.roomId, room)
+    persistRuntimeState()
+    throw error
+  }
+  finalizeRemovedRoom(room, reason, eventType)
 }
 const scheduleDissolveExpiry = (room) => {
   clearDissolveTimer(room.roomId)
   const expiresAt = room.dissolveVote?.expiresAt
   if (!expiresAt) return
   dissolveTimers.set(room.roomId, setTimeout(() => {
-    if (!rooms.has(room.roomId) || room.dissolveVote?.expiresAt !== expiresAt) return
-    room.dissolveVote = null
-    room.version += 1
-    publishDissolveVote(room, 'expired')
-    clearDissolveTimer(room.roomId)
-    persistRuntimeState()
+    void enqueueServerOperation(async () => {
+      if (!rooms.has(room.roomId) || room.dissolveVote?.expiresAt !== expiresAt) return
+      room.dissolveVote = null
+      room.version += 1
+      clearDissolveTimer(room.roomId)
+      await commitRuntimeState()
+      publishDissolveVote(room, 'expired')
+    }, `dissolve expiry ${room.roomId}`, room.roomId)
   }, Math.max(0, expiresAt - Date.now())))
 }
-const autoStartMatchedRoom = (room) => {
-  if (!room.ticketBound || room.state || ids.some(id => !room.seats[id])) return false
-  room.state = createGame(2, 'p1')
+const initializeRoomMatch = (room, { matched = false } = {}) => {
+  resetRoomBotPolicy(room)
+  room.roundStatsBySeat = createGameStatsBySeat()
+  const dealt = createGame(2, 'p1', ruleProfileForRoom(room), shuffleRandom)
   ids.forEach(id => {
-    room.state.players[id].isAI = false
-    room.state.players[id].name = `玩家${id.slice(1)}`
+    const isAI = matched ? false : isBotPlayer(room, id)
+    dealt.players[id].isAI = isAI
+    dealt.players[id].name = isAI ? `机器人${id.slice(1)}` : `玩家${id.slice(1)}`
   })
-  room.matchStartedAt = Date.now()
-  room.totalDeadlineAt = null
-  room.matchEnded = null
-  room.version += 1
-  reportSpectatorEvent(room, { type: 'game-start', roundSequence: 1 })
-  armMatchDuration(room)
-  armTurnDeadline(room)
-  publishState(room)
-  return true
+  room.state = createInitialMatchState({
+    players: dealt.players,
+    ruleProfile: ruleProfileForRoom(room),
+    currentLevel: 2,
+    dealerId: 'p1',
+    teamLevels: room.teamLevels || { teamA: 2, teamB: 2 },
+    aFailStreaks: room.aFailStreaks || { teamA: 0, teamB: 0 },
+    scores: room.scores || { teamA: 0, teamB: 0 },
+    revision: Math.max(1, Number(room.gameVersion) + 1 || 1),
+    roundId: Math.max(1, Number(room.roundSequence) + 1 || 1),
+  })
+  syncRoomFromMatchState(room)
 }
-const entryPayloadFor = (room, playerId) => ({
-  roomId: room.roomId,
-  myPlayerId: playerId,
-  resumeToken: room.resumeTokens[playerId],
-  state: room.state ? stateFor(room.state, playerId) : null,
-  tribute: room.tribute || null,
-  roundResult: room.roundResult || null,
-  phase: phaseFor(room),
-  version: room.version,
-  roomSettings: normalizeFriendRoomSettings(room.roomSettings),
-  ...lobbyMetadataFor(room),
-  ...liveMetadataFor(room),
-})
 const ensureTicketBindings = (room) => {
   room.ticketJtisBySeat ||= { p1: null, p2: null, p3: null, p4: null }
   room.ticketExpiresAtBySeat ||= { p1: null, p2: null, p3: null, p4: null }
+}
+const revokePreviousSeatTicket = (room, playerId, nextJti = null) => {
+  const previousJti = room.ticketJtisBySeat?.[playerId]
+  const previousExp = room.ticketExpiresAtBySeat?.[playerId]
+  if (!previousJti || previousJti === nextJti || !Number.isFinite(previousExp)) return
+  room.revokedTicketJtis ||= []
+  if (!room.revokedTicketJtis.some(item => item.jti === previousJti)) {
+    room.revokedTicketJtis.push({ jti: previousJti, exp: previousExp })
+  }
 }
 const seatHasAnotherActiveConnection = (room, playerId, connection) => {
   const connectionId = room.seats[playerId]
   return Boolean(connectionId && connectionId !== connection.id && connections.has(connectionId))
 }
-
-const handleCommand = (connection, message) => {
-  const { type, requestId, payload = {} } = message
-  const reply = (replyType, body = {}) => send(connection, replyType, { requestId, ...body })
-  const requestedRoomId = String(payload.roomId || connection.roomId || '')
-  const requestedRoom = rooms.get(requestedRoomId)
-  const cacheKey = idempotentActionTypes.has(type) ? actionCacheKey(requestedRoom, connection, requestId) : null
-  const previousAccepted = cacheKey ? acceptedActions.get(cacheKey) : null
-  if (previousAccepted) return send(connection, 'actionAccepted', previousAccepted)
-  const acceptAction = (room) => {
-    const accepted = { requestId, requestType: type, roomId: room.roomId, version: room.version }
-    rememberAccepted(cacheKey, accepted)
-    persistRuntimeState()
-    send(connection, 'actionAccepted', accepted)
+const gameStartCoordinator = createWeAppGameStartCoordinator({
+  playerIds: ids, rooms, connections, acceptedActions,
+  emptyRoomTimeoutMs: EMPTY_ROOM_TIMEOUT_MS,
+  testPersistFailures: process.env.NODE_ENV === 'test' && process.env.WEAPP_TEST_FAIL_GAME_START_PERSIST_ONCE === '1' ? 1 : 0,
+  isShuttingDown: () => shuttingDown,
+  isFriendRoom, isMatchRoom, seatHasLiveConnection, enqueueServerOperation,
+  commitRuntimeState, persistRuntimeState, spectatorEventReporter,
+  initializeRoomMatch, armMatchDuration, armTurnDeadline, closeRoomWithoutAck,
+  publishRoomMembers, publishLobbyReady, publishState, rememberAccepted, send,
+})
+const {
+  abandon: abandonUnclaimedGameStart,
+  autoStartMatchedRoom,
+  finalizeClaimedStart: finalizeClaimedGameStart,
+  isTerminalClaimError: isTerminalGameStartClaimError,
+  persistClaimedStart: persistClaimedGameStart,
+  prepare: prepareGameStartClaim,
+  publishPending: publishGameStartPending,
+  scheduleClaim: scheduleGameStartClaim,
+  scheduleEntryDeadline,
+} = gameStartCoordinator
+const consumeCommandBudget = connection => {
+  const now = Date.now()
+  if (now - connection.rateWindowStartedAt >= COMMAND_RATE_WINDOW_MS) {
+    connection.rateWindowStartedAt = now
+    connection.rateWindowCount = 0
   }
-  // 小程序协议只接受意图型命令（play/pass），不接受客户端覆盖整局状态。
-  if (type === 'updateState') return reply('error', { message: '该通道禁止整状态同步，请提交出牌或不要动作' })
-  if (type === 'listRooms') return reply('roomList', { rooms: listRooms() })
-  if (type === 'createRoom') {
-    const roomId = String(payload.roomId || '')
-    if (!/^\d{6}$/.test(roomId)) return reply('error', { message: '房间号无效' })
-    let ticketStatus
-    try { ticketStatus = inspectEntryTicket(payload, { roomId, seat: 'p1' }) } catch (error) { return reply('error', { message: error instanceof Error ? error.message : '入桌票据无效' }) }
-    const claims = ticketStatus.claims
-    let requestedRoomSettings = null
-    if (!claims) {
-      try { requestedRoomSettings = normalizeFriendRoomSettings(payload.roomSettings, { strict: true }) } catch (error) {
-        return reply('error', { message: error instanceof Error ? error.message : '好友房设置无效' })
-      }
-    }
-    let room = rooms.get(roomId)
-
-    if (ticketStatus.consumed) {
-      if (!room || !room.ticketBound || !ticketMatchesRoom(room, claims)) return reply('error', { message: '已使用票据对应的房间不存在' })
-      ensureTicketBindings(room)
-      if (room.ticketJtisBySeat.p1 !== claims.jti) return reply('error', { message: '入桌票据与房主席位绑定不一致' })
-      if (seatHasAnotherActiveConnection(room, 'p1', connection)) return reply('error', { message: '房主席位已被另一个活动连接占用' })
-      if (!room.resumeTokens.p1) return reply('error', { message: '房主席位恢复凭证不存在' })
-      const isSameConnection = room.seats.p1 === connection.id
-      room.seats.p1 = connection.id
-      connection.roomId = roomId
-      clearEmptyRoomExpiry(roomId)
-      const restoredDissolveVote = restoreOfflineDissolveVote(room, 'p1')
-      if (!isSameConnection) room.version += 1
-      clearHostExpiry(roomId)
-      reply('roomCreated', entryPayloadFor(room, 'p1'))
-      publishRoomMembers(room)
-      if (restoredDissolveVote) publishDissolveVote(room)
-      broadcastRooms()
-      autoStartMatchedRoom(room)
-      return
-    }
-
-    let createdRoom = false
-    if (room) {
-      if (!claims || !room.ticketBound || !ticketMatchesRoom(room, claims)) return reply('error', { message: '房间号已存在' })
-      ensureTicketBindings(room)
-      if (room.ticketJtisBySeat.p1 && room.ticketJtisBySeat.p1 !== claims.jti) return reply('error', { message: '房主席位已绑定其他票据' })
-      if (seatHasAnotherActiveConnection(room, 'p1', connection)) return reply('error', { message: '房主席位已被占用' })
-    } else {
-      room = createRoomRecord({
-        roomId,
-        hostName: String(payload.hostName || '玩家'),
-        hostConnectionId: connection.id,
-        state: claims ? null : (payload.state || null),
-        ticketClaims: claims,
-        roomSettings: requestedRoomSettings,
-      })
-      rooms.set(roomId, room)
-      createdRoom = true
-    }
-    try { gameTicketVerifier.consume(claims) } catch (error) { if (createdRoom) rooms.delete(roomId); return reply('error', { message: error instanceof Error ? error.message : '入桌票据已使用' }) }
-    const resumeToken = room.resumeTokens.p1 || createResumeToken()
-    room.hostName = String(payload.hostName || '玩家')
-    room.seats.p1 = connection.id
-    room.resumeTokens.p1 = resumeToken
-    if (claims) {
-      room.ticketBound = true
-      room.matchId = claims.matchId
-      room.userIdsBySeat.p1 = claims.sub
-      room.ticketJtisBySeat.p1 = claims.jti
-      room.ticketExpiresAtBySeat.p1 = claims.exp
-    }
-    clearHostExpiry(roomId)
-    clearEmptyRoomExpiry(roomId)
-    connection.roomId = roomId
-    if (room.state && !room.matchStartedAt) {
-      room.matchStartedAt = Date.now()
-      armMatchDuration(room)
-      armTurnDeadline(room)
-    }
-    reply('roomCreated', entryPayloadFor(room, 'p1'))
-    broadcastRooms()
-    autoStartMatchedRoom(room)
-    return
-  }
-  if (type === 'joinRoom') {
-    const roomId = String(payload.roomId || '')
-    if (!/^\d{6}$/.test(roomId)) return reply('error', { message: '房间号无效' })
-    let ticketStatus
-    try { ticketStatus = inspectEntryTicket(payload, { roomId }) } catch (error) { return reply('error', { message: error instanceof Error ? error.message : '入桌票据无效' }) }
-    const claims = ticketStatus.claims
-    if (claims?.seat === 'p1') return reply('error', { message: 'p1 席位必须使用 createRoom 入桌' })
-    let room = rooms.get(roomId)
-
-    if (ticketStatus.consumed) {
-      const myPlayerId = claims.seat
-      if (!room || !room.ticketBound || !ticketMatchesRoom(room, claims)) return reply('error', { message: '已使用票据对应的房间不存在' })
-      ensureTicketBindings(room)
-      if (room.ticketJtisBySeat[myPlayerId] !== claims.jti) return reply('error', { message: '入桌票据与席位绑定不一致' })
-      if (seatHasAnotherActiveConnection(room, myPlayerId, connection)) return reply('error', { message: '匹配票据指定席位已被另一个活动连接占用' })
-      if (!room.resumeTokens[myPlayerId]) return reply('error', { message: '席位恢复凭证不存在' })
-      const isSameConnection = room.seats[myPlayerId] === connection.id
-      room.seats[myPlayerId] = connection.id
-      connection.roomId = roomId
-      clearEmptyRoomExpiry(roomId)
-      const restoredDissolveVote = restoreOfflineDissolveVote(room, myPlayerId)
-      if (!isSameConnection) room.version += 1
-      reply('roomJoined', entryPayloadFor(room, myPlayerId))
-      publishRoomMembers(room)
-      if (restoredDissolveVote) publishDissolveVote(room)
-      broadcastRooms()
-      autoStartMatchedRoom(room)
-      return
-    }
-
-    let createdRoom = false
-    if (!room && claims) {
-      room = createRoomRecord({ roomId, ticketClaims: claims })
-      rooms.set(roomId, room)
-      createdRoom = true
-      scheduleHostExpiry(roomId, Math.max(1000, claims.exp * 1000 - Date.now()))
-    }
-    if (!room) return reply('error', { message: '房间不存在' })
-    if (!ticketMatchesRoom(room, claims)) return reply('error', { message: room.ticketBound ? '该房间要求有效匹配票据' : '入桌票据与房间不匹配' })
-    ensureTicketBindings(room)
-    if (room.state) return reply('error', { message: '对局已经开始，请使用重连凭证恢复席位' })
-    const myPlayerId = claims?.seat || ids.slice(1).find(id => !seatIsOccupied(room, id))
-    if (!myPlayerId) return reply('error', { message: '房间已满' })
-    if (claims && room.ticketJtisBySeat[myPlayerId] && room.ticketJtisBySeat[myPlayerId] !== claims.jti) return reply('error', { message: '匹配席位已绑定其他票据' })
-    if (seatHasAnotherActiveConnection(room, myPlayerId, connection)) return reply('error', { message: '匹配票据指定席位已被占用' })
-    try { gameTicketVerifier.consume(claims) } catch (error) { if (createdRoom) { clearHostExpiry(roomId); rooms.delete(roomId) }; return reply('error', { message: error instanceof Error ? error.message : '入桌票据已使用' }) }
-    const resumeToken = createResumeToken()
-    room.seats[myPlayerId] = connection.id
-    room.resumeTokens[myPlayerId] = resumeToken
-    ensureLobbyMetadata(room)
-    room.lobbyReady[myPlayerId] = false
-    room.version += 1
-    connection.roomId = roomId
-    clearEmptyRoomExpiry(roomId)
-    if (claims) {
-      room.ticketBound = true
-      room.matchId = claims.matchId
-      room.userIdsBySeat[myPlayerId] = claims.sub
-      room.ticketJtisBySeat[myPlayerId] = claims.jti
-      room.ticketExpiresAtBySeat[myPlayerId] = claims.exp
-    }
-    reply('roomJoined', entryPayloadFor(room, myPlayerId))
-    publishRoomMembers(room)
-    broadcastRooms()
-    autoStartMatchedRoom(room)
-    return
-  }
-  if (type === 'rejoinRoom') {
-    const room = rooms.get(String(payload.roomId || '')); const myPlayerId = payload.myPlayerId
-    if (!room || !ids.includes(myPlayerId)) return reply('error', { message: '房间或席位无效' })
-    if (isBotPlayer(room, myPlayerId)) return reply('error', { message: '该席位当前由机器人占用' })
-    if (!sameToken(room.resumeTokens[myPlayerId], payload.resumeToken)) return reply('error', { message: '重连凭证无效' })
-    if (seatHasAnotherActiveConnection(room, myPlayerId, connection)) return reply('error', { message: '该席位已被另一个活动连接占用' })
-    room.seats[myPlayerId] = connection.id; room.version += 1; connection.roomId = payload.roomId
-    clearEmptyRoomExpiry(payload.roomId)
-    const restoredDissolveVote = restoreOfflineDissolveVote(room, myPlayerId)
-    if (myPlayerId === 'p1') clearHostExpiry(payload.roomId)
-    reply('roomRejoined', entryPayloadFor(room, myPlayerId))
-    publishRoomMembers(room)
-    if (restoredDissolveVote) publishDissolveVote(room)
-    return
-  }
-  if (type === 'startGame') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    if (!room || playerIn(room, connection.id) !== 'p1') return reply('error', { message: '只有房主可以开始游戏' })
-    if (room.state) return reply('error', { message: '对局已经开始' })
-    if (ids.some(id => !seatIsOccupied(room, id))) return reply('error', { message: '需要四个已占用席位才能开始' })
-    ensureLobbyMetadata(room)
-    if (!room.ticketBound && ids.some(id => !room.lobbyReady[id])) return reply('error', { message: '四名玩家都准备后才能开始' })
-    room.state = createGame(2, 'p1')
-    ids.forEach(id => {
-      const isAI = isBotPlayer(room, id)
-      room.state.players[id].isAI = isAI
-      room.state.players[id].name = isAI ? `机器人${id.slice(1)}` : `玩家${id.slice(1)}`
-    })
-    room.matchStartedAt = Date.now()
-    room.totalDeadlineAt = null
-    room.matchEnded = null
-    room.version += 1
-    reportSpectatorEvent(room, { type: 'game-start', roundSequence: 1 })
-    armMatchDuration(room)
-    armTurnDeadline(room)
-    acceptAction(room)
-    publishState(room)
-    return
-  }
-  if (type === 'setLobbyReady' || type === 'cancelLobbyReady') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId) return reply('error', { message: '当前不在房间中' })
-    if (room.ticketBound) return reply('error', { message: '匹配房由服务器自动开局，无需手动准备' })
-    if (room.state) return reply('error', { message: '对局已经开始' })
-    ensureLobbyMetadata(room)
-    const ready = type === 'setLobbyReady'
-    if (room.lobbyReady[playerId] !== ready) {
-      room.lobbyReady[playerId] = ready
-      room.version += 1
-    }
-    acceptAction(room)
-    publishLobbyReady(room)
-    return
-  }
-  if (type === 'kickMember') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    if (!room || playerIn(room, connection.id) !== 'p1') return reply('error', { message: '只有房主可以移出成员' })
-    if (room.ticketBound) return reply('error', { message: '匹配房不允许房主移出成员' })
-    if (room.state) return reply('error', { message: '对局开始后不能移出成员' })
-    const targetPlayerId = String(payload.playerId || '')
-    if (!ids.includes(targetPlayerId) || targetPlayerId === 'p1') return reply('error', { message: '只能移出其他有效席位' })
-    const targetConnectionId = room.seats[targetPlayerId]
-    const targetConnection = connections.get(targetConnectionId)
-    if (!targetConnectionId || !targetConnection) return reply('error', { message: '该成员当前不在房间中' })
-    ensureLobbyMetadata(room)
-    if (room.lobbyReady[targetPlayerId]) return reply('error', { message: '已准备成员不能被移出，请等待其取消准备' })
-    room.seats[targetPlayerId] = null
-    room.resumeTokens[targetPlayerId] = null
-    room.lobbyReady[targetPlayerId] = false
-    targetConnection.roomId = null
-    room.version += 1
-    send(targetConnection, 'roomKicked', { roomId: room.roomId, reason: 'host-kicked', version: room.version })
-    acceptAction(room)
-    publishRoomMembers(room)
-    broadcastRooms()
-    return
-  }
-  if (type === 'addBot' || type === 'removeBot') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    if (!room || playerIn(room, connection.id) !== 'p1') return reply('error', { message: '只有房主可以设置机器人' })
-    if (room.ticketBound) return reply('error', { message: '匹配票据房不允许设置机器人' })
-    if (room.state) return reply('error', { message: '对局开始后不能设置机器人' })
-    const targetPlayerId = String(payload.playerId || '')
-    if (!ids.slice(1).includes(targetPlayerId)) return reply('error', { message: '只能设置空闲的其他席位' })
-    ensureLobbyMetadata(room)
-    const botIndex = room.botPlayerIds.indexOf(targetPlayerId)
-    if (type === 'addBot') {
-      if (room.seats[targetPlayerId]) return reply('error', { message: '该席位已有玩家' })
-      if (botIndex >= 0) return reply('error', { message: '该席位已经是机器人' })
-      room.botPlayerIds.push(targetPlayerId)
-      room.botPlayerIds.sort((left, right) => ids.indexOf(left) - ids.indexOf(right))
-      ensureBotMetadata(room)
-      room.lobbyReady[targetPlayerId] = true
-    } else {
-      if (botIndex < 0) return reply('error', { message: '该席位不是机器人' })
-      room.botPlayerIds.splice(botIndex, 1)
-      room.lobbyReady[targetPlayerId] = false
-    }
-    room.version += 1
-    acceptAction(room)
-    publishRoomMembers(room)
-    broadcastRooms()
-    return
-  }
-  if (type === 'play' || type === 'pass') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId || !room.state) return reply('error', { message: '对局尚未开始' })
-    ensureLiveMetadata(room)
-    if (room.trustees[playerId]) return reply('error', { message: '请先取消托管再操作' })
-    if (room.matchEnded || room.roundResult || room.tribute) return reply('error', { message: '当前阶段不能出牌' })
-    try {
-      if (type === 'play') {
-        const cardIds = Array.isArray(payload.cardIds) ? payload.cardIds : []
-        const cards = cardIds.map(id => room.state.players[playerId].hand.find(card => card.id === id)).filter(Boolean)
-        if (cards.length !== cardIds.length) throw new Error('所选手牌无效')
-        room.state = playCards(room.state, playerId, cards)
-        recordRoomAction(room, playerId, { kind: 'play', playType: room.state.playArea.at(-1)?.type || null })
-        reportSpectatorAction(room, { type: 'play', playerId, cards, automatic: false })
-      } else {
-        room.state = passTurn(room.state, playerId)
-        recordRoomAction(room, playerId, { kind: 'pass' })
-        reportSpectatorAction(room, { type: 'pass', playerId, automatic: false })
-      }
-      room.consecutiveTimeouts[playerId] = 0
-      room.version += 1
-      const result = settleRoundIfNeeded(room)
-      if (!result) armTurnDeadline(room)
-      acceptAction(room)
-      publishState(room)
-      if (result) broadcast(room, 'roundEnded', { roomId: room.roomId, result, phase: phaseFor(room), version: room.version, ...liveMetadataFor(room) })
-    } catch (error) { reply('error', { message: error instanceof Error ? error.message : '出牌失败' }) }
-    return
-  }
-  if (type === 'nextRound' || type === 'readyNextRound' || type === 'roundReady' || type === 'ready') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId || !room.roundResult) return reply('error', { message: '当前不能准备下一局' })
-    const result = room.roundResult
-    if (room.matchEnded) return reply('error', { message: '本场已结束，请重新创建对局' })
-    if (result.isGameWon) return reply('error', { message: '本场已打过 A，请重新创建对局' })
-    ensureLiveMetadata(room)
-    room.roundReady[playerId] = true
-    room.version += 1
-    acceptAction(room)
-    if (ids.every(id => room.roundReady[id])) prepareNextRound(room, false)
-    else publishRoundReady(room)
-    return
-  }
-  if (type === 'cancelRoundReady' || type === 'cancelReady') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId || !room.roundResult) return reply('error', { message: '当前不能取消准备' })
-    ensureLiveMetadata(room)
-    room.roundReady[playerId] = false
-    room.version += 1
-    acceptAction(room)
-    publishRoundReady(room)
-    return
-  }
-  if (type === 'setTrustee' || type === 'cancelTrustee') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId || !room.state || room.matchEnded) return reply('error', { message: '当前不在进行中的对局' })
-    ensureLiveMetadata(room)
-    if (type === 'setTrustee' && !room.ticketBound && normalizeFriendRoomSettings(room.roomSettings).trusteeSeconds === 0) {
-      return reply('error', { message: '本好友房已关闭托管' })
-    }
-    if (type === 'setTrustee') room.trustees[playerId] = { reason: 'manual', since: Date.now() }
-    else {
-      room.trustees[playerId] = null
-      room.consecutiveTimeouts[playerId] = 0
-    }
-    room.version += 1
-    if (!room.roundResult && room.deadlinePlayerId === playerId) armTurnDeadline(room)
-    acceptAction(room)
-    publishTrustees(room)
-    if (room.roundResult || room.deadlinePlayerId !== playerId) publishTurnStatus(room)
-    return
-  }
-  if (type === 'proposeDissolve') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId || !room.state) return reply('error', { message: '当前不在对局中' })
-    ensureLiveMetadata(room)
-    if (room.dissolveVote) return reply('error', { message: '已有解散投票进行中' })
-    const votes = { p1: 'pending', p2: 'pending', p3: 'pending', p4: 'pending' }
-    votes[playerId] = 'agree'
-    room.botPlayerIds.forEach(id => { votes[id] = 'agree' })
-    room.dissolveVote = { initiator: playerId, votes, expiresAt: Date.now() + DISSOLVE_TIMEOUT_MS }
-    room.version += 1
-    scheduleDissolveExpiry(room)
-    acceptAction(room)
-    publishDissolveVote(room)
-    return
-  }
-  if (type === 'dissolveVote' || type === 'voteDissolve') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId || !room.dissolveVote) return reply('error', { message: '当前没有解散投票' })
-    const agree = payload.agree === true
-    room.dissolveVote.votes[playerId] = agree ? 'agree' : 'refuse'
-    room.version += 1
-    acceptAction(room)
-    if (!agree) {
-      room.dissolveVote = null
-      clearDissolveTimer(room.roomId)
-      publishDissolveVote(room, 'rejected')
-      return
-    }
-    if (ids.every(id => room.dissolveVote.votes[id] === 'agree')) {
-      dissolveRoom(room)
-      return
-    }
-    publishDissolveVote(room)
-    return
-  }
-  if (type === 'tribute' || type === 'returnTribute') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || '')); const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId || !room.tribute) return reply('error', { message: '当前不是贡还阶段' })
-    if (room.trustees[playerId]) return reply('error', { message: '请先取消托管再操作' })
-    if (room.deadlinePlayerId !== playerId || room.deadlineAction !== type) return reply('error', { message: '当前等待其他玩家完成贡还' })
-    try {
-      const result = type === 'tribute'
-        ? giveTribute(room.state, room.tribute, playerId, payload.cardId)
-        : returnTribute(room.state, room.tribute, playerId, payload.cardId)
-      room.state = result.state; room.tribute = result.tribute; room.consecutiveTimeouts[playerId] = 0; room.version += 1
-      recordRoomAction(room, playerId, { kind: type })
-      reportSpectatorEvent(room, { type: type === 'tribute' ? 'tribute' : 'return-tribute', playerId, roundSequence: room.roundSequence + 1 })
-      armTurnDeadline(room)
-      acceptAction(room)
-      publishTribute(room)
-    } catch (error) { reply('error', { message: error instanceof Error ? error.message : '贡还失败' }) }
-    return
-  }
-  if (type === 'finishTribute') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !room.tribute || (!room.tribute.isAntiTribute && room.tribute.phase !== 'done')) return reply('error', { message: '贡还尚未完成' })
-    if (!playerId || room.deadlinePlayerId !== playerId || room.deadlineAction !== 'finishTribute') return reply('error', { message: '当前等待指定玩家开始本局' })
-    if (room.trustees[playerId]) return reply('error', { message: '请先取消托管再操作' })
-    try { finishTributeState(room) } catch (error) { return reply('error', { message: error instanceof Error ? error.message : '开始本局失败' }) }
-    room.consecutiveTimeouts[playerId] = 0
-    room.version += 1
-    armTurnDeadline(room); acceptAction(room); publishState(room)
-    return
-  }
-  if (type === 'chat') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || '')); const playerId = room && playerIn(room, connection.id)
-    const text = typeof payload.text === 'string' ? payload.text.trim() : ''
-    if (!room || !playerId) return reply('error', { message: '当前不在房间中' })
-    if (!room.ticketBound && normalizeFriendRoomSettings(room.roomSettings).disableInteraction) return reply('error', { message: '本好友房已禁止互动' })
-    if (!QUICK_CHAT_PHRASES.has(text)) return reply('error', { message: '仅支持固定快捷语' })
-    room.chatLastAcceptedAt ||= { p1: 0, p2: 0, p3: 0, p4: 0 }
-    room.chatLastPhraseAt ||= { p1: {}, p2: {}, p3: {}, p4: {} }
-    const now = Date.now()
-    const intervalRemaining = room.chatLastAcceptedAt[playerId] + QUICK_CHAT_INTERVAL_MS - now
-    if (intervalRemaining > 0) return reply('error', { message: '快捷语发送过于频繁', retryAfterMs: intervalRemaining })
-    const repeatRemaining = (room.chatLastPhraseAt[playerId][text] || 0) + QUICK_CHAT_REPEAT_MS - now
-    if (repeatRemaining > 0) return reply('error', { message: '相同快捷语仍在冷却中', retryAfterMs: repeatRemaining })
-    room.chatLastAcceptedAt[playerId] = now
-    room.chatLastPhraseAt[playerId][text] = now
-    acceptAction(room)
-    broadcast(room, 'chat', { roomId: room.roomId, playerId, text, version: room.version })
-    return
-  }
-  if (type === 'leaveRoom' || type === 'safeExit') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || '')); const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId) return reply('error', { message: '当前不在房间中' })
-    room.version += 1
-    if (room.state) {
-      ensureLiveMetadata(room)
-      room.seats[playerId] = null
-      room.trustees[playerId] = { reason: 'disconnected', since: Date.now() }
-      if (room.dissolveVote?.votes[playerId] === 'pending') room.dissolveVote.votes[playerId] = 'offline'
-      markOfflineReady(room, playerId)
-      if (!room.roundResult && room.deadlinePlayerId === playerId) armTurnDeadline(room)
-      publishRoomMembers(room)
-      publishTrustees(room)
-      if (room.dissolveVote) publishDissolveVote(room)
-    } else if (playerId === 'p1') {
-      reportSpectatorClosed(room, 'host-left')
-      clearHostExpiry(payload.roomId || connection.roomId)
-      clearTurnTimer(room.roomId)
-      clearMatchDurationTimer(room.roomId)
-      clearDissolveTimer(room.roomId)
-      clearEmptyRoomExpiry(room.roomId)
-      rooms.delete(payload.roomId || connection.roomId)
-      broadcast(room, 'hostLeft', { roomId: room.roomId, version: room.version })
-    } else {
-      room.seats[playerId] = null
-      room.resumeTokens[playerId] = null
-      ensureLobbyMetadata(room)
-      room.lobbyReady[playerId] = false
-      publishRoomMembers(room)
-    }
-    connection.roomId = null; broadcastRooms(); reply('roomLeft', { roomId: room.roomId, version: room.version, seatReserved: Boolean(room.state) })
-    if (room.state) scheduleEmptyRoomExpiry(room)
-    return
-  }
-  reply('error', { message: '未知协议消息' })
+  connection.rateWindowCount += 1
+  if (connection.rateWindowCount <= COMMAND_RATE_LIMIT) return true
+  connection.rateLimitViolations += 1
+  return false
 }
 
-const handle = (connection, message) => {
-  try { return handleCommand(connection, message) } finally { persistRuntimeState() }
-}
+const gameCommandHandler = createGameCommandHandler({
+  ids, rooms, connections, acceptedActions,
+  dissolveTimeoutMs: DISSOLVE_TIMEOUT_MS,
+  quickChatIntervalMs: QUICK_CHAT_INTERVAL_MS,
+  quickChatRepeatMs: QUICK_CHAT_REPEAT_MS,
+  quickChatPhrases: QUICK_CHAT_PHRASES,
+  playerIn, ensureLiveMetadata, ensureLobbyMetadata, isFriendRoom,
+  applyRoomSettlementPolicy,
+  syncRoomFromMatchState,
+  recordRoomAction,
+  reportSpectatorAction,
+  consumeRoundSettlement,
+  armTurnDeadline,
+  finalizePendingRound,
+  publishState, publishRoundEnded, prepareNextRound, publishTribute,
+  publishRoundReady, publishTrustees, publishTurnStatus,
+  scheduleDissolveExpiry,
+  publishDissolveVote,
+  clearDissolveTimer,
+  rememberClosedRoomTombstone,
+  reportSpectatorClosed,
+  commitRuntimeState,
+  stagePendingSideEffects,
+  persistRuntimeState,
+  finalizeRemovedRoom,
+  reportSpectatorEvent,
+  finishTributeState,
+  broadcast,
+  rememberAccepted,
+  syncConnectionRoomId,
+  deleteAcceptedActionIdentity: acceptedActionStore.deleteToken,
+  markOfflineReady,
+  publishRoomMembers,
+  scheduleEmptyRoomExpiry,
+  broadcastRooms,
+  send,
+})
+const lobbyCommandHandler = createLobbyCommandHandler({
+  ids, rooms, connections, playerIn,
+  isMatchRoom, isFriendRoom, seatIsOccupied, ensureLobbyMetadata,
+  prepareGameStartClaim,
+  commitRuntimeState,
+  publishGameStartPending,
+  spectatorEventReporter,
+  persistClaimedGameStart,
+  isTerminalGameStartClaimError,
+  abandonUnclaimedGameStart,
+  closeRoomWithoutAck,
+  scheduleGameStartClaim,
+  finalizeClaimedGameStart,
+  initializeRoomMatch,
+  reportSpectatorEvent,
+  armMatchDuration,
+  armTurnDeadline,
+  publishState,
+  deleteAcceptedActionIdentity: acceptedActionStore.deleteToken,
+  publishLobbyReady,
+  ensureBotMetadata,
+  syncConnectionRoomId,
+  send,
+  publishRoomMembers,
+  broadcastRooms,
+})
+const entryCommandHandler = createEntryCommandHandler({
+  ids, rooms, acceptedActions,
+  maxRooms: MAX_ROOMS,
+  gameTicketVerifier,
+  inspectEntryTicket,
+  ticketBlockedByClosedRoom,
+  normalizeEntryAttemptId,
+  pendingSeatReleaseFor,
+  actionFingerprint,
+  sameToken,
+  seatHasAnotherActiveConnection,
+  clearEmptyRoomExpiry,
+  restoreOfflineDissolveVote,
+  commitRuntimeState,
+  stagePendingSideEffects,
+  send,
+  publishRoomMembers,
+  publishDissolveVote,
+  publishState,
+  scheduleEntryDeadline,
+  scheduleGameStartClaim,
+  entryPayloadFor,
+  rememberAccepted,
+  reserveAccepted: acceptedActionStore.reserve,
+  releaseAccepted: acceptedActionStore.release,
+  entryConflictFor,
+  createRoomRecord,
+  ticketMatchesRoom,
+  ensureTicketBindings,
+  createResumeToken,
+  entryKindForClaims,
+  entryDeadlineForClaims,
+  revokePreviousSeatTicket,
+  clearHostExpiry,
+  armMatchDuration,
+  armTurnDeadline,
+  autoStartMatchedRoom,
+  broadcastRooms,
+  playerIn,
+  rotateAcceptedActionIdentity,
+  deleteAcceptedActionIdentity: acceptedActionStore.deleteToken,
+  publishGameStartPending,
+  isBotPlayer,
+  seatIsOccupied,
+  ensureLobbyMetadata,
+})
+const commandRouter = createCommandRouter([
+  { types: ENTRY_COMMAND_TYPES, handle: entryCommandHandler },
+  { types: LOBBY_COMMAND_TYPES, handle: lobbyCommandHandler },
+  { types: GAME_COMMAND_TYPES, handle: gameCommandHandler },
+])
 
-const server = createServer((_, response) => { response.writeHead(404); response.end() })
-server.on('upgrade', (request, socket) => {
-  if (request.url !== '/weapp' || request.headers.upgrade?.toLowerCase() !== 'websocket' || !request.headers['sec-websocket-key']) { socket.destroy(); return }
-  const accept = createHash('sha1').update(`${request.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64')
-  socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`)
-  const connection = { id: `w${nextConnection++}`, socket, buffer: Buffer.alloc(0), roomId: null }
-  connections.set(connection.id, connection)
-  // 客户端切后台、开发者工具重启都会直接断开 TCP；不能让单个连接拖垮房间服务。
-  socket.on('error', () => {})
-  socket.on('data', (chunk) => {
-    connection.buffer = Buffer.concat([connection.buffer, chunk])
-    while (connection.buffer.length >= 2) {
-      const opcode = connection.buffer[0] & 15; const length = connection.buffer[1] & 127; const masked = Boolean(connection.buffer[1] & 128); const header = length < 126 ? 2 : 4
-      if (!masked || length === 127) { socket.destroy(); return }
-      if (connection.buffer.length < header + 4) return
-      const size = length === 126 ? connection.buffer.readUInt16BE(2) : length; const maskStart = header; const bodyStart = header + 4
-      if (size > MAX_MESSAGE_BYTES) { socket.destroy(); return }
-      if (connection.buffer.length < bodyStart + size) return
-      const body = Buffer.from(connection.buffer.subarray(bodyStart, bodyStart + size)); for (let i = 0; i < size; i += 1) body[i] ^= connection.buffer[maskStart + i % 4]
-      connection.buffer = connection.buffer.subarray(bodyStart + size)
-      if (opcode === 8) { socket.end(); return }
-      try { handle(connection, JSON.parse(body.toString())) } catch { send(connection, 'error', { message: '协议数据无效' }) }
+const handleCommand = createCommandGateway({
+  rooms, acceptedActions, idempotentActionTypes, actionCacheKey, actionFingerprint,
+  validateCommandRequestId, validateExpectedVersion, playerIn, isFriendRoom,
+  finalizePendingRound, scheduleGameStartClaim, commitRuntimeState, stagePendingSideEffects,
+  publishState, rememberAccepted, reserveAccepted: acceptedActionStore.reserve,
+  releaseAccepted: acceptedActionStore.release, listRooms, send, router: commandRouter,
+})
+
+const enqueueCommand = (connection, message) => {
+  if (shuttingDown || !connection.acceptingCommands) return Promise.resolve()
+  if (!consumeCommandBudget(connection)) {
+    send(connection, 'error', { requestId: message?.requestId, code: 'RATE_LIMITED', message: '请求过于频繁，请稍后重试', retryAfterMs: COMMAND_RATE_WINDOW_MS })
+    if (connection.rateLimitViolations >= 3) {
+      connection.acceptingCommands = false
+      connection.dropQueuedCommands = true
+      connection.socket.destroy()
     }
+    return Promise.resolve()
+  }
+  if (connection.pendingCommands >= MAX_PENDING_COMMANDS) {
+    send(connection, 'error', { requestId: message?.requestId, code: 'COMMAND_QUEUE_FULL', message: '当前连接的待处理请求过多' })
+    connection.acceptingCommands = false
+    connection.dropQueuedCommands = true
+    connection.socket.destroy()
+    return Promise.resolve()
+  }
+  connection.pendingCommands += 1
+  const task = () => {
+    if (connection.dropQueuedCommands) return undefined
+    return handleCommand(connection, message)
+  }
+  const key = operationKeyForCommand({ connection, message, rooms, entryTypes: ENTRY_COMMAND_TYPES })
+  const operation = (key !== GLOBAL_OPERATION_KEY
+    ? operationScheduler.enqueue(key, task, `command ${message?.type || 'unknown'}`)
+    : operationScheduler.enqueueGlobal(task, `command ${message?.type || 'unknown'}`)
+  ).finally(() => { connection.pendingCommands = Math.max(0, connection.pendingCommands - 1) })
+  void operation.catch(error => {
+    console.error('WeApp protocol command failed:', error instanceof Error ? error.message : error)
+    if (!connection.socket.destroyed) send(connection, 'error', { requestId: message?.requestId, message: '服务器处理请求失败' })
   })
-  socket.on('close', () => {
-    const room = rooms.get(connection.roomId)
-    if (room) {
+  return operation
+}
+
+const rejectInvalidProtocolMessage = connection => {
+  if (consumeCommandBudget(connection)) send(connection, 'error', { message: '协议数据无效' })
+  else if (connection.rateLimitViolations >= 3) {
+    connection.acceptingCommands = false
+    connection.dropQueuedCommands = true
+    connection.socket.destroy()
+  }
+}
+
+const handleConnectionClosed = connection => {
+  connection.acceptingCommands = false
+  if (shuttingDown) {
+    connections.delete(connection.id)
+    return
+  }
+  void enqueueServerOperation(async () => {
+    const memberships = membershipsFor(connection)
+    const preparedRooms = new Set()
+    for (const room of memberships) {
       const playerId = playerIn(room, connection.id)
       if (playerId) {
         room.version += 1
@@ -1188,84 +909,90 @@ server.on('upgrade', (request, socket) => {
           ensureLiveMetadata(room)
           room.trustees[playerId] = { reason: 'disconnected', since: Date.now() }
           if (room.dissolveVote?.votes[playerId] === 'pending') room.dissolveVote.votes[playerId] = 'offline'
-          markOfflineReady(room, playerId)
-          if (!room.roundResult && room.deadlinePlayerId === playerId) armTurnDeadline(room)
-          publishTrustees(room)
-          if (room.dissolveVote) publishDissolveVote(room)
-        } else if (playerId === 'p1') {
-          const ticketExpiry = room.ticketExpiresAtBySeat?.p1
-          const timeoutMs = room.ticketBound && Number.isFinite(ticketExpiry)
-            ? Math.max(1000, ticketExpiry * 1000 - Date.now())
-            : 15000
-          scheduleHostExpiry(connection.roomId, timeoutMs)
-        }
+          if (markOfflineReady(room, playerId)) preparedRooms.add(room.roomId)
+          if (!room.roundResult && room.deadlinePlayerId === playerId) armTurnDeadline(room, { publish: false })
+        } else if (room.ticketBound) scheduleEntryDeadline(room)
+        else if (playerId === 'p1') scheduleHostExpiry(room.roomId, 15000)
       }
-      if (rooms.has(connection.roomId)) publishRoomMembers(room)
-      if (room.state) scheduleEmptyRoomExpiry(room)
-      broadcastRooms()
     }
     connections.delete(connection.id)
-    persistRuntimeState()
+    await commitRuntimeState()
+    for (const room of memberships) {
+      if (!rooms.has(room.roomId)) continue
+      stagePendingSideEffects(room)
+      publishRoomMembers(room)
+      if (room.state) {
+        publishTrustees(room)
+        if (room.dissolveVote) publishDissolveVote(room)
+        if (preparedRooms.has(room.roomId)) publishTribute(room, 'roundPrepared')
+        else if (room.roundResult) publishRoundReady(room)
+        scheduleEmptyRoomExpiry(room)
+      }
+    }
+    broadcastRooms()
+  }, 'WeApp disconnect cleanup')
+}
+
+const server = createServer((_, response) => { response.writeHead(404); response.end() })
+server.on('upgrade', (request, socket) => {
+  upgradeToProtocolConnection({
+    request,
+    socket,
+    allowedOrigins: security.allowedOrigins,
+    connectionCount: connections.size,
+    maxConnections: MAX_CONNECTIONS,
+    maxMessageBytes: MAX_MESSAGE_BYTES,
+    createConnectionId: () => `w${nextConnection++}`,
+    onOpen: connection => connections.set(connection.id, connection),
+    onMessage: enqueueCommand,
+    onInvalidMessage: rejectInvalidProtocolMessage,
+    onClose: handleConnectionClosed,
   })
 })
 
-const restoreTurnDeadline = (room) => {
-  clearTurnTimer(room.roomId)
-  const step = deadlineStepFor(room)
-  if (!step) {
-    room.turnDeadlineAt = null
-    room.deadlinePlayerId = null
-    room.deadlineAction = null
-    return
-  }
-  const deadline = Number(room.turnDeadlineAt)
-  const matchesStoredStep = Number.isFinite(deadline) && room.deadlinePlayerId === step.playerId && room.deadlineAction === step.action
-  if (!matchesStoredStep) {
-    armTurnDeadline(room)
-    return
-  }
-  const delay = Math.max(0, deadline - Date.now())
-  turnTimers.set(room.roomId, setTimeout(() => automatedDeadline(room, step.playerId, step.action, deadline), delay))
+const restorePersistedRuntime = async () => {
+  await restoreWeAppRuntime({
+    roomStateStore, rooms, acceptedActions, closedRoomTombstones, maxAcceptedActions, playerIds: ids,
+    roomFromPersistence, migrateLegacyMatchState, ensureTicketBindings, ensureLobbyMetadata, ensureLiveMetadata,
+    rulePresetForRoom, ruleProfileForRoom, syncRoomFromMatchState, botPolicyForRoom, resetRoomBotPolicy,
+    stagePendingSideEffects, rememberClosedRoomTombstone, removeRoomBotPolicy: roomId => roomBotPolicies.delete(roomId),
+    scheduleDissolveExpiry, schedulePendingRoundFinalization, gameStartCoordinator,
+    restoreTurnDeadline, armMatchDuration, scheduleEmptyRoomExpiry, scheduleHostExpiry, commitRuntimeState,
+  })
 }
-
-const restorePersistedRuntime = () => {
-  if (!roomStateStore.configured) return
-  const stored = roomStateStore.load()
-  for (const entry of stored.acceptedActions.slice(-maxAcceptedActions)) {
-    if (Array.isArray(entry) && typeof entry[0] === 'string' && entry[1] && typeof entry[1] === 'object') acceptedActions.set(entry[0], entry[1])
-  }
-  for (const rawRoom of stored.rooms) {
-    if (!rawRoom || !/^\d{6}$/.test(String(rawRoom.roomId || '')) || rooms.has(String(rawRoom.roomId))) continue
-    const room = roomFromPersistence(rawRoom)
-    ensureTicketBindings(room)
-    ensureLobbyMetadata(room)
-    ensureLiveMetadata(room)
-    if (!room.resumeTokens || !ids.every(id => Object.prototype.hasOwnProperty.call(room.resumeTokens, id))) continue
-    if (!Number.isSafeInteger(room.version) || room.version < 0) room.version = 0
-    if (room.state) {
-      ids.forEach(id => {
-        if (room.resumeTokens[id] && !room.trustees[id]) room.trustees[id] = { reason: 'disconnected', since: Date.now() }
-        if (room.dissolveVote?.votes?.[id] === 'pending') room.dissolveVote.votes[id] = 'offline'
-      })
-    }
-    rooms.set(room.roomId, room)
-    if (room.dissolveVote) scheduleDissolveExpiry(room)
-    if (room.state) {
-      if (!room.roundResult && !room.matchEnded) restoreTurnDeadline(room)
-      armMatchDuration(room)
-      scheduleEmptyRoomExpiry(room)
-    } else {
-      const ticketExpiry = room.ticketExpiresAtBySeat?.p1
-      const timeoutMs = room.ticketBound && Number.isFinite(ticketExpiry)
-        ? Math.max(1000, ticketExpiry * 1000 - Date.now())
-        : 15000
-      scheduleHostExpiry(room.roomId, timeoutMs)
-    }
-  }
-  persistRuntimeState()
-  console.log(`Restored ${rooms.size} WeApp room(s) from ${roomStateStore.filePath}`)
-}
-
-const port = Number(process.env.WEAPP_WS_PORT || 3002)
-restorePersistedRuntime()
+const port = security.wsPort
+await restorePersistedRuntime()
 server.listen(port, () => console.log(`Guandan WeApp WebSocket server running on port ${port}`))
+
+const shutdown = async signal => {
+  if (shuttingDown) return
+  shuttingDown = true
+  console.log(`Stopping Guandan WeApp server after ${signal}`)
+  connections.forEach(connection => { connection.acceptingCommands = false })
+  const serverClosed = new Promise(resolve => server.close(resolve))
+  for (const timers of [hostExpiryTimers, emptyRoomExpiryTimers, dissolveTimers, sideEffectStageRetryTimers]) { for (const timer of timers.values()) clearTimeout(timer); timers.clear() }
+  matchLifecycle.dispose()
+  gameStartCoordinator.dispose()
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = null
+  let failed = false
+  try {
+    resultReporter.stop(new Error(`server shutdown: ${signal}`))
+    for (const room of rooms.values()) {
+      if (room.matchId) spectatorEventReporter.stop(room.matchId, new Error(`server shutdown: ${signal}`))
+    }
+    await Promise.allSettled([...sideEffectCompletionHandlers.values()])
+    await operationScheduler.drain()
+    await commitRuntimeState()
+    await roomStateStore.whenIdle()
+  } catch (error) {
+    failed = true
+    console.error('Final WeApp persistence failed:', error instanceof Error ? error.message : error)
+  } finally {
+    for (const connection of connections.values()) connection.socket.destroy()
+    await serverClosed
+    process.exitCode = failed ? 1 : 0
+  }
+}
+process.once('SIGTERM', () => { void shutdown('SIGTERM') })
+process.once('SIGINT', () => { void shutdown('SIGINT') })

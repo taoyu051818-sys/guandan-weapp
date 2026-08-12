@@ -5,8 +5,8 @@ const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
 const sourcePath = path.join(root, 'assets/scripts/replay/ReplayTimeline.ts')
-const typescriptPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript'
-const ts = require(typescriptPath)
+const { loadTypeScript, typescriptPath } = require('./support/typescript.cjs')
+const ts = loadTypeScript()
 const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   fileName: sourcePath,

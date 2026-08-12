@@ -3,14 +3,19 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
-const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
+const { compilerPath, loadTypeScript } = require('./support/typescript.cjs')
 const arrangementPath = path.join(projectRoot, 'assets/scripts/game/HandArrangement.ts')
+const arrangementModelPath = path.join(projectRoot, 'assets/scripts/game/HandArrangementModel.ts')
+const displayOrderingPath = path.join(projectRoot, 'assets/scripts/game/HandDisplayOrdering.ts')
+const groupSuggestionsPath = path.join(projectRoot, 'assets/scripts/game/HandGroupSuggestions.ts')
 const groupingPath = path.join(projectRoot, 'assets/scripts/game/HandGrouping.ts')
+const groupingStatePath = path.join(projectRoot, 'assets/scripts/game/HandGroupingState.ts')
+const groupingHistoryPath = path.join(projectRoot, 'assets/scripts/game/HandGroupingHistory.ts')
 const workspacePath = path.join(projectRoot, 'assets/scripts/game/HandWorkspace.ts')
 const stackLayoutPath = path.join(projectRoot, 'assets/scripts/game/HandStackLayout.ts')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
-const ts = require(compilerPath)
+const ts = loadTypeScript()
 
 require.extensions['.ts'] = (module, filePath) => {
   const result = ts.transpileModule(fs.readFileSync(filePath, 'utf8'), {
@@ -24,14 +29,26 @@ require.extensions['.ts'] = (module, filePath) => {
 }
 
 const {
+  arrangeHandGroupCardIds,
   arrangeHandCardIds,
   recognizeHandGroup,
   selectNonOverlappingSuggestions,
+  sortHandDisplayUnits,
   suggestHandGroups,
 } = require(arrangementPath)
 const { HandGrouping } = require(groupingPath)
+const { HandGroupingHistory } = require(groupingHistoryPath)
 const { HandWorkspace } = require(workspacePath)
-const { createHandStackLayout, handStackRise } = require(stackLayoutPath)
+const { createHandStackLayout, handStackRise, STACK_EXPOSURE_HEIGHT } = require(stackLayoutPath)
+const classicRuleProfile = Object.freeze({
+  allowA2345Straight: true,
+  straightFlushAsBomb: true,
+  enableTripleWithPair: true,
+})
+const tournamentRuleProfile = Object.freeze({
+  ...classicRuleProfile,
+  straightFlushAsBomb: false,
+})
 
 const rankValue = rank => ({ J: 11, Q: 12, K: 13, A: 14, Small: 16, Big: 17 }[rank] ?? Number(rank))
 const card = (id, rank, suit = 'spade', overrides = {}) => Object.freeze({
@@ -114,6 +131,17 @@ function verifyArrangement () {
     ],
     'ascending rank arrangement must preserve the same level-card boundary in reverse',
   )
+  const aceLevelHand = [
+    card('ace-level-big', 'Big', 'joker'),
+    card('ace-level-small', 'Small', 'joker'),
+    card('ace-level-ace', 'A', 'heart'),
+    card('ace-level-king', 'K', 'club'),
+  ]
+  assert.deepEqual(
+    arrangeHandCardIds(aceLevelHand, { direction: 'desc', levelRank: 'A' }),
+    ['ace-level-big', 'ace-level-small', 'ace-level-ace', 'ace-level-king'],
+    'when A is level it must sit below both jokers and above K',
+  )
 }
 
 function verifyLevelRankPropagation () {
@@ -130,6 +158,107 @@ function verifyLevelRankPropagation () {
     ['prop-small-joker', 'prop-level', 'prop-ace'],
     'HandGrouping must retain the authoritative level rank while reconciling newly dealt cards',
   )
+}
+
+function verifyUnifiedDisplayOrdering () {
+  const ordinaryHand = [
+    card('ordinary-big', 'Big', 'joker'),
+    card('ordinary-small', 'Small', 'joker'),
+    card('level-7-a', 7, 'spade'), card('level-7-b', 7, 'heart'),
+    card('ordinary-A', 'A', 'club'),
+    card('ordinary-K-a', 'K', 'spade'), card('ordinary-K-b', 'K', 'heart'), card('ordinary-K-c', 'K', 'club'),
+    card('ordinary-Q-a', 'Q', 'spade'), card('ordinary-Q-b', 'Q', 'heart'),
+    card('ordinary-3', 3, 'diamond'),
+  ]
+  const units = [
+    { key: 'big', groupId: null, origin: 'single', locked: false, cardIds: ['ordinary-big'] },
+    { key: 'small', groupId: null, origin: 'single', locked: false, cardIds: ['ordinary-small'] },
+    { key: 'level-pair', groupId: 'level-pair', origin: 'rank', locked: false, cardIds: ['level-7-a', 'level-7-b'] },
+    { key: 'ace', groupId: null, origin: 'single', locked: false, cardIds: ['ordinary-A'] },
+    { key: 'king-triple', groupId: 'king-triple', origin: 'rank', locked: false, cardIds: ['ordinary-K-a', 'ordinary-K-b', 'ordinary-K-c'] },
+    { key: 'queen-pair', groupId: 'queen-pair', origin: 'rank', locked: false, cardIds: ['ordinary-Q-a', 'ordinary-Q-b'] },
+    { key: 'three', groupId: null, origin: 'single', locked: false, cardIds: ['ordinary-3'] },
+  ]
+  assert.deepEqual(
+    sortHandDisplayUnits(ordinaryHand, units.slice().reverse(), classicRuleProfile, 'point-stacked', { direction: 'desc', levelRank: 7 }).map(unit => unit.key),
+    ['big', 'small', 'level-pair', 'ace', 'king-triple', 'queen-pair', 'three'],
+    'single, pair and triple lanes must interleave by effective rank, with level cards between jokers and A',
+  )
+
+  const aceLevelUnits = units.filter(unit => ['big', 'small', 'ace', 'king-triple'].includes(unit.key))
+  assert.deepEqual(
+    sortHandDisplayUnits(ordinaryHand, aceLevelUnits.slice().reverse(), classicRuleProfile, 'point-stacked', { direction: 'desc', levelRank: 'A' }).map(unit => unit.key),
+    ['big', 'small', 'ace', 'king-triple'],
+    'when A is level its lane must sit between both jokers and K',
+  )
+  const lockedMultiplicityUnits = units
+    .filter(unit => ['ace', 'king-triple', 'queen-pair'].includes(unit.key))
+    .map(unit => ({ ...unit, locked: unit.key !== 'ace' }))
+  assert.deepEqual(
+    sortHandDisplayUnits(ordinaryHand, lockedMultiplicityUnits.slice().reverse(), classicRuleProfile, 'point-stacked', { direction: 'asc', levelRank: 7 }).map(unit => unit.key),
+    ['king-triple', 'queen-pair', 'ace'],
+    'locked triples must precede locked pairs regardless of the ordinary point direction',
+  )
+
+  const structuredHand = [
+    card('rocket-big-a', 'Big', 'joker'), card('rocket-big-b', 'Big', 'joker'),
+    card('rocket-small-a', 'Small', 'joker'), card('rocket-small-b', 'Small', 'joker'),
+    ...Array.from({ length: 6 }, (_, index) => card(`bomb-6-${index}`, 9, ['spade', 'heart', 'club', 'diamond'][index % 4])),
+    ...[10, 'J', 'Q', 'K', 'A'].map(rank => card(`flush-${String(rank)}`, rank, 'spade')),
+    ...Array.from({ length: 5 }, (_, index) => card(`bomb-5-${index}`, 8, ['spade', 'heart', 'club', 'diamond'][index % 4])),
+    ...Array.from({ length: 4 }, (_, index) => card(`bomb-4-${index}`, 'K', ['spade', 'heart', 'club', 'diamond'][index])),
+    ...[6, 7].flatMap(rank => Array.from({ length: 3 }, (_, index) => card(`plate-${rank}-${index}`, rank, ['spade', 'heart', 'club'][index]))),
+    card('structured-A', 'A', 'diamond'),
+  ]
+  const structuredUnits = [
+    { key: 'ordinary', groupId: null, origin: 'single', locked: false, cardIds: ['structured-A'] },
+    { key: 'plate', groupId: 'plate', origin: 'auto', locked: false, cardIds: structuredHand.filter(item => item.id.startsWith('plate-')).map(item => item.id) },
+    { key: 'bomb-4', groupId: 'bomb-4', origin: 'auto', locked: false, cardIds: structuredHand.filter(item => item.id.startsWith('bomb-4-')).map(item => item.id) },
+    { key: 'bomb-5', groupId: 'bomb-5', origin: 'auto', locked: false, cardIds: structuredHand.filter(item => item.id.startsWith('bomb-5-')).map(item => item.id) },
+    { key: 'straight-flush', groupId: 'straight-flush', origin: 'auto', locked: false, cardIds: structuredHand.filter(item => item.id.startsWith('flush-')).map(item => item.id) },
+    { key: 'bomb-6', groupId: 'bomb-6', origin: 'auto', locked: false, cardIds: structuredHand.filter(item => item.id.startsWith('bomb-6-')).map(item => item.id) },
+    { key: 'rocket', groupId: 'rocket', origin: 'auto', locked: false, cardIds: structuredHand.filter(item => item.id.startsWith('rocket-')).map(item => item.id) },
+  ]
+  assert.deepEqual(
+    sortHandDisplayUnits(structuredHand, structuredUnits, classicRuleProfile, 'smart-arranged', { direction: 'desc', levelRank: 7 }).map(unit => unit.key),
+    ['rocket', 'bomb-6', 'straight-flush', 'bomb-5', 'bomb-4', 'plate', 'ordinary'],
+    'large combinations must stay left and bombs must use the same strength order as the shared rules',
+  )
+  const lockedStructuredUnits = structuredUnits.map(unit => ({ ...unit, locked: unit.groupId !== null }))
+  assert.deepEqual(
+    sortHandDisplayUnits(structuredHand, lockedStructuredUnits, classicRuleProfile, 'point-stacked', { direction: 'desc', levelRank: 7 }).map(unit => unit.key),
+    ['rocket', 'bomb-6', 'straight-flush', 'bomb-5', 'bomb-4', 'plate', 'ordinary'],
+    'explicit locks must form a left zone ordered by shared rule strength without entering smart arrangement',
+  )
+  assert.deepEqual(
+    sortHandDisplayUnits(structuredHand, lockedStructuredUnits, tournamentRuleProfile, 'point-stacked', { direction: 'desc', levelRank: 7 }).map(unit => unit.key),
+    ['rocket', 'bomb-6', 'bomb-5', 'bomb-4', 'plate', 'straight-flush', 'ordinary'],
+    'a tournament straight flush must stay in the structured locked tier instead of masquerading as a bomb',
+  )
+
+  const regressionHand = [
+    card('regression-A', 'A', 'spade'),
+    card('regression-K', 'K', 'club'),
+    card('regression-5-a', 5, 'spade'),
+    card('regression-5-b', 5, 'heart'),
+    card('regression-3-a', 3, 'spade'),
+    card('regression-3-b', 3, 'heart'),
+    card('regression-3-c', 3, 'club'),
+    card('regression-3-d', 3, 'diamond'),
+  ]
+  const grouping = new HandGrouping(regressionHand, { arrangement: { direction: 'desc', levelRank: 7 }, ruleProfile: classicRuleProfile })
+  grouping.stackMatchingRanks()
+  grouping.arrange({ direction: 'desc' })
+  assert.deepEqual(
+    grouping.getSnapshot().displayUnits.map(unit => unit.cardIds),
+    [['regression-A'], ['regression-K'], ['regression-5-a', 'regression-5-b'], ['regression-3-a', 'regression-3-b', 'regression-3-c', 'regression-3-d']],
+    'point-stacked mode must keep even a four-card bomb at its effective point instead of promoting it left',
+  )
+  assert.equal(grouping.getSnapshot().layoutMode, 'point-stacked')
+  grouping.autoGroup()
+  grouping.stackMatchingRanks()
+  assert.equal(grouping.getSnapshot().layoutMode, 'smart-arranged')
+  assert.deepEqual(grouping.getSnapshot().displayUnits[0].cardIds, ['regression-3-a', 'regression-3-b', 'regression-3-c', 'regression-3-d'])
 }
 
 function verifyOneKeyRestoreSnapshot () {
@@ -176,7 +305,7 @@ function verifyMatchingRankStacksAndCompleteRestore () {
   assert.equal(grouping.restoreSnapshot(untouched), true)
   assert.deepEqual(grouping.getSnapshot().displayCardIds, untouched.displayCardIds, 'restore must recover every formerly loose card')
 
-  const originalGroupId = grouping.createGroup(['rank-9-spade', 'rank-9-heart'])
+  const originalGroupId = grouping.createLockedGroup(['rank-9-spade', 'rank-9-heart'], classicRuleProfile)
   const mixedBaseline = grouping.getSnapshot()
   grouping.arrange({ direction: 'asc' })
   grouping.stackMatchingRanks()
@@ -201,24 +330,38 @@ function verifyWorkspaceTransactionBoundary () {
     card('workspace-3', 3, 'club'),
   ]
   const workspace = new HandWorkspace()
-  assert.equal(workspace.syncAuthoritativeHand(hand, { levelRank: 2, direction: 'desc', autoSort: true }), true)
-  assert.equal(workspace.syncAuthoritativeHand(hand.slice().reverse(), { levelRank: 2, direction: 'desc', autoSort: true }), false, 'transport order alone must not reset presentation state')
+  const syncOptions = { roundId: 1, levelRank: 2, direction: 'desc', autoSort: true, ruleProfile: classicRuleProfile }
+  assert.equal(workspace.syncAuthoritativeHand(hand, syncOptions), true)
+  assert.equal(workspace.syncAuthoritativeHand(hand.slice().reverse(), syncOptions), false, 'transport order alone must not reset presentation state')
   assert.deepEqual(workspace.snapshot.groups.map(group => group.kind), ['rank-stack'])
+  assert.equal(workspace.snapshot.layoutMode, 'point-stacked')
+  assert.deepEqual(
+    workspace.snapshot.displayUnits.map(unit => unit.cardIds),
+    [['workspace-A'], ['workspace-9-spade', 'workspace-9-heart', 'workspace-9-club', 'workspace-9-diamond'], ['workspace-3']],
+    'an untouched four-card point stack must remain between higher and lower points',
+  )
 
   workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
   assert.equal(workspace.snapshot.groups.some(group => group.kind === 'bomb'), true, 'smart arrangement must consume editable default stacks')
+  assert.equal(workspace.snapshot.layoutMode, 'smart-arranged')
+  assert.deepEqual(workspace.snapshot.displayUnits[0].cardIds, ['workspace-9-spade', 'workspace-9-heart', 'workspace-9-club', 'workspace-9-diamond'])
   assert.equal(workspace.canRestoreArrangement, true)
   workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
   assert.deepEqual(workspace.snapshot.groups.map(group => group.kind), ['rank-stack'], 'restore must recover the complete pre-arrangement stack state')
+  assert.equal(workspace.snapshot.layoutMode, 'point-stacked')
 
   workspace.beginManualSelection()
   assert.equal(workspace.toggleManualCard('workspace-9-spade'), 'selected')
   assert.equal(workspace.toggleManualCard('workspace-9-heart'), 'selected')
-  assert.equal(workspace.canLockSelection(), true, 'cards in a default rank stack must remain selectable for a legal lock')
-  assert.equal(workspace.commitManualSelection(), true)
+  assert.equal(workspace.canLockSelection(classicRuleProfile), true, 'cards in a default rank stack must remain selectable for a legal lock')
+  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
   const locked = workspace.snapshot.groups.find(group => group.cardIds.includes('workspace-9-spade'))
   assert.ok(locked)
   assert.notEqual(locked.kind, 'rank-stack')
+  assert.equal(locked.origin, 'manual')
+  assert.equal(locked.locked, true)
+  assert.equal(workspace.snapshot.displayCardIds[0], 'workspace-9-spade', 'an explicit lock must move directly into the left locked zone')
+  assert.equal(workspace.snapshot.displayCardIds.at(-1), 'workspace-3')
 
   const lockedSnapshot = JSON.parse(JSON.stringify(locked))
   workspace.toggleArrangement({ direction: 'asc', allowAceLowStraight: true })
@@ -231,8 +374,205 @@ function verifyWorkspaceTransactionBoundary () {
   assert.deepEqual(workspace.snapshot.groups.find(group => group.id === locked.id), lockedSnapshot)
 
   workspace.beginManualSelection()
-  assert.equal(workspace.toggleManualCard('workspace-9-spade'), 'locked', 'an explicit lock must reject later manual selection')
-  assert.equal(workspace.canLockSelection(), false)
+  assert.equal(workspace.toggleManualCard('workspace-9-spade'), 'unlock-selected', 'an explicit lock must enter whole-group unlock selection')
+  assert.equal(workspace.canLockSelection(classicRuleProfile), false)
+  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.equal(workspace.snapshot.displayCardIds[0], 'workspace-A', 'unlocking must return released cards to point-stacked rank order')
+}
+
+function verifyLockChangesStayIndependentFromArrangementRestore () {
+  const hand = [
+    card('independent-A', 'A', 'spade'),
+    card('independent-Q-a', 'Q', 'spade'),
+    card('independent-Q-b', 'Q', 'heart'),
+    card('independent-3-a', 3, 'spade'),
+    card('independent-3-b', 3, 'heart'),
+    card('independent-3-c', 3, 'club'),
+    card('independent-3-d', 3, 'diamond'),
+    card('independent-2', 2, 'club'),
+  ]
+  const workspace = new HandWorkspace()
+  workspace.syncAuthoritativeHand(hand, {
+    roundId: 8,
+    levelRank: 2,
+    direction: 'desc',
+    autoSort: true,
+    ruleProfile: classicRuleProfile,
+  })
+  workspace.syncAuthoritativeHand(hand.filter(item => item.id !== 'independent-2'), {
+    roundId: 8,
+    levelRank: 2,
+    direction: 'desc',
+    autoSort: true,
+    ruleProfile: classicRuleProfile,
+  })
+  assert.deepEqual(
+    workspace.snapshot.displayUnits.map(unit => unit.cardIds),
+    [
+      ['independent-A'],
+      ['independent-Q-a', 'independent-Q-b'],
+      ['independent-3-a', 'independent-3-b', 'independent-3-c', 'independent-3-d'],
+    ],
+    'an authoritative hand update must not promote an existing four-card point stack before smart arrangement',
+  )
+  workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
+  assert.equal(workspace.snapshot.layoutMode, 'smart-arranged')
+
+  workspace.beginManualSelection()
+  workspace.toggleManualCard('independent-Q-a')
+  workspace.toggleManualCard('independent-Q-b')
+  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  const lockedPair = workspace.snapshot.groups.find(group => group.cardIds.includes('independent-Q-a'))
+  assert.ok(lockedPair?.locked, 'a lock created during smart arrangement must persist independently')
+
+  assert.equal(
+    workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true }),
+    'fallback-restored',
+    'changing lock membership invalidates only the old layout checkpoint',
+  )
+  assert.equal(workspace.snapshot.layoutMode, 'point-stacked')
+  assert.deepEqual(workspace.snapshot.groups.find(group => group.id === lockedPair.id), lockedPair)
+  assert.deepEqual(
+    workspace.snapshot.displayUnits.map(unit => unit.cardIds),
+    [
+      ['independent-Q-a', 'independent-Q-b'],
+      ['independent-A'],
+      ['independent-3-a', 'independent-3-b', 'independent-3-c', 'independent-3-d'],
+    ],
+    'fallback restore must keep the locked zone left while returning every other card to point stacks',
+  )
+}
+
+function verifyRankStacksReconcileAndUnlock () {
+  const initialHand = [
+    card('merge-A', 'A', 'spade'),
+    card('merge-Q-a', 'Q', 'spade'),
+    card('merge-Q-b', 'Q', 'heart'),
+    card('merge-3', 3, 'club'),
+  ]
+  const syncOptions = {
+    roundId: 11,
+    levelRank: 2,
+    direction: 'desc',
+    autoSort: true,
+    ruleProfile: classicRuleProfile,
+  }
+  const workspace = new HandWorkspace()
+  workspace.syncAuthoritativeHand(initialHand, syncOptions)
+  const originalRankStack = workspace.snapshot.groups.find(group => group.origin === 'rank')
+  assert.ok(originalRankStack)
+
+  workspace.syncAuthoritativeHand(initialHand.concat(
+    card('merge-Q-c', 'Q', 'club'),
+    card('merge-Q-d', 'Q', 'diamond'),
+  ), syncOptions)
+  let qStacks = workspace.snapshot.groups.filter(group =>
+    group.origin === 'rank' && group.cardIds.some(cardId => cardId.startsWith('merge-Q-')),
+  )
+  assert.equal(qStacks.length, 1, 'new cards of an existing physical rank must merge into one presentation lane')
+  assert.equal(qStacks[0].id, originalRankStack.id, 'reconciling a rank lane should preserve its stable group id')
+  idSetEquals(qStacks[0].cardIds, ['merge-Q-a', 'merge-Q-b', 'merge-Q-c', 'merge-Q-d'])
+
+  workspace.beginManualSelection()
+  workspace.toggleManualCard('merge-Q-a')
+  workspace.toggleManualCard('merge-Q-b')
+  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  const lockedPair = workspace.snapshot.groups.find(group => group.locked && group.cardIds.includes('merge-Q-a'))
+  assert.ok(lockedPair)
+  const unlockedPairStack = workspace.snapshot.groups.find(group =>
+    group.origin === 'rank' && group.cardIds.includes('merge-Q-c'),
+  )
+  assert.ok(unlockedPairStack, 'locking part of a rank lane must restack the remaining same-rank cards')
+  idSetEquals(unlockedPairStack.cardIds, ['merge-Q-c', 'merge-Q-d'])
+  workspace.beginManualSelection()
+  assert.equal(workspace.toggleManualCard('merge-Q-a'), 'unlock-selected')
+  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+
+  qStacks = workspace.snapshot.groups.filter(group =>
+    group.origin === 'rank' && group.cardIds.some(cardId => cardId.startsWith('merge-Q-')),
+  )
+  assert.equal(qStacks.length, 1, 'unlocking a group must immediately rebuild one physical-rank lane')
+  idSetEquals(qStacks[0].cardIds, ['merge-Q-a', 'merge-Q-b', 'merge-Q-c', 'merge-Q-d'])
+  assert.equal(workspace.lockedCardIds.length, 0)
+}
+
+function verifySmartArrangementRecomputesAfterAuthorityChange () {
+  const initialHand = [
+    card('recompute-A', 'A', 'spade'),
+    card('recompute-3-a', 3, 'spade'),
+    card('recompute-3-b', 3, 'heart'),
+    card('recompute-3-c', 3, 'club'),
+    card('recompute-3-d', 3, 'diamond'),
+    card('recompute-5-a', 5, 'spade'),
+    card('recompute-5-b', 5, 'heart'),
+    card('recompute-5-c', 5, 'club'),
+  ]
+  const syncOptions = {
+    roundId: 12,
+    levelRank: 2,
+    direction: 'desc',
+    autoSort: true,
+    ruleProfile: classicRuleProfile,
+  }
+  const workspace = new HandWorkspace()
+  workspace.syncAuthoritativeHand(initialHand, syncOptions)
+  workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
+  assert.equal(
+    workspace.snapshot.groups.some(group => group.origin === 'auto' && group.kind === 'bomb' && group.cardIds.every(cardId => cardId.startsWith('recompute-3-'))),
+    true,
+  )
+
+  const changedHand = initialHand
+    .filter(item => item.id !== 'recompute-3-d')
+    .concat(card('recompute-5-d', 5, 'diamond'))
+  workspace.syncAuthoritativeHand(changedHand, syncOptions)
+  assert.equal(workspace.snapshot.layoutMode, 'smart-arranged')
+  assert.equal(workspace.canRestoreArrangement, true)
+  assert.equal(
+    workspace.snapshot.groups.some(group => group.origin === 'auto' && group.kind === 'bomb' && group.cardIds.every(cardId => cardId.startsWith('recompute-5-'))),
+    true,
+    'smart arrangement must recompute current legal groups after an authoritative hand change',
+  )
+  assert.equal(
+    workspace.snapshot.groups.some(group => group.kind === 'bomb' && group.cardIds.some(cardId => cardId.startsWith('recompute-3-'))),
+    false,
+    'smart arrangement must discard a combination invalidated by the authoritative hand',
+  )
+}
+
+function verifySmartUnlockReprojectsTheLayout () {
+  const hand = [
+    card('unlock-smart-A', 'A', 'spade'),
+    card('unlock-smart-K', 'K', 'club'),
+    card('unlock-smart-3', 3, 'heart'),
+    card('unlock-smart-4', 4, 'heart'),
+    card('unlock-smart-5', 5, 'heart'),
+    card('unlock-smart-6', 6, 'heart'),
+    card('unlock-smart-7', 7, 'heart'),
+  ]
+  const workspace = new HandWorkspace()
+  workspace.syncAuthoritativeHand(hand, {
+    roundId: 13,
+    levelRank: 2,
+    direction: 'desc',
+    autoSort: true,
+    ruleProfile: classicRuleProfile,
+  })
+  assert.equal(workspace.selectStraightFlush('heart'), true)
+  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.equal(workspace.lockedCardIds.length, 5)
+  workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
+
+  workspace.beginManualSelection()
+  assert.equal(workspace.toggleManualCard('unlock-smart-3'), 'unlock-selected')
+  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  const snapshot = workspace.snapshot
+  assert.equal(snapshot.layoutMode, 'smart-arranged')
+  assert.equal(workspace.lockedCardIds.length, 0, 'unlocking must remove persistent lock ownership')
+  assert.equal(snapshot.displayUnits[0].origin, 'auto')
+  assert.equal(snapshot.groups[0].kind, 'straight-flush')
+  assert.equal(snapshot.groups[0].locked, false, 'smart recognition after unlock must remain recomputable')
+  idSetEquals(snapshot.groups[0].cardIds, ['unlock-smart-3', 'unlock-smart-4', 'unlock-smart-5', 'unlock-smart-6', 'unlock-smart-7'])
 }
 
 function verifySuggestions () {
@@ -298,30 +638,110 @@ function verifySuggestions () {
     false,
     'wildcards must never be suggested as additional small/big jokers',
   )
+
+  const conflictWildcard = card('conflict-wild', 7, 'heart', { value: 15, isLevelCard: true, isRedJoker: true })
+  const wildcardConflictHand = [
+    card('conflict-s5', 5, 'spade'),
+    card('conflict-s6', 6, 'spade'),
+    conflictWildcard,
+    card('conflict-s8', 8, 'spade'),
+    card('conflict-s9', 9, 'spade'),
+    card('conflict-h9', 9, 'heart'),
+    card('conflict-c9', 9, 'club'),
+  ]
+  const conflictSuggestions = suggestHandGroups(wildcardConflictHand)
+  const conflictFlush = conflictSuggestions.find(suggestion => suggestion.kind === 'straight-flush' &&
+    suggestion.wildcardUsages.some(usage => usage.cardId === conflictWildcard.id))
+  const conflictBomb = conflictSuggestions.find(suggestion => suggestion.kind === 'bomb' &&
+    suggestion.wildcardUsages.some(usage => usage.cardId === conflictWildcard.id))
+  assert.ok(conflictFlush && conflictBomb, 'the shared wildcard must produce both competing candidates')
+  assert.ok(
+    conflictSuggestions.indexOf(conflictFlush) < conflictSuggestions.indexOf(conflictBomb),
+    'shared rule strength must rank a straight flush above a four-card bomb',
+  )
+  const selectedConflict = selectNonOverlappingSuggestions(conflictSuggestions)
+  assert.equal(selectedConflict[0]?.key, conflictFlush.key, 'smart grouping must spend the conflicting wildcard on the stronger straight flush')
+  assert.equal(selectedConflict.some(suggestion => suggestion.key === conflictBomb.key), false)
+  assert.deepEqual(
+    selectNonOverlappingSuggestions(suggestHandGroups(wildcardConflictHand.slice().reverse())),
+    selectedConflict,
+    'wildcard conflict resolution must not depend on authoritative hand order',
+  )
+
+  const tournamentConflictSuggestions = suggestHandGroups(wildcardConflictHand, {
+    allowAceLowStraight: tournamentRuleProfile.allowA2345Straight,
+    ruleProfile: tournamentRuleProfile,
+  })
+  const tournamentConflict = selectNonOverlappingSuggestions(tournamentConflictSuggestions, tournamentRuleProfile)
+  assert.equal(
+    tournamentConflict[0]?.kind,
+    'bomb',
+    'a tournament straight flush is an ordinary straight and must not outrank a conflicting bomb',
+  )
+  const tournamentGrouping = new HandGrouping(wildcardConflictHand, { ruleProfile: tournamentRuleProfile })
+  assert.equal(
+    tournamentGrouping.autoGroup({ allowAceLowStraight: tournamentRuleProfile.allowA2345Straight })[0]?.kind,
+    'bomb',
+    'automatic grouping must use the rule profile owned by HandGrouping',
+  )
+
+  const secondConflictWildcard = card('conflict-wild-2', 7, 'heart', { value: 15, isLevelCard: true, isRedJoker: true })
+  const naturalBombConflictHand = wildcardConflictHand
+    .concat(secondConflictWildcard, card('conflict-d9', 9, 'diamond'))
+  const naturalConflictSuggestions = suggestHandGroups(naturalBombConflictHand)
+  const naturalBombCandidates = naturalConflictSuggestions.filter(suggestion =>
+    suggestion.kind === 'bomb' && suggestion.primaryValue === 9)
+  assert.equal(naturalBombCandidates.length, 1, 'a complete natural bomb must suppress wildcard-extended dominated variants')
+  assert.equal(naturalBombCandidates[0].cardIds.length, 4)
+  assert.equal(naturalBombCandidates[0].wildcardUsages.length, 0)
+  const naturalConflictFlush = naturalConflictSuggestions.find(suggestion => suggestion.kind === 'straight-flush')
+  assert.ok(naturalConflictFlush)
+  assert.ok(
+    naturalConflictSuggestions.indexOf(naturalConflictFlush) < naturalConflictSuggestions.indexOf(naturalBombCandidates[0]),
+    'the filtered bomb-family order must still put a straight flush above the overlapping natural four-bomb',
+  )
+  assert.deepEqual(
+    selectNonOverlappingSuggestions(suggestHandGroups(naturalBombConflictHand.slice().reverse())),
+    selectNonOverlappingSuggestions(naturalConflictSuggestions),
+    'natural-bomb and two-wildcard conflicts must remain stable under reversed input',
+  )
+
+  const strengthOrderHand = [
+    card('strength-small-a', 'Small', 'joker'), card('strength-small-b', 'Small', 'joker'),
+    card('strength-big-a', 'Big', 'joker'), card('strength-big-b', 'Big', 'joker'),
+    ...['a', 'b', 'c', 'd', 'e', 'f'].map((suffix, index) =>
+      card(`strength-Q-${suffix}`, 'Q', ['spade', 'heart', 'club', 'diamond'][index % 4])),
+    ...[2, 3, 4, 5, 6].map(rank => card(`strength-flush-${rank}`, rank, 'heart')),
+  ]
+  const strengthOrder = suggestHandGroups(strengthOrderHand)
+  const kingBombIndex = strengthOrder.findIndex(suggestion => suggestion.kind === 'king-bomb')
+  const sixBombIndex = strengthOrder.findIndex(suggestion => suggestion.kind === 'bomb' && suggestion.cardIds.length === 6)
+  const straightFlushIndex = strengthOrder.findIndex(suggestion => suggestion.kind === 'straight-flush')
+  const fiveBombIndex = strengthOrder.findIndex(suggestion => suggestion.kind === 'bomb' && suggestion.cardIds.length === 5)
+  assert.ok(
+    kingBombIndex < sixBombIndex && sixBombIndex < straightFlushIndex && straightFlushIndex < fiveBombIndex,
+    'bomb-family suggestions must retain rocket > 6+ bomb > straight flush > 4/5 bomb ordering',
+  )
 }
 
 function verifyGroupingLifecycle () {
   const ruleHand = [
-    card('a', 2), card('b', 5), card('c', 8), card('d', 'J'), card('e', 'K'), card('f', 'A'),
+    card('a', 2, 'spade'), card('b', 2, 'heart'), card('c', 5, 'spade'),
+    card('d', 5, 'heart'), card('e', 'K'), card('f', 'A'),
   ]
   const originalRuleOrder = ruleHand.map(item => item.id)
   const grouping = new HandGrouping(ruleHand, { arrangement: { direction: 'asc', levelCards: 'natural' } })
 
-  const first = grouping.createGroup(['a', 'b', 'c'])
-  const second = grouping.createGroup(['d', 'e'])
+  const first = grouping.createLockedGroup(['a', 'b'], classicRuleProfile, 0)
+  const second = grouping.createLockedGroup(['c', 'd'], classicRuleProfile, 1)
   assert.deepEqual(grouping.getSnapshot().groups.map(group => group.id), [first, second])
-  grouping.moveCard('c', { groupId: first, beforeCardId: 'a' })
-  assert.deepEqual(grouping.getSnapshot().groups.find(group => group.id === first).cardIds, ['c', 'a', 'b'], 'cards must reorder within a group by cardId')
-  grouping.moveCard('c', { groupId: second, beforeCardId: 'e' })
-  assert.deepEqual(grouping.getSnapshot().groups.find(group => group.id === first).cardIds, ['a', 'b'])
-  assert.deepEqual(grouping.getSnapshot().groups.find(group => group.id === second).cardIds, ['d', 'c', 'e'], 'cards must move across groups by cardId')
+  grouping.moveGroup(second, first)
+  assert.deepEqual(grouping.getSnapshot().groups.map(group => group.id), [second, first], 'whole groups may be reordered without changing locked membership')
 
   assert.equal(grouping.undo(), true)
-  assert.deepEqual(grouping.getSnapshot().groups.find(group => group.id === first).cardIds, ['c', 'a', 'b'])
-  assert.equal(grouping.undo(), true)
-  assert.deepEqual(grouping.getSnapshot().groups.find(group => group.id === first).cardIds, ['a', 'b', 'c'], 'multi-step undo must restore the earlier group')
+  assert.deepEqual(grouping.getSnapshot().groups.map(group => group.id), [first, second])
   assert.equal(grouping.redo(), true)
-  assert.deepEqual(grouping.getSnapshot().groups.find(group => group.id === first).cardIds, ['c', 'a', 'b'])
+  assert.deepEqual(grouping.getSnapshot().groups.map(group => group.id), [second, first])
 
   assert.equal(grouping.splitGroup(second), true)
   assert.equal(grouping.getSnapshot().groups.some(group => group.id === second), false, 'split must return every group card to the ungrouped lane')
@@ -332,13 +752,15 @@ function verifyGroupingLifecycle () {
   assert.deepEqual(ruleHand.map(item => item.id), originalRuleOrder, 'manual grouping must never reorder rule-layer cards')
 
   grouping.restoreDefault()
-  const serverGroup = grouping.createGroup(['a', 'b', 'c'])
+  const serverGroup = grouping.createLockedGroup(['a', 'b'], classicRuleProfile)
   grouping.syncAuthoritativeHand(ruleHand.filter(item => item.id !== 'b'))
   let snapshot = grouping.getSnapshot()
   assert.equal(snapshot.canUndo, false, 'an authoritative hand update must invalidate old undo history')
   assert.equal(snapshot.canRedo, false)
   assert.equal(snapshot.displayCardIds.includes('b'), false, 'a played cardId must disappear from every presentation lane')
-  assert.deepEqual(snapshot.groups.find(group => group.id === serverGroup).cardIds, ['a', 'c'])
+  assert.equal(snapshot.groups.some(group => group.id === serverGroup), false, 'a changed manual lock must release every survivor')
+  assert.equal(snapshot.ungroupedCardIds.includes('a') && snapshot.ungroupedCardIds.includes('c'), true)
+  assert.equal(grouping.isCardLocked('a'), false)
   assert.equal(grouping.undo(), false, 'undo must never resurrect a card removed by the server')
 
   grouping.replaceHandFromServer(ruleHand.filter(item => !['b', 'c'].includes(item.id)).concat(card('new-card', 3, 'diamond')))
@@ -347,6 +769,29 @@ function verifyGroupingLifecycle () {
   assert.equal(snapshot.ungroupedCardIds.includes('new-card'), true, 'newly dealt server cards must join the ungrouped order')
   assert.equal(new Set(snapshot.displayCardIds).size, snapshot.displayCardIds.length)
   idSetEquals(snapshot.displayCardIds, snapshot.handCardIds)
+}
+
+function verifyBoundedGroupingHistory () {
+  const history = new HandGroupingHistory(2, value => ({ ...value }))
+  let current = { value: 0 }
+  history.record(current)
+  current = { value: 1 }
+  history.record(current)
+  current = { value: 2 }
+  history.record(current)
+  current = { value: 3 }
+  current = history.undo(current)
+  assert.deepEqual(current, { value: 2 })
+  current = history.undo(current)
+  assert.deepEqual(current, { value: 1 }, 'history must retain only its configured number of prior states')
+  assert.equal(history.undo(current), null)
+  current = history.redo(current)
+  assert.deepEqual(current, { value: 2 })
+  history.record(current)
+  assert.equal(history.canRedo, false, 'recording a new branch must retire stale redo states')
+  history.clear()
+  assert.equal(history.canUndo, false)
+  assert.equal(history.canRedo, false)
 }
 
 function verifyAutoGrouping () {
@@ -372,15 +817,15 @@ function verifyLockedGroupsSurviveArrangement () {
     card('loose-nine-diamond', 9, 'diamond'),
   ]
   const hand = straightFlush.concat([
-    card('manual-K', 'K', 'heart'),
-    card('manual-2', 2, 'diamond'),
+    card('manual-K-heart', 'K', 'heart'),
+    card('manual-K-spade', 'K', 'spade'),
     ...looseBomb,
     card('loose-A', 'A', 'spade'),
     card('loose-4', 4, 'heart'),
   ])
   const grouping = new HandGrouping(hand)
   const straightFlushGroupId = grouping.lockStraightFlush('club')
-  const manualGroupId = grouping.createGroup(['manual-K', 'manual-2'])
+  const manualGroupId = grouping.createLockedGroup(['manual-K-heart', 'manual-K-spade'], classicRuleProfile)
   assert.ok(straightFlushGroupId)
 
   const lockedBefore = grouping.getSnapshot().groups
@@ -395,7 +840,15 @@ function verifyLockedGroupsSurviveArrangement () {
   }
   assert.equal(grouping.arrange(arrangement), true)
   let snapshot = grouping.getSnapshot()
-  assert.deepEqual(snapshot.groups, lockedBefore, 'arrange must not reorder locked groups or cards inside a locked group')
+  for (const previous of lockedBefore) {
+    const current = snapshot.groups.find(group => group.id === previous.id)
+    assert.ok(current, 'arrange must retain every explicit lock')
+    assert.equal(current.locked, true)
+    assert.equal(current.origin, 'manual')
+    idSetEquals(current.cardIds, previous.cardIds)
+  }
+  assert.equal(snapshot.layoutMode, 'point-stacked')
+  assert.equal(snapshot.groups[0].id, straightFlushGroupId, 'basic suit sorting must use the configured suit anchor without switching to smart mode')
 
   const lockedCardIds = new Set(lockedBefore.flatMap(group => group.cardIds))
   const expectedLooseOrder = arrangeHandCardIds(hand, arrangement).filter(cardId => !lockedCardIds.has(cardId))
@@ -404,14 +857,19 @@ function verifyLockedGroupsSurviveArrangement () {
   const looseBeforeAutoGroup = new Set(snapshot.ungroupedCardIds)
   const applied = grouping.autoGroup()
   snapshot = grouping.getSnapshot()
+  assert.equal(snapshot.layoutMode, 'smart-arranged')
+  assert.equal(snapshot.groups[0].id, straightFlushGroupId, 'smart arrangement may promote a protected large combination by rule strength')
   assert.equal(applied.some(suggestion => suggestion.kind === 'bomb'), true, 'auto-group must still recognize patterns in loose cards')
   assert.equal(
     applied.every(suggestion => suggestion.cardIds.every(cardId => looseBeforeAutoGroup.has(cardId))),
     true,
     'auto-group suggestions must never consume a card from a locked group',
   )
-  assert.deepEqual(snapshot.groups.slice(0, lockedBefore.length), lockedBefore, 'auto-group must append without modifying prior locks')
-  assert.deepEqual(snapshot.groups.map(group => group.id).slice(0, 2), [straightFlushGroupId, manualGroupId])
+  assert.equal(snapshot.groups.find(group => group.id === straightFlushGroupId)?.locked, true)
+  assert.equal(snapshot.groups.find(group => group.id === manualGroupId)?.locked, true)
+  const autoGroups = snapshot.groups.filter(group => group.origin === 'auto')
+  assert.equal(autoGroups.length > 0, true)
+  assert.equal(autoGroups.every(group => group.locked === false), true, 'smart grouping must remain recomputable rather than becoming a lock')
 
   const newlyGrouped = new Set(applied.flatMap(suggestion => suggestion.cardIds))
   assert.deepEqual(
@@ -421,9 +879,12 @@ function verifyLockedGroupsSurviveArrangement () {
   )
   idSetEquals(snapshot.displayCardIds, hand.map(item => item.id))
 
-  const afterFirstAutoGroup = snapshot.groups
-  assert.deepEqual(grouping.autoGroup(), [], 'a second auto-group pass must treat prior smart groups as locked')
-  assert.deepEqual(grouping.getSnapshot().groups, afterFirstAutoGroup)
+  const secondPass = grouping.autoGroup()
+  assert.equal(secondPass.some(suggestion => suggestion.kind === 'bomb'), true, 'a second pass must deterministically recompute unlocked smart groups')
+  const afterSecondPass = grouping.getSnapshot()
+  assert.equal(afterSecondPass.groups.filter(group => group.origin === 'manual').length, 2)
+  assert.equal(afterSecondPass.groups.filter(group => group.origin === 'auto').every(group => group.locked === false), true)
+  idSetEquals(afterSecondPass.displayCardIds, hand.map(item => item.id))
 }
 
 function verifyDownwardStackLayout () {
@@ -436,7 +897,7 @@ function verifyDownwardStackLayout () {
   assert.deepEqual(triple.map(slot => slot.x), [triple[0].x, triple[0].x, triple[0].x], 'one arranged group must consume one horizontal lane')
   assert.ok(triple[0].y > triple[1].y && triple[1].y > triple[2].y, 'cards in an arranged group must cascade downward')
   assert.equal(triple[2].y, 0, 'the final full card must remain on the normal hand baseline')
-  assert.equal(triple.every(slot => slot.stackStep > 0), true)
+  assert.equal(triple.every(slot => slot.stackStep === STACK_EXPOSURE_HEIGHT), true, 'every covered card must expose one fixed point strip')
   assert.equal(layout.laneCount, 4, 'two groups and two loose cards must use four horizontal lanes')
   assert.equal(layout.maxRise, handStackRise(3))
   assert.deepEqual(layout.slots.map(slot => slot.cardId), display, 'layout must preserve the presentation card-id order')
@@ -446,40 +907,81 @@ function verifyDownwardStackLayout () {
     [{ id: 'large-bomb', cardIds: Array.from({ length: 10 }, (_, index) => `bomb-${index}`) }],
     680,
   )
-  assert.ok(huge.maxRise <= 96.001, 'large bombs must not grow through the action controls')
+  assert.equal(huge.maxRise, STACK_EXPOSURE_HEIGHT * 9, 'large stacks must retain the same exposure instead of being compressed')
+  assert.deepEqual(
+    huge.slots.slice(0, -1).map((slot, index) => slot.y - huge.slots[index + 1].y),
+    Array(9).fill(STACK_EXPOSURE_HEIGHT),
+    'every adjacent card, including joker ids, must use one identical pixel step',
+  )
   assert.equal(new Set(huge.slots.map(slot => slot.cardId)).size, 10)
+
+  const mixedFaces = createHandStackLayout(
+    ['normal', 'small-joker', 'big-joker'],
+    [{ id: 'mixed-faces', cardIds: ['normal', 'small-joker', 'big-joker'] }],
+    680,
+  )
+  assert.deepEqual(mixedFaces.slots.map(slot => slot.stackStep), [40, 40, 40], 'normal cards and both jokers share the same stack geometry')
 }
 
 function verifyArchitectureBoundary () {
   const arrangementSource = fs.readFileSync(arrangementPath, 'utf8')
+  const arrangementModelSource = fs.readFileSync(arrangementModelPath, 'utf8')
+  const displayOrderingSource = fs.readFileSync(displayOrderingPath, 'utf8')
+  const groupSuggestionsSource = fs.readFileSync(groupSuggestionsPath, 'utf8')
   const groupingSource = fs.readFileSync(groupingPath, 'utf8')
   const workspaceSource = fs.readFileSync(workspacePath, 'utf8')
-  for (const sourcePath of [arrangementPath, groupingPath, workspacePath, stackLayoutPath]) {
+  for (const sourcePath of [
+    arrangementPath,
+    arrangementModelPath,
+    displayOrderingPath,
+    groupSuggestionsPath,
+    groupingPath,
+    groupingStatePath,
+    groupingHistoryPath,
+    workspacePath,
+    stackLayoutPath,
+  ]) {
     assert.equal(fs.existsSync(`${sourcePath}.meta`), true, `missing Cocos metadata for ${sourcePath}`)
   }
   assert.doesNotMatch(groupingSource, /selectedCardIds|GameScene|GameManager|HandController/, 'grouping must remain independent from selection and scene state')
   assert.doesNotMatch(workspaceSource, /from 'cc'|GameScene|GameManager|HandController|TableGameHud/, 'the hand transaction must remain independent from Cocos and UI state')
-  assert.doesNotMatch(arrangementSource, /\.sort\(.*hand\)/, 'arrangement must sort a copy, never the rule hand itself')
+  assert.doesNotMatch(arrangementModelSource, /\.sort\(.*hand\)/, 'arrangement must sort a copy, never the rule hand itself')
+  assert.doesNotMatch(arrangementSource, /resolvePlay|allocatePattern/, 'the stable arrangement facade must not absorb implementation responsibilities')
+  assert.doesNotMatch(arrangementModelSource, /resolvePlay|HandDisplayOrdering|HandGroupSuggestions/, 'the base arrangement model must remain independent from display and candidate discovery')
+  assert.doesNotMatch(displayOrderingSource, /HandGroupSuggestions|suggestHandGroups/, 'display ordering must not discover semantic group candidates')
+  assert.doesNotMatch(groupSuggestionsSource, /HandDisplayOrdering|sortHandDisplayUnits/, 'candidate discovery must not depend on presentation ordering')
   assert.match(groupingSource, /syncAuthoritativeHand/)
-  assert.match(groupingSource, /undoStack/)
-  assert.match(groupingSource, /redoStack/)
+  assert.match(groupingSource, /HandGroupingHistory/, 'bounded undo and redo ownership must remain outside the grouping domain class')
+  assert.match(groupingSource, /normalizeHandGroupingState/, 'the grouping aggregate must delegate snapshot normalization to its state boundary')
+  assert.doesNotMatch(groupingSource, /private normalizeState \(/, 'snapshot normalization must not grow back into the grouping aggregate')
+  assert.doesNotMatch(groupingSource, /public createGroup \(/, 'arbitrary unchecked group creation must not remain public')
+  assert.doesNotMatch(groupingSource, /public moveCard \(/, 'single-card movement must not bypass locked-group invariants')
 }
 
 function verifyRuntimeIntegration () {
   const sceneSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts'), 'utf8')
+  const matchCoordinatorSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableMatchCoordinator.ts'), 'utf8')
+  const interactionSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableHandInteractionController.ts'), 'utf8')
+  const turnClockSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableTurnClockController.ts'), 'utf8')
   const workspaceSource = fs.readFileSync(workspacePath, 'utf8')
   const handSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/HandController.ts'), 'utf8')
-  assert.match(sceneSource, /private readonly handWorkspace = new HandWorkspace\(\)/, 'the table scene must own one presentation-side hand transaction')
-  assert.match(sceneSource, /this\.handWorkspace\.syncAuthoritativeHand\(humanHand, \{[\s\S]*levelRank: snapshot\.state\.currentLevel/, 'an authoritative hand update must pass the current level into the hand workspace')
+  assert.match(sceneSource, /new TableHandInteractionController\(\{/, 'the table scene must compose one hand interaction owner')
+  assert.match(matchCoordinatorSource, /handInteraction\.submit\(snapshot\)/, 'the live-match coordinator must project snapshots through the hand interaction owner')
+  assert.match(interactionSource, /private readonly workspace: HandWorkspace/, 'the hand interaction owner must exclusively hold the presentation workspace')
+  assert.match(interactionSource, /private readonly interaction = new HandInteractionStateMachine\(\)/, 'one explicit state machine must own the active hand input mode')
+  assert.match(interactionSource, /this\.workspace\.syncAuthoritativeHand\(hand, \{[\s\S]*levelRank: snapshot\.state\.currentLevel/, 'an authoritative hand update must pass the current level into the hand workspace')
+  assert.doesNotMatch(interactionSource, /from 'cc'/, 'the hand interaction owner must remain independently testable without Cocos')
   assert.match(workspaceSource, /this\.grouping\.autoGroup/, 'the hand workspace must own smart grouping')
   assert.match(workspaceSource, /this\.grouping\.stackMatchingRanks\(\)/, 'default table presentation must stack repeated ranks')
-  assert.match(workspaceSource, /this\.grouping\.createLockedGroup\(selected\)/, 'the hand workspace must own legal manual locking')
-  assert.match(sceneSource, /this\.handStackRise > 32 \? -47 : 47/, 'a raised hand stack must move the countdown below the action row')
-  assert.match(workspaceSource, /private readonly manualSelection = new Set<string>\(\)/, 'manual grouping must own one presentation-only selection')
-  assert.match(sceneSource, /if \(!this\.handWorkspace\.isManualSelectionActive\)[\s\S]*?(?:this\.gameManager|manager)\?\.toggleCard\(cardId\)/, 'normal taps must still route to the rule selection')
-  assert.match(sceneSource, /stackSelectionForBottomCard\(cardId\)[\s\S]*manager\.replaceSelectedCards/, 'a stack bottom must route through atomic rule selection')
-  assert.match(sceneSource, /playingTapMode !== 'blocked' \|\| this\.canInteractWithHand/, 'manual grouping must remain interactive outside the local turn without bypassing pending actions')
-  assert.doesNotMatch(sceneSource, /const selected = \[\.\.\.\(this\.gameManager\?\.selectedCardIds/, 'manual grouping must not reuse the play-selection set')
+  assert.match(workspaceSource, /this\.grouping\.createLockedGroup\(selected, ruleProfile\)/, 'the hand workspace must own legal manual locking with an explicit profile')
+  assert.doesNotMatch(turnClockSource, /handStackRise/, 'the countdown layer must not react to presentation-only hand height')
+  assert.match(turnClockSource, /const countdownY = update\.controlsY \+ 47/, 'the countdown must remain fixed above the action row')
+  assert.doesNotMatch(sceneSource, /Math\.max\(0, this\.handStackRise - 32\)/, 'table controls must not move to avoid card stacks')
+  assert.match(workspaceSource, /private lockDraft: HandLockDraft = \{ mode: 'idle' \}/, 'manual grouping must own one discriminated presentation transaction')
+  assert.match(interactionSource, /mode === 'play' \|\| mode === 'tribute'[\s\S]*this\.dependencies\.ruleAuthority\.toggleCard\(cardId\)/, 'only play and tribute modes may route taps to the rule selection')
+  assert.match(interactionSource, /playSelectionForCard\(cardId\)[\s\S]*ruleAuthority\.replaceSelectedCards/, 'an eligible stack member must route through atomic rule selection')
+  assert.match(interactionSource, /interactive: this\.interaction\.isLocking \|\| this\.canInteract/, 'only an explicit lock mode may keep the hand interactive outside the local turn')
+  assert.doesNotMatch(interactionSource, /const selected = \[\.\.\.\(this\.dependencies\.ruleAuthority\.selectedCardIds/, 'manual grouping must not reuse the play-selection set')
   assert.doesNotMatch(sceneSource, /toggleArrangePanel|ArrangeMenu|arrangeNodes|groupEditMode|activeHandGroupId/, 'retired hidden grouping controls must not remain in the live scene')
   assert.match(handSource, /displayCardIds\?: readonly string\[\]/, 'HandController must accept the presentation order without mutating rule cards')
   assert.match(handSource, /createHandStackLayout/, 'arranged groups must use the downward cascade layout')
@@ -487,22 +989,29 @@ function verifyRuntimeIntegration () {
   assert.match(handSource, /left\.slot\.stackIndex\s*-\s*right\.slot\.stackIndex/, 'later downward cards must render above the preceding card body')
   const cardViewSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/CardView.ts'), 'utf8')
   assert.doesNotMatch(cardViewSource, /\bLabel\b|`\$\{this\.card\.rank\}\$\{this\.card\.suit\}`/, 'covered cards must not reintroduce the retired text renderer')
-  assert.match(cardViewSource, /StackCornerRank/, 'covered cards need a compact classic rank sprite inside the exposed strip')
-  assert.match(cardViewSource, /StackCornerSuit/, 'covered cards need a compact classic suit sprite inside the exposed strip')
-  assert.match(cardViewSource, /setStackFrame\('rank',[\s\S]*plan\.cornerRank/, 'the compact rank must reuse the resolved classic PNG frame')
-  assert.match(cardViewSource, /setStackFrame\('suit',[\s\S]*plan\.cornerSuit/, 'the compact suit must reuse the resolved classic PNG frame')
-  assert.match(cardViewSource, /hiddenByStack[\s\S]*layer === 'cornerRank'[\s\S]*layer === 'cornerSuit'/, 'covered cards must hide the full-face corner layers before showing compact duplicates')
+  assert.doesNotMatch(cardViewSource, /StackRankSuit|StackCornerRank|StackCornerSuit|contentHeight|rankWidth|suitWidth/, 'stack hit geometry must never replace or resize the natural classic artwork')
+  assert.match(cardViewSource, /CLASSIC_CARD_LAYER_GEOMETRY\[layer\][\s\S]*geometry\.width[\s\S]*geometry\.height/, 'every stacked card must keep the shared natural card geometry')
+  assert.match(cardViewSource, /configureStackHitArea[\s\S]*applyHitAreaGeometry\(\)[\s\S]*refreshStateVisuals\(\)/, 'stack exposure must affect only input and exposed state overlays')
+  assert.match(handSource, /lockedCardIds\?: readonly string\[\]/, 'the hand renderer must accept an explicit persistent lock projection')
+  assert.match(handSource, /group\.locked \? group\.cardIds : \[\]/, 'live grouping projections must infer explicit locks when the optional id list is omitted')
+  assert.match(handSource, /locked: lockedIds\.has\(card\.id\)/, 'each card view must receive its persistent lock state')
 }
 
 verifyArchitectureBoundary()
 verifyRuntimeIntegration()
 verifyArrangement()
 verifyLevelRankPropagation()
+verifyUnifiedDisplayOrdering()
 verifyOneKeyRestoreSnapshot()
 verifyMatchingRankStacksAndCompleteRestore()
 verifyWorkspaceTransactionBoundary()
+verifyLockChangesStayIndependentFromArrangementRestore()
+verifyRankStacksReconcileAndUnlock()
+verifySmartArrangementRecomputesAfterAuthorityChange()
+verifySmartUnlockReprojectsTheLayout()
 verifySuggestions()
 verifyGroupingLifecycle()
+verifyBoundedGroupingHistory()
 verifyAutoGrouping()
 verifyLockedGroupsSurviveArrangement()
 verifyDownwardStackLayout()

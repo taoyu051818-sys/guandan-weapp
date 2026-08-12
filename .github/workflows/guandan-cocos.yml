@@ -1,0 +1,42 @@
+name: Guandan Cocos Client
+
+on:
+  pull_request:
+    paths:
+      - 'shared-core/**'
+      - 'work/guandan-cocos/**'
+      - '.github/workflows/guandan-cocos.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'shared-core/**'
+      - 'work/guandan-cocos/**'
+      - '.github/workflows/guandan-cocos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    env:
+      GUANDAN_FORCE_PACKAGE_TYPESCRIPT: '1'
+    defaults:
+      run:
+        working-directory: work/guandan-cocos
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: work/guandan-cocos/pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install shared core dependencies
+        run: pnpm --dir ../../shared-core install --frozen-lockfile
+      - name: Verify architecture, Cocos-independent types, and regressions
+        run: pnpm test:ci

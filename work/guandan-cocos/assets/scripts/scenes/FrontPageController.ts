@@ -3,9 +3,8 @@ import { LobbyController, type LobbySnapshot } from '../network/LobbyController'
 import {
   createDevelopmentGateways,
   SAMPLE_DASHBOARD,
-  type FrontPageGateways,
-  type MatchTicket,
 } from '../services/DevelopmentApis'
+import type { FrontPageGateways, MatchRecoveryEntry, MatchTicket } from '../services/FrontPageGatewayContracts'
 import { GameSession } from '../session/GameSession'
 import type { EffectQuality } from '../effects/EffectTypes'
 import { ScreenAdapter } from '../ui/ScreenAdapter'
@@ -60,6 +59,7 @@ export class FrontPageController {
   ) {
     this.router = new PageRouter(root, (previous, next) => {
       if (previous === 'spectator-feed' && next !== 'spectator-feed') this.replaySpectatorPage.leaveSpectatorFeed()
+      if (previous === 'effect-lab' && next !== 'effect-lab') this.effectLabPage.cancelPending()
       if (next !== 'menu') this.settingsRulesPage.dismissRulesState()
     })
     this.walletState = new FrontPageWalletState(gateways.configured)
@@ -174,9 +174,17 @@ export class FrontPageController {
 
   public showMenu (): void { this.lobbyPage.showMenu() }
 
+  public showRecoveryMenu (): void { this.lobbyPage.showMenu(true) }
+
   public showOnlinePlay (): void { this.lobbyPage.showOnlinePlay() }
 
-  public showLobby (): void { this.lobbyPage.showLobby() }
+  public showLobby (compensateReservation = true): void { this.lobbyPage.showLobby(compensateReservation) }
+
+  public handoffFriendRoomReservation (): void { this.lobbyPage.handoffFriendRoomReservation() }
+
+  public restoreFriendRoomReservation (entry: Extract<MatchRecoveryEntry, { roomKind: 'friend' }>): void {
+    this.lobbyPage.restoreFriendRoomReservation(entry)
+  }
 
   public renderLobby (snapshot: LobbySnapshot): void { this.lobbyPage.renderLobby(snapshot) }
 
@@ -185,6 +193,7 @@ export class FrontPageController {
     this.pageRequestToken += 1
     this.matchmakingPage.stop()
     this.replaySpectatorPage.stop()
+    this.effectLabPage.handleShellHidden()
     this.lobbyPage.hide()
     this.router.clear()
   }
@@ -192,13 +201,18 @@ export class FrontPageController {
   public resize (width: number, height: number): void {
     this.router.resize(width, height)
     if (this.disposed) return
-    if (this.router.current === 'menu') {
-      const reopenRules = this.settingsRulesPage.rulesVisible
-      this.lobbyPage.renderMenu()
-      if (reopenRules) this.settingsRulesPage.showRules()
-    }
-    else if (this.router.current === 'lobby') this.lobbyPage.renderLobby(this.lobby.snapshot)
-    else if (this.router.current === 'effect-lab') this.effectLabPage.reflow()
+    const route = this.router.current
+    const reopenRules = this.settingsRulesPage.rulesVisible
+    if (route && ['menu', 'online', 'classic-rooms', 'friend-room-settings', 'lobby'].includes(route)) this.lobbyPage.reflow()
+    else if (route && ['shop', 'product'].includes(route)) this.shopPage.reflow()
+    else if (route && ['competition', 'tournament-flow', 'tournament-standings'].includes(route)) this.competitionPage.reflow()
+    else if (route && ['player-center', 'season-tasks'].includes(route)) this.playerCenterPage.reflow()
+    else if (route && ['replay-list', 'replay-detail', 'spectator-list', 'spectator-feed'].includes(route)) this.replaySpectatorPage.reflow()
+    else if (route === 'settings') this.settingsRulesPage.reflow()
+    else if (route === 'matching') this.matchmakingPage.reflow()
+    else if (route === 'effect-lab') this.effectLabPage.reflow()
+    else if (route === 'more') this.showMoreMenu()
+    if (reopenRules) this.settingsRulesPage.showRules()
   }
 
   private readonly handleApplicationHide = (): void => {
@@ -216,7 +230,8 @@ export class FrontPageController {
     game.off(Game.EVENT_SHOW, this.handleApplicationShow)
     this.matchmakingPage.destroy()
     this.replaySpectatorPage.destroy()
-    this.lobbyPage.hide()
+    this.effectLabPage.cancelPending()
+    this.lobbyPage.destroy()
     this.disposed = true
     this.router.destroy()
   }

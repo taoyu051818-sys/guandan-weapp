@@ -1,31 +1,35 @@
 import { Card, PlayType, PlayAction, Rank, Suit, PlayResolution, WildcardUsage } from '../types/game';
 
 export interface RuleProfile {
-  allowA2345Straight: boolean;
-  straightFlushAsBomb: boolean;
-  enableTripleWithPair: boolean;
+  readonly allowA2345Straight: boolean;
+  readonly straightFlushAsBomb: boolean;
+  readonly enableTripleWithPair: boolean;
 }
 
-const RULE_PRESETS: Record<'classic' | 'tournament', RuleProfile> = {
-  classic: {
+export type RulePreset = 'classic' | 'tournament';
+
+const freezeProfile = (profile: RuleProfile): RuleProfile => Object.freeze(profile);
+
+export const RULE_PROFILES: Readonly<Record<RulePreset, RuleProfile>> = Object.freeze({
+  classic: freezeProfile({
     allowA2345Straight: true,
     straightFlushAsBomb: true,
     enableTripleWithPair: true,
-  },
-  tournament: {
+  }),
+  tournament: freezeProfile({
     allowA2345Straight: false,
     straightFlushAsBomb: false,
     enableTripleWithPair: true,
-  },
-};
+  }),
+});
 
-let currentRuleProfile: RuleProfile = RULE_PRESETS.classic;
+export const getRuleProfile = (preset: RulePreset): RuleProfile => RULE_PROFILES[preset];
 
-export const setRuleProfileByPreset = (preset: 'classic' | 'tournament') => {
-  currentRuleProfile = RULE_PRESETS[preset];
-};
-
-export const getRuleProfile = () => currentRuleProfile;
+export const ruleProfileKey = (profile: RuleProfile): string => [
+  Number(profile.allowA2345Straight),
+  Number(profile.straightFlushAsBomb),
+  Number(profile.enableTripleWithPair),
+].join(':');
 
 // 获取卡牌的值，包含A可以作为1的情况
 export const getFaceValue = (card: Card, isAceAsOne: boolean = false): number => {
@@ -190,21 +194,21 @@ const getBasePlayInfo = (cards: Card[], profile: RuleProfile): PlayResolution | 
   return null;
 };
 
-export const getPlayInfos = (cards: Card[]): PlayResolution[] => {
+export const getPlayInfos = (cards: Card[], profile: RuleProfile): PlayResolution[] => {
   if (cards.length === 0) return [];
 
   const wildcards = cards.filter(c => c.isRedJoker);
   const normalCards = cards.filter(c => !c.isRedJoker);
 
   if (wildcards.length === 0 || normalCards.length === 0) {
-    const info = getBasePlayInfo(cards, currentRuleProfile);
+    const info = getBasePlayInfo(cards, profile);
     return info ? [info] : [];
   }
 
   const validInfos = new Map<string, PlayResolution>();
 
   const tryAddInfo = (simulatedCards: Card[], wildcardUsages: WildcardUsage[]) => {
-    const info = getBasePlayInfo(simulatedCards, currentRuleProfile);
+    const info = getBasePlayInfo(simulatedCards, profile);
     if (info) {
       const key = `${info.type}-${info.maxValue}`;
       if (!validInfos.has(key)) {
@@ -215,44 +219,77 @@ export const getPlayInfos = (cards: Card[]): PlayResolution[] => {
 
   const suits: Suit[] = ['spade', 'heart', 'club', 'diamond'];
   const allValues = [2,3,4,5,6,7,8,9,10,11,12,13,14,15]; // 2到级牌
+  const naturalSuits = new Set(normalCards.map(card => card.suit).filter(suit => suit !== 'joker'));
+  const flushSuit = naturalSuits.size === 1 ? Array.from(naturalSuits)[0] : null;
+  // Suits affect only StraightFlush recognition. For each value assignment it
+  // is therefore sufficient to test one flush-preserving assignment and one
+  // deterministic non-flush assignment; pair/triple/bomb semantics are suitless.
+  const suitAssignments: Suit[][] = flushSuit
+    ? [
+        wildcards.map(() => flushSuit),
+        wildcards.map(() => suits.find(suit => suit !== flushSuit)!),
+      ]
+    : [wildcards.map(() => suits[0])];
+
+  const tryValues = (values: number[]): void => {
+    for (const assignedSuits of suitAssignments) {
+      const simulated = values.map((value, index): Card => ({
+        id: `sim${index + 1}`,
+        suit: assignedSuits[index],
+        rank: '2' as Rank,
+        value,
+        isLevelCard: false,
+        isRedJoker: false,
+      }));
+      tryAddInfo([...normalCards, ...simulated], values.map((value, index) => ({
+        cardId: wildcards[index].id,
+        representedValue: value,
+        representedSuit: assignedSuits[index],
+      })));
+    }
+  };
 
   if (wildcards.length === 1) {
-    for (const v of allValues) {
-      for (const s of suits) {
-        const simCard: Card = { id: 'sim', suit: s, rank: '2' as Rank, value: v, isLevelCard: false, isRedJoker: false };
-        tryAddInfo([...normalCards, simCard], [{ cardId: wildcards[0].id, representedValue: v, representedSuit: s }]);
-      }
-    }
+    for (const value of allValues) tryValues([value]);
   } else if (wildcards.length === 2) {
-    for (const v1 of allValues) {
-      for (const s1 of suits) {
-        for (const v2 of allValues) {
-          for (const s2 of suits) {
-            const simCard1: Card = { id: 'sim1', suit: s1, rank: '2' as Rank, value: v1, isLevelCard: false, isRedJoker: false };
-            const simCard2: Card = { id: 'sim2', suit: s2, rank: '2' as Rank, value: v2, isLevelCard: false, isRedJoker: false };
-            tryAddInfo([...normalCards, simCard1, simCard2], [
-              { cardId: wildcards[0].id, representedValue: v1, representedSuit: s1 },
-              { cardId: wildcards[1].id, representedValue: v2, representedSuit: s2 },
-            ]);
-          }
-        }
-      }
+    for (const first of allValues) {
+      for (const second of allValues) tryValues([first, second]);
     }
   }
 
   return Array.from(validInfos.values());
 };
 
-export const getPlayInfo = (cards: Card[]): PlayResolution | null => {
-  const infos = getPlayInfos(cards);
+export const isBombResolution = (info: PlayResolution): boolean =>
+  info.type === PlayType.Bomb || info.type === PlayType.StraightFlush || info.type === PlayType.Rocket;
+
+/** Positive means left is the stronger bomb resolution. */
+export const compareBombResolutions = (left: PlayResolution, right: PlayResolution): number => {
+  if (left.type === PlayType.Rocket) return right.type === PlayType.Rocket ? 0 : 1;
+  if (right.type === PlayType.Rocket) return -1;
+  return left.maxValue - right.maxValue;
+};
+
+const strongestResolution = (infos: PlayResolution[]): PlayResolution | null =>
+  infos.length
+    ? infos.reduce((previous, current) => previous.maxValue > current.maxValue ? previous : current)
+    : null;
+
+const weakestResolution = (infos: PlayResolution[]): PlayResolution | null =>
+  infos.length
+    ? infos.reduce((previous, current) => previous.maxValue <= current.maxValue ? previous : current)
+    : null;
+
+export const getPlayInfo = (cards: Card[], profile: RuleProfile): PlayResolution | null => {
+  const infos = getPlayInfos(cards, profile);
   if (infos.length === 0) return null;
   
   // 优先返回炸弹/同花顺等高级牌型
-  const bomb = infos.find(i => i.type === PlayType.Bomb || i.type === PlayType.StraightFlush || i.type === PlayType.Rocket);
+  const bomb = infos.find(isBombResolution);
   if (bomb) {
     // 找最大的炸弹
-    return infos.filter(i => i.type === PlayType.Bomb || i.type === PlayType.StraightFlush || i.type === PlayType.Rocket)
-                .reduce((prev, current) => (prev.maxValue > current.maxValue) ? prev : current);
+    return infos.filter(isBombResolution)
+      .reduce((previous, current) => compareBombResolutions(previous, current) > 0 ? previous : current);
   }
 
   // 对于普通牌型（如三带二，顺子等），如果有多种可能（因为逢人配模拟出不同的合法组合）
@@ -261,50 +298,60 @@ export const getPlayInfo = (cards: Card[]): PlayResolution | null => {
 };
 
 /** Explicit name for presentation consumers; getPlayInfo remains API-compatible. */
-export const resolvePlay = (cards: Card[]): PlayResolution | null => getPlayInfo(cards);
+export const resolvePlay = (cards: Card[], profile: RuleProfile): PlayResolution | null => getPlayInfo(cards, profile);
+
+const resolveAction = (action: PlayAction, profile: RuleProfile): PlayResolution | null => {
+  const infos = getPlayInfos(action.cards, profile);
+  const matchingType = infos.filter(info => info.type === action.type);
+  if (action.resolution) {
+    const exact = matchingType.find(info => info.maxValue === action.resolution?.maxValue);
+    if (exact) return exact;
+  }
+  return strongestResolution(matchingType) ?? strongestResolution(infos);
+};
+
+const beatsResolution = (
+  candidate: PlayResolution,
+  candidateLength: number,
+  target: PlayResolution,
+  targetLength: number,
+): boolean => {
+  if (target.type === PlayType.Rocket) return false;
+  if (candidate.type === PlayType.Rocket) return true;
+  const candidateBomb = isBombResolution(candidate);
+  const targetBomb = isBombResolution(target);
+  if (candidateBomb && !targetBomb) return true;
+  if (targetBomb) return candidateBomb && compareBombResolutions(candidate, target) > 0;
+  return candidate.type === target.type
+    && candidateLength === targetLength
+    && candidate.maxValue > target.maxValue;
+};
+
+/**
+ * Resolves ambiguity and legality as one operation. A response first uses the
+ * weakest same-type interpretation that wins, then the weakest sufficient bomb.
+ */
+export const resolvePlayForContext = (
+  cards: Card[],
+  lastPlay: PlayAction | null,
+  profile: RuleProfile,
+): PlayResolution | null => {
+  const infos = getPlayInfos(cards, profile);
+  if (!infos.length) return null;
+  if (!lastPlay || lastPlay.type === PlayType.Pass) return getPlayInfo(cards, profile);
+  const target = resolveAction(lastPlay, profile);
+  if (!target) return null;
+  const legal = infos.filter(info => beatsResolution(info, cards.length, target, lastPlay.cards.length));
+  const sameType = legal.filter(info => info.type === target.type);
+  return weakestResolution(sameType.length ? sameType : legal);
+};
 
 export const canPlay = (
   cards: Card[],
-  lastPlay: PlayAction | null
+  lastPlay: PlayAction | null,
+  profile: RuleProfile,
 ): boolean => {
-  const myInfos = getPlayInfos(cards);
-  if (myInfos.length === 0) return false;
-
-  if (!lastPlay || lastPlay.type === PlayType.Pass) return true;
-
-  const lastPlayInfos = getPlayInfos(lastPlay.cards);
-  if (lastPlayInfos.length === 0) return false; 
-  
-  // 我们只取上家当时打出的具体类型，但是由于 lastPlay 里面存了 type，我们可以直接用 lastPlay.type 和 lastPlay 的 maxValue
-  // 但为了安全，我们重新解析 lastPlay.cards 中符合 lastPlay.type 的 info
-  const validLastInfos = lastPlayInfos.filter(i => i.type === lastPlay.type);
-  const lastPlayInfo = validLastInfos.length > 0 
-    ? validLastInfos.reduce((prev, current) => (prev.maxValue > current.maxValue) ? prev : current)
-    : lastPlayInfos[0];
-
-  for (const playInfo of myInfos) {
-    if (playInfo.type === PlayType.Rocket) return true;
-
-    const isPlayBombType = playInfo.type === PlayType.Bomb || playInfo.type === PlayType.StraightFlush;
-    const isLastBombType = lastPlayInfo.type === PlayType.Bomb || lastPlayInfo.type === PlayType.StraightFlush;
-
-    if (isPlayBombType && !isLastBombType && lastPlayInfo.type !== PlayType.Rocket) {
-      return true;
-    }
-
-    if (isPlayBombType && isLastBombType) {
-      if (playInfo.maxValue > lastPlayInfo.maxValue) return true;
-    }
-
-    if (playInfo.type === lastPlayInfo.type) {
-      // Includes Single, Pair, Triple, TripleWithPair, etc.
-      if (cards.length === lastPlay.cards.length && playInfo.maxValue > lastPlayInfo.maxValue) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return resolvePlayForContext(cards, lastPlay, profile) !== null;
 };
 
 /**
@@ -330,47 +377,38 @@ export interface PlayValidation {
   requiredType: PlayType | null;
 }
 
-const isBombResolution = (info: PlayResolution) =>
-  info.type === PlayType.Bomb || info.type === PlayType.StraightFlush;
-
-const strongestResolution = (infos: PlayResolution[]): PlayResolution | null =>
-  infos.length
-    ? infos.reduce((previous, current) => previous.maxValue > current.maxValue ? previous : current)
-    : null;
-
 /**
  * Explains why a selected group can or cannot follow the current table play.
  * This deliberately calls `canPlay` first so the diagnostic can never reject
  * a group accepted by the actual rules path.
  */
-export const diagnosePlay = (cards: Card[], lastPlay: PlayAction | null): PlayValidation => {
+export const diagnosePlay = (cards: Card[], lastPlay: PlayAction | null, profile: RuleProfile): PlayValidation => {
   if (cards.length === 0) {
     return { code: 'empty', canPlay: false, resolution: null, requiredType: lastPlay?.type ?? null };
   }
 
-  const resolution = getPlayInfo(cards);
-  if (!resolution) {
+  const defaultResolution = getPlayInfo(cards, profile);
+  if (!defaultResolution) {
     return { code: 'invalid-combination', canPlay: false, resolution: null, requiredType: lastPlay?.type ?? null };
   }
-  if (canPlay(cards, lastPlay)) {
-    return { code: 'valid', canPlay: true, resolution, requiredType: lastPlay?.type ?? null };
+  const contextualResolution = resolvePlayForContext(cards, lastPlay, profile);
+  if (contextualResolution) {
+    return { code: 'valid', canPlay: true, resolution: contextualResolution, requiredType: lastPlay?.type ?? null };
   }
   if (!lastPlay || lastPlay.type === PlayType.Pass) {
     // Defensive fallback: a recognized leading play should already have been
     // accepted by canPlay, but callers still receive a safe non-playable code.
-    return { code: 'invalid-combination', canPlay: false, resolution, requiredType: null };
+    return { code: 'invalid-combination', canPlay: false, resolution: defaultResolution, requiredType: null };
   }
 
-  const myInfos = getPlayInfos(cards);
-  const lastInfos = getPlayInfos(lastPlay.cards);
-  const lastInfo = strongestResolution(lastInfos.filter(info => info.type === lastPlay.type))
-    ?? strongestResolution(lastInfos);
+  const myInfos = getPlayInfos(cards, profile);
+  const lastInfo = resolveAction(lastPlay, profile);
   if (!lastInfo) {
-    return { code: 'type-mismatch', canPlay: false, resolution, requiredType: lastPlay.type };
+    return { code: 'type-mismatch', canPlay: false, resolution: defaultResolution, requiredType: lastPlay.type };
   }
 
   if (lastInfo.type === PlayType.Rocket) {
-    return { code: 'rocket-unbeatable', canPlay: false, resolution, requiredType: lastInfo.type };
+    return { code: 'rocket-unbeatable', canPlay: false, resolution: defaultResolution, requiredType: lastInfo.type };
   }
 
   const myBombs = myInfos.filter(isBombResolution);
@@ -378,17 +416,17 @@ export const diagnosePlay = (cards: Card[], lastPlay: PlayAction | null): PlayVa
     return {
       code: myBombs.length ? 'bomb-too-small' : 'requires-bomb',
       canPlay: false,
-      resolution,
+      resolution: defaultResolution,
       requiredType: lastInfo.type,
     };
   }
 
   const matchingType = myInfos.filter(info => info.type === lastInfo.type);
   if (!matchingType.length) {
-    return { code: 'type-mismatch', canPlay: false, resolution, requiredType: lastInfo.type };
+    return { code: 'type-mismatch', canPlay: false, resolution: defaultResolution, requiredType: lastInfo.type };
   }
   if (cards.length !== lastPlay.cards.length) {
-    return { code: 'card-count-mismatch', canPlay: false, resolution, requiredType: lastInfo.type };
+    return { code: 'card-count-mismatch', canPlay: false, resolution: defaultResolution, requiredType: lastInfo.type };
   }
-  return { code: 'not-high-enough', canPlay: false, resolution, requiredType: lastInfo.type };
+  return { code: 'not-high-enough', canPlay: false, resolution: defaultResolution, requiredType: lastInfo.type };
 };

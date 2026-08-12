@@ -1,6 +1,8 @@
 export type HandStackGroup = Readonly<{
   id: string
   cardIds: readonly string[]
+  /** Present on live HandGrouping projections; omitted by layout-only callers. */
+  locked?: boolean
 }>
 
 export type HandStackSlot = Readonly<{
@@ -22,13 +24,20 @@ export type HandStackLayout = Readonly<{
 }>
 
 const MAX_LANE_SPACING = 68
-const MAX_STACK_STEP = 24
-const MAX_STACK_RISE = 96
+/**
+ * Every covered card exposes the same 40px point strip. The value is large
+ * enough for the 27x36 classic point artwork plus a small visual margin.
+ * It deliberately does not shrink for large stacks.
+ */
+export const STACK_EXPOSURE_HEIGHT = 40
 
-/** Keeps grouped cards readable without letting a large bomb cover the action row. */
+/**
+ * Grouping decides which physical point owns a lane. Layout is deliberately
+ * rank-agnostic: stack size and index alone determine the exposed height.
+ */
 export const handStackStep = (cardCount: number): number => {
   if (cardCount < 2) return 0
-  return Math.min(MAX_STACK_STEP, MAX_STACK_RISE / (cardCount - 1))
+  return STACK_EXPOSURE_HEIGHT
 }
 
 export const handStackRise = (cardCount: number): number => handStackStep(cardCount) * Math.max(0, cardCount - 1)

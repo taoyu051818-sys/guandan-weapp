@@ -1,4 +1,4 @@
-import type { PlayerDashboard } from '../../services/DevelopmentApis'
+import type { PlayerDashboard } from '../../services/FrontPageGatewayContracts'
 
 /** Shared player projection used by the lobby identity lane and player-center pages. */
 export class FrontPagePlayerState {

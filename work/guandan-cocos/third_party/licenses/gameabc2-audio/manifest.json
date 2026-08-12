@@ -5,15 +5,6 @@
   "runtimeDirectory": "assets/game-assets/audio/voices/licensed",
   "assets": [
     {
-      "label": "同花顺",
-      "key": "licensed/straight_flush",
-      "file": "straight_flush.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/9f/9f6d19fa-01ee-4668-913a-8c0b80345ba8.f5861.mp3",
-      "bytes": 28707,
-      "sha256": "1b99002fdc3d0709b3aadb63e0b878da827233bf8ed3c0f39a4a043679f3a6bb",
-      "contentType": "audio/mpeg"
-    },
-    {
       "label": "顺子",
       "key": "licensed/straight",
       "file": "straight.mp3",
@@ -47,16 +38,6 @@
       "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3e/3eb574c7-3cd1-4217-afb9-b08bce88c607.12cfb.mp3",
       "bytes": 34080,
       "sha256": "504eba7be6572a75e54f76f0c726baad9d3d14657b9b7d3df908d30d022c58be",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "等等，轿夫抬杠子对A",
-      "key": "licensed/pair_a_phrase",
-      "file": "pair_a_phrase.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/74/740f86a0-e430-4635-93a8-a80446351c6c.d7ceb.mp3",
-      "usage": "download-only-until-label-is-confirmed",
-      "bytes": 62112,
-      "sha256": "5528b4e0415183fb2314a97e30ad0b220c991afd536df175d013cc2f767b0556",
       "contentType": "audio/mpeg"
     },
     {
@@ -246,6 +227,29 @@
       "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/c2/c2d7d6ba-c33a-4ae3-97fb-b215dff3aebe.47c39.mp3",
       "bytes": 10659,
       "sha256": "acb0686d8a2928c104c8a64ac26682b257bba7d6d8eb4384fb3d7d46816f0a5c",
+      "contentType": "audio/mpeg"
+    }
+  ],
+  "archiveDirectory": "art-source/audio/licensed-archive",
+  "archived": [
+    {
+      "label": "同花顺",
+      "key": "licensed/straight_flush",
+      "file": "straight_flush.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/9f/9f6d19fa-01ee-4668-913a-8c0b80345ba8.f5861.mp3",
+      "reason": "Superseded by the single canonical NiuMa straight-flush announcement.",
+      "bytes": 28707,
+      "sha256": "1b99002fdc3d0709b3aadb63e0b878da827233bf8ed3c0f39a4a043679f3a6bb",
+      "contentType": "audio/mpeg"
+    },
+    {
+      "label": "等等，轿夫抬杠子对A",
+      "key": "licensed/pair_a_phrase",
+      "file": "pair_a_phrase.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/74/740f86a0-e430-4635-93a8-a80446351c6c.d7ceb.mp3",
+      "reason": "Meaning is unconfirmed; retained for source audit only.",
+      "bytes": 62112,
+      "sha256": "5528b4e0415183fb2314a97e30ad0b220c991afd536df175d013cc2f767b0556",
       "contentType": "audio/mpeg"
     }
   ],

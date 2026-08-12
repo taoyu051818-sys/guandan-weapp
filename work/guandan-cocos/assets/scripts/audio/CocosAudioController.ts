@@ -46,8 +46,7 @@ export class CocosAudioController extends Component {
   }
 
   protected onDestroy (): void {
-    this.playbackEpoch += 1
-    this.roundStartEpoch += 1
+    this.cancelTransientPlayback()
     this.session?.events.off('guandan:session', this.applySettings, this)
     this.bgmSource?.stop()
     this.pendingLoads.clear()
@@ -71,9 +70,17 @@ export class CocosAudioController extends Component {
 
   public playPass (): void { this.playEvent('pass') }
 
+  /** Invalidates delayed cues and in-flight optional loads at a table/session boundary. */
+  public cancelTransientPlayback (): void {
+    this.playbackEpoch += 1
+    this.roundStartEpoch += 1
+    this.effectSource?.stop()
+  }
+
   /** Plays the semantic start cue, then the existing deal event as a separate layer. */
   public playRoundStart (): void {
-    const token = ++this.roundStartEpoch
+    this.cancelTransientPlayback()
+    const token = this.roundStartEpoch
     this.playEvent('game-start')
     this.scheduleOnce(() => {
       if (token === this.roundStartEpoch) this.playEvent('deal')
@@ -124,8 +131,7 @@ export class CocosAudioController extends Component {
     const settings = this.session?.snapshot.settings
     const nextSoundEnabled = settings?.soundEnabled ?? true
     if (this.soundEnabled && !nextSoundEnabled) {
-      this.playbackEpoch += 1
-      this.roundStartEpoch += 1
+      this.cancelTransientPlayback()
     }
     this.soundEnabled = nextSoundEnabled
     if (!settings) return

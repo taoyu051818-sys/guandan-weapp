@@ -64,7 +64,7 @@ export async function preloadClassicCardFrames (plans: readonly ClassicCardPlan[
   return frames.every(Boolean)
 }
 
-/** Preloads the complete 49-component classic deck before the table appears. */
+/** Preloads the complete 37-component classic deck before the table appears. */
 export async function preloadAllClassicCardFrames (): Promise<boolean> {
   const frames = await Promise.all(ALL_CLASSIC_CARD_ASSET_NAMES.map(requestClassicCardFrame))
   return frames.every(Boolean)

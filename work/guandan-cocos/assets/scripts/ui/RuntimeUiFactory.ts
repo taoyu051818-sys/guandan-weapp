@@ -366,4 +366,13 @@ export class RuntimeUiFactory {
     })
     return edit.node.parent ?? edit.node
   }
+
+  public friendRoomInviteInput (x: number, y: number, initialValue = ''): EditBox {
+    return this.formInput('FriendRoomInviteInput', '粘贴完整邀请口令', x, y, {
+      width: 520,
+      maxLength: 160,
+      inputMode: EditBox.InputMode.ANY,
+      initialValue,
+    })
+  }
 }

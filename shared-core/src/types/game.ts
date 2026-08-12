@@ -115,10 +115,13 @@ export interface CampaignProgress {
   failed: boolean;
 }
 
-export interface AIRoundMeta {
+export interface RoundMeta {
   fromTribute: boolean;
   isAntiTribute: boolean;
 }
+
+/** @deprecated Use RoundMeta; retained for legacy GameState compatibility. */
+export type AIRoundMeta = RoundMeta;
 
 export interface GameState {
   status: 'menu' | 'grouping' | 'dealing' | 'playing' | 'tribute' | 'gameover' | 'settlement' | 'lobby';

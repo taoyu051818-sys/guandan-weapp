@@ -1,28 +1,22 @@
 import type { Card } from '../core/generated'
+import type { ClassicCardSuit } from './CardSkinResolver'
 
 export type CardFacePresentation = Readonly<{
   rank: string
-  suit: string
+  suit: ClassicCardSuit
   red: boolean
   levelCard: boolean
 }>
-
-const SUIT_GLYPHS = Object.freeze({
-  spade: '♠',
-  heart: '♥',
-  club: '♣',
-  diamond: '♦',
-} as const)
 
 /** One canonical conversion from rule cards to every visible card face. */
 export function mapCardToPresentation (card: Card): CardFacePresentation {
   if (card.suit === 'joker') {
     const big = card.rank === 'Big'
-    return { rank: big ? '大王' : '小王', suit: '王', red: big, levelCard: false }
+    return { rank: big ? 'Big' : 'Small', suit: 'joker', red: big, levelCard: false }
   }
   return {
     rank: String(card.rank),
-    suit: SUIT_GLYPHS[card.suit],
+    suit: card.suit,
     red: card.suit === 'heart' || card.suit === 'diamond',
     levelCard: card.isLevelCard,
   }

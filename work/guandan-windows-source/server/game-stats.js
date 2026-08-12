@@ -1,5 +1,5 @@
 const seats = ['p1', 'p2', 'p3', 'p4']
-const bombTypes = new Set(['Bomb', 'StraightFlush', 'Rocket'])
+const unconditionalBombTypes = new Set(['Bomb', 'Rocket'])
 const knownPlayTypes = new Set(['Single', 'Pair', 'Triple', 'Straight', 'TripleWithPair', 'Tube', 'Plate', 'StraightFlush', 'Bomb', 'Rocket'])
 
 const emptySeatStats = () => ({
@@ -29,13 +29,13 @@ export const ensureGameStatsBySeat = stats => {
 }
 
 /** Records only server-accepted actions, never client intents. */
-export const recordAuthoritativeAction = (statsBySeat, seat, { kind, playType = null, timedOut = false, trustee = false } = {}) => {
+export const recordAuthoritativeAction = (statsBySeat, seat, { kind, playType = null, timedOut = false, trustee = false } = {}, ruleProfile = null) => {
   if (!seats.includes(seat)) throw new TypeError('统计席位无效')
   const stats = ensureGameStatsBySeat(statsBySeat)[seat]
   if (kind === 'play') {
     stats.playsMade += 1
     if (knownPlayTypes.has(playType)) stats.playTypes[playType] = (Number(stats.playTypes[playType]) || 0) + 1
-    if (bombTypes.has(playType)) stats.bombsPlayed += 1
+    if (unconditionalBombTypes.has(playType) || (playType === 'StraightFlush' && ruleProfile?.straightFlushAsBomb !== false)) stats.bombsPlayed += 1
   } else if (kind === 'pass') stats.passesMade += 1
   else if (kind === 'tribute') stats.tributeActions += 1
   else if (kind === 'returnTribute') stats.returnTributeActions += 1
@@ -76,6 +76,6 @@ export const buildGameResultEvent = (room, result, finishedAt = Date.now()) => (
   winnerTeam: result.winnerTeam,
   teamLevels: result.teamLevels,
   statsBySeat: gameStatsForResult(room.statsBySeat),
+  finalSpectatorSequence: Math.max(0, Number(room.spectatorSequence) || 0),
   finishedAt,
 })
-

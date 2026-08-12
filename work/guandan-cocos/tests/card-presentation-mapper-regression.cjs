@@ -16,21 +16,25 @@ const card = (suit, rank) => ({ id: `${suit}-${rank}`, suit, rank, value: 0, isL
 
 async function verifyMappings () {
   const { mapCardToPresentation } = await import(`${pathToFileURL(mapperPath).href}?regression=${Date.now()}`)
-  assert.deepEqual(mapCardToPresentation(card('spade', 'A')), { rank: 'A', suit: '♠', red: false, levelCard: false })
-  assert.deepEqual(mapCardToPresentation(card('heart', 10)), { rank: '10', suit: '♥', red: true, levelCard: false })
-  assert.deepEqual(mapCardToPresentation(card('club', 'K')), { rank: 'K', suit: '♣', red: false, levelCard: false })
-  assert.deepEqual(mapCardToPresentation(card('diamond', 2)), { rank: '2', suit: '♦', red: true, levelCard: false })
-  assert.deepEqual(mapCardToPresentation(card('joker', 'Small')), { rank: '小王', suit: '王', red: false, levelCard: false })
-  assert.deepEqual(mapCardToPresentation(card('joker', 'Big')), { rank: '大王', suit: '王', red: true, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('spade', 'A')), { rank: 'A', suit: 'spade', red: false, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('heart', 10)), { rank: '10', suit: 'heart', red: true, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('club', 'K')), { rank: 'K', suit: 'club', red: false, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('diamond', 2)), { rank: '2', suit: 'diamond', red: true, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('joker', 'Small')), { rank: 'Small', suit: 'joker', red: false, levelCard: false })
+  assert.deepEqual(mapCardToPresentation(card('joker', 'Big')), { rank: 'Big', suit: 'joker', red: true, levelCard: false })
   assert.equal(mapCardToPresentation({ ...card('heart', 7), isLevelCard: true }).levelCard, true)
 }
 
 function verifyOneMappingBoundary () {
   assert.equal(fs.existsSync(mapperMetaPath), true, 'the canonical presentation mapper needs Cocos metadata')
+  const mapper = read(mapperPath)
   const hand = read(handPath)
   const playArea = read(playAreaPath)
   const effects = read(effectTypesPath)
   const vfx = read(vfxSnapshotPath)
+
+  assert.match(mapper, /suit:\s*ClassicCardSuit/, 'the canonical presentation must expose semantic suit ids')
+  assert.doesNotMatch(mapper, /[\u2660\u2663\u2665\u2666]/u, 'the canonical presentation must not emit host-font suit glyphs')
 
   for (const [name, source] of [['hand', hand], ['play area', playArea]]) {
     assert.match(source, /import \{ mapCardToPresentation \} from '\.\/CardPresentationMapper'/, `${name} must import the canonical mapper`)

@@ -1,12 +1,12 @@
 import { Color, Node, Vec3 } from 'cc'
-import {
-  SAMPLE_TOURNAMENTS,
-  type FrontPageGateways,
-  type MatchQueueId,
-  type TournamentState,
-  type TournamentStandings,
-  type TournamentSummary,
-} from '../../services/DevelopmentApis'
+import { SAMPLE_TOURNAMENTS } from '../../services/DevelopmentApis'
+import type {
+  FrontPageGateways,
+  MatchQueueId,
+  TournamentState,
+  TournamentStandings,
+  TournamentSummary,
+} from '../../services/FrontPageGatewayContracts'
 import type { ScreenAdapter } from '../../ui/ScreenAdapter'
 import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import type { PageRouter } from '../PageRouter'
@@ -51,6 +51,9 @@ export class CompetitionPageDomain {
   private dataState: RemoteDataState
   private pendingTournamentId: string | null = null
   private tournaments: TournamentSummary[]
+  private statusText = ''
+  private flowView: { tournament: TournamentSummary, state: TournamentState | null, status: string } | null = null
+  private standingsView: { tournament: TournamentSummary, result: TournamentStandings | null, status: string } | null = null
 
   public constructor (private readonly dependencies: CompetitionPageDependencies) {
     this.tournaments = dependencies.gateways.configured ? [] : SAMPLE_TOURNAMENTS
@@ -72,6 +75,7 @@ export class CompetitionPageDomain {
   }
 
   private render (statusText: string): void {
+    this.statusText = statusText
     const ui = this.dependencies.router.open('competition')
     const safeWidth = this.dependencies.screen.safeSize().x
     const safeHeight = this.dependencies.screen.safeSize().y
@@ -228,6 +232,7 @@ export class CompetitionPageDomain {
   }
 
   private renderTournamentFlow (tournament: TournamentSummary, state: TournamentState | null, status: string): void {
+    this.flowView = { tournament, state, status }
     const ui = this.dependencies.router.open('tournament-flow')
     ui.menuLabel(tournament.name, 0, 225, 40)
     ui.menuLabel(status, 0, 180, 18)
@@ -279,6 +284,7 @@ export class CompetitionPageDomain {
   }
 
   private renderTournamentStandings (tournament: TournamentSummary, result: TournamentStandings | null, status: string): void {
+    this.standingsView = { tournament, result, status }
     const ui = this.dependencies.router.open('tournament-standings')
     ui.menuLabel(tournament.name, 0, 220, 40)
     const roundText = tournament.roundsTotal ? `第 ${tournament.currentRound ?? 0}/${tournament.roundsTotal} 轮 · 前 ${result?.cutoffRank ?? tournament.advanceCount ?? 0} 名晋级` : '积分赛'
@@ -295,6 +301,13 @@ export class CompetitionPageDomain {
       ui.menuLabel(`我的排名：${mine.rank}. ${mine.displayName}    ${mine.points}分    ${mine.played}场/${mine.wins}胜    ${mark}`, 0, -145, 19)
     }
     this.pageButton(ui, '返回比赛场', -205, () => this.show())
+  }
+
+  public reflow (): void {
+    const route = this.dependencies.router.current
+    if (route === 'competition') this.render(this.statusText)
+    else if (route === 'tournament-flow' && this.flowView) this.renderTournamentFlow(this.flowView.tournament, this.flowView.state, this.flowView.status)
+    else if (route === 'tournament-standings' && this.standingsView) this.renderTournamentStandings(this.standingsView.tournament, this.standingsView.result, this.standingsView.status)
   }
 
   private replaceTournament (tournament: TournamentSummary): void {

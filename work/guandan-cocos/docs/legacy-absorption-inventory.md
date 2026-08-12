@@ -40,15 +40,16 @@
 
 来源：`素材/音效/音效.txt`。
 
-- 27 个 MP3 已下载到本地并改为语义化、不冲突的文件名。
+- 27 个 MP3 已下载到本地并改为语义化、不冲突的文件名；25 个运行时可达，2 个仅保留在包外来源归档。
 - 已记录原始 URL、字节数、Content-Type 与 SHA-256。
 - 已接入发牌、不要、失败、炸弹、顺子、同花顺，以及来源列表中明确标注的部分单张/对子报牌。
-- “等等，轿夫抬杠子对A”因语义不清，只归档不自动播放。
+- “等等，轿夫抬杠子对A”因语义不清只归档；重复的授权 CDN 同花顺语音也由 NiuMa 单一路由替代。两者均不进入 Cocos `assets/`。
 - 列表中的“炸弹特效图汇总”视觉质量不合格，明确排除且未下载。
 
 落地位置：
 
 - `assets/game-assets/audio/voices/licensed/`
+- `art-source/audio/licensed-archive/`
 - `third_party/licenses/gameabc2-audio/catalog.json`
 - `third_party/licenses/gameabc2-audio/manifest.json`
 - `scripts/import-licensed-audio.mjs`

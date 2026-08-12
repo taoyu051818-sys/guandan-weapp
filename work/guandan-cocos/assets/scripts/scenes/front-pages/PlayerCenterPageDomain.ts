@@ -1,5 +1,5 @@
 import { Node, Vec3 } from 'cc'
-import type { FrontPageGateways, PlayerDashboard, SeasonTaskList } from '../../services/DevelopmentApis'
+import type { FrontPageGateways, PlayerDashboard, SeasonTaskList } from '../../services/FrontPageGatewayContracts'
 import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import type { PageRouter } from '../PageRouter'
 import type { FrontPagePlayerState } from './FrontPagePlayerState'
@@ -27,6 +27,8 @@ export type PlayerCenterPageDependencies = {
 /** Owns the player overview and season-task pages. */
 export class PlayerCenterPageDomain {
   private pendingSeasonTaskId: string | null = null
+  private dashboardView: { dashboard: PlayerDashboard | null, status: string } = { dashboard: null, status: '' }
+  private taskView: { taskList: SeasonTaskList | null, status: string } = { taskList: null, status: '' }
 
   public constructor (private readonly dependencies: PlayerCenterPageDependencies) {}
 
@@ -51,6 +53,7 @@ export class PlayerCenterPageDomain {
   }
 
   private render (dashboard: PlayerDashboard | null, status: string): void {
+    this.dashboardView = { dashboard, status }
     const ui = this.dependencies.router.open('player-center')
     ui.menuLabel('个人中心', 0, 220, 42)
     ui.menuLabel(status, 0, 174, 18)
@@ -81,6 +84,7 @@ export class PlayerCenterPageDomain {
   }
 
   private renderSeasonTasks (taskList: SeasonTaskList | null, status: string): void {
+    this.taskView = { taskList, status }
     const ui = this.dependencies.router.open('season-tasks')
     ui.menuLabel(taskList?.season?.name ?? '赛季任务', 0, 220, 42)
     ui.menuLabel(status, 0, 174, 18)
@@ -92,6 +96,11 @@ export class PlayerCenterPageDomain {
       else ui.menuLabel(label, 0, 115 - index * 55, 19)
     })
     this.pageButton(ui, '返回个人中心', -205, () => { void this.show() })
+  }
+
+  public reflow (): void {
+    if (this.dependencies.router.current === 'player-center') this.render(this.dashboardView.dashboard, this.dashboardView.status)
+    else if (this.dependencies.router.current === 'season-tasks') this.renderSeasonTasks(this.taskView.taskList, this.taskView.status)
   }
 
   private async claimSeasonTask (taskId: string): Promise<void> {

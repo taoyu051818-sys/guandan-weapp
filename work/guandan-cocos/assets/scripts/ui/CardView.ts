@@ -1,9 +1,11 @@
 import { _decorator, Color, Component, EventTouch, Graphics, Node, Sprite, SpriteFrame, Tween, UIOpacity, UITransform, Vec2, Vec3, tween } from 'cc'
 import { getCachedClassicCardFrames, requestClassicCardFrames } from './ClassicCardFrameStore'
+import { CLASSIC_CARD_JOKER_GEOMETRY, CLASSIC_CARD_LAYER_GEOMETRY } from './ClassicCardGeometry'
+import type { ClassicCardLayer } from './ClassicCardGeometry'
 import { resolveClassicCardPlan } from './CardSkinResolver'
-import type { ClassicCardPlan } from './CardSkinResolver'
+import type { ClassicCardPlan, ClassicCardSuit } from './CardSkinResolver'
 
-export type CardPresentation = { id: string, rank: string, suit: string, red: boolean, levelCard: boolean, selected: boolean, interactive?: boolean }
+export type CardPresentation = { id: string, rank: string, suit: ClassicCardSuit, red: boolean, levelCard: boolean, selected: boolean, lockDraft?: boolean, locked?: boolean, interactive?: boolean }
 
 export const HAND_CARD_TOUCH_START = 'guandan:hand-card-touch-start'
 export const HAND_CARD_TOUCH_MOVE = 'guandan:hand-card-touch-move'
@@ -18,8 +20,7 @@ export type HandCardTouch = Readonly<{
 
 const { ccclass } = _decorator
 
-type ClassicLayer = 'background' | 'cornerRank' | 'cornerSuit' | 'center'
-type StackLayer = 'rank' | 'suit' | 'joker'
+type ClassicLayer = ClassicCardLayer
 
 /** Input-safe card view whose only face renderer is the composited classic art. */
 @ccclass('CardView')
@@ -28,15 +29,14 @@ export class CardView extends Component {
   private inputBound = false
   private surface: Graphics | null = null
   private selectionOverlay: Graphics | null = null
+  private lockDraftOverlay: Graphics | null = null
+  private lockOverlay: Graphics | null = null
   private levelFilter: Graphics | null = null
   private opacity: UIOpacity | null = null
   private bombReactionRoot: Node | null = null
   private visualRoot: Node | null = null
   private classicRoot: Node | null = null
   private readonly classicSprites = new Map<ClassicLayer, Sprite>()
-  private stackCornerRoot: Node | null = null
-  private readonly stackSprites = new Map<StackLayer, Sprite>()
-  private renderedPlan: ClassicCardPlan | null = null
   private expectedPlanKey = ''
   private artworkRequestId = 0
   private hitArea: Node | null = null
@@ -44,7 +44,7 @@ export class CardView extends Component {
   private hitAreaOffsetX = 0
   private hitAreaHeight = 114
   private hitAreaOffsetY = 0
-  private stackCornerVisible = false
+  private stackCovered = false
   private entranceEpoch = 0
   private entranceResolve: (() => void) | null = null
 
@@ -77,10 +77,14 @@ export class CardView extends Component {
     this.createClassicVisuals(visualRoot)
     this.createLevelFilter(visualRoot)
     this.createSelectionOverlay(visualRoot)
+    this.createLockDraftOverlay(visualRoot)
+    this.createLockOverlay(visualRoot)
     if (this.card) {
       this.applyCard(++this.artworkRequestId)
       this.redrawLevelFilter(this.card.levelCard)
       this.applySelectionVisual(this.card.selected)
+      this.applyLockDraftVisual(Boolean(this.card.lockDraft))
+      this.applyLockVisual(Boolean(this.card.locked))
     }
     this.syncInputBinding()
   }
@@ -105,6 +109,8 @@ export class CardView extends Component {
     this.applyCard(requestId)
     this.redrawLevelFilter(card.levelCard)
     this.applySelectionVisual(card.selected)
+    this.applyLockDraftVisual(Boolean(card.lockDraft))
+    this.applyLockVisual(Boolean(card.locked))
     this.syncInputBinding()
   }
 
@@ -122,10 +128,13 @@ export class CardView extends Component {
     this.applyHitAreaGeometry()
   }
 
-  /** Restricts every covered card to its exposed rank/suit strip. */
+  /**
+   * Restricts a covered card to its exposed strip without changing its visual
+   * scale or artwork. Normal cards and jokers use the same strip geometry.
+   */
   public configureStackHitArea (verticalStep: number, stackIndex: number, stackSize: number): void {
-    this.stackCornerVisible = verticalStep > 0 && stackSize > 1 && stackIndex < stackSize - 1
-    if (this.stackCornerVisible) {
+    this.stackCovered = verticalStep > 0 && stackSize > 1 && stackIndex < stackSize - 1
+    if (this.stackCovered) {
       this.hitAreaHeight = Math.max(1, Math.min(114, verticalStep))
       this.hitAreaOffsetY = (114 - this.hitAreaHeight) / 2
     } else {
@@ -133,7 +142,7 @@ export class CardView extends Component {
       this.hitAreaOffsetY = 0
     }
     this.applyHitAreaGeometry()
-    this.applyStackCorner()
+    this.refreshStateVisuals()
   }
 
   private applyHitAreaGeometry (): void {
@@ -162,46 +171,29 @@ export class CardView extends Component {
     this.applyClassicArtwork(requestId)
   }
 
-  /** Keeps covered cards readable by reusing the classic corner PNG frames. */
-  private applyStackCorner (): void {
-    if (!this.stackCornerRoot) return
-    const height = Math.max(10, this.hitAreaHeight)
-    const contentHeight = Math.max(8, Math.min(24, height - 2))
-    const rankWidth = Math.max(7, Math.min(18, contentHeight * 0.72))
-    const suitWidth = Math.max(7, Math.min(18, contentHeight * 0.95))
-    this.stackCornerRoot.getComponent(UITransform)?.setContentSize(66, height)
-    this.stackCornerRoot.setPosition(new Vec3(0, this.hitAreaOffsetY, 4))
-
-    const rank = this.stackSprites.get('rank')
-    rank?.node.setPosition(new Vec3(-25, 0, 0))
-    rank?.node.getComponent(UITransform)?.setContentSize(rankWidth, contentHeight)
-    const suit = this.stackSprites.get('suit')
-    suit?.node.setPosition(new Vec3(-7, 0, 0))
-    suit?.node.getComponent(UITransform)?.setContentSize(suitWidth, contentHeight)
-    const joker = this.stackSprites.get('joker')
-    joker?.node.setPosition(new Vec3(-25, 0, 0))
-    joker?.node.getComponent(UITransform)?.setContentSize(contentHeight * 115 / 169, contentHeight)
-    this.syncClassicLayerVisibility()
-  }
-
   private createClassicVisuals (parent: Node): void {
     const root = new Node('ClassicCardSkin')
     root.parent = parent
     root.active = false
     this.classicRoot = root
-    this.classicSprites.set('background', this.createClassicSprite(root, 'ClassicBackground', 76, 112, 0, 0, 0))
-    this.classicSprites.set('cornerRank', this.createClassicSprite(root, 'ClassicCornerRank', 20, 28, -26, 39, 2))
-    this.classicSprites.set('cornerSuit', this.createClassicSprite(root, 'ClassicCornerSuit', 18, 19, -26, 14, 2))
-    this.classicSprites.set('center', this.createClassicSprite(root, 'ClassicCenter', 43, 45, 7, -15, 1))
-    const stackCornerRoot = new Node('StackRankSuit')
-    stackCornerRoot.parent = root
-    stackCornerRoot.setPosition(new Vec3(0, 45, 4))
-    stackCornerRoot.addComponent(UITransform).setContentSize(66, 24)
-    stackCornerRoot.active = false
-    this.stackCornerRoot = stackCornerRoot
-    this.stackSprites.set('rank', this.createClassicSprite(stackCornerRoot, 'StackCornerRank', 17, 22, -25, 0, 0))
-    this.stackSprites.set('suit', this.createClassicSprite(stackCornerRoot, 'StackCornerSuit', 18, 22, -7, 0, 0))
-    this.stackSprites.set('joker', this.createClassicSprite(stackCornerRoot, 'StackCornerJoker', 15, 22, -25, 0, 0))
+    const layerNames: Readonly<Record<ClassicLayer, string>> = {
+      background: 'ClassicBackground',
+      cornerRank: 'ClassicCornerRank',
+      cornerSuit: 'ClassicCornerSuit',
+      center: 'ClassicCenter',
+    }
+    ;(Object.keys(CLASSIC_CARD_LAYER_GEOMETRY) as ClassicLayer[]).forEach(layer => {
+      const geometry = CLASSIC_CARD_LAYER_GEOMETRY[layer]
+      this.classicSprites.set(layer, this.createClassicSprite(
+        root,
+        layerNames[layer],
+        geometry.width,
+        geometry.height,
+        geometry.x,
+        geometry.y,
+        geometry.z,
+      ))
+    })
   }
 
   private createSelectionOverlay (parent: Node): void {
@@ -211,6 +203,24 @@ export class CardView extends Component {
     node.addComponent(UITransform).setContentSize(86, 122)
     this.selectionOverlay = node.addComponent(Graphics)
     this.redrawSelectionOverlay(false)
+  }
+
+  private createLockOverlay (parent: Node): void {
+    const node = new Node('CardLockOverlay')
+    node.parent = parent
+    node.setPosition(new Vec3(0, 0, 9))
+    node.addComponent(UITransform).setContentSize(86, 122)
+    this.lockOverlay = node.addComponent(Graphics)
+    this.redrawLockOverlay(false)
+  }
+
+  private createLockDraftOverlay (parent: Node): void {
+    const node = new Node('CardLockDraftOverlay')
+    node.parent = parent
+    node.setPosition(new Vec3(0, 0, 9))
+    node.addComponent(UITransform).setContentSize(86, 122)
+    this.lockDraftOverlay = node.addComponent(Graphics)
+    this.redrawLockDraftOverlay(false)
   }
 
   private createLevelFilter (parent: Node): void {
@@ -263,24 +273,12 @@ export class CardView extends Component {
     this.setClassicFrame('cornerSuit', plan.cornerSuit ? frames.get(plan.cornerSuit) ?? null : null)
     const centerAsset = plan.joker ?? plan.center
     this.setClassicFrame('center', centerAsset ? frames.get(centerAsset) ?? null : null)
-    this.setStackFrame('rank', plan.cornerRank ? frames.get(plan.cornerRank) ?? null : null)
-    this.setStackFrame('suit', plan.cornerSuit ? frames.get(plan.cornerSuit) ?? null : null)
-    this.setStackFrame('joker', plan.joker ? frames.get(plan.joker) ?? null : null)
     const centerNode = this.classicSprites.get('center')?.node
     const centerTransform = centerNode?.getComponent(UITransform)
-    if (plan.joker) {
-      centerNode?.setPosition(new Vec3(0, 0, 1))
-      centerTransform?.setContentSize(72, 106)
-    } else if (plan.center?.startsWith('role_')) {
-      centerNode?.setPosition(new Vec3(7, -9, 1))
-      centerTransform?.setContentSize(63, 87)
-    } else {
-      centerNode?.setPosition(new Vec3(7, -15, 1))
-      centerTransform?.setContentSize(43, 45)
-    }
-    this.renderedPlan = plan
+    const centerGeometry = plan.joker ? CLASSIC_CARD_JOKER_GEOMETRY : CLASSIC_CARD_LAYER_GEOMETRY.center
+    centerNode?.setPosition(new Vec3(centerGeometry.x, centerGeometry.y, centerGeometry.z))
+    centerTransform?.setContentSize(centerGeometry.width, centerGeometry.height)
     this.classicRoot!.active = true
-    this.applyStackCorner()
   }
 
   private setClassicFrame (layer: ClassicLayer, frame: SpriteFrame | null): void {
@@ -289,30 +287,8 @@ export class CardView extends Component {
     sprite.spriteFrame = frame
   }
 
-  private setStackFrame (layer: StackLayer, frame: SpriteFrame | null): void {
-    const sprite = this.stackSprites.get(layer)
-    if (sprite) sprite.spriteFrame = frame
-  }
-
-  private syncClassicLayerVisibility (): void {
-    const covered = this.stackCornerVisible && Boolean(this.renderedPlan)
-    for (const [layer, sprite] of this.classicSprites) {
-      const hiddenByStack = covered && (layer === 'cornerRank' || layer === 'cornerSuit' || (layer === 'center' && Boolean(this.renderedPlan?.joker)))
-      sprite.node.active = Boolean(sprite.spriteFrame) && !hiddenByStack
-    }
-    if (this.stackCornerRoot) this.stackCornerRoot.active = covered
-    const joker = Boolean(this.renderedPlan?.joker)
-    const rank = this.stackSprites.get('rank')
-    if (rank) rank.node.active = covered && !joker && Boolean(rank.spriteFrame)
-    const suit = this.stackSprites.get('suit')
-    if (suit) suit.node.active = covered && !joker && Boolean(suit.spriteFrame)
-    const jokerSprite = this.stackSprites.get('joker')
-    if (jokerSprite) jokerSprite.node.active = covered && joker && Boolean(jokerSprite.spriteFrame)
-  }
-
   private hideClassicArtwork (): void {
     if (this.classicRoot) this.classicRoot.active = false
-    this.renderedPlan = null
   }
 
   /** Staggered deal animation used for new hand cards. */
@@ -373,12 +349,70 @@ export class CardView extends Component {
     // A neutral dark wash preserves every classic PNG detail while the warm,
     // heavy outline remains legible on both red and black suits.
     this.selectionOverlay.fillColor = new Color(8, 18, 24, 82)
+    if (this.stackCovered) {
+      const height = Math.max(6, Math.min(112, this.hitAreaHeight))
+      const y = 56 - height
+      const radius = Math.min(8, height / 2)
+      this.selectionOverlay.roundRect(-38, y, 76, height, radius)
+      this.selectionOverlay.fill()
+      this.selectionOverlay.strokeColor = new Color(255, 205, 64, 255)
+      this.selectionOverlay.lineWidth = 4
+      const strokeHeight = Math.max(1, height - 2)
+      this.selectionOverlay.roundRect(-39, y + 1, 78, strokeHeight, Math.min(radius, strokeHeight / 2))
+      this.selectionOverlay.stroke()
+      return
+    }
     this.selectionOverlay.roundRect(-38, -56, 76, 112, 8)
     this.selectionOverlay.fill()
     this.selectionOverlay.strokeColor = new Color(255, 205, 64, 255)
     this.selectionOverlay.lineWidth = 4
     this.selectionOverlay.roundRect(-40, -58, 80, 116, 9)
     this.selectionOverlay.stroke()
+  }
+
+  private redrawLockOverlay (locked: boolean): void {
+    if (!this.lockOverlay) return
+    this.lockOverlay.clear()
+    if (!locked) return
+    this.lockOverlay.strokeColor = new Color(48, 205, 226, 255)
+    this.lockOverlay.lineWidth = 3
+    if (this.stackCovered) {
+      const height = Math.max(6, Math.min(112, this.hitAreaHeight))
+      const y = 56 - height
+      const strokeHeight = Math.max(1, height - 6)
+      this.lockOverlay.roundRect(-35, y + 3, 70, strokeHeight, Math.min(6, strokeHeight / 2))
+      this.lockOverlay.stroke()
+      return
+    }
+    this.lockOverlay.roundRect(-35, -53, 70, 106, 7)
+    this.lockOverlay.stroke()
+    // The small cool-colour clasp stays distinct from the gold selection state.
+    this.lockOverlay.fillColor = new Color(48, 205, 226, 230)
+    this.lockOverlay.roundRect(24, 42, 12, 10, 2)
+    this.lockOverlay.fill()
+    this.lockOverlay.strokeColor = new Color(234, 253, 255, 255)
+    this.lockOverlay.lineWidth = 2
+    this.lockOverlay.moveTo(27, 42)
+    this.lockOverlay.lineTo(27, 47)
+    this.lockOverlay.lineTo(33, 47)
+    this.lockOverlay.lineTo(33, 42)
+    this.lockOverlay.stroke()
+  }
+
+  private redrawLockDraftOverlay (active: boolean): void {
+    if (!this.lockDraftOverlay) return
+    this.lockDraftOverlay.clear()
+    if (!active) return
+    const height = this.stackCovered ? Math.max(6, Math.min(112, this.hitAreaHeight)) : 112
+    const y = this.stackCovered ? 56 - height : -56
+    const inset = this.stackCovered ? 2 : 0
+    this.lockDraftOverlay.fillColor = new Color(38, 170, 220, 52)
+    this.lockDraftOverlay.roundRect(-38 + inset, y + inset, 76 - inset * 2, Math.max(2, height - inset * 2), 7)
+    this.lockDraftOverlay.fill()
+    this.lockDraftOverlay.strokeColor = new Color(110, 229, 255, 255)
+    this.lockDraftOverlay.lineWidth = 4
+    this.lockDraftOverlay.roundRect(-38 + inset, y + inset, 76 - inset * 2, Math.max(2, height - inset * 2), 7)
+    this.lockDraftOverlay.stroke()
   }
 
   private redrawLevelFilter (isLevelCard: boolean): void {
@@ -397,6 +431,20 @@ export class CardView extends Component {
   private applySelectionVisual (selected: boolean): void {
     this.syncHitAreaPosition()
     this.redrawSelectionOverlay(selected)
+  }
+
+  private applyLockVisual (locked: boolean): void {
+    this.redrawLockOverlay(locked)
+  }
+
+  private applyLockDraftVisual (active: boolean): void {
+    this.redrawLockDraftOverlay(active)
+  }
+
+  private refreshStateVisuals (): void {
+    this.applySelectionVisual(Boolean(this.card?.selected))
+    this.applyLockDraftVisual(Boolean(this.card?.lockDraft))
+    this.applyLockVisual(Boolean(this.card?.locked))
   }
 
   private syncHitAreaPosition (): void {

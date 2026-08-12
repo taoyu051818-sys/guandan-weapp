@@ -1,10 +1,17 @@
 import { _decorator, Component } from 'cc'
-import { createGame, createTribute, dealNextRound, diagnosePlay, getPlayInfo, getPossiblePlays, giveTribute, highestCard, isRoundOver, lowestCard, makeDecision, passTurn, playCards, returnTribute, settle, tributeLeader } from '../core/generated'
-import type { Card, EngineState, PlayerId, PlayValidation, Rank, SettlementResult, Team, TributeState } from '../core/generated'
+import { diagnosePlay, getRuleProfile, legalMoves, type HintProtectedGroup } from '../core/generated'
+import type { Card, EngineState, GameEvent, PlayerId, PlayValidation, Rank, RuleProfile, SettlementResult, Team, TributeState } from '../core/generated'
 import { APPLICATION_AI_DIFFICULTY, GameSession } from '../session/GameSession'
 import { CocosAudioController } from '../audio/CocosAudioController'
-import { LobbyController, type LobbyNetworkResult } from '../network/LobbyController'
-import { canSelectPlayingHand } from './HandInteractionPolicy'
+import { LobbyController, type LobbyNetworkResult, type NetworkViewerRoundStats } from '../network/LobbyController'
+import { LocalAITurnController } from './LocalAITurnController'
+import { LocalHandSelectionController, playValidationHint } from './LocalHandSelectionController'
+import { localMatchFailureHint, LocalMatchController, type LocalMatchIntent, type LocalMatchOperationResult } from './LocalMatchController'
+import { LocalMatchEventController } from './LocalMatchEventController'
+import { NetworkMatchSnapshotController } from './NetworkMatchSnapshotController'
+import { NetworkActionController } from './NetworkActionController'
+import { createSynchronousLocalAIEngine } from './SynchronousLocalAIEngine'
+import { createGameManagerProjection, mergeGameManagerProjection, type GameManagerProjection } from './GameManagerProjection'
 
 export type GameSnapshot = {
   state: EngineState
@@ -19,25 +26,7 @@ export type GameSnapshot = {
   settlement: SettlementResult | null
 }
 
-const playTypeNames: Record<string, string> = {
-  Single: '单牌', Pair: '对子', Triple: '三张', Straight: '顺子', TripleWithPair: '三带二',
-  Tube: '三连对', Plate: '钢板', StraightFlush: '同花顺', Bomb: '炸弹', Rocket: '天王炸', Pass: '不要',
-}
-
-export const playValidationHint = (validation: PlayValidation): string => {
-  const typeName = validation.resolution ? (playTypeNames[validation.resolution.type] ?? validation.resolution.type) : ''
-  switch (validation.code) {
-    case 'valid': return `可出 · ${typeName}`
-    case 'empty': return '请选择手牌'
-    case 'invalid-combination': return '牌型不合法'
-    case 'type-mismatch': return '牌型不匹配，需同牌型或炸弹'
-    case 'card-count-mismatch': return '张数不匹配，需同牌型同张数'
-    case 'not-high-enough': return '点数压不过'
-    case 'requires-bomb': return '压不过，需要更大的炸弹'
-    case 'bomb-too-small': return '炸弹不够大'
-    case 'rocket-unbeatable': return '天王炸无法压过'
-  }
-}
+export { playValidationHint } from './LocalHandSelectionController'
 
 const { ccclass, property } = _decorator
 
@@ -56,111 +45,91 @@ export class GameManager extends Component {
   @property(LobbyController)
   public lobby: LobbyController | null = null
   public state!: EngineState
-  public selectedCardIds = new Set<string>()
-  public phase: 'playing' | 'tribute' | 'settlement' = 'playing'
-  public teamLevels: Record<Team, Rank> = { teamA: 2, teamB: 2 }
-  public aFailStreaks: Record<Team, number> = { teamA: 0, teamB: 0 }
-  public scores: Record<Team, number> = { teamA: 0, teamB: 0 }
-  public lastRoundRank: PlayerId[] = []
-  public tribute: TributeState | null = null
-  public settlement: SettlementResult | null = null
-  public actionPending = false
-  private hintIndex = 0
-  private aiTurnToken = 0
-  private networkActionToken = 0
-  private activeNetworkRequestId: number | null = null
-  private activeNetworkRequestType: string | null = null
+  private projection: GameManagerProjection = createGameManagerProjection()
+  private localMatch: LocalMatchController | null = null
+  private localAITurns: LocalAITurnController | null = null
+  private localMatchEvents: LocalMatchEventController | null = null
+  private readonly selection = new LocalHandSelectionController()
+  private networkActions: NetworkActionController | null = null
   private developmentFixtureActive = false
+  private localMatchGeneration = 0
+  private readonly networkSnapshots = new NetworkMatchSnapshotController({
+    getState: () => this.state,
+    getProjection: () => this.projection,
+    getRoomId: () => this.session?.snapshot.roomId ?? null,
+    getHumanId: () => this.humanId,
+    commit: (state, projection) => { this.state = state; this.projection = projection },
+    retireLocalMatch: () => this.retireLocalMatch(),
+    clearSelection: () => this.selection.clear(),
+    cancelPendingAction: () => this.networkActionController.cancel(),
+    setSessionPhase: phase => {
+      if (phase === 'playing') this.session?.beginPlay()
+      else if (phase === 'tribute') this.session?.beginTribute()
+      else this.session?.beginSettlement()
+    },
+    recordRound: ({ settlement, wasFirst, bombCount, scores }) => {
+      this.session?.recordRound(settlement.winnerTeam, wasFirst, bombCount, {
+        levelUp: settlement.levelUp,
+        currentLevel: settlement.currentLevel,
+        teamLevels: settlement.teamLevels,
+        scores,
+      })
+    },
+    publishHint: hint => this.emitSnapshot(hint),
+  })
 
   public startRound (dealer?: PlayerId): void {
     this.developmentFixtureActive = false
-    this.aiTurnToken += 1
+    this.retireLocalMatch()
+    this.networkSnapshots.reset()
+    this.projection = createGameManagerProjection()
     const session = this.session ?? this.getComponent(GameSession)
     const level = session?.snapshot.currentLevel ?? 2
     const roundDealer = dealer ?? session?.snapshot.dealerId ?? 'p1'
-    this.state = createGame(level, roundDealer)
-    this.selectedCardIds.clear()
-    this.networkActionToken += 1
-    this.actionPending = false
-    this.clearActiveNetworkRequest()
-    this.phase = 'playing'
-    this.teamLevels = session?.snapshot.teamLevels ?? { teamA: 2, teamB: 2 }
-    this.aFailStreaks = { teamA: 0, teamB: 0 }
-    this.scores = { teamA: 0, teamB: 0 }
-    this.lastRoundRank = []
-    this.tribute = null
-    this.settlement = null
+    const ruleProfile = session?.ruleProfile ?? getRuleProfile('classic')
+    const teamLevels = session?.snapshot.teamLevels ?? { teamA: 2, teamB: 2 }
+    this.localMatch = LocalMatchController.start({
+      ruleProfile,
+      level,
+      levelTeam: 'teamA',
+      teamLevels,
+      dealerId: roundDealer,
+    })
+    this.localAITurns = this.createLocalAITurnController(this.localMatch)
+    this.syncLocalProjection()
+    this.selection.clear()
+    this.networkActionController.cancel()
     this.audio?.playRoundStart()
     session?.beginPlay()
     this.emitSnapshot(this.state.currentTurn === this.humanId ? '新对局开始，轮到你出牌' : '新对局开始，电脑正在思考…')
-    if (this.state.currentTurn !== this.humanId) this.runNextAiTurn()
+    if (this.state.currentTurn !== this.humanId) this.localAITurns.runNext()
   }
 
   public toggleCard (cardId: string): void {
-    if (this.actionPending) return this.emitSnapshot('正在等待服务器确认')
-    if (this.phase !== 'playing' && this.phase !== 'tribute') return this.emitSnapshot('当前不能选择手牌')
-    if (this.phase === 'playing' && !canSelectPlayingHand(this.state, this.humanId, this.actionPending)) {
-      return this.emitSnapshot('请等待其他玩家出牌')
-    }
-    if (this.phase === 'tribute' && !this.canHumanActInTribute()) return this.emitSnapshot('当前等待其他玩家操作')
-    if (!this.state.players[this.humanId].hand.some(card => card.id === cardId)) {
-      this.selectedCardIds.delete(cardId)
-      return this.emitSnapshot('手牌已更新，请重新选择')
-    }
-    if (this.selectedCardIds.has(cardId)) {
-      this.selectedCardIds.delete(cardId)
-    } else {
-      if (this.phase === 'tribute') this.selectedCardIds.clear()
-      this.selectedCardIds.add(cardId)
-    }
-    const cards = this.selectedCards()
-    if (this.phase === 'tribute') {
-      this.emitSnapshot(cards.length === 1 ? '确认这张牌' : '进贡或还贡只能选择一张牌')
-      return
-    }
-    this.emitSnapshot(playValidationHint(diagnosePlay(cards, this.state.lastValidPlay)))
+    this.emitSnapshot(this.selection.toggle(cardId, this.selectionContext))
   }
 
   /** Replaces the current choice in one snapshot, used by locked hand stacks. */
   public replaceSelectedCards (cardIds: readonly string[]): void {
-    if (this.actionPending) return this.emitSnapshot('正在等待服务器确认')
-    if (this.phase !== 'playing' && this.phase !== 'tribute') return this.emitSnapshot('当前不能选择手牌')
-    if (this.phase === 'playing' && !canSelectPlayingHand(this.state, this.humanId, this.actionPending)) {
-      return this.emitSnapshot('请等待其他玩家出牌')
-    }
-    if (this.phase === 'tribute' && !this.canHumanActInTribute()) return this.emitSnapshot('当前等待其他玩家操作')
-
-    const requested = Array.from(new Set(cardIds))
-    const handIds = new Set(this.state.players[this.humanId].hand.map(card => card.id))
-    if (requested.some(cardId => !handIds.has(cardId))) {
-      this.selectedCardIds.clear()
-      return this.emitSnapshot('手牌已更新，请重新选择')
-    }
-    if (this.phase === 'tribute' && requested.length > 1) {
-      return this.emitSnapshot('进贡或还贡只能选择一张牌')
-    }
-
-    this.selectedCardIds = new Set(requested)
-    const cards = this.selectedCards()
-    if (this.phase === 'tribute') {
-      this.emitSnapshot(cards.length === 1 ? '确认这张牌' : '请选择一张牌')
-      return
-    }
-    this.emitSnapshot(playValidationHint(diagnosePlay(cards, this.state.lastValidPlay)))
+    this.emitSnapshot(this.selection.replaceFromInput(cardIds, this.selectionContext))
   }
 
   public playSelected (): void {
     if (this.actionPending || this.phase !== 'playing' || this.state.currentTurn !== this.humanId) return
     const cards = this.selectedCards()
-    const validation = diagnosePlay(cards, this.state.lastValidPlay)
+    const validation = diagnosePlay(cards, this.state.lastValidPlay, this.ruleProfile)
     if (!validation.canPlay) return this.emitSnapshot(playValidationHint(validation))
     if (this.session?.snapshot.isMultiplayer) {
       this.beginNetworkAction('正在等待服务器确认出牌…', 'play', () => this.lobby?.play(cards.map(card => card.id)) ?? null)
       return
     }
     try {
-      this.state = playCards(this.state, this.humanId, cards)
-      this.selectedCardIds.clear()
+      this.applyLocalCommand({
+        type: 'PLAY_CARDS',
+        playerId: this.humanId,
+        cardIds: cards.map(card => card.id),
+      })
+      this.selection.clear()
       this.finishHumanAction()
     } catch (error) {
       this.emitSnapshot(error instanceof Error ? error.message : '出牌失败')
@@ -175,9 +144,11 @@ export class GameManager extends Component {
       return
     }
     try {
-      this.state = passTurn(this.state, this.humanId)
-      this.selectedCardIds.clear()
-      this.audio?.playPass()
+      this.applyLocalCommand({
+        type: 'PASS',
+        playerId: this.humanId,
+      })
+      this.selection.clear()
       this.finishHumanAction()
     } catch (error) {
       this.emitSnapshot(error instanceof Error ? error.message : '当前不能不要')
@@ -185,51 +156,43 @@ export class GameManager extends Component {
   }
 
   /** Cycles legal human plays, preserving the desktop HandArea hint behavior. */
-  public hint (): void {
-    if (this.actionPending || this.phase !== 'playing' || this.state.currentTurn !== this.humanId) return
-    const choices = getPossiblePlays(this.state.players[this.humanId].hand, this.state.lastValidPlay, APPLICATION_AI_DIFFICULTY)
-    if (!choices.length) return this.emitSnapshot('没有可用提示，请选择不要')
-    const choice = choices[this.hintIndex++ % choices.length]
-    this.selectedCardIds = new Set(choice.map(card => card.id))
-    const validation = diagnosePlay(choice, this.state.lastValidPlay)
-    const info = validation.resolution ?? getPlayInfo(choice)
-    this.emitSnapshot(info ? `提示：${playTypeNames[info.type] ?? info.type} · 可出` : playValidationHint(validation))
+  public hint (protectedGroups: readonly HintProtectedGroup[] = []): void {
+    const hint = this.selection.hint(this.selectionContext, protectedGroups)
+    if (hint !== null) this.emitSnapshot(hint)
   }
 
   /** Clears a live rule selection when switching into a presentation-only grouping mode. */
   public clearRuleSelection (): void {
     if (this.actionPending) return
-    this.selectedCardIds.clear()
+    this.selection.clear()
     this.emitSnapshot('')
   }
 
   /** Stops delayed local actions before leaving the table. */
   public abortRound (): void {
-    this.aiTurnToken += 1
+    this.retireLocalMatch()
     this.unscheduleAllCallbacks()
-    this.selectedCardIds.clear()
-    this.networkActionToken += 1
-    this.actionPending = false
-    this.clearActiveNetworkRequest()
+    this.selection.clear()
+    this.networkActionController.cancel()
     this.developmentFixtureActive = false
+    this.networkSnapshots.reset()
+    this.projection = createGameManagerProjection()
   }
 
   /** Development-only caller entry: fixed scenarios never write local progression or stats. */
   public applyDevelopmentFixtureState (state: EngineState, label: string): void {
-    this.aiTurnToken += 1
+    this.retireLocalMatch()
+    this.networkSnapshots.reset()
+    this.projection = createGameManagerProjection()
     this.session?.beginLocalGame('standard')
-    this.state = state
-    this.selectedCardIds.clear()
-    this.networkActionToken += 1
-    this.actionPending = false
-    this.clearActiveNetworkRequest()
-    this.phase = 'playing'
-    this.teamLevels = { teamA: state.currentLevel, teamB: state.currentLevel }
-    this.aFailStreaks = { teamA: 0, teamB: 0 }
-    this.scores = { teamA: 0, teamB: 0 }
-    this.lastRoundRank = []
-    this.tribute = null
-    this.settlement = null
+    this.localMatch = LocalMatchController.fromEngineState(state, {
+      teamA: state.currentLevel,
+      teamB: state.currentLevel,
+    })
+    this.localAITurns = this.createLocalAITurnController(this.localMatch)
+    this.syncLocalProjection()
+    this.selection.clear()
+    this.networkActionController.cancel()
     this.developmentFixtureActive = true
     this.session?.beginPlay()
     this.emitSnapshot(`固定测试牌局：${label}`)
@@ -238,55 +201,18 @@ export class GameManager extends Component {
   /** Called by the WebSocket adapter after service-authoritative state sync. */
   public applyServerState (state: EngineState, hint = '已同步服务器状态'): void {
     this.developmentFixtureActive = false
-    this.aiTurnToken += 1
-    this.state = state
-    // A server snapshot is a turn boundary or a recovery snapshot. Keeping a
-    // selection by card id can resurrect a choice from the previous turn when
-    // a reconnect happens to return control to the same player.
-    this.selectedCardIds.clear()
-    this.networkActionToken += 1
-    this.actionPending = false
-    this.clearActiveNetworkRequest()
-    this.phase = 'playing'
-    this.tribute = null
-    this.settlement = null
-    this.session?.beginPlay()
-    this.emitSnapshot(hint)
+    this.networkSnapshots.applyServerState(state, hint)
   }
 
   public applyNetworkRoundPrepared (state: EngineState, tribute: TributeState | null): void {
     this.developmentFixtureActive = false
-    this.aiTurnToken += 1
-    this.state = state
-    this.tribute = tribute
-    this.phase = tribute ? 'tribute' : 'playing'
-    this.settlement = null
-    this.networkActionToken += 1
-    this.actionPending = false
-    this.clearActiveNetworkRequest()
-    this.selectedCardIds.clear()
-    if (tribute) this.session?.beginTribute()
-    else this.session?.beginPlay()
-    this.emitSnapshot(tribute ? (tribute.isAntiTribute ? '抗贡成立，等待开始本局' : '请完成进贡与还贡') : '本局开始')
+    this.networkSnapshots.applyRoundPrepared(state, tribute)
   }
 
-  public applyNetworkRoundEnded (result: SettlementResult): void {
+  public applyNetworkRoundEnded (result: SettlementResult, state: EngineState | null = null, viewerRoundStats?: NetworkViewerRoundStats,
+    eventIdentity?: Readonly<{ roomId: string, version: number, gameVersion: number }>): void {
     this.developmentFixtureActive = false
-    this.aiTurnToken += 1
-    this.teamLevels = result.teamLevels
-    this.aFailStreaks = result.aFailStreaks
-    this.lastRoundRank = result.fullRank
-    this.scores = { ...this.scores, [result.winnerTeam]: this.scores[result.winnerTeam] + result.levelUp }
-    this.settlement = result
-    this.phase = 'settlement'
-    this.selectedCardIds.clear()
-    this.networkActionToken += 1
-    this.actionPending = false
-    this.clearActiveNetworkRequest()
-    this.session?.setRoundLevels(result.teamLevels, result.currentLevel)
-    this.session?.recordRound(result.winnerTeam, result.fullRank[0] === this.humanId, 0, { levelUp: result.levelUp, currentLevel: result.currentLevel, teamLevels: result.teamLevels, scores: this.scores })
-    this.session?.beginSettlement()
-    this.emitSnapshot(result.message)
+    this.networkSnapshots.applyRoundEnded(result, state, viewerRoundStats, eventIdentity)
   }
 
   public nextRound (): void {
@@ -298,25 +224,18 @@ export class GameManager extends Component {
       return
     }
     if (this.settlement.isGameWon) {
+      this.session?.resetMatchProgress()
       this.startRound()
       return
     }
-    const dealer = this.lastRoundRank[0] ?? 'p1'
-    this.state = dealNextRound(this.state, this.settlement.currentLevel, dealer)
-    this.audio?.playRoundStart()
-    this.tribute = createTribute(this.state, this.lastRoundRank)
-    this.settlement = null
-    this.selectedCardIds.clear()
-    if (!this.tribute) {
-      this.phase = 'playing'
-      this.session?.beginPlay()
-      this.finishHumanAction()
-      return
+    try {
+      this.applyLocalResult(this.requireLocalController().prepareNextRound())
+      this.selection.clear()
+      this.runTributeAi()
+      this.emitSnapshot(this.tribute?.isAntiTribute ? '抗贡成立，请开始本局' : '请完成进贡与还贡')
+    } catch (error) {
+      this.emitSnapshot(error instanceof Error ? error.message : '下一局准备失败')
     }
-    this.phase = 'tribute'
-    this.session?.beginTribute()
-    this.runTributeAi()
-    this.emitSnapshot(this.tribute.isAntiTribute ? '抗贡成立，请开始本局' : '请完成进贡与还贡')
   }
 
   public confirmTribute (): void {
@@ -336,14 +255,17 @@ export class GameManager extends Component {
           : this.lobby?.returnTribute(cards[0].id) ?? null)
         return
       }
-      const result = this.tribute.phase === 'tributing'
-        ? giveTribute(this.state, this.tribute, this.humanId, cards[0].id)
-        : returnTribute(this.state, this.tribute, this.humanId, cards[0].id)
-      this.state = result.state
-      this.tribute = result.tribute
-      this.selectedCardIds.clear()
+      const localTribute = this.requireLocalController().state.tribute
+      if (!localTribute) throw new Error('当前不在贡还阶段')
+      if (localTribute.status !== 'selecting_tribute' && localTribute.status !== 'selecting_return') {
+        throw new Error('当前等待开始本局')
+      }
+      this.applyLocalCommand(localTribute.status === 'selecting_tribute'
+        ? { type: 'SELECT_TRIBUTE_CARD', playerId: this.humanId, cardId: cards[0].id }
+        : { type: 'SELECT_RETURN_CARD', playerId: this.humanId, cardId: cards[0].id })
+      this.selection.clear()
       this.runTributeAi()
-      this.emitSnapshot(this.tribute.phase === 'done' ? '贡还完成，请开始本局' : '等待下一步贡还')
+      this.emitSnapshot(this.tribute?.phase === 'done' ? '贡还完成，请开始本局' : '等待下一步贡还')
     } catch (error) {
       this.emitSnapshot(error instanceof Error ? error.message : '贡还失败')
     }
@@ -355,30 +277,23 @@ export class GameManager extends Component {
       this.beginNetworkAction('正在等待服务器开始本局…', 'finishTribute', () => this.lobby?.finishTribute() ?? null)
       return
     }
-    this.state = { ...this.state, currentTurn: tributeLeader(this.tribute, this.lastRoundRank, this.lastRoundRank[0] ?? 'p1'), lastValidPlay: null }
-    this.tribute = null
-    this.phase = 'playing'
-    this.session?.beginPlay()
-    this.selectedCardIds.clear()
-    this.finishHumanAction()
+    try {
+      this.applyLocalResult(this.requireLocalController().beginPlayAfterTribute())
+      this.selection.clear()
+      this.finishHumanAction()
+    } catch (error) {
+      this.emitSnapshot(error instanceof Error ? error.message : '无法开始本局')
+    }
   }
 
   /** Restores interaction after a rejected or failed network intent. */
   public applyNetworkError (message: string): void {
-    this.networkActionToken += 1
-    this.actionPending = false
-    this.clearActiveNetworkRequest()
-    this.emitSnapshot(message || '网络操作失败，请重试')
+    this.networkActionController.fail(message)
   }
 
   /** Only the rejection matching the active request may unlock its UI. */
   public applyNetworkResult (result: LobbyNetworkResult): void {
-    if (!this.actionPending || result.ok) return
-    const sameType = result.requestType === this.activeNetworkRequestType
-    const sameRequest = this.activeNetworkRequestId === null
-      ? result.requestId === null && sameType
-      : result.requestId === this.activeNetworkRequestId
-    if (sameRequest) this.applyNetworkError(result.message || '服务器拒绝了操作，请重试')
+    this.networkActionController.applyResult({ ...result, message: result.message ?? '' })
   }
 
   /** Applies the default 20-second timeout policy without duplicating UI logic. */
@@ -388,144 +303,69 @@ export class GameManager extends Component {
       this.pass()
       return
     }
-    const choice = getPossiblePlays(this.state.players[this.humanId].hand, null, APPLICATION_AI_DIFFICULTY)[0]
+    const choice = legalMoves(this.state.players[this.humanId].hand, null, this.ruleProfile)[0]
     if (!choice?.length) return this.emitSnapshot('没有可自动出的牌，请返回大厅重开')
-    this.selectedCardIds = new Set(choice.map(card => card.id))
+    this.selection.replace(choice.map(card => card.id))
     this.playSelected()
   }
 
   private selectedCards (): Card[] {
-    return this.state.players[this.humanId].hand.filter(card => this.selectedCardIds.has(card.id))
-  }
-
-  private canHumanActInTribute (): boolean {
-    if (!this.tribute || this.tribute.isAntiTribute || this.tribute.phase === 'done') return false
-    return this.tribute.phase === 'tributing'
-      ? this.tribute.actions.some(action => action.from === this.humanId && !action.card)
-      : this.tribute.actions.some(action => action.to === this.humanId && !action.returnCard)
+    return this.selection.selectedCards(this.state, this.humanId)
   }
 
   private beginNetworkAction (hint: string, requestType: string, submit: () => number | null): boolean {
-    if (!this.lobby?.snapshot.connected || !this.lobby.snapshot.roomId || this.lobby.snapshot.roomStatus !== 'ready') {
-      this.emitSnapshot(this.lobby?.snapshot.roomStatus === 'rejoining' ? '正在恢复房间，请稍后操作' : '网络未连接，请稍后重试')
-      return false
-    }
-    this.actionPending = true
-    const token = ++this.networkActionToken
-    this.activeNetworkRequestType = requestType
-    this.activeNetworkRequestId = null
-    this.emitSnapshot(hint)
-    const requestId = submit()
-    if (requestId === null) {
-      this.applyNetworkError('操作未发送，请检查网络后重试')
-      return false
-    }
-    this.activeNetworkRequestId = requestId
-    this.scheduleOnce(() => {
-      if (this.actionPending && token === this.networkActionToken) this.applyNetworkError('服务器响应超时，请重试')
-    }, 8)
-    return true
-  }
-
-  private clearActiveNetworkRequest (): void {
-    this.activeNetworkRequestId = null
-    this.activeNetworkRequestType = null
+    const snapshot = this.lobby?.snapshot
+    return this.networkActionController.begin({
+      connected: snapshot?.connected ?? false,
+      roomId: snapshot?.roomId ?? null,
+      roomStatus: snapshot?.roomStatus ?? 'offline',
+    }, hint, requestType, submit)
   }
 
   private finishHumanAction (): void {
-    if (this.maybeSettle()) return
-    this.runNextAiTurn()
-  }
-
-  /** One scheduled AI action at a time, matching the desktop game's visible thinking rhythm. */
-  private runNextAiTurn (): void {
-    if (this.session?.snapshot.isMultiplayer) return
-    if (this.maybeSettle()) return
-    if (this.state.currentTurn === this.humanId) {
-      this.emitSnapshot('轮到你出牌')
-      return
-    }
-    const token = ++this.aiTurnToken
-    const aiId = this.state.currentTurn
-    this.emitSnapshot(`${this.state.players[aiId].name} 正在思考…`)
-    this.scheduleOnce(() => {
-      if (token !== this.aiTurnToken || this.phase !== 'playing' || this.state.currentTurn !== aiId) return
-      try {
-        this.state = this.resolveAiAction(aiId)
-      } catch (error) {
-        this.emitSnapshot(error instanceof Error ? error.message : '电脑出牌失败')
-        // A transient AI decision failure must not permanently strand the turn.
-        this.scheduleOnce(() => {
-          if (token === this.aiTurnToken && this.phase === 'playing' && this.state.currentTurn === aiId) this.runNextAiTurn()
-        }, 0.25)
-        return
-      }
-      if (this.maybeSettle()) return
-      this.runNextAiTurn()
-    }, 0.72)
-  }
-
-  private resolveAiAction (aiId: PlayerId): EngineState {
-    const ai = this.state.players[aiId]
-    const decision = makeDecision(ai.hand, this.state.lastValidPlay, APPLICATION_AI_DIFFICULTY, ai.team, this.state.players, aiId, { currentLevel: this.state.currentLevel, teamLevels: this.teamLevels, roundMeta: null })
-    if (decision?.length && getPlayInfo(decision)) {
-      try { return playCards(this.state, aiId, decision) } catch { /* fall through to a verified legal choice */ }
-    }
-    const legal = getPossiblePlays(ai.hand, this.state.lastValidPlay, APPLICATION_AI_DIFFICULTY)[0]
-    if (legal?.length) return playCards(this.state, aiId, legal)
-    if (this.state.lastValidPlay) {
-      this.audio?.playPass()
-      return passTurn(this.state, aiId)
-    }
-    const lowest = ai.hand.reduce<Card | null>((best, card) => !best || card.value < best.value ? card : best, null)
-    if (!lowest) throw new Error('电脑手牌状态异常，请返回大厅重新开始')
-    return playCards(this.state, aiId, [lowest])
-  }
-
-  private maybeSettle (): boolean {
-    if (!isRoundOver(this.state)) return false
-    const result = settle(this.state, this.teamLevels, this.aFailStreaks)
-    if (!result) return false
-    this.teamLevels = result.teamLevels
-    this.aFailStreaks = result.aFailStreaks
-    this.scores = { ...this.scores, [result.winnerTeam]: this.scores[result.winnerTeam] + result.levelUp }
-    this.lastRoundRank = result.fullRank
-    this.settlement = result
-    this.phase = 'settlement'
-    this.selectedCardIds.clear()
-    if (!this.developmentFixtureActive) {
-      this.session?.setRoundLevels(this.teamLevels, result.currentLevel)
-      this.session?.recordRound(result.winnerTeam, result.fullRank[0] === this.humanId, this.state.playArea.filter(action => action.type === 'Bomb' || action.type === 'StraightFlush' || action.type === 'Rocket').length, { levelUp: result.levelUp, currentLevel: result.currentLevel, teamLevels: result.teamLevels, scores: this.scores })
-    }
-    this.session?.beginSettlement()
-    this.emitSnapshot(result.message)
-    return true
+    if (this.phase !== 'playing') return
+    this.localAITurns?.runNext()
   }
 
   private runTributeAi (): void {
-    if (!this.tribute || this.tribute.isAntiTribute) return
-    if (this.tribute.phase === 'tributing') {
-      this.tribute.actions.filter(action => this.state.players[action.from].isAI && !action.card).forEach(action => {
-        const hand = this.state.players[action.from].hand
-        const eligible = hand.filter(card => !(card.isLevelCard && card.suit === 'heart'))
-        const result = giveTribute(this.state, this.tribute!, action.from, highestCard(eligible.length ? eligible : hand).id)
-        this.state = result.state
-        this.tribute = result.tribute
-      })
-    }
-    if (this.tribute.phase === 'returning') {
-      this.tribute.actions.filter(action => this.state.players[action.to].isAI && !action.returnCard).forEach(action => {
-        const card = lowestCard(this.state.players[action.to].hand.filter(item => item.value <= 10))
-        if (!card) throw new Error('电脑没有可还贡的牌')
-        const result = returnTribute(this.state, this.tribute!, action.to, card.id)
-        this.state = result.state
-        this.tribute = result.tribute
-      })
-    }
+    this.applyLocalResult(this.requireLocalController().automateTribute())
+  }
+
+  /** The only local state write path. Failed commands leave the current match untouched. */
+  private applyLocalCommand (command: LocalMatchIntent): GameEvent[] {
+    return this.applyLocalResult(this.requireLocalController().dispatch(command))
+  }
+
+  private applyLocalResult (result: LocalMatchOperationResult): GameEvent[] {
+    if (!result.ok) throw new Error(localMatchFailureHint(result.reason))
+    this.syncLocalProjection()
+    this.consumeLocalEvents(result.events)
+    return result.events
+  }
+
+  private requireLocalController (): LocalMatchController {
+    if (!this.localMatch) throw new Error('本地牌局状态不可用')
+    return this.localMatch
+  }
+
+  private syncLocalProjection (): void {
+    const projection = this.requireLocalController().projection
+    this.state = projection.state
+    this.projection = mergeGameManagerProjection(this.projection, { ...projection, roundId: projection.state.roundId, revision: projection.state.revision })
+  }
+
+  /** Every emitted domain event is consumed once, after its state has been committed. */
+  private consumeLocalEvents (events: readonly GameEvent[]): void {
+    this.localEventController.consume(events, {
+      state: this.requireLocalController().state,
+      humanId: this.humanId,
+      scores: this.scores,
+      recordProgress: !this.developmentFixtureActive,
+    })
   }
 
   private emitSnapshot (hint: string): void {
-    const playValidation = diagnosePlay(this.phase === 'playing' ? this.selectedCards() : [], this.state.lastValidPlay)
+    const playValidation = diagnosePlay(this.phase === 'playing' ? this.selectedCards() : [], this.state.lastValidPlay, this.ruleProfile)
     this.node.emit('guandan:state', {
       state: this.state,
       selectedCardIds: Array.from(this.selectedCardIds),
@@ -540,5 +380,87 @@ export class GameManager extends Component {
     } satisfies GameSnapshot)
   }
 
+  private get ruleProfile (): RuleProfile {
+    return this.state?.ruleProfile ?? this.session?.ruleProfile ?? getRuleProfile('classic')
+  }
+
+  private get networkActionController (): NetworkActionController {
+    if (!this.networkActions) {
+      this.networkActions = new NetworkActionController(
+        (callback, delaySeconds) => this.scheduleOnce(callback, delaySeconds),
+        hint => this.emitSnapshot(hint),
+      )
+    }
+    return this.networkActions
+  }
+
+  private createLocalAITurnController (match: LocalMatchController): LocalAITurnController {
+    return new LocalAITurnController(
+      match,
+      createSynchronousLocalAIEngine({
+        ruleProfile: match.ruleProfile,
+        seed: 20260811 + (++this.localMatchGeneration),
+      }),
+      (callback, delaySeconds) => this.scheduleOnce(callback, delaySeconds),
+      {
+        humanId: this.humanId,
+        difficulty: APPLICATION_AI_DIFFICULTY,
+        publishHint: hint => this.emitSnapshot(hint),
+        commit: result => { this.applyLocalResult(result) },
+        failureHint: localMatchFailureHint,
+      },
+    )
+  }
+
+  private get localEventController (): LocalMatchEventController {
+    if (!this.localMatchEvents) {
+      this.localMatchEvents = new LocalMatchEventController({
+        playPass: () => this.audio?.playPass(),
+        playRoundStart: () => this.audio?.playRoundStart(),
+        setSessionPhase: phase => {
+          if (phase === 'playing') this.session?.beginPlay()
+          else if (phase === 'tribute') this.session?.beginTribute()
+          else this.session?.beginSettlement()
+        },
+        recordRound: ({ settlement, wasFirst, bombCount, scores }) => {
+          this.session?.recordRound(settlement.winnerTeam, wasFirst, bombCount, {
+            levelUp: settlement.levelUp,
+            currentLevel: settlement.currentLevel,
+            teamLevels: settlement.teamLevels,
+            scores,
+          })
+        },
+        clearSelection: () => this.selection.clear(),
+        publishHint: hint => this.emitSnapshot(hint),
+      })
+    }
+    return this.localMatchEvents
+  }
+
+  private retireLocalMatch (): void {
+    this.localAITurns?.dispose()
+    this.localAITurns = null
+    this.localMatch = null
+  }
+
   private get humanId (): PlayerId { return this.session?.snapshot.myPlayerId ?? 'p1' }
+  public get phase (): GameManagerProjection['phase'] { return this.projection.phase }
+  public get teamLevels (): Record<Team, Rank> { return { ...this.projection.teamLevels } }
+  public get aFailStreaks (): Record<Team, number> { return { ...this.projection.aFailStreaks } }
+  public get scores (): Record<Team, number> { return { ...this.projection.scores } }
+  public get lastRoundRank (): PlayerId[] { return [...this.projection.lastRoundRank] }
+  public get tribute (): TributeState | null { return this.projection.tribute }
+  public get settlement (): SettlementResult | null { return this.projection.settlement }
+  public get selectedCardIds (): ReadonlySet<string> { return this.selection.selectedCardIds }
+  public get actionPending (): boolean { return this.networkActions?.pending ?? false }
+
+  private get selectionContext () {
+    return {
+      state: this.state,
+      humanId: this.humanId,
+      actionPending: this.actionPending,
+      phase: this.phase,
+      tribute: this.tribute,
+    } as const
+  }
 }

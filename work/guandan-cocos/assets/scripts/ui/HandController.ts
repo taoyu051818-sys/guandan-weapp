@@ -1,5 +1,6 @@
 import { _decorator, Component, instantiate, Node, Prefab, Tween, UITransform, Vec2, Vec3, tween } from 'cc'
 import type { Card } from '../core/generated'
+import type { HandInteractionMode } from '../game/HandInteractionState'
 import type { CardBlastReactionTarget } from '../effects/CardBlastReaction'
 import { HandDragSelectionPolicy, sampleHandDragSegment } from '../game/HandDragSelectionPolicy'
 import { createHandStackLayout, type HandStackGroup } from '../game/HandStackLayout'
@@ -26,6 +27,7 @@ export class HandController extends Component {
   private selectedCardIds = new Set<string>()
   private interactive = false
   private longPressPointerId: number | null = null
+  private touchExclusionPredicate: ((screenPoint: Readonly<{ x: number, y: number }>) => boolean) | null = null
 
   protected onLoad (): void {
     this.node.on(HAND_CARD_TOUCH_START, this.handleCardTouchStart, this)
@@ -76,13 +78,25 @@ export class HandController extends Component {
     this.cards.forEach(node => node.getComponent(CardView)?.finishEntranceImmediately())
   }
 
+  /** Lets the visually topmost HUD arbitrate overlap without changing hand layout. */
+  public setTouchExclusionPredicate (predicate: ((screenPoint: Readonly<{ x: number, y: number }>) => boolean) | null): void {
+    this.touchExclusionPredicate = predicate
+    if (predicate) {
+      this.cancelLongPressSelection()
+      this.dragSelection.cancel()
+    }
+  }
+
   public render (
     hand: Card[],
-    selectedCardIds: string[],
+    playSelectedCardIds: string[],
     sortOrder: 'asc' | 'desc' = 'desc',
     interactive = false,
     displayCardIds?: readonly string[],
     stackGroups: readonly HandStackGroup[] = [],
+    lockedCardIds?: readonly string[],
+    lockDraftCardIds: readonly string[] = [],
+    interactionMode: HandInteractionMode = 'play',
   ): number {
     const fallback = [...hand].sort((a, b) => sortOrder === 'desc' ? b.value - a.value : a.value - b.value)
     const byId = new Map(hand.map(card => [card.id, card]))
@@ -99,8 +113,13 @@ export class HandController extends Component {
     const availableWidth = Math.max(280, (this.getComponent(UITransform)?.contentSize.width ?? 1040) - 100)
     const layout = createHandStackLayout(displayHand.map(card => card.id), stackGroups, availableWidth)
     const slotByCard = new Map(layout.slots.map(slot => [slot.cardId, slot]))
-    const selectedIds = new Set(selectedCardIds)
-    this.selectedCardIds = selectedIds
+    const playSelectedIds = new Set(playSelectedCardIds)
+    const lockDraftIds = new Set(lockDraftCardIds)
+    const inferredLockedCardIds = stackGroups.flatMap(group => group.locked ? group.cardIds : [])
+    const lockedIds = new Set(lockedCardIds ?? inferredLockedCardIds)
+    this.selectedCardIds = interactionMode === 'lock-create' || interactionMode === 'lock-unlock'
+      ? lockDraftIds
+      : playSelectedIds
     this.interactive = interactive
     if (!interactive) {
       this.cancelLongPressSelection()
@@ -109,7 +128,7 @@ export class HandController extends Component {
     const entranceCompletions: Promise<void>[] = []
     displayHand.forEach((card, index) => {
       let node = this.cards.get(card.id)
-      const selected = selectedIds.has(card.id)
+      const selected = playSelectedIds.has(card.id)
       const isNew = !node
       if (!node) {
         node = this.cardPrefab ? instantiate(this.cardPrefab) : new Node(`card-${card.id}`)
@@ -126,6 +145,8 @@ export class HandController extends Component {
         id: card.id,
         ...mapCardToPresentation(card),
         selected,
+        lockDraft: lockDraftIds.has(card.id),
+        locked: lockedIds.has(card.id),
         interactive,
       })
       view?.configureFanHitArea(layout.laneSpacing || 78, (slot?.laneIndex ?? index) === layout.laneCount - 1)
@@ -160,6 +181,10 @@ export class HandController extends Component {
 
   private handleCardTouchStart (detail: HandCardTouch): void {
     if (!this.interactive) return
+    if (this.isTouchExcluded(detail.screenPoint)) {
+      this.dragSelection.cancel(detail.pointerId)
+      return
+    }
     this.cancelLongPressSelection()
     this.dragSelection.begin(detail.pointerId, detail.cardId, this.selectedCardIds.has(detail.cardId), detail.screenPoint)
     this.longPressPointerId = detail.pointerId
@@ -168,6 +193,11 @@ export class HandController extends Component {
 
   private handleCardTouchMove (detail: HandCardTouch): void {
     if (!this.interactive) return
+    if (this.isTouchExcluded(detail.screenPoint)) {
+      this.cancelLongPressSelection()
+      this.dragSelection.cancel(detail.pointerId)
+      return
+    }
     const segment = this.dragSelection.move(detail.pointerId, detail.screenPoint)
     if (segment) {
       this.cancelLongPressSelection()
@@ -178,6 +208,10 @@ export class HandController extends Component {
   private handleCardTouchEnd (detail: HandCardTouch): void {
     if (!this.interactive) return
     this.cancelLongPressSelection()
+    if (this.isTouchExcluded(detail.screenPoint)) {
+      this.dragSelection.cancel(detail.pointerId)
+      return
+    }
     const finalSegment = this.dragSelection.move(detail.pointerId, detail.screenPoint)
     if (finalSegment) this.applyDragSegment(finalSegment)
     const tap = this.dragSelection.end(detail.pointerId)
@@ -212,6 +246,7 @@ export class HandController extends Component {
   }
 
   private findTopCardAt (screenPoint: Readonly<{ x: number, y: number }>): string | null {
+    if (this.isTouchExcluded(screenPoint)) return null
     const point = new Vec2(screenPoint.x, screenPoint.y)
     const topFirst = Array.from(this.cards.entries())
       .filter(([, node]) => node.isValid && node.activeInHierarchy)
@@ -220,6 +255,14 @@ export class HandController extends Component {
       if (node.getComponent(CardView)?.hitTestScreenPoint(point)) return cardId
     }
     return null
+  }
+
+  private isTouchExcluded (screenPoint: Readonly<{ x: number, y: number }>): boolean {
+    try {
+      return this.touchExclusionPredicate?.(screenPoint) ?? false
+    } catch {
+      return false
+    }
   }
 
   private applySelectionTarget (cardId: string, selected: boolean): void {

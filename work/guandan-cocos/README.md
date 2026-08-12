@@ -9,6 +9,10 @@
 3. 打开现有的 `assets/scenes/Game.scene`。场景已包含横屏 `1280×720` 设计分辨率和 `GameScene`；首次运行会自动装配 `GameSession`、牌局、座位、出牌区、菜单、大厅和音频控制器，方便在没有正式 prefab 前直接预览完整流程。
 4. 构建目标选择「微信小游戏」。横屏设计分辨率已经提交到 `settings/v2/packages/project.json`。
 
+## 架构基线
+
+当前 P0-P6 交付状态、分层、状态所有权、依赖方向、生命周期约束、可注入边界和验收门禁统一记录在 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。新增模块前先按该文档判断归属，并运行 `pnpm test:ci`；文档同时列出了不阻断发布、但仍应继续拆分的展示层热点。
+
 ## 微信资源分包与加载页
 
 微信首包只保留启动所需代码和压缩后的加载图。当前加载图是 `assets/startup/resource-loading-lingshui-v1.jpg`，原始无损图保存在 `art-source/backgrounds/resource-loading-lingshui-v1-source.png`；`build-templates/wechatgame/background.jpg` 让微信原生首屏在 Cocos 场景启动前也显示同一画面。两个加载层都采用等比 `cover`，会按机型铺满并裁切边缘，不会拉伸人物。
@@ -25,21 +29,22 @@ node scripts/verify-wechat-build.mjs
 npm run verify:wechat-build
 ```
 
-脚本会检查子包声明与输出路径、加载图主包依赖、原生首屏接管顺序、未使用引擎产物和包体限制。最近一次 Creator 3.8.8 发行构建的首包为 `2.69 MiB`，`game-assets` 子包为 `3.48 MiB`，总计 `6.17 MiB`。
+脚本会检查子包声明与输出路径、加载图主包依赖、原生首屏接管顺序、未使用引擎产物和包体限制。最近一次 Creator 3.8.8 发行构建的首包为 `2.84 MiB`，`game-assets` 子包为 `6.69 MiB`，总计 `9.53 MiB`。
 
-运行时采用分层职责：`FrontPageController + PageRouter` 管理大厅、比赛、商城、商户技术预览、规则弹窗、设置与多人房间页面，`RuntimeUiFactory` 统一代码生成 UI；`GameScene` 只负责装配、牌桌 HUD、交互倒计时和网络状态桥接。`GameManager`、`HandController`、`PlayerSeatController`、`PlayAreaController` 与 `LobbyController` 提供牌局能力：
+运行时采用分层职责：`FrontPageController + PageRouter` 管理大厅、比赛、商城、规则弹窗、设置与多人房间页面，`RuntimeUiFactory` 统一代码生成 UI；休眠的商户技术预览源码位于包外 `migration/merchant`。`GameScene` 负责组合与牌桌展示桥接，短期交互、回合钟、弹层和快照投影由独立控制器持有。`GameManager`、`LocalMatchController`、`HandController`、`PlayerSeatController`、`PlayAreaController` 与 `LobbyController` 提供牌局能力：
 
 - 两副牌完整开局、AI 回合和合法出牌；
 - 选牌上移、手牌响应式排布；
 - `ScreenAdapter` 监听 `canvas-resize`，用真实可视尺寸和安全区重新布局牌桌、手牌、座位、操作区和快捷语，并重绘背景；
 - `assets/game-assets/backgrounds/lobby-lingshui-coast-v1.jpg` 是菜单和大厅的海滨背景，`assets/game-assets/backgrounds/table-perspective-blue-v2.jpg` 是对局牌桌背景；两者会按页面状态淡入切换，并由 `ScreenAdapter` 以等比 cover 方式适配横屏尺寸和安全区；
-- `CardSkinResolver` 甡49张 MIT 组件图组合54种单副牌面；手牌、桌面牌和飞牌特效只使用这一条经典 PNG 渲染链路，共用同一帧缓存。全部牌面在大厅初始化前预加载，缺图时停留在资源重试页，不再切换为文字牌面；
+- `CardSkinResolver` 用 36 张项目授权牌面组件和 1 张 NiuMa MIT 牌底组合 54 种单副牌面；手牌、桌面牌和飞牌特效只使用这一条经典 PNG 渲染链路，共用同一帧缓存。全部牌面在大厅初始化前预加载，缺图时停留在资源重试页，不再切换为文字牌面；
 - 统一 `EffectController`：规则语义解析、L0-L3 强度、四方飞牌、对象池、牌型标签、逢人配、炸弹/同花顺/天王炸、胜负升级和跳过动画；
 - `AudioProfiles` 统一局开始、发牌、出牌、三种不要、0–5 倒计时、关键牌型与胜负的语义音频映射；完整女声与可选男声报牌包互不混播，资源缺失会安全回退或静默；
-- 手牌已加入错峰发牌、选中上浮、按压缩放和重排过渡；正式桌面牌先显示，装饰特效不阻塞输入、AI 或网络消息；震屏仅作用于 `GameTableShakeRoot`，HUD 和返回按钮保持稳定；
+- 手牌已加入错峰发牌、固定尺寸的选中/锁定反馈和重排过渡；选中、锁定与堆叠均不改变卡牌缩放或层级；正式桌面牌先显示，装饰特效不阻塞输入、AI 或网络消息；震屏仅作用于 `GameTableShakeRoot`，HUD 和返回按钮保持稳定；
 - 设置页提供「完整 / 精简 / 关闭」特效质量与震动开关；断线重连和跨局恢复只显示最终状态，不重放历史大特效；联机倒计时严格读取服务端 `turnDeadlineAt`，连续超时、主动托管和断线托管都由服务端权威驱动；
 - 局间由四个座位分别准备/取消准备；返回入口区分安全退出和全员解散投票，投票拒绝、超时与断线恢复都有明确状态；
-- 智能理牌、手动成组、牌组前后移动、拆组、撤销/重做和恢复默认只调整展示 cardId 顺序，不修改规则手牌；整理后的每组牌占一个横向位置并从上向下错层，只露出每张牌顶部的点数/花色和最后一张完整牌面，叠牌触控只响应实际露出的区域，其他玩家回合仍可继续理牌；
+- 普通手牌使用 `point-stacked`：实体点数决定归列，同点牌固定每张露出 40px，普通牌与大小王使用相同像素步长，牌数增加时不压缩；未锁牌即使四张以上也不会按牌型跳到左侧。点击「一键理牌」才进入 `smart-arranged`，把天王炸、炸弹和组合牌型移到左边，单张/对子/三张仍按有效点数交错；级牌固定在大小王与 A 之间（A 为级牌时在大小王与 K 之间）。显式手动锁组会作为完整单元进入左侧锁定区，区内按当前 `RuleProfile` 的共享规则强度稳定排序，但不会让其他牌隐式进入智能理牌；解锁后牌张回到当前布局规则。复原理牌不会回滚当前锁，权威手牌变化导致锁组失效时立即释放，新局/离桌必定清空。操作按钮和倒计时处于牌面上层并保持固定位置。这些都只调整展示 cardId，不修改规则手牌；
+- 「提示」先由 shared-core 生成合法候选，再按当前锁组和理牌组评估拆牌损伤：只要存在替代选择就不部分拆锁组，并依次保护天王炸、炸弹、组合牌、三张和对子；同等候选优先保留红桃级牌。提示只替换本地选中 cardId，实际出牌仍由同一规则内核及联机服务端复核；
 - 开发构建的「固定牌局 · 音效/动效实验室」提供固定开局、逢人配/炸弹手牌、炸弹压制，以及所有牌型、贡还、结算和倒计时 fixture；固定牌局结算不会写入战绩；
 - 大厅头像/资料栏进入个人中心，统一展示八位账号、积分和服务端综合分；赛季任务与我的牌谱从个人中心进入并返回。未配置平台时，牌谱和任务明确标为开发模拟/演示，且不会展示可领取的假按钮；
 - 「我的牌谱」和「延迟观战（实验）」使用同一套公开状态播放器：按服务端 sequence 排序去重，复原四座位最后动作、桌面已出牌与公开阶段，支持播放/暂停、前后步进和比例跳转；“更多”内可一键进入固定 30 秒公开事件示例，真实观战页每 3 秒增量追帧，处于末尾时自动跟随，回看历史时保留光标并提示“回到最新”，前后台/离页会停止无效轮询；客户端不会保存或推断隐藏手牌；
@@ -115,7 +120,7 @@ node scripts/sync-core.mjs
 node scripts/import-licensed-audio.mjs
 ```
 
-脚本只下载 `third_party/licenses/gameabc2-audio/catalog.json` 中的 27 个 MP3，并生成带 SHA-256 的来源清单；被视觉筛选淘汰的 PNG 永远不会下载。运行环境没有全局 Node 时，可改用 Codex 随附的 Node 执行同一个脚本。
+脚本下载 `third_party/licenses/gameabc2-audio/catalog.json` 中的 27 个 MP3：25 个可达语音进入 Cocos 运行时，2 个仅审计用音频进入 `art-source/audio/licensed-archive`，并生成带 SHA-256 的来源清单；被视觉筛选淘汰的 PNG 永远不会下载。运行环境没有全局 Node 时，可改用 Codex 随附的 Node 执行同一个脚本。
 
 重新审计或恢复固定 MIT 来源的 NiuMa 音频时运行：
 
@@ -155,13 +160,14 @@ node tests/platform-live-contract.cjs
 # Cocos Web 构建
 /Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator --project "$PWD" --build "platform=web-desktop;debug=false;useSplashScreen=false"
 
-# Cocos 微信小游戏构建后检查首包、子包和加载页
+# Cocos 微信小游戏构建后注入正式平台地址，再检查首包、子包和加载页
 /Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator --project "$PWD" --build "platform=wechatgame;debug=false;sourceMaps=false;useSplashScreen=false"
-node scripts/verify-wechat-build.mjs
+GUANDAN_PLATFORM_ENDPOINT=https://platform.example pnpm finalize:wechat-build
+GUANDAN_PLATFORM_ENDPOINT=https://platform.example pnpm verify:wechat-build
 
 # Creator 某些 CLI 构建仍会回填默认开屏；发布前强制收口并验证构建产物
-node scripts/finalize-web-build.mjs
-node scripts/finalize-web-build.mjs --check
+GUANDAN_PLATFORM_ENDPOINT=https://platform.example pnpm finalize:web-build
+GUANDAN_PLATFORM_ENDPOINT=https://platform.example pnpm verify:web-build
 node tests/selection-regression.cjs --require-build
 node tests/card-skin-regression.cjs --require-build
 

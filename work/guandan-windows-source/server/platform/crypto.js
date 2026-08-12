@@ -1,4 +1,5 @@
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { normalizeFriendRoomSettings } from '../friend-room-settings.js'
 import { unauthorized } from './errors.js'
 
 const encode = (value) => Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)).toString('base64url')
@@ -9,6 +10,22 @@ const safeEqual = (left, right) => {
   const b = Buffer.from(String(right))
   return a.length === b.length && timingSafeEqual(a, b)
 }
+const ticketRoomKinds = new Set(['match', 'friend'])
+const gameTicketPurposes = new Set(['entry', 'rejoin'])
+const validEntryAttemptId = value => typeof value === 'string' && value.length >= 22 && value.length <= 128 && /^[A-Za-z0-9_-]+$/.test(value)
+const canonicalFriendRoomSettings = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw unauthorized('好友房票据缺少规范房间设置')
+  let normalized
+  try { normalized = normalizeFriendRoomSettings(value, { strict: true }) } catch { throw unauthorized('好友房票据房间设置无效') }
+  const expectedKeys = Object.keys(normalized)
+  const receivedKeys = Object.keys(value)
+  if (
+    receivedKeys.length !== expectedKeys.length ||
+    expectedKeys.some(key => !Object.hasOwn(value, key) || value[key] !== normalized[key])
+  ) throw unauthorized('好友房票据房间设置不是规范格式')
+  return normalized
+}
+const roomSettingsFingerprint = value => value === undefined ? '' : JSON.stringify(canonicalFriendRoomSettings(value))
 
 export const signCompactToken = (claims, secret) => {
   const header = encode({ alg: 'HS256', typ: 'GDT' })
@@ -63,9 +80,12 @@ export class GameTicketService {
     this.now = now
   }
 
-  issue ({ userId, matchId, roomId, seat }) {
+  issue ({ userId, matchId, roomId, seat, roomKind = 'match', purpose = 'entry', entryAttemptId = randomBytes(16).toString('base64url'), roomExpiresAt, roomSettings }) {
+    if (!validEntryAttemptId(entryAttemptId)) throw new TypeError('entryAttemptId 必须是 22 到 128 位 base64url 字符')
     const issuedAt = this.now()
-    const expiresAt = issuedAt + this.ttlMs
+    const expiresAt = roomKind === 'friend' && purpose === 'entry' && Number.isSafeInteger(roomExpiresAt)
+      ? Math.min(issuedAt + this.ttlMs, roomExpiresAt)
+      : issuedAt + this.ttlMs
     const claims = {
       kind: 'game-ticket',
       aud: 'guandan-game',
@@ -73,11 +93,24 @@ export class GameTicketService {
       matchId,
       roomId,
       seat,
+      roomKind,
+      purpose,
+      entryAttemptId,
+      ...(Number.isSafeInteger(roomExpiresAt) ? { roomExpiresAt } : {}),
+      ...(roomSettings ? { roomSettings: structuredClone(roomSettings) } : {}),
       jti: randomUUID(),
       iat: Math.floor(issuedAt / 1000),
       exp: Math.floor(expiresAt / 1000),
     }
     return { gameTicket: signCompactToken(claims, this.secret), expiresAt, gameEndpoint: this.gameEndpoint, claims }
+  }
+
+  inspect (gameTicket) {
+    return verifyCompactToken(gameTicket, this.secret, {
+      now: this.now(),
+      kind: 'game-ticket',
+      audience: 'guandan-game',
+    })
   }
 }
 
@@ -99,11 +132,26 @@ export class GameTicketVerifier {
     if (!claims.jti || !claims.sub || !claims.matchId || !/^\d{6}$/.test(String(claims.roomId)) || !/^p[1-4]$/.test(String(claims.seat))) {
       throw unauthorized('入桌票据字段不完整')
     }
+    if (!ticketRoomKinds.has(claims.roomKind)) throw unauthorized('入桌票据房间类型无效')
+    if (!gameTicketPurposes.has(claims.purpose)) throw unauthorized('入桌票据用途无效')
+    if (!validEntryAttemptId(claims.entryAttemptId)) throw unauthorized('入桌票据 entryAttemptId 无效')
+    if (claims.roomKind === 'friend') {
+      if (
+        !Number.isSafeInteger(claims.roomExpiresAt) ||
+        claims.roomExpiresAt < 0 ||
+        (claims.purpose === 'entry' && claims.roomExpiresAt < claims.exp * 1000) ||
+        claims.roomExpiresAt > this.now() + 30 * 24 * 60 * 60 * 1000
+      ) throw unauthorized('好友房票据租约无效')
+      canonicalFriendRoomSettings(claims.roomSettings)
+    } else if (Object.hasOwn(claims, 'roomExpiresAt') || Object.hasOwn(claims, 'roomSettings')) {
+      throw unauthorized('普通匹配票据不能携带好友房字段')
+    }
     if (roomId && String(claims.roomId) !== String(roomId)) throw unauthorized('入桌票据房间不匹配')
     if (seat && claims.seat !== seat) throw unauthorized('入桌票据席位不匹配')
     const consumedClaims = this.consumed.get(claims.jti) || null
     if (consumedClaims) {
-      const sameBinding = ['jti', 'sub', 'matchId', 'roomId', 'seat', 'exp'].every(key => consumedClaims[key] === claims[key])
+      const sameBinding = ['jti', 'sub', 'matchId', 'roomId', 'seat', 'roomKind', 'purpose', 'entryAttemptId', 'roomExpiresAt', 'exp'].every(key => consumedClaims[key] === claims[key]) &&
+        roomSettingsFingerprint(consumedClaims.roomSettings) === roomSettingsFingerprint(claims.roomSettings)
       if (!sameBinding) throw unauthorized('入桌票据消费记录不一致')
     }
     return { claims, consumed: Boolean(consumedClaims) }

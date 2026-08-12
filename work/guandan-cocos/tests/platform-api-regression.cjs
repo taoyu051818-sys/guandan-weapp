@@ -5,10 +5,27 @@ const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
 const sourcePath = path.join(projectRoot, 'assets/scripts/services/PlatformApi.ts')
-const typescriptPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript'
-const ts = require(typescriptPath)
+const platformModuleDir = path.join(projectRoot, 'assets/scripts/services/platform')
+const gatewayContractsPath = path.join(projectRoot, 'assets/scripts/services/FrontPageGatewayContracts.ts')
+const { loadTypeScript } = require('./support/typescript.cjs')
+const ts = loadTypeScript()
 
 const source = fs.readFileSync(sourcePath, 'utf8')
+assert.ok(source.split('\n').length < 40, 'PlatformApi.ts must remain a small compatibility facade')
+assert.match(source, /export type \{[\s\S]*HttpTransport,[\s\S]*PlatformApiConfig,[\s\S]*\} from '\.\/platform\/contracts'/)
+assert.match(source, /export \{ PlatformApiError \} from '\.\/platform\/contracts'/)
+assert.match(source, /export \{ PlatformApiClient, XhrTransport \} from '\.\/platform\/client'/)
+assert.match(source, /export \{ createHttpGateways \} from '\.\/platform\/factory'/)
+assert.equal(fs.existsSync(gatewayContractsPath), true, 'stable front-page gateway contracts are missing')
+assert.equal(fs.existsSync(`${gatewayContractsPath}.meta`), true, 'stable front-page gateway contracts need Cocos metadata')
+const gatewayContracts = fs.readFileSync(gatewayContractsPath, 'utf8')
+assert.doesNotMatch(gatewayContracts, /SAMPLE_|Development[A-Z]|from ['"]cc['"]/, 'gateway contracts must remain transport and runtime independent')
+for (const moduleName of ['client', 'contracts', 'validation', 'profileGateways', 'replayGateways', 'merchantGateway', 'commerceGateways', 'competitionDecoders', 'competitionGateways', 'friendRoomGateway', 'MatchRecoveryAttempt', 'matchRecoveryGateway', 'factory']) {
+  const modulePath = path.join(platformModuleDir, `${moduleName}.ts`)
+  assert.equal(fs.existsSync(modulePath), true, `platform module ${moduleName} is missing`)
+  assert.equal(fs.existsSync(path.join(platformModuleDir, `${moduleName}.ts.meta`)), true, `platform module ${moduleName} is missing Cocos metadata`)
+  assert.doesNotMatch(fs.readFileSync(modulePath, 'utf8'), /DevelopmentApis/, `production platform module ${moduleName} must not depend on development adapters`)
+}
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
   fileName: sourcePath,
@@ -39,7 +56,19 @@ const developmentCompiled = ts.transpileModule(fs.readFileSync(developmentSource
 const developmentModule = new Module(developmentSourcePath, module)
 developmentModule.filename = developmentSourcePath
 developmentModule.paths = Module._nodeModulePaths(path.dirname(developmentSourcePath))
-developmentModule._compile(developmentCompiled, developmentSourcePath)
+Module._extensions['.ts'] = (targetModule, filename) => {
+  const dependency = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
+    fileName: filename,
+  }).outputText
+  targetModule._compile(dependency, filename)
+}
+try {
+  developmentModule._compile(developmentCompiled, developmentSourcePath)
+} finally {
+  if (previousTypeScriptLoader) Module._extensions['.ts'] = previousTypeScriptLoader
+  else delete Module._extensions['.ts']
+}
 
 const { createHttpGateways, PlatformApiClient, PlatformApiError } = runtimeModule.exports
 const { DevelopmentTournamentGateway } = developmentModule.exports
@@ -50,6 +79,7 @@ const errorResponse = (status, code, message, details, retryable) => ({
 })
 const validMatched = (overrides = {}) => ({
   matchId: 'm1',
+  entryAttemptId: 'normalMatchEntry_Q7mN4vX9kLp2',
   mode: 'quick',
   status: 'matched',
   roomId: '123456',
@@ -57,6 +87,29 @@ const validMatched = (overrides = {}) => ({
   gameEndpoint: 'ws://127.0.0.1:3002/weapp',
   gameTicket: 'signed-ticket',
   expiresAt: Date.now() + 60_000,
+  ...overrides,
+})
+const friendRoomSettings = {
+  mode: 'classic', rounds: 8, scoring: 'double-3', scoreVisibility: 'live', turnSeconds: 40,
+  trusteeSeconds: 15, totalTimeMinutes: 0, spectator: 'off', autoSort: true,
+  disableInteraction: true, sortOrder: 'desc', authoritativeValidation: true,
+}
+const validFriendEntry = (entryAttemptId, overrides = {}) => ({
+  entryAttemptId,
+  matchId: 'mat_friend_1',
+  roomId: '123456',
+  seat: 'p1',
+  gameEndpoint: 'wss://game.example/weapp',
+  gameTicket: 'signed-friend-ticket',
+  joinToken: 'signed-friend-ticket',
+  expiresAt: Date.now() + 60_000,
+  roomExpiresAt: Date.now() + 600_000,
+  roomSettings: friendRoomSettings,
+  roomKind: 'friend',
+  ticketPurpose: 'entry',
+  inviteCode: 'Q7mN4vX9kLp2sTw8aBcD',
+  invitePayload: { version: 1, roomId: '123456', inviteCode: 'Q7mN4vX9kLp2sTw8aBcD' },
+  inviteText: '123456.Q7mN4vX9kLp2sTw8aBcD',
   ...overrides,
 })
 const validMerchantConsole = (overrides = {}) => ({
@@ -154,13 +207,13 @@ class FakeTransport {
     if (url.pathname === '/api/v1/season/tasks' && input.method === 'GET') return ok({ season: { id: 's1', name: '夏季赛季', status: 'active' }, tasks: [{ id: 'daily', name: '完成一局', target: 1, rewardPoints: 80, progress: 1, completed: true, claimed: false, cadence: 'daily' }] })
     if (url.pathname === '/api/v1/season/tasks/daily/claim') return ok({ claim: { taskId: 'daily' } })
     if (url.pathname === '/api/v1/replays' && input.method === 'GET') return ok({ replays: [{ id: 'r1', eventId: 'e1', matchId: 'm1', roomId: '123456', ranking: ['p1', 'p3', 'p2', 'p4'], winnerTeam: 'teamA', finishedAt: 1000, eventCount: 1 }] })
-    if (url.pathname === '/api/v1/replays/r1') return ok({ replay: { id: 'r1', eventId: 'e1', matchId: 'm1', roomId: '123456', ranking: ['p1', 'p3', 'p2', 'p4'], winnerTeam: 'teamA', finishedAt: 1000, participants: { p1: '陵水玩家' }, events: [{ sequence: 1, at: 900, type: 'play', roundSequence: 2, playerId: 'p1', cards: [{ rank: 'A', suit: 'heart' }], playType: 'Single', automatic: false }] } })
+    if (url.pathname === '/api/v1/replays/r1') return ok({ replay: { id: 'r1', eventId: 'e1', matchId: 'm1', roomId: '123456', ranking: ['p1', 'p3', 'p2', 'p4'], winnerTeam: 'teamA', finishedAt: 1000, participants: { p1: '陵水玩家' }, viewerSeat: 'p2', events: [{ sequence: 1, at: 900, type: 'play', roundSequence: 2, playerId: 'p1', cards: [{ rank: 'A', suit: 'heart' }], playType: 'Single', automatic: false }] } })
     if (url.pathname === '/api/v1/spectate') return ok({ delaySeconds: 30, feeds: [
-      { matchId: 'm-live', tableLabel: '快速匹配 · MLIVE桌', mode: 'quick', status: 'running', startedAt: 800, finishedAt: null, abortedAt: null, abortReason: null, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 1, totalEventCount: 2, timelineComplete: false },
+      { matchId: 'm-live', tableLabel: '快速匹配 · MLIVE桌', mode: 'quick', status: 'playing', startedAt: 800, finishedAt: null, abortedAt: null, abortReason: null, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 1, totalEventCount: 2, timelineComplete: false },
       { matchId: 'm-aborted', tableLabel: '快速匹配 · MABORT桌', mode: 'quick', status: 'aborted', startedAt: 600, finishedAt: null, abortedAt: 900, abortReason: 'empty-timeout', delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 2, totalEventCount: 2, timelineComplete: true },
       { matchId: 'm-classic-50', tableLabel: '经典场 · 底分50', mode: 'classic_50', status: 'running', startedAt: 850, finishedAt: null, abortedAt: null, abortReason: null, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 0, totalEventCount: 0, timelineComplete: false },
     ] })
-    if (url.pathname === '/api/v1/spectate/m1') return ok({ feed: { matchId: 'm1', tableLabel: '快速匹配 · M1桌', mode: 'quick', status: 'finished', startedAt: 800, finishedAt: 1000, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 1, totalEventCount: 1, timelineComplete: true, availableThrough: 1100, events: [{ sequence: 1, at: 900, type: 'play', playerId: 'p1' }] } })
+    if (url.pathname === '/api/v1/spectate/m1') return ok({ feed: { matchId: 'm1', tableLabel: '快速匹配 · M1桌', mode: 'quick', status: 'completed', startedAt: 800, finishedAt: 1000, delaySeconds: Number(url.searchParams.get('delaySeconds')), availableEventCount: 1, totalEventCount: 1, timelineComplete: true, availableThrough: 1100, events: [{ sequence: 1, at: 900, type: 'play', playerId: 'p1' }] } })
     if (url.pathname === '/api/v1/merchants/apply') return ok({ merchant: { id: 'mch1', ownerUserId: 'u1', name: '陵水生活馆', contactName: '店长', status: 'pending', dailyPointLimit: 5000, createdAt: 1000 } })
     if (url.pathname === '/api/v1/merchants/me') return ok({
       merchant: { id: 'mch1', ownerUserId: 'u1', name: '陵水生活馆', contactName: '店长', status: 'active', dailyPointLimit: 5000, createdAt: 1000 },
@@ -302,8 +355,9 @@ const testBasicGateways = async () => {
   assert.equal(replay.events[0].roundSequence, 2)
   assert.equal(replay.events[0].playType, 'Single')
   assert.equal(replay.events[0].automatic, false)
+  assert.equal(replay.viewerSeat, 'p2')
   const publicMatches = await gateways.spectator.list(30)
-  assert.equal(publicMatches[0].status, 'running')
+  assert.equal(publicMatches[0].status, 'playing')
   assert.equal(publicMatches[0].tableLabel, '快速匹配 · MLIVE桌')
   assert.equal('roomId' in publicMatches[0], false, '公开观战 DTO 不应包含入桌房间码')
   assert.equal(publicMatches[1].status, 'aborted')
@@ -311,7 +365,7 @@ const testBasicGateways = async () => {
   assert.equal(publicMatches[2].mode, 'classic_50')
   const publicFeed = await gateways.spectator.getFeed('m1', 30)
   assert.equal(publicFeed.delaySeconds, 30)
-  assert.equal(publicFeed.status, 'finished')
+  assert.equal(publicFeed.status, 'completed')
   assert.equal(publicFeed.events.length, 1)
 
   const merchantConsole = await gateways.merchant.getConsole()
@@ -346,6 +400,7 @@ const testBasicGateways = async () => {
   assert.deepEqual(matchJoinRequests.at(-1).body, { mode: 'lingshui_16_cup', tournamentId: 't16', assignmentId: 'tpa-roster-r1-t1' })
   const matched = await gateways.matchmaking.getStatus('m1')
   assert.equal(matched.joinToken, 'signed-ticket')
+  assert.equal(matched.entryAttemptId, 'normalMatchEntry_Q7mN4vX9kLp2')
   assert.equal(matched.seat, 'p2')
   assert.ok(matched.expiresAt > Date.now())
   await gateways.matchmaking.cancel('m1')
@@ -368,6 +423,60 @@ const testWechatLoginBody = async () => {
   await gateways.wallet.getWallet()
   assert.deepEqual(requests[0].body, { code: 'wx-code', displayName: '海风玩家' })
   assert.equal(requests.some(item => item.url.endsWith('/api/v1/auth/dev-login')), false)
+}
+
+const testLoginLifecycle = async () => {
+  let releaseCredential
+  let providerCalls = 0
+  let storedToken = null
+  const requests = []
+  const firstCredential = new Promise(resolve => { releaseCredential = resolve })
+  const client = new PlatformApiClient({ request: async input => {
+    requests.push(input)
+    const route = new URL(input.url).pathname
+    if (route === '/api/v1/auth/wx-login') return ok({ accessToken: providerCalls === 1 ? 'stale-late-token' : 'fresh-token' })
+    if (route === '/api/v1/wallet') return ok({ wallet: true })
+    throw new Error(`unexpected route ${route}`)
+  } }, {
+    baseUrl: 'https://platform.example',
+    deviceId: 'wechat-device',
+    loginProvider: async () => {
+      providerCalls += 1
+      if (providerCalls === 1) return firstCredential
+      return { kind: 'wechat', code: 'fresh-code' }
+    },
+    credentialStore: {
+      getAccessToken: () => storedToken,
+      setAccessToken: token => { storedToken = token },
+      clearAccessToken: () => { storedToken = null },
+    },
+  })
+
+  const staleRequest = client.request('/api/v1/wallet')
+  await Promise.resolve()
+  client.signOut()
+  releaseCredential({ kind: 'wechat', code: 'late-code' })
+  await assert.rejects(staleRequest, error => error instanceof PlatformApiError && error.code === 'AUTH_CANCELLED')
+  assert.equal(storedToken, null, 'signOut must prevent a late login from restoring credentials')
+  assert.equal(requests.some(item => item.body?.code === 'late-code'), false, 'a provider result arriving after signOut must not reach the auth endpoint')
+
+  await client.request('/api/v1/wallet')
+  assert.equal(storedToken, 'fresh-token', 'a later explicit request may start a fresh login generation')
+  assert.equal(providerCalls, 2)
+
+  const timedClient = new PlatformApiClient({ request: async () => assert.fail('a timed-out provider must not reach HTTP') }, {
+    baseUrl: 'https://platform.example',
+    deviceId: 'timeout-device',
+    loginTimeoutMs: 5,
+    loginProvider: () => new Promise(() => {}),
+  })
+  await assert.rejects(
+    Promise.race([
+      timedClient.request('/api/v1/wallet'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('login lifecycle test watchdog expired')), 50)),
+    ]),
+    error => error instanceof PlatformApiError && error.code === 'LOGIN_PROVIDER_TIMEOUT' && error.retryable,
+  )
 }
 
 const testErrorMetadata = async () => {
@@ -440,6 +549,10 @@ const testTicketValidation = async () => {
   await assertMalformedTicket({ matchId: 'm1', mode: 'unknown', status: 'matching' }, /队列/)
   await assertMalformedTicket({ matchId: '  ', mode: 'quick', status: 'matching' }, /ID/)
   await assertMalformedTicket(validMatched({ seat: 'p9' }), /座位/)
+  await assertMalformedTicket(validMatched({ entryAttemptId: 'short' }), /幂等 ID/)
+  const missingEntryAttempt = validMatched()
+  delete missingEntryAttempt.entryAttemptId
+  await assertMalformedTicket(missingEntryAttempt, /缺少入桌所需字段/)
   await assertMalformedTicket(validMatched({ expiresAt: Date.now() - 1 }), /过期时间/)
   await assertMalformedTicket(validMatched({ gameTicket: '' }), /入桌凭证/)
   await assertMalformedTicket(validMatched({ gameEndpoint: 'javascript:alert(1)' }), /WebSocket/)
@@ -459,6 +572,139 @@ const testTicketValidation = async () => {
     baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
   }, secureTransport)
   assert.equal((await secureGateways.matchmaking.getStatus('m1')).gameEndpoint, 'wss://game.example/weapp')
+  const fixedTicket = await createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, { request: async () => ok({ match: validMatched({
+    matchId: 'fixed-match', mode: 'lingshui_16_cup', entryAttemptId: 'fixedTournamentEntry_Q7mN4vX9k', gameEndpoint: 'wss://game.example/weapp',
+  }) }) }).matchmaking.getStatus('fixed-match')
+  assert.equal(fixedTicket.entryAttemptId, 'fixedTournamentEntry_Q7mN4vX9k', 'fixed tournament tickets must preserve the server-bound WebSocket attempt id')
+
+  for (const status of ['playing', 'completed', 'aborted']) {
+    const terminalGateways = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token' }, {
+      request: async () => ok({ match: { matchId: `m-${status}`, mode: 'quick', status } }),
+    })
+    assert.equal((await terminalGateways.matchmaking.getStatus(`m-${status}`)).status, status)
+  }
+}
+
+const testMatchRecoveryGateway = async () => {
+  const calls = []
+  const transport = { request: async input => {
+    calls.push(input)
+    const recoveryAttemptId = input.body.recoveryAttemptId
+    return ok({ entry: {
+      entryAttemptId: recoveryAttemptId, recoveryAttemptId, matchId: 'recover-match', roomId: '787878', seat: 'p3',
+      roomKind: 'match', ticketPurpose: 'rejoin', gameEndpoint: 'wss://game.example/weapp',
+      gameTicket: `ticket-${recoveryAttemptId}`, joinToken: `ticket-${recoveryAttemptId}`, expiresAt: Date.now() + 60_000,
+    } })
+  } }
+  const gateways = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, transport)
+  const first = await gateways.matchRecovery.recover()
+  const duplicate = await gateways.matchRecovery.recover()
+  assert.match(first.recoveryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
+  assert.equal(duplicate.recoveryAttemptId, first.recoveryAttemptId, 'HTTP retry and subsequent WS entry must share one recovery attempt')
+  assert.equal(calls[0].method, 'POST')
+  assert.equal(new URL(calls[0].url).pathname, '/api/v1/matches/recover')
+  gateways.matchRecovery.confirm(first.recoveryAttemptId)
+  const rotated = await gateways.matchRecovery.recover()
+  assert.notEqual(rotated.recoveryAttemptId, first.recoveryAttemptId, 'roomRejoined confirmation must close the attempt before the next disconnect')
+
+  const expiredLeaseGateway = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, { request: async input => ok({ entry: validFriendEntry(input.body.recoveryAttemptId, {
+    recoveryAttemptId: input.body.recoveryAttemptId, ticketPurpose: 'rejoin', roomExpiresAt: Date.now() - 60_000,
+    inviteCode: undefined, invitePayload: undefined, inviteText: undefined,
+  }) }) })
+  const friendRecovery = await expiredLeaseGateway.matchRecovery.recover()
+  assert.equal(friendRecovery.ticketPurpose, 'rejoin')
+  assert.ok(friendRecovery.roomExpiresAt < Date.now(), 'a playing friend-room rejoin must preserve its immutable expired lobby lease')
+
+  const waitingHostGateway = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, { request: async input => ok({ entry: validFriendEntry(input.body.recoveryAttemptId, {
+    recoveryAttemptId: input.body.recoveryAttemptId,
+  }) }) })
+  const waitingHost = await waitingHostGateway.matchRecovery.recover()
+  assert.equal(waitingHost.roomKind, 'friend')
+  assert.equal(waitingHost.inviteText, '123456.Q7mN4vX9kLp2sTw8aBcD', 'waiting host recovery must retain the complete invite secret')
+
+  const leakingGuestGateway = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, { request: async input => ok({ entry: validFriendEntry(input.body.recoveryAttemptId, {
+    recoveryAttemptId: input.body.recoveryAttemptId, seat: 'p3',
+  }) }) })
+  await assert.rejects(leakingGuestGateway.matchRecovery.recover(), error => error instanceof PlatformApiError && /邀请/.test(error.message))
+
+  const waitingGuestGateway = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, { request: async input => ok({ entry: validFriendEntry(input.body.recoveryAttemptId, {
+    recoveryAttemptId: input.body.recoveryAttemptId, seat: 'p3', inviteCode: undefined, invitePayload: undefined, inviteText: undefined,
+  }) }) })
+  const waitingGuest = await waitingGuestGateway.matchRecovery.recover()
+  assert.equal('inviteText' in waitingGuest, false, 'guest recovery must not synthesize or retain the host invite secret')
+
+  const retryAttemptIds = []
+  let recoveryRequests = 0
+  const retryGateway = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, { request: async input => {
+    retryAttemptIds.push(input.body.recoveryAttemptId)
+    recoveryRequests += 1
+    if (recoveryRequests === 1) throw new Error('temporary timeout')
+    return ok({ entry: null })
+  } })
+  await assert.rejects(retryGateway.matchRecovery.recover(), /temporary timeout/)
+  assert.equal(await retryGateway.matchRecovery.recover(), null)
+  assert.equal(retryAttemptIds[1], retryAttemptIds[0], 'an HTTP retry after transport uncertainty must reuse the same recovery attempt id')
+}
+
+const testFriendRoomGateway = async () => {
+  const calls = []
+  let createCalls = 0
+  const gateways = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only' }, {
+    request: async input => {
+      const route = new URL(input.url).pathname
+      calls.push({ route, body: input.body })
+      if (route === '/api/v1/friend-rooms/create') {
+        createCalls += 1
+        if (createCalls === 1) throw new Error('response lost after friend room commit')
+        return ok({ entry: validFriendEntry(input.body.entryAttemptId) })
+      }
+      if (route === '/api/v1/friend-rooms/join') return ok({ entry: validFriendEntry(input.body.entryAttemptId, {
+        seat: 'p3', inviteCode: undefined, invitePayload: undefined, inviteText: undefined,
+      }) })
+      if (route === '/api/v1/match/cancel') return ok({ match: { matchId: input.body.matchId, status: 'cancelled' } })
+      throw new Error(`unexpected friend-room route ${route}`)
+    },
+  })
+
+  await assert.rejects(gateways.friendRooms.create(friendRoomSettings), error => error instanceof PlatformApiError && error.retryable)
+  const created = await gateways.friendRooms.create(friendRoomSettings)
+  assert.equal(created.inviteText, '123456.Q7mN4vX9kLp2sTw8aBcD')
+  const creates = calls.filter(call => call.route.endsWith('/create'))
+  assert.match(creates[0].body.entryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
+  assert.equal(creates[1].body.entryAttemptId, creates[0].body.entryAttemptId, 'an uncertain create retry must reuse entryAttemptId')
+  assert.deepEqual(creates[0].body.roomSettings, friendRoomSettings)
+
+  const joined = await gateways.friendRooms.join(' 123456.Q7mN4vX9kLp2sTw8aBcD ')
+  assert.equal(joined.seat, 'p3')
+  const joinCall = calls.find(call => call.route.endsWith('/join'))
+  assert.deepEqual({ roomId: joinCall.body.roomId, inviteCode: joinCall.body.inviteCode }, {
+    roomId: '123456', inviteCode: 'Q7mN4vX9kLp2sTw8aBcD',
+  })
+  assert.match(joinCall.body.entryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
+  await assert.rejects(gateways.friendRooms.join('123456'), error => error instanceof PlatformApiError && error.code === 'INVALID_FRIEND_ROOM_INVITE')
+  assert.equal(calls.filter(call => call.route.endsWith('/join')).length, 1, 'a six-digit display id alone must never reach the authenticated join endpoint')
+
+  await gateways.friendRooms.cancel(created.matchId)
+  assert.equal(calls.at(-1).body.matchId, created.matchId)
+
+  const malformed = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only' }, {
+    request: async input => ok({ entry: validFriendEntry(input.body.entryAttemptId, { inviteText: '123456.wrong' }) }),
+  })
+  await assert.rejects(malformed.friendRooms.create(friendRoomSettings), error => error instanceof PlatformApiError && error.code === 'MALFORMED_RESPONSE' && /邀请口令/.test(error.message))
 }
 
 const testOrderIdempotencyRecovery = async () => {
@@ -610,9 +856,12 @@ const testMalformedCollections = async () => {
   await testDevelopmentTournamentState()
   await testBasicGateways()
   await testWechatLoginBody()
+  await testLoginLifecycle()
   await testErrorMetadata()
   await testConcurrentUnauthorizedRefresh()
   await testTicketValidation()
+  await testMatchRecoveryGateway()
+  await testFriendRoomGateway()
   await testOrderIdempotencyRecovery()
   await testMerchantIdempotencyRecovery()
   await testMalformedCollections()

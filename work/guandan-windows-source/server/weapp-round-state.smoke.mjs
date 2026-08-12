@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { sendProtocolCommand } from './weapp-smoke-protocol.mjs'
 
 let nextRequestId = 1
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const send = (socket, type, payload, requestId = nextRequestId++) => {
-  socket.send(JSON.stringify({ type, requestId, payload }))
+  sendProtocolCommand(socket, type, payload, requestId)
   return requestId
 }
 const waitFor = (socket, type, matches = () => true, timeoutMs = 5000) => new Promise((resolve, reject) => {
@@ -19,7 +20,7 @@ const waitFor = (socket, type, matches = () => true, timeoutMs = 5000) => new Pr
   socket.addEventListener('message', handler)
 })
 const connect = async port => {
-  const deadline = Date.now() + 3000
+  const deadline = Date.now() + 5000
   while (Date.now() < deadline) {
     try {
       return await new Promise((resolve, reject) => {
@@ -62,11 +63,17 @@ const startRoom = async (entered, roomId) => {
   return statePromise
 }
 const launch = (port, env = {}, randomSeed = '0x5eed1234') => {
-  const randomPrelude = `data:text/javascript,${encodeURIComponent(`let seed=${randomSeed}; Math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296)`)}`
-  return spawn(process.execPath, ['--import', randomPrelude, 'server/weapp-ws.js'], {
+  return spawn(process.execPath, ['server/weapp-ws.js'], {
   cwd: process.cwd(),
-  env: { ...process.env, WEAPP_WS_PORT: String(port), ...env },
+  env: { ...process.env, NODE_ENV: 'test', WEAPP_TEST_RANDOM_SEED: randomSeed, WEAPP_WS_PORT: String(port), ...env },
   stdio: 'ignore',
+  })
+}
+const stop = child => {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
+  return new Promise(resolve => {
+    child.once('exit', resolve)
+    child.kill('SIGTERM')
   })
 }
 
@@ -111,7 +118,7 @@ try {
   assert.match((await expiredRejoinErrorPromise).message, /房间或席位无效/, '整桌离线超过宽限期后必须清理恢复凭证')
 } finally {
   timeoutSockets.forEach(socket => socket.close())
-  timeoutChild.kill('SIGTERM')
+  await stop(timeoutChild)
 }
 
 const roundPort = 39113
@@ -151,7 +158,7 @@ try {
   const p4ExitId = nextRequestId++
   const p4AutoReadyPromise = waitFor(entered.sockets[0], 'roundReadyUpdated', packet => packet.roundReadyPlayerIds.includes('p4'))
   const p4ExitPromise = waitFor(p4Socket, 'roomLeft', packet => packet.requestId === p4ExitId)
-  send(p4Socket, 'safeExit', { roomId }, p4ExitId)
+  send(p4Socket, 'safeExit', { roomId, expectedVersion: 0 }, p4ExitId)
   const [p4AutoReady, p4Exit] = await Promise.all([p4AutoReadyPromise, p4ExitPromise])
   assert.deepEqual(p4AutoReady.roundReadyPlayerIds, ['p4'], '结算阶段离线席位必须由服务器自动准备')
   assert.equal(p4Exit.seatReserved, true)
@@ -160,6 +167,8 @@ try {
   const p4RejoinedPromise = waitFor(p4Socket, 'roomRejoined', packet => packet.requestId === p4RejoinId)
   send(p4Socket, 'rejoinRoom', { roomId, myPlayerId: 'p4', resumeToken: entered.tokens.p4 }, p4RejoinId)
   const p4Rejoined = await p4RejoinedPromise
+  assert.notEqual(p4Rejoined.resumeToken, entered.tokens.p4)
+  entered.tokens.p4 = p4Rejoined.resumeToken
   assert.deepEqual(p4Rejoined.roundReadyPlayerIds, ['p4'], '重连快照必须保留服务端自动准备状态')
   const p4TrusteeCancelledPromise = waitFor(entered.sockets[0], 'trusteeUpdated', packet => packet.trustees.p4 === null)
   send(p4Socket, 'cancelTrustee', { roomId })
@@ -182,6 +191,7 @@ try {
   send(entered.seats.get('p3'), 'readyNextRound', { roomId })
   const prepared = await preparedPromise
   assert.equal(prepared.roundResult, null)
+  assert.equal(prepared.gameVersion, prepared.state.revision, '准备下一局必须由 canonical transition 推进版本')
   assert.deepEqual(prepared.roundReadyPlayerIds, [])
   assert.equal(prepared.tribute.isDoubleDown, true, '固定单张领出策略应形成同队前二，以覆盖双下贡还')
   assert.equal(prepared.tribute.actions.length, 2)
@@ -194,16 +204,24 @@ try {
   send(entered.seats.get(secondTribute.from), 'tribute', { roomId, cardId: 'not-current-yet' }, outOfOrderId)
   assert.match((await outOfOrderErrorPromise).message, /等待其他玩家/, '第二贡者不得越过第一贡者并发提交')
 
-  const firstAutoTributePromise = waitFor(entered.sockets[0], 'tributeUpdated', packet => (
+  const firstTributeViewer = entered.seats.get(firstTribute.from)
+  const hiddenFirstTributePromise = waitFor(entered.seats.get(secondTribute.from), 'tributeUpdated', packet => (
+    packet.deadlineAction === 'tribute' && packet.deadlinePlayerId === secondTribute.from
+  ))
+  const firstAutoTributePromise = waitFor(firstTributeViewer, 'tributeUpdated', packet => (
     packet.tribute?.actions[0]?.card && packet.deadlineAction === 'tribute' && packet.deadlinePlayerId === secondTribute.from
   ))
-  send(entered.seats.get(firstTribute.from), 'setTrustee', { roomId })
-  const afterFirstTribute = await firstAutoTributePromise
+  send(firstTributeViewer, 'setTrustee', { roomId })
+  const [afterFirstTribute, hiddenFirstTribute] = await Promise.all([firstAutoTributePromise, hiddenFirstTributePromise])
+  assert.equal(afterFirstTribute.gameVersion, afterFirstTribute.state.revision, '贡牌选择必须由 canonical transition 推进版本')
+  assert.equal(hiddenFirstTribute.tribute.actions[0].card, null, '未完成双贡不得向另一贡者泄露先选牌面')
+  assert.equal(hiddenFirstTribute.state.tribute.exchanges[0].tributeCardId, null, '未完成双贡不得通过 canonical state 泄露选择 ID')
+  assert.equal(afterFirstTribute.state.tribute.exchanges[0].tributeCardId, afterFirstTribute.tribute.actions[0].card.id, '贡者自己的 canonical state 应确认已选择牌')
   assert.equal(afterFirstTribute.tribute.actions[1].card, null)
   assert.equal(
     Object.values(afterFirstTribute.state.players).reduce((total, player) => total + player.hand.length, 0),
-    107,
-    '首张双贡应进入 TributeState escrow，不能仍显示在贡者手牌或提前进入收贡者手牌',
+    108,
+    '双贡收齐前不得移动任一张牌，避免半完成状态污染权威手牌',
   )
   assert.equal(afterFirstTribute.tribute.actions.filter(action => action.card).length, 1)
 
@@ -230,15 +248,24 @@ try {
   const tributeRejoinedPromise = waitFor(tributeReplacement, 'roomRejoined', packet => packet.requestId === tributeRejoinId)
   send(tributeReplacement, 'rejoinRoom', { roomId, myPlayerId: secondTribute.from, resumeToken: entered.tokens[secondTribute.from] }, tributeRejoinId)
   const tributeRejoined = await tributeRejoinedPromise
+  assert.notEqual(tributeRejoined.resumeToken, entered.tokens[secondTribute.from])
+  entered.tokens[secondTribute.from] = tributeRejoined.resumeToken
   assert.equal(tributeRejoined.deadlineAction, 'returnTribute')
   assert.equal(tributeRejoined.deadlinePlayerId, firstReturn.to, '贡者重连必须恢复动态 recipient 的当前权威还贡步骤，而不是本地补动作')
   entered.seats.set(secondTribute.from, tributeReplacement)
 
-  const firstAutoReturnPromise = waitFor(entered.sockets[0], 'tributeUpdated', packet => (
+  const firstReturnViewer = entered.seats.get(firstReturn.to)
+  const hiddenFirstReturnPromise = waitFor(entered.seats.get(secondReturn.to), 'tributeUpdated', packet => (
+    packet.deadlineAction === 'returnTribute' && packet.deadlinePlayerId === secondReturn.to
+  ))
+  const firstAutoReturnPromise = waitFor(firstReturnViewer, 'tributeUpdated', packet => (
     packet.tribute?.actions[0]?.returnCard && packet.deadlineAction === 'returnTribute' && packet.deadlinePlayerId === secondReturn.to
   ))
-  send(entered.seats.get(firstReturn.to), 'setTrustee', { roomId })
-  const afterFirstReturn = await firstAutoReturnPromise
+  send(firstReturnViewer, 'setTrustee', { roomId })
+  const [afterFirstReturn, hiddenFirstReturn] = await Promise.all([firstAutoReturnPromise, hiddenFirstReturnPromise])
+  assert.equal(hiddenFirstReturn.tribute.actions[0].returnCard, null, '未完成双还贡不得向另一还贡者泄露先选牌面')
+  assert.equal(hiddenFirstReturn.state.tribute.exchanges[0].returnCardId, null, '未完成双还贡不得通过 canonical state 泄露选择 ID')
+  assert.equal(afterFirstReturn.state.tribute.exchanges[0].returnCardId, afterFirstReturn.tribute.actions[0].returnCard.id, '还贡者自己的 canonical state 应确认已选择牌')
   assert.equal(afterFirstReturn.tribute.actions[1].returnCard, null)
   assert.ok(afterFirstReturn.tribute.actions[0].returnCard.value <= 10, '超时还贡必须实际落下点数不高于 10 的最低合法牌')
 
@@ -269,6 +296,8 @@ try {
   const p2PendingVotePromise = waitFor(entered.sockets[0], 'dissolveVoteUpdated', packet => packet.dissolveVote?.votes.p2 === 'pending')
   send(p2Replacement, 'rejoinRoom', { roomId, myPlayerId: 'p2', resumeToken: entered.tokens.p2 }, p2RejoinId)
   const [p2Rejoined] = await Promise.all([p2RejoinedPromise, p2PendingVotePromise])
+  assert.notEqual(p2Rejoined.resumeToken, entered.tokens.p2)
+  entered.tokens.p2 = p2Rejoined.resumeToken
   assert.equal(p2Rejoined.dissolveVote.votes.p2, 'pending', '投票中断线玩家重连后必须恢复为可投票状态')
   entered.seats.set('p2', p2Replacement)
   const rejectedPromise = waitFor(entered.sockets[0], 'dissolveVoteUpdated', packet => packet.outcome === 'rejected')
@@ -289,7 +318,7 @@ try {
 
 } finally {
   roundSockets.forEach(socket => socket.close())
-  roundChild.kill('SIGTERM')
+  await stop(roundChild)
 }
 
 const antiPort = 39114
@@ -339,7 +368,7 @@ try {
   assert.equal(antiStarted.deadlinePlayerId, antiPrepared.deadlinePlayerId)
 } finally {
   antiSockets.forEach(socket => socket.close())
-  antiChild.kill('SIGTERM')
+  await stop(antiChild)
 }
 
 console.log('weapp round-state integration passed')

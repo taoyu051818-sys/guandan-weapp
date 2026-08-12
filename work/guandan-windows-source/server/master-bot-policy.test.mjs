@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { chooseMasterBotCards, MASTER_BOT_DIFFICULTY } from './master-bot-policy.js'
+import { createRoomBotPolicy, MASTER_BOT_DIFFICULTY, roundMetaForAI } from './master-bot-policy.js'
 
 const require = createRequire(import.meta.url)
 const { createGame, passTurn, playCards } = require('../../../shared-core/dist')
@@ -20,28 +20,56 @@ const controlledGame = (leaderId) => {
 }
 
 assert.equal(MASTER_BOT_DIFFICULTY, 'master', '牌局服只允许最高档机器人策略')
+const sourceRoundMeta = { fromTribute: true, isAntiTribute: false }
+const copiedRoundMeta = roundMetaForAI(sourceRoundMeta)
+assert.deepEqual(copiedRoundMeta, sourceRoundMeta)
+assert.notEqual(copiedRoundMeta, sourceRoundMeta, '服务端 AI 上下文不得持有权威状态中的可变引用')
+assert.equal(roundMetaForAI(null), null)
+assert.throws(() => roundMetaForAI({ fromTribute: true }), /局次上下文无效/)
+
+const policy = createRoomBotPolicy({ ruleProfile: controlledGame('p1').ruleProfile, seed: 20260811 })
 
 let teammateLed = controlledGame('p1')
 teammateLed = playCards(teammateLed, 'p1', [teammateLed.players.p1.hand[0]])
 teammateLed = passTurn(teammateLed, 'p2')
 assert.equal(teammateLed.currentTurn, 'p3')
 assert.equal(
-  chooseMasterBotCards({ state: teammateLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' }),
+  policy.chooseCards({ state: teammateLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' }),
   null,
   'p3 必须识别 p1 为队友并让牌，不能压制友方有效出牌',
 )
 
 let enemyLed = controlledGame('p2')
 enemyLed = playCards(enemyLed, 'p2', [enemyLed.players.p2.hand[0]])
-const enemyResponse = chooseMasterBotCards({ state: enemyLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' })
+const enemyResponse = policy.chooseCards({ state: enemyLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' })
 assert.ok(Array.isArray(enemyResponse) && enemyResponse.length > 0, 'p3 必须识别 p2 为敌方并在有合法跟牌时进行策略响应')
 
 const corrupted = controlledGame('p1')
 corrupted.players.p3.team = 'teamB'
 assert.throws(
-  () => chooseMasterBotCards({ state: corrupted, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' }),
+  () => policy.chooseCards({ state: corrupted, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' }),
   /队伍数据无效/,
   '服务端不得在席位与队伍映射损坏时继续执行机器人决策',
 )
+
+const isolatedA = createRoomBotPolicy({ ruleProfile: enemyLed.ruleProfile, seed: 77 })
+const isolatedB = createRoomBotPolicy({ ruleProfile: enemyLed.ruleProfile, seed: 77 })
+const beforeB = isolatedB.checkpoint()
+const choiceA = isolatedA.chooseCards({ state: enemyLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' })
+assert.deepEqual(isolatedB.checkpoint(), beforeB, '一个房间的决策不得修改另一个房间的 AI 状态')
+const choiceB = isolatedB.chooseCards({ state: enemyLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' })
+assert.deepEqual(choiceB?.map(card => card.id), choiceA?.map(card => card.id), '相同 seed 的独立房间必须可复现')
+assert.deepEqual(isolatedB.checkpoint(), isolatedA.checkpoint(), '相同输入序列的房间 checkpoint 必须一致')
+
+const serializedCheckpoint = JSON.parse(JSON.stringify(isolatedA.checkpoint()))
+const restored = createRoomBotPolicy({
+  ruleProfile: enemyLed.ruleProfile,
+  seed: 1,
+  checkpoint: serializedCheckpoint,
+})
+const continuedChoice = isolatedA.chooseCards({ state: enemyLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' })
+const restoredChoice = restored.chooseCards({ state: enemyLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' })
+assert.deepEqual(restoredChoice?.map(card => card.id), continuedChoice?.map(card => card.id), '恢复后的房间必须延续同一决策序列')
+assert.deepEqual(restored.checkpoint(), isolatedA.checkpoint(), '恢复后的房间必须延续同一记牌与随机状态')
 
 process.stdout.write('master bot team-awareness policy tests passed\n')

@@ -5,17 +5,21 @@ const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
 const requireBuild = process.argv.includes('--require-build')
-const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
+const { compilerPath, loadTypeScript } = require('./support/typescript.cjs')
 const audioProfilesPath = path.join(projectRoot, 'assets/scripts/audio/AudioProfiles.ts')
 const playVoiceProfilesPath = path.join(projectRoot, 'assets/scripts/audio/PlayVoiceProfiles.ts')
 const audioControllerPath = path.join(projectRoot, 'assets/scripts/audio/CocosAudioController.ts')
 const effectPolicyPath = path.join(projectRoot, 'assets/scripts/effects/EffectPolicy.ts')
 const effectResolverPath = path.join(projectRoot, 'assets/scripts/effects/EffectProfileResolver.ts')
 const effectControllerPath = path.join(projectRoot, 'assets/scripts/effects/EffectController.ts')
+const effectPlaybackPath = path.join(projectRoot, 'assets/scripts/effects/EffectPlaybackCoordinator.ts')
 const gameManagerPath = path.join(projectRoot, 'assets/scripts/game/GameManager.ts')
 const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
+const tableMatchCoordinatorPath = path.join(projectRoot, 'assets/scripts/scenes/TableMatchCoordinator.ts')
+const tableTurnClockPath = path.join(projectRoot, 'assets/scripts/scenes/TableTurnClockController.ts')
 const settingsRulesPagePath = path.join(projectRoot, 'assets/scripts/scenes/front-pages/SettingsRulesPageDomain.ts')
 const gameSessionPath = path.join(projectRoot, 'assets/scripts/session/GameSession.ts')
+const gameSessionModelPath = path.join(projectRoot, 'assets/scripts/session/GameSessionModel.ts')
 const licensedCatalogPath = path.join(projectRoot, 'third_party/licenses/gameabc2-audio/catalog.json')
 const licensedManifestPath = path.join(projectRoot, 'third_party/licenses/gameabc2-audio/manifest.json')
 const niumaAudioManifestPath = path.join(projectRoot, 'third_party/licenses/niuma-client-cocos-audio.json')
@@ -25,7 +29,7 @@ const niumaLicensePath = path.join(projectRoot, 'third_party/licenses/NiuMa-clie
 const battleBgmPath = path.join(projectRoot, 'assets/game-assets/audio/music/duizhan.mp3')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
-const ts = require(compilerPath)
+const ts = loadTypeScript()
 
 const read = filePath => fs.readFileSync(filePath, 'utf8')
 const loadPureTs = (filePath, dependencies = {}) => {
@@ -108,10 +112,12 @@ assert.equal(audio.resolveAudioEvent('unregistered-clip'), null, 'unknown asset 
 
 const catalog = JSON.parse(read(licensedCatalogPath))
 const manifest = JSON.parse(read(licensedManifestPath))
-assert.equal(catalog.assets.length, 27, 'the authorized source list must contain exactly 27 imported MP3 files')
+assert.equal(catalog.assets.length, 25, 'only the 25 reachable authorized clips may enter the runtime bundle')
+assert.equal(catalog.archived.length, 2, 'two authorized but unreachable clips must remain outside assets')
 assert.equal(catalog.excluded.length, 1, 'the rejected visual must remain explicitly excluded')
 assert.match(catalog.excluded[0].url, /\.png$/)
 assert.equal(manifest.assets.length, catalog.assets.length)
+assert.equal(manifest.archived.length, catalog.archived.length)
 assert.deepEqual(manifest.excluded, catalog.excluded)
 assert.equal(new Set(manifest.assets.map(asset => asset.sha256)).size, manifest.assets.length, 'each imported clip must have a recorded content hash')
 for (const asset of manifest.assets) {
@@ -123,6 +129,24 @@ for (const asset of manifest.assets) {
   assert.equal(buffer.subarray(0, 3).toString('ascii'), 'ID3', `${asset.file} must have an MP3 ID3 header`)
   assert.equal(fs.existsSync(`${runtimePath}.meta`), true, `${asset.file} must be imported by Cocos Creator`)
 }
+for (const asset of manifest.archived) {
+  const archivePath = path.join(projectRoot, manifest.archiveDirectory, asset.file)
+  const buffer = fs.readFileSync(archivePath)
+  assert.equal(buffer.length, asset.bytes, `${asset.file} archived byte count must match the manifest`)
+  assert.equal(crypto.createHash('sha256').update(buffer).digest('hex'), asset.sha256, `${asset.file} archived hash must match the manifest`)
+  assert.equal(archivePath.includes(`${path.sep}assets${path.sep}`), false, `${asset.file} must stay outside the Cocos asset graph`)
+  assert.equal(fs.existsSync(`${archivePath}.meta`), false, `${asset.file} must not receive Cocos metadata`)
+}
+assert.deepEqual(
+  fs.readdirSync(path.join(projectRoot, manifest.archiveDirectory)).filter(file => file.endsWith('.mp3')).sort(),
+  manifest.archived.map(asset => asset.file).sort(),
+  'licensed source archive must exactly match the non-runtime manifest',
+)
+assert.deepEqual(
+  fs.readdirSync(path.join(projectRoot, manifest.runtimeDirectory)).filter(file => file.endsWith('.mp3')).sort(),
+  manifest.assets.map(asset => asset.file).sort(),
+  'licensed runtime audio must exactly match the reachable manifest',
+)
 assert.equal(fs.readdirSync(path.join(projectRoot, 'assets/game-assets/audio/voices/licensed')).some(file => /\.(png|jpe?g|webp)$/i.test(file)), false, 'rejected images must never enter the licensed audio runtime directory')
 
 const policy = loadPureTs(effectPolicyPath)
@@ -308,10 +332,14 @@ assert.equal(audioOnlyBomb.sound, 'bomb', 'visual-off mode must not silently ove
 
 const audioController = read(audioControllerPath)
 const effectController = read(effectControllerPath)
+const effectPlayback = read(effectPlaybackPath)
 const gameManager = read(gameManagerPath)
 const gameScene = read(gameScenePath)
+const tableMatchCoordinator = read(tableMatchCoordinatorPath)
+const tableTurnClock = read(tableTurnClockPath)
 const settingsRulesPage = read(settingsRulesPagePath)
 const gameSession = read(gameSessionPath)
+const gameSessionModel = read(gameSessionModelPath)
 assert.match(audioController, /if \(!clip\) return this\.playFirstAvailable\(assetKeys, volumeScale, index \+ 1, epoch\)/, 'a missing clip must try the next configured candidate')
 assert.match(audioController, /this\.unavailableAssets\.add\(assetKey\)/, 'failed resources must be cached instead of loaded forever')
 assert.match(audioController, /if \(settings && !settings\.soundEnabled\) return/, 'the independent sound switch must be authoritative')
@@ -334,19 +362,19 @@ assert.doesNotMatch(audioController, /soundEnabled[\s\S]{0,80}bgmSource\.stop/, 
 assert.match(audioController, /settings\.voicePack !== 'male'/, 'the selected voice pack must drive human announcements')
 assert.match(audioController, /replace\(\/\^niuma\\\/\/, 'niuma-male\/'\)/, 'Male selection must stay in its isolated runtime namespace')
 assert.match(audioController, /!key\.startsWith\('licensed\/'\)/, 'Male selection must not fall through into another recorded human voice')
-assert.match(gameSession, /voicePack: 'female'/, 'Female must remain the backward-compatible default pack')
-assert.match(gameSession, /saved\.settings\?\.voicePack === 'male' \? 'male' : 'female'/, 'restored voice-pack values must be normalized')
+assert.match(gameSessionModel, /voicePack: 'female'/, 'Female must remain the backward-compatible default pack')
+assert.match(gameSessionModel, /voicePack: oneOf\(settings\.voicePack, \['female', 'male'\], base\.settings\.voicePack\)/, 'restored voice-pack values must be normalized by the session schema owner')
 assert.match(settingsRulesPage, /切换报牌声线/, 'settings must expose the optional Male/Female voice pack')
-assert.doesNotMatch(effectController, /enqueueSemanticAudio/, 'pass audio must not restore the retired side queue')
-const playMethodSource = effectController.slice(effectController.indexOf('  private play (event: PlayEffectEvent)'), effectController.indexOf('  private renderPlayImpact'))
+assert.doesNotMatch(`${effectController}\n${effectPlayback}`, /enqueueSemanticAudio/, 'pass audio must not restore the retired side queue')
+const playMethodSource = effectPlayback.slice(effectPlayback.indexOf('  public play (event: PlayEffectEvent'), effectPlayback.indexOf('  public renderPreparedContext'))
 const playStartIndex = playMethodSource.indexOf('const start = async (): Promise<void> =>')
 const qualityOffMatch = /if \(effectQuality === 'off'\)/.exec(playMethodSource)
 assert.equal(playStartIndex >= 0, true, 'every live action must expose one queued play start')
 assert.equal(Boolean(qualityOffMatch && qualityOffMatch.index > playStartIndex), true, 'visual-off actions, including Pass, must still wait for the shared visible lane')
-assert.match(playMethodSource, /const handle = new EffectHandle[\s\S]*const start = async \(\): Promise<void> =>[\s\S]*if \(event\.action\.type === PlayType\.Pass\) \{[\s\S]*beginPresentation\(\)[\s\S]*this\.soundPlayer\?\.\('pass'\)[\s\S]*handle\.complete\(\)[\s\S]*this\.playStartQueue = this\.playStartQueue\.then\(start, start\)/, 'Pass must use the outer play handle and sound only after its ticketed presentation begins in lane order')
-assert.match(effectController, /this\.actionVoicePlayer\?\.\(event\.action\)/, 'incremental live actions must dispatch card announcements')
-assert.match(playMethodSource, /const start = async \(\): Promise<void> =>[\s\S]*if \(effectQuality === 'off'\) \{[\s\S]*beginPresentation\(\)[\s\S]*if \(profile\.sound\) this\.soundPlayer\?\.\(profile\.sound\)[\s\S]*handle\.complete\(\)[\s\S]*return[\s\S]*const cardFramesReady = await[\s\S]*flightHandle = this\.flight\.play\(/, 'visual-off mode must keep semantic audio and complete its queued outer handle before any prepare or flight work')
-assert.match(playMethodSource, /const renderImpact = \(\): void => \{[\s\S]*?this\.withQuality\(effectQuality, \(\) => \{[\s\S]*?if \(!rendererOwnsBombFlight\) this\.vibrate\(profile\.haptic\)[\s\S]*?impactHandle = this\.renderPlayImpact\(profile, playEvent, wildcardUsed\)/, 'enabled visuals must trigger haptics from the arrival-synchronised impact callback')
+assert.match(playMethodSource, /const handle = new EffectHandle[\s\S]*const start = async \(\): Promise<void> =>[\s\S]*if \(event\.action\.type === PlayType\.Pass\) \{[\s\S]*beginPresentation\(\)[\s\S]*this\.dependencies\.playSound\('pass'\)[\s\S]*handle\.complete\(\)[\s\S]*this\.startQueue = this\.startQueue\.then\(start, start\)/, 'Pass must use the outer play handle and sound only after its ticketed presentation begins in lane order')
+assert.match(effectPlayback, /this\.dependencies\.playActionVoice\(event\.action\)/, 'incremental live actions must dispatch card announcements')
+assert.match(playMethodSource, /const start = async \(\): Promise<void> =>[\s\S]*if \(effectQuality === 'off'\) \{[\s\S]*beginPresentation\(\)[\s\S]*if \(profile\.sound\) this\.dependencies\.playSound\(profile\.sound\)[\s\S]*handle\.complete\(\)[\s\S]*return[\s\S]*const cardFramesReady = await[\s\S]*flightHandle = flight\.play\(/, 'visual-off mode must keep semantic audio and complete its queued outer handle before any prepare or flight work')
+assert.match(playMethodSource, /const renderImpact = \(\): void => \{[\s\S]*?this\.dependencies\.withQuality\(effectQuality, \(\) => \{[\s\S]*?if \(!rendererOwnsBombFlight\) this\.dependencies\.vibrate\(profile\.haptic\)[\s\S]*?impactHandle = this\.dependencies\.renderPlayImpact\(profile, playEvent, wildcardUsed\)/, 'enabled visuals must trigger haptics from the arrival-synchronised impact callback')
 assert.match(effectController, /this\.policy\.maxMajorEffectCount === 0/, 'the major-effect budget must be enforced')
 assert.match(effectController, /profile\.level > this\.majorLevel && !this\.policy\.replaceLowerLevelEffect/, 'major-effect replacement policy must be enforced')
 assert.match(effectController, /private renderFlow \([\s\S]*if \(kind === 'victory'\) this\.soundPlayer\?\.\('victory'\)[\s\S]*else if \(kind === 'defeat'\) this\.soundPlayer\?\.\('defeat'\)[\s\S]*return EffectHandle\.completed\('unavailable'\)/, 'EffectController must dispatch settlement audio directly after the retired flow renderer is removed')
@@ -354,8 +382,8 @@ assert.match(effectController, /this\.renderFlow\(won \? 'victory' : 'defeat'/, 
 assert.doesNotMatch(effectController, /showTag\(profile\.label/, 'reduced settlement must not fall back to a system-font tag')
 assert.doesNotMatch(effectController, /pauseSystemEvents|resumeSystemEvents|enabled\s*=\s*false/, 'effect playback must not disable gameplay input')
 assert.match(gameManager, /this\.audio\?\.playRoundStart\(\)/, 'local round creation must dispatch the layered semantic start/deal cue')
-assert.match(gameScene, /this\.actionCountdown > 0 && this\.actionCountdown <= 5.*this\.audio\?\.playCountdown\(this\.actionCountdown\)/, 'the last five countdown seconds must select their dedicated semantic ticks')
-assert.match(gameScene, /isLiveNextRound.*this\.audio\?\.playRoundStart\(\)/s, 'live network next-round preparation must dispatch the layered start/deal cue')
+assert.match(tableTurnClock, /this\.remainingSeconds > 0 && this\.remainingSeconds <= 5[\s\S]*this\.dependencies\.playCountdown\(this\.remainingSeconds\)/, 'the last five countdown seconds must select their dedicated semantic ticks')
+assert.match(tableMatchCoordinator, /isLiveNextRound[\s\S]*audio\.playRoundStart\(\)/, 'live network next-round preparation must dispatch the layered start/deal cue')
 assert.match(gameScene, /action => this\.audio\?\.playActionVoice\(action\)/, 'the scene must bind action semantics to the audio controller')
 assert.match(gameScene, /this\.audio\?\.setBgmMode\(visible \? 'battle' : 'lobby'\)/, 'only the visible battle table may select the battle BGM')
 

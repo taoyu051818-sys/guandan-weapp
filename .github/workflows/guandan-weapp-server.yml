@@ -1,0 +1,42 @@
+name: Guandan WeApp Server
+
+on:
+  pull_request:
+    paths:
+      - 'shared-core/**'
+      - 'work/guandan-windows-source/server/**'
+      - 'work/guandan-windows-source/package.json'
+      - '.github/workflows/guandan-weapp-server.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'shared-core/**'
+      - 'work/guandan-windows-source/server/**'
+      - 'work/guandan-windows-source/package.json'
+      - '.github/workflows/guandan-weapp-server.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  authoritative-game-server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: work/guandan-windows-source
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: shared-core/pnpm-lock.yaml
+      - name: Install shared core dependencies
+        run: pnpm --dir ../../shared-core install --frozen-lockfile
+      - name: Check authoritative server syntax
+        run: npm run check:weapp-server
+      - name: Build shared core and run authoritative server tests
+        run: npm run test:weapp-server

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import './rating-matchmaking.test.mjs'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createPlatformRuntime } from '../platform-server.js'
+import { nodeAsyncDurableFileOperations } from '../durable-file.js'
 import { GameResultReporter } from './result-reporter.js'
 import { SpectatorEventReporter } from './spectator-event-reporter.js'
 import { AccessTokenService, GameTicketService, GameTicketVerifier } from './crypto.js'
@@ -113,6 +114,7 @@ try {
     assert.equal(joined[0].status, 'matching')
     assert.equal(joined[3].status, 'matched')
     assert.ok(joined.every(match => match.mode === mode && match.queueId === mode))
+    assert.ok(joined.every(match => /^[A-Za-z0-9_-]{22,128}$/.test(match.entryAttemptId)), '普通匹配入队即必须返回平台持久 attempt')
     classicMatches[mode] = joined[3].matchId
     classicPlayers[mode] = players
   }
@@ -328,6 +330,14 @@ try {
   assert.equal(new Set(matched.map(item => item.roomId)).size, 1)
   assert.deepEqual(new Set(matched.map(item => item.seat)), new Set(['p1', 'p2', 'p3', 'p4']))
   assert.ok(matched.every(item => item.gameEndpoint === baseEnv.GAME_ENDPOINT && item.gameTicket === item.joinToken))
+  const ordinaryMatchTicketVerifier = new GameTicketVerifier({ secret: ticketSecret, required: true })
+  for (const entry of matched) {
+    assert.match(entry.entryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
+    const claims = ordinaryMatchTicketVerifier.inspect(entry.gameTicket)
+    assert.equal(claims.roomKind, 'match')
+    assert.equal(claims.purpose, 'entry')
+    assert.equal(claims.entryAttemptId, entry.entryAttemptId, '普通匹配响应 attempt 必须与签名票据完全一致')
+  }
   const liveSpectatorList = await call(baseUrl, '/api/v1/spectate?delaySeconds=1')
   assert.equal(liveSpectatorList.payload.data.delaySeconds, 15, '公开观战延迟不得低于15秒')
   const liveSpectator = liveSpectatorList.payload.data.feeds.find(item => item.matchId === matchId)
@@ -453,7 +463,8 @@ try {
     ranking: ['p1', 'p2', 'p3', 'p4'],
     userIdsBySeat: Object.fromEntries(matched.map((item, index) => [item.seat, users[index].user.id])),
     winnerTeam: 'teamA',
-    finishedAt: Date.now(),
+    finishedAt: Date.now() - 18_000,
+    finalSpectatorSequence: 3,
     statsBySeat: { p1: { bombsPlayed: 2 }, p2: { bombsPlayed: 0 }, p3: { bombsPlayed: 1 }, p4: { bombsPlayed: 0 } },
     publicTimeline: [
       { at: Date.now() - 22_000, type: 'play', playerId: 'p1', cards: [{ rank: 'A', suit: 'heart' }] },
@@ -520,14 +531,29 @@ try {
   const spectator = await call(baseUrl, `/api/v1/spectate/${encodeURIComponent(matchId)}?delaySeconds=15`)
   assert.equal(spectator.payload.data.feed.events.length, 2)
   assert.equal(spectator.payload.data.feed.delaySeconds, 15)
-  assert.equal(spectator.payload.data.feed.status, 'finished')
-  assert.equal(spectator.payload.data.feed.timelineComplete, false, '结束状态与延迟时间线是两个独立概念')
+  assert.equal(spectator.payload.data.feed.status, 'running', '结算先到但最终公开事件缺失时不得提前完成时间线')
+  assert.equal(spectator.payload.data.feed.finishedAt, null)
+  assert.equal(spectator.payload.data.feed.timelineComplete, false)
+  assert.equal(spectator.payload.data.feed.availableEventCount, 2)
+  assert.equal(spectator.payload.data.feed.totalEventCount, 2, '延迟窗口外或尚未到达的事件不能通过总数侧漏')
   assert.equal('roomId' in spectator.payload.data.feed, false)
   const finishedSpectatorList = await call(baseUrl, '/api/v1/spectate?delaySeconds=15')
-  assert.equal(finishedSpectatorList.payload.data.feeds.find(item => item.matchId === matchId).status, 'finished')
-  const ignoredFinishedClose = await spectatorReporter.report({
+  assert.equal(finishedSpectatorList.payload.data.feeds.find(item => item.matchId === matchId).status, 'running')
+  await spectatorReporter.report({
     eventId: `spectate:${matchId}:3`, matchId, roomId: matched[0].roomId,
-    sequence: 3, at: Date.now(), type: 'room-closed', roundSequence: 1, reason: 'empty-timeout',
+    sequence: 3, at: event.finishedAt, type: 'round-end', roundSequence: 1,
+    ranking: event.ranking, winnerTeam: event.winnerTeam, isGameWon: true,
+  })
+  const completedSpectator = await call(baseUrl, `/api/v1/spectate/${encodeURIComponent(matchId)}?delaySeconds=15`)
+  assert.equal(completedSpectator.payload.data.feed.status, 'finished')
+  assert.equal(completedSpectator.payload.data.feed.finishedAt, event.finishedAt)
+  assert.equal(completedSpectator.payload.data.feed.timelineComplete, true)
+  assert.equal(completedSpectator.payload.data.feed.availableEventCount, 3)
+  assert.equal(completedSpectator.payload.data.feed.totalEventCount, 3)
+  assert.equal(completedSpectator.payload.data.feed.events.at(-1).type, 'round-end')
+  const ignoredFinishedClose = await spectatorReporter.report({
+    eventId: `spectate:${matchId}:4`, matchId, roomId: matched[0].roomId,
+    sequence: 4, at: Date.now(), type: 'room-closed', roundSequence: 1, reason: 'empty-timeout',
   })
   assert.equal(ignoredFinishedClose.ignored, true, '正常结算后的资源回收应被确认但不能把 feed 改判为 aborted')
   assert.equal((await call(baseUrl, `/api/v1/spectate/${encodeURIComponent(matchId)}?delaySeconds=15`)).payload.data.feed.status, 'finished')
@@ -551,13 +577,46 @@ try {
     eventId: `spectate:${abortMatchId}:2`, matchId: abortMatchId, roomId: abortRoomId,
     sequence: 2, at: Date.now() - 19_000, type: 'room-closed', roundSequence: 1, reason: 'empty-timeout',
   }
-  const lowPrivilegeReporter = new SpectatorEventReporter({ endpoint: `${baseUrl}/api/v1/game/spectator-events`, secret: spectatorSecret, maxAttempts: 1 })
+  const lowPrivilegeReporter = new SpectatorEventReporter({
+    endpoint: `${baseUrl}/api/v1/game/spectator-events`,
+    secret: spectatorSecret,
+    maxAttempts: 1,
+    fetchImpl: (url, options) => globalThis.fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'x-game-event-id': JSON.parse(options.body).eventId,
+        'x-game-timestamp': options.headers['x-spectator-timestamp'],
+      },
+    }),
+  })
+  await assert.rejects(() => lowPrivilegeReporter.report(abortStart), /高权限|签名/, '只有观战密钥的调用方不得声明牌局已经开始')
   await assert.rejects(() => lowPrivilegeReporter.report({
     ...abortClose,
     eventId: `spectate:${abortMatchId}:1`,
     sequence: 1,
   }), /高权限|签名/, '只有观战密钥的调用方不得终止平台匹配')
-  await spectatorReporter.report(abortStart)
+  const startClaim = await spectatorReporter.claimStart(abortStart)
+  assert.deepEqual(
+    { accepted: startClaim.lifecycleClaim.accepted, status: startClaim.lifecycleClaim.status },
+    { accepted: true, status: 'playing' },
+    '牌局服必须拿到平台同步 lifecycle claim 后才能开始发牌',
+  )
+  const duplicateStartClaim = await spectatorReporter.claimStart(abortStart)
+  assert.equal(duplicateStartClaim.duplicate, true, '开局确认响应丢失后使用同一事件重试必须幂等')
+  assert.equal(duplicateStartClaim.lifecycleClaim.accepted, true)
+  for (const user of abortUsers) {
+    const playing = await call(baseUrl, `/api/v1/match/status?matchId=${encodeURIComponent(abortMatchId)}`, { token: user.token })
+    assert.equal(playing.payload.data.match.status, 'playing')
+    assert.equal('gameTicket' in playing.payload.data.match, false, '开局后状态查询不得继续下发短期入桌票据')
+  }
+  await runtime.store.transaction(state => {
+    state.matches[abortMatchId].participants.forEach(participant => { participant.expiresAt = Date.now() - 1 })
+    state.matches[abortMatchId].entryDeadlineAt = Date.now() - 1
+  })
+  const noOverlap = await call(baseUrl, '/api/v1/match/join', { method: 'POST', token: abortUsers[0].token, body: { mode: 'quick' } })
+  assert.equal(noOverlap.payload.data.match.matchId, abortMatchId, '入桌票据过期不得释放已开局匹配')
+  assert.equal(noOverlap.payload.data.match.status, 'playing')
   await spectatorReporter.report(abortClose)
   const abortedFeed = await call(baseUrl, `/api/v1/spectate/${encodeURIComponent(abortMatchId)}?delaySeconds=15`)
   assert.equal(abortedFeed.payload.data.feed.status, 'aborted')
@@ -589,8 +648,114 @@ try {
   const recoveredMatch = await call(baseUrl, `/api/v1/match/status?matchId=${encodeURIComponent(abortMatchId)}`, { token: abortUsers[0].token })
   assert.equal(recoveredMatch.payload.data.match.status, 'completed')
   const recoveredFeed = await call(baseUrl, `/api/v1/spectate/${encodeURIComponent(abortMatchId)}?delaySeconds=15`)
-  assert.equal(recoveredFeed.payload.data.feed.status, 'finished')
+  assert.equal(recoveredFeed.payload.data.feed.status, 'running', '补到的实时结算终态仍需等待公开延迟')
+  assert.equal(recoveredFeed.payload.data.feed.finishedAt, null)
+  assert.equal(recoveredFeed.payload.data.feed.timelineComplete, false)
+  assert.equal(recoveredFeed.payload.data.feed.totalEventCount, recoveredFeed.payload.data.feed.availableEventCount)
   assert.equal((await call(baseUrl, `/api/v1/match/status?matchId=${encodeURIComponent(rematchAfterAbort.payload.data.match.matchId)}`, { token: abortUsers[0].token })).payload.data.match.status, 'matching', '补到的旧局结算不得破坏玩家的新匹配')
+
+  const expiredClaimUsers = []
+  for (let index = 1; index <= 4; index += 1) {
+    const login = await call(baseUrl, '/api/v1/auth/dev-login', { method: 'POST', body: { deviceId: `expired-claim-${index}`, displayName: `过期开局${index}` } })
+    expiredClaimUsers.push({ token: login.payload.data.accessToken, user: login.payload.data.user })
+  }
+  const expiredClaimJoins = []
+  for (const user of expiredClaimUsers) {
+    expiredClaimJoins.push((await call(baseUrl, '/api/v1/match/join', { method: 'POST', token: user.token, body: { mode: 'classic_2000' } })).payload.data.match)
+  }
+  const expiredClaimMatchId = expiredClaimJoins.at(-1).matchId
+  const expiredClaimViews = []
+  for (const user of expiredClaimUsers) {
+    expiredClaimViews.push((await call(baseUrl, `/api/v1/match/status?matchId=${encodeURIComponent(expiredClaimMatchId)}`, { token: user.token })).payload.data.match)
+  }
+  await runtime.store.transaction(state => {
+    const expiredMatch = state.matches[expiredClaimMatchId]
+    expiredMatch.entryDeadlineAt = Date.now() - 1
+    expiredMatch.participants.forEach(participant => { participant.expiresAt = Date.now() - 1 })
+  })
+  const lateStart = {
+    eventId: `spectate:${expiredClaimMatchId}:1`, matchId: expiredClaimMatchId,
+    roomId: expiredClaimViews[0].roomId, sequence: 1, at: Date.now(), type: 'game-start', roundSequence: 1,
+  }
+  await assert.rejects(
+    () => spectatorReporter.claimStart(lateStart),
+    error => error?.code === 'MATCH_ENTRY_EXPIRED' && error?.status === 409,
+    '普通桌必须由平台事务裁定 game-start 与 TTL 的胜负，过期 claim 不能开局',
+  )
+  const expiredClaimSnapshot = await runtime.store.read(state => state)
+  assert.equal(expiredClaimSnapshot.matches[expiredClaimMatchId].status, 'cancelled')
+  assert.ok(expiredClaimSnapshot.matches[expiredClaimMatchId].participants.every(participant => participant.status === 'cancelled'))
+  assert.ok(expiredClaimUsers.every(user => expiredClaimSnapshot.activeMatchByUser[user.user.id] !== expiredClaimMatchId), '整桌过期必须一次清理四名玩家的 activeMatch')
+  assert.equal(expiredClaimSnapshot.spectatorFeeds[expiredClaimMatchId].abortReason, 'entry-timeout')
+  const revealClock = runtime.service.now
+  runtime.service.now = () => Date.now() + 16_000
+  try {
+    const expiredPublicFeed = await call(baseUrl, `/api/v1/spectate/${encodeURIComponent(expiredClaimMatchId)}?delaySeconds=15`)
+    assert.equal(expiredPublicFeed.payload.data.feed.status, 'aborted')
+    assert.equal(expiredPublicFeed.payload.data.feed.abortReason, 'entry-timeout')
+    assert.equal(expiredPublicFeed.payload.data.feed.timelineComplete, true)
+    assert.equal(expiredPublicFeed.payload.data.feed.availableEventCount, 0)
+    assert.equal(expiredPublicFeed.payload.data.feed.totalEventCount, 0)
+  } finally {
+    runtime.service.now = revealClock
+  }
+
+  const passiveExpiryNow = Date.now()
+  const passiveExpiryMatchId = 'mat_passive_expiry'
+  await runtime.store.transaction(state => {
+    state.matches[passiveExpiryMatchId] = {
+      id: passiveExpiryMatchId,
+      mode: 'quick',
+      status: 'matched',
+      roomId: '777777',
+      matchedAt: passiveExpiryNow - 1_000,
+      entryDeadlineAt: passiveExpiryNow - 1,
+      participants: ['passive-a', 'passive-b', 'passive-c', 'passive-d'].map((userId, index) => ({
+        userId,
+        status: 'matched',
+        seat: `p${index + 1}`,
+        expiresAt: passiveExpiryNow - 1,
+      })),
+    }
+    state.spectatorFeeds[passiveExpiryMatchId] = {
+      matchId: passiveExpiryMatchId,
+      mode: 'quick',
+      startedAt: passiveExpiryNow - 1_000,
+      finishedAt: null,
+      events: [],
+    }
+    for (const participant of state.matches[passiveExpiryMatchId].participants) state.activeMatchByUser[participant.userId] = passiveExpiryMatchId
+  })
+  const passiveClock = runtime.service.now
+  runtime.service.now = () => passiveExpiryNow
+  try {
+    const justExpiredList = await call(baseUrl, '/api/v1/spectate?delaySeconds=15')
+    assert.equal(justExpiredList.payload.data.feeds.find(feed => feed.matchId === passiveExpiryMatchId).status, 'running', '过期终态本身也必须服从观战延迟')
+    const swept = await runtime.store.read(state => state)
+    assert.equal(swept.matches[passiveExpiryMatchId].status, 'cancelled', '无人重试时观战读取也必须回收已过期普通桌')
+    assert.equal(swept.spectatorFeeds[passiveExpiryMatchId].abortReason, 'entry-timeout')
+    assert.ok(swept.matches[passiveExpiryMatchId].participants.every(participant => swept.activeMatchByUser[participant.userId] === undefined))
+    const lateExpiryClose = await spectatorReporter.report({
+      eventId: `spectate:${passiveExpiryMatchId}:1`,
+      matchId: passiveExpiryMatchId,
+      roomId: '777777',
+      sequence: 1,
+      at: passiveExpiryNow,
+      type: 'room-closed',
+      roundSequence: 1,
+      reason: 'entry-timeout',
+    })
+    assert.equal(lateExpiryClose.ignored, true, '平台 TTL 先胜出后必须确认牌局服迟到的同原因关闭事件，让 outbox 排空')
+    assert.equal((await runtime.store.read(state => state.spectatorFeeds[passiveExpiryMatchId].events.length)), 0, '迟到关闭确认不得伪造公开时间线事件')
+    runtime.service.now = () => passiveExpiryNow + 16_000
+    const revealedList = await call(baseUrl, '/api/v1/spectate?delaySeconds=15')
+    const revealedExpiry = revealedList.payload.data.feeds.find(feed => feed.matchId === passiveExpiryMatchId)
+    assert.equal(revealedExpiry.status, 'aborted')
+    assert.equal(revealedExpiry.timelineComplete, true, '平台自身终态化的空时间线不能永久 running')
+    assert.equal(revealedExpiry.totalEventCount, revealedExpiry.availableEventCount)
+  } finally {
+    runtime.service.now = passiveClock
+  }
 
   const completedTasks = await call(baseUrl, '/api/v1/season/tasks', { token: users[0].token })
   assert.equal(completedTasks.payload.data.tasks.find(task => task.id === 'daily-play-1').completed, true)
@@ -638,11 +803,13 @@ try {
 
 const tempRoot = await mkdtemp(join(tmpdir(), 'guandan-platform-'))
 try {
-  const filePath = join(tempRoot, 'platform.json')
+  const filePath = join(tempRoot, 'durable-platform', 'platform.json')
   const jsonStore = await JsonFilePlatformStore.open(filePath, createSeededPlatformState())
   await jsonStore.transaction(state => { state.products.soap.stock = 7 })
   const reopened = await JsonFilePlatformStore.open(filePath, createSeededPlatformState())
   assert.equal(await reopened.read(state => state.products.soap.stock), 7)
+  assert.equal((await stat(filePath)).mode & 0o777, 0o600, '平台快照必须只允许服务账号读写')
+  assert.equal((await stat(dirname(filePath))).mode & 0o777, 0o700, '平台快照目录必须只允许服务账号访问')
 
   const legacyPath = join(tempRoot, 'platform-schema-4.json')
   const legacyState = createSeededPlatformState()
@@ -661,10 +828,10 @@ try {
     mat_legacy_active: {
       id: 'mat_legacy_active',
       mode: 'classic_300',
-      status: 'matched',
+      status: 'playing',
       participants: [
-        { userId: 'usr_legacy_a', status: 'matched' },
-        { userId: 'usr_legacy_b', status: 'matched' },
+        { userId: 'usr_legacy_a', status: 'playing' },
+        { userId: 'usr_legacy_b', status: 'playing' },
       ],
       createdAt: 1,
     },
@@ -691,7 +858,7 @@ try {
   await writeFile(legacyPath, `${JSON.stringify(legacyState)}\n`)
   const migrated = await JsonFilePlatformStore.open(legacyPath, createSeededPlatformState())
   const migratedSnapshot = await migrated.read(state => state)
-  assert.equal(migratedSnapshot.schemaVersion, 8)
+  assert.equal(migratedSnapshot.schemaVersion, 9)
   assert.equal(migratedSnapshot.tournaments['lingshui-16-cup'].format, 'fixed16-latin-3', '旧 JSON 应补入新增系统赛事')
   assert.equal(migratedSnapshot.tournaments['weekend-cup'].name, '运营自定义周末赛', '迁移不得覆盖已有运营记录')
   assert.deepEqual(migratedSnapshot.tournamentRuns, {})
@@ -715,18 +882,25 @@ try {
   assert.deepEqual(
     migratedSnapshot.activeMatchByUser,
     { usr_legacy_a: 'mat_legacy_active', usr_legacy_b: 'mat_legacy_active' },
-    '迁移必须从 matching/matched 对局重建活跃匹配索引并移除终态旧索引',
+    '迁移必须从 matching/matched/playing 对局重建活跃匹配索引并移除终态旧索引',
   )
+  const migratedAttemptIds = migratedSnapshot.matches.mat_legacy_active.participants.map(participant => participant.entryAttemptId)
+  assert.ok(migratedAttemptIds.every(value => /^[A-Za-z0-9_-]{22,128}$/.test(value)), '旧匹配参与者必须在加载迁移时补齐稳定入桌标识')
   const migratedReopened = await JsonFilePlatformStore.open(legacyPath, createSeededPlatformState())
-  assert.equal(await migratedReopened.read(state => state.schemaVersion), 8, '迁移结果应立即持久化')
+  assert.equal(await migratedReopened.read(state => state.schemaVersion), 9, '迁移结果应立即持久化')
   assert.deepEqual(await migratedReopened.read(state => Object.values(state.users).map(user => user.accountId)), migratedAccountIds, '迁移账号重启后必须稳定')
   assert.equal(await migratedReopened.read(state => state.ledgerEntries.filter(entry => entry.id.startsWith('led_wallet_migration_')).length), 2, '迁移重启后不得重复写入初始积分流水')
+  assert.deepEqual(
+    await migratedReopened.read(state => state.matches.mat_legacy_active.participants.map(participant => participant.entryAttemptId)),
+    migratedAttemptIds,
+    '迁移生成的入桌标识重启后必须稳定且已经落盘',
+  )
 
   const conflictingPath = join(tempRoot, 'platform-conflicting-active-matches.json')
   const conflictingState = createSeededPlatformState()
   conflictingState.matches = {
     mat_active_a: { id: 'mat_active_a', mode: 'classic_50', status: 'matching', participants: [{ userId: 'usr_conflict', status: 'matching' }] },
-    mat_active_b: { id: 'mat_active_b', mode: 'classic_300', status: 'matched', participants: [{ userId: 'usr_conflict', status: 'matched' }] },
+    mat_active_b: { id: 'mat_active_b', mode: 'classic_300', status: 'playing', participants: [{ userId: 'usr_conflict', status: 'playing' }] },
   }
   await writeFile(conflictingPath, `${JSON.stringify(conflictingState)}\n`)
   await assert.rejects(
@@ -734,6 +908,26 @@ try {
     /用户 usr_conflict 同时存在多个活跃匹配/,
     '同一用户存在多个活跃匹配时必须 fail-fast，不能静默选择并错误预留底分',
   )
+
+  const failurePath = join(tempRoot, 'platform-failure', 'platform.json')
+  const stableStore = await JsonFilePlatformStore.open(failurePath, createSeededPlatformState())
+  await stableStore.transaction(state => { state.products.soap.stock = 13 })
+  const injectedFailure = new Error('injected platform rename failure')
+  const failingStore = await JsonFilePlatformStore.open(failurePath, createSeededPlatformState(), {
+    durableFileOperations: {
+      ...nodeAsyncDurableFileOperations,
+      async replace () { throw injectedFailure },
+    },
+  })
+  await assert.rejects(
+    failingStore.transaction(state => { state.products.soap.stock = 1 }),
+    error => error === injectedFailure,
+    '持久化失败必须拒绝事务',
+  )
+  assert.equal(await failingStore.read(state => state.products.soap.stock), 13, '持久化失败不能提前提交内存状态')
+  const failureReopened = await JsonFilePlatformStore.open(failurePath, createSeededPlatformState())
+  assert.equal(await failureReopened.read(state => state.products.soap.stock), 13, '持久化失败后 reopen 必须保留上一份快照')
+  assert.deepEqual(await readdir(dirname(failurePath)), ['platform.json'], '持久化失败不能遗留临时文件')
 } finally {
   await rm(tempRoot, { recursive: true, force: true })
 }

@@ -1,12 +1,29 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractRuntimeConfig, injectWebRuntimeConfig, runtimeConfigFromEnv, verifyReleaseRuntimeConfig } from './runtime-client-config.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const settingsPath = resolve(projectRoot, 'build/web-desktop/src/settings.json');
 const applicationPath = resolve(projectRoot, 'build/web-desktop/application.js');
 const indexPath = resolve(projectRoot, 'build/web-desktop/index.html');
 const checkOnly = process.argv.includes('--check');
+const release = process.argv.includes('--release');
+const buildRoot = resolve(projectRoot, 'build/web-desktop');
+const forbiddenBundleMarkers = [
+  '53e52062-b47e-43f8-b184-fb566cd720bd',
+  '0cedd476-e4cd-4e92-a6d1-b85a9143167c',
+  '0bdc3382-5148-4ac5-9e27-7cdbf08c1968',
+  '1c24bc85-bf61-42fa-a125-c66267f3ee79',
+  'pair_a_phrase',
+  'licensed/straight_flush',
+  'MerchantPageDomain',
+];
+
+const listFiles = async directory => (await Promise.all((await readdir(directory, { withFileTypes: true })).map(async entry => {
+  const path = resolve(directory, entry.name);
+  return entry.isDirectory() ? listFiles(path) : [path];
+}))).flat();
 
 const settings = JSON.parse(await readFile(settingsPath, 'utf8'));
 const splash = settings.splashScreen;
@@ -34,13 +51,29 @@ if (/showFPS\s*:\s*true/.test(applicationSource)) {
   throw new Error('Web build still enables the FPS debug overlay. Rebuild with debug=false.');
 }
 
-const indexSource = await readFile(indexPath, 'utf8');
+let indexSource = await readFile(indexPath, 'utf8');
 if (!/name="screen-orientation" content="landscape"/.test(indexSource)) {
   throw new Error('Web build must advertise landscape orientation.');
 }
 if (!/id="GameDiv"[^>]*width: 1280px; height: 720px;/.test(indexSource)
   || !/id="GameCanvas" width="1280" height="720"/.test(indexSource)) {
   throw new Error('Web build shell must start at 1280x720.');
+}
+const requestedRuntimeConfig = runtimeConfigFromEnv(process.env, { release });
+if (!checkOnly && requestedRuntimeConfig) {
+  indexSource = injectWebRuntimeConfig(indexSource, requestedRuntimeConfig);
+  await writeFile(indexPath, indexSource, 'utf8');
+}
+const embeddedRuntimeConfig = extractRuntimeConfig(indexSource);
+if (release) verifyReleaseRuntimeConfig(embeddedRuntimeConfig);
+if (requestedRuntimeConfig && JSON.stringify(embeddedRuntimeConfig) !== JSON.stringify(requestedRuntimeConfig)) {
+  throw new Error('Web build runtime config does not match the requested environment.');
+}
+
+for (const filePath of await listFiles(buildRoot)) {
+  const contents = await readFile(filePath);
+  const marker = forbiddenBundleMarkers.find(candidate => contents.includes(Buffer.from(candidate)));
+  if (marker) throw new Error(`Archived or migration-only marker leaked into Web build: ${marker} (${filePath})`);
 }
 
 console.log(

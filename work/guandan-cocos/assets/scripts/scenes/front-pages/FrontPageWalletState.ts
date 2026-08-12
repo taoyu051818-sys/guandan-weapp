@@ -1,4 +1,4 @@
-import type { WalletSnapshot } from '../../services/DevelopmentApis'
+import type { WalletSnapshot } from '../../services/FrontPageGatewayContracts'
 
 /** Shared wallet projection read by the lobby, shop, tournaments, and player center. */
 export class FrontPageWalletState {

@@ -1,5 +1,5 @@
 import { _decorator, Color, Component, Graphics, Label, Node, Tween, UITransform, Vec3, tween } from 'cc'
-import type { Player } from '../core/generated'
+import type { Player, Team } from '../core/generated'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
 
 const { ccclass } = _decorator
@@ -73,7 +73,7 @@ export class PlayerSeatController extends Component {
     this.chatBubble = bubble
   }
 
-  public render (player: Player, isTurn: boolean, showHand = false, chat?: string, finishPlace = 0): void {
+  public render (player: Player, isTurn: boolean, viewerTeam: Team, showHand = false, chat?: string, finishPlace = 0): void {
     const graphic = this.graphics!
     const handCount = player.hand.length
     const danger = !finishPlace && handCount > 0 && handCount <= 2
@@ -84,7 +84,7 @@ export class PlayerSeatController extends Component {
     graphic.roundRect(-88, -30, 176, 60, 15)
     graphic.fill()
     graphic.stroke()
-    const team = player.team === 'teamA' ? '我方' : '对方'
+    const team = player.team === viewerTeam ? '我方' : '对方'
     const rankNames = ['头游', '二游', '三游', '末游']
     const detail = finishPlace > 0
       ? rankNames[finishPlace - 1]

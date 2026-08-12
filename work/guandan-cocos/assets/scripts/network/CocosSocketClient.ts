@@ -1,18 +1,12 @@
-type Listener<T = unknown> = (payload: T) => void
+import type { LobbySocketClient, LobbySocketListener, NetworkRequestResult } from './LobbySocketClient'
+
+export type { NetworkRequestResult } from './LobbySocketClient'
 
 type WireMessage = {
   type: string
   requestId?: number
   payload?: unknown
   [key: string]: unknown
-}
-
-export type NetworkRequestResult = {
-  requestId: number
-  requestType: string | null
-  responseType: string
-  ok: boolean
-  message: string | null
 }
 
 export type SocketConnectionSnapshot = {
@@ -26,9 +20,9 @@ export type SocketConnectionSnapshot = {
  * The server remains authoritative: this class only sends intents and receives
  * redacted snapshots.  It intentionally contains no scene/UI dependency.
  */
-export class CocosSocketClient {
+export class CocosSocketClient implements LobbySocketClient {
   private socket: WebSocket | null = null
-  private readonly listeners = new Map<string, Set<Listener>>()
+  private readonly listeners = new Map<string, Set<LobbySocketListener>>()
   private readonly pendingRequests = new Map<number, string>()
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private closedByUser = false
@@ -102,11 +96,11 @@ export class CocosSocketClient {
     return promise
   }
 
-  public on<T> (type: string, listener: Listener<T>): () => void {
-    const group = this.listeners.get(type) ?? new Set<Listener>()
-    group.add(listener as Listener)
+  public on<T> (type: string, listener: LobbySocketListener<T>): () => void {
+    const group = this.listeners.get(type) ?? new Set<LobbySocketListener>()
+    group.add(listener as LobbySocketListener)
     this.listeners.set(type, group)
-    return () => group.delete(listener as Listener)
+    return () => group.delete(listener as LobbySocketListener)
   }
 
   public send (type: string, payload?: unknown): number {
@@ -151,6 +145,7 @@ export class CocosSocketClient {
             requestType,
             responseType: message.type,
             ok: message.type !== 'error',
+            code: message.type === 'error' && typeof message.code === 'string' ? message.code : null,
             message: message.type === 'error' && typeof message.message === 'string' ? message.message : null,
           } satisfies NetworkRequestResult)
         }

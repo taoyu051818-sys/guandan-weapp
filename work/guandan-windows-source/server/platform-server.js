@@ -10,13 +10,13 @@ import { WxCodeVerifier } from './platform/wx-auth.js'
 
 export const createPlatformRuntime = async ({ env = process.env, store, logger = console, wxCodeVerifier } = {}) => {
   const config = loadPlatformConfig(env)
-  const platformStore = store || (config.jsonFile
+  const platformStore = store || (config.storeMode === 'json-single-instance'
     ? await JsonFilePlatformStore.open(config.jsonFile, createSeededPlatformState())
     : new MemoryPlatformStore(createSeededPlatformState()))
   const service = new PlatformService({
     store: platformStore,
-    accessTokens: new AccessTokenService({ secret: config.accessSecret }),
-    gameTickets: new GameTicketService({ secret: config.gameTicketSecret, gameEndpoint: config.gameEndpoint }),
+    accessTokens: new AccessTokenService({ secret: config.accessSecret, ttlMs: config.accessTokenTtlMs }),
+    gameTickets: new GameTicketService({ secret: config.gameTicketSecret, gameEndpoint: config.gameEndpoint, ttlMs: config.gameTicketTtlMs }),
   })
   const verifier = wxCodeVerifier || new WxCodeVerifier({ appId: config.wxAppId, secret: config.wxSecret, timeoutMs: config.wxTimeoutMs })
   const handler = createPlatformHttpHandler({
@@ -36,6 +36,6 @@ if (startedAsScript) {
   const runtime = await createPlatformRuntime()
   runtime.server.listen(runtime.config.port, runtime.config.host, () => {
     console.log(`Guandan platform API running at http://${runtime.config.host}:${runtime.config.port}/api/v1`)
-    if (!runtime.config.jsonFile) console.log('Platform storage: in-memory (development/test only)')
+    if (runtime.config.storeMode === 'memory') console.log('Platform storage: in-memory (development/test only)')
   })
 }

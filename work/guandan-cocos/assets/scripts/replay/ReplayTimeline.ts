@@ -1,4 +1,4 @@
-import type { ReplayEvent } from '../services/DevelopmentApis'
+import type { ReplayEvent } from '../services/FrontPageGatewayContracts'
 
 export const REPLAY_SEATS = ['p1', 'p2', 'p3', 'p4'] as const
 

@@ -1,5 +1,11 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { resolve } from 'node:path'
+import {
+  durableReplaceFile,
+  hardenPrivateFile,
+  nodeAsyncDurableFileOperations,
+} from '../durable-file.js'
 
 const clone = (value) => value === undefined ? undefined : structuredClone(value)
 const seededCatalogKeys = ['products', 'tournaments', 'seasons', 'taskDefinitions']
@@ -162,14 +168,38 @@ const migrateMatchQueueIndexes = state => {
   return changed
 }
 
+const stableEntryAttemptId = (matchId, userId, seat = '') => {
+  const source = `${String(matchId)}\u0000${String(userId)}\u0000${String(seat)}`
+  return `legacy_${createHash('sha256').update(source).digest('base64url').slice(0, 32)}`
+}
+
+const migrateParticipantEntryAttemptIds = state => {
+  const matches = isRecord(state.matches) ? state.matches : {}
+  let changed = false
+  Object.keys(matches).sort().forEach(matchId => {
+    const match = matches[matchId]
+    if (!isRecord(match) || !Array.isArray(match.participants)) return
+    match.participants.forEach(participant => {
+      if (!isRecord(participant)) return
+      const current = typeof participant.entryAttemptId === 'string' ? participant.entryAttemptId : ''
+      if (/^[A-Za-z0-9_-]{22,128}$/.test(current)) return
+      const userId = typeof participant.userId === 'string' ? participant.userId : ''
+      if (!userId) return
+      participant.entryAttemptId = stableEntryAttemptId(matchId, userId, participant.seat)
+      changed = true
+    })
+  })
+  return changed
+}
+
 const migrateActiveMatchIndex = state => {
   const matches = isRecord(state.matches) ? state.matches : {}
   const rebuilt = {}
   Object.keys(matches).sort().forEach(matchId => {
     const match = matches[matchId]
-    if (!isRecord(match) || !['matching', 'matched'].includes(match.status) || !Array.isArray(match.participants)) return
+    if (!isRecord(match) || !['matching', 'matched', 'playing'].includes(match.status) || !Array.isArray(match.participants)) return
     match.participants.forEach(participant => {
-      if (!isRecord(participant) || !['matching', 'matched'].includes(participant.status)) return
+      if (!isRecord(participant) || !['matching', 'matched', 'playing'].includes(participant.status)) return
       const userId = typeof participant.userId === 'string' ? participant.userId : ''
       if (!userId) return
       const previousMatchId = rebuilt[userId]
@@ -221,6 +251,7 @@ const upgradeLoadedState = (loadedState, fallbackState) => {
   if (migratePlayerRatings(upgraded)) changed = true
   if (migrateUserWallets(upgraded)) changed = true
   if (migrateMatchQueueIndexes(upgraded)) changed = true
+  if (migrateParticipantEntryAttemptIds(upgraded)) changed = true
   if (migrateActiveMatchIndex(upgraded)) changed = true
 
   const loadedVersion = Number.isSafeInteger(upgraded.schemaVersion) ? upgraded.schemaVersion : 0
@@ -233,7 +264,7 @@ const upgradeLoadedState = (loadedState, fallbackState) => {
 }
 
 export const createEmptyPlatformState = () => ({
-  schemaVersion: 8,
+  schemaVersion: 9,
   users: {},
   userByExternalId: {},
   userByAccountId: {},
@@ -299,8 +330,8 @@ export class MemoryPlatformStore extends PlatformStateStore {
     const operation = this.writeQueue.then(async () => {
       const draft = clone(this.state)
       const result = await mutator(draft)
-      this.state = draft
       await this.persist(draft)
+      this.state = draft
       return clone(result)
     })
     this.writeQueue = operation.then(() => undefined, () => undefined)
@@ -311,35 +342,40 @@ export class MemoryPlatformStore extends PlatformStateStore {
 }
 
 /**
- * 本地 JSON 持久化实现。采用临时文件 + rename，适合单实例演示环境；它没有
- * 跨进程锁、备份和迁移机制，因此不应被当成生产数据库。
+ * 本地 JSON 持久化实现。它只提供单实例快照，不提供跨进程锁、自动备份或
+ * 数据库级恢复；多实例部署必须替换为具备事务和唯一约束的正式 repository。
  */
 export class JsonFilePlatformStore extends MemoryPlatformStore {
-  constructor (filePath, initialState) {
+  constructor (filePath, initialState, { durableFileOperations = nodeAsyncDurableFileOperations } = {}) {
     super(initialState)
-    this.filePath = filePath
+    this.filePath = resolve(filePath)
+    this.durableFileOperations = durableFileOperations
   }
 
-  static async open (filePath, fallbackState = createEmptyPlatformState()) {
+  static async open (filePath, fallbackState = createEmptyPlatformState(), options = {}) {
+    const resolvedPath = resolve(filePath)
+    const durableFileOperations = options.durableFileOperations || nodeAsyncDurableFileOperations
+    await hardenPrivateFile(resolvedPath, durableFileOperations)
     let state = fallbackState
     let loadedFromDisk = false
     try {
-      state = JSON.parse(await readFile(filePath, 'utf8'))
+      state = JSON.parse(await readFile(resolvedPath, 'utf8'))
       loadedFromDisk = true
     } catch (error) {
       if (error?.code !== 'ENOENT') throw error
     }
     const upgraded = upgradeLoadedState(state, fallbackState)
-    const store = new JsonFilePlatformStore(filePath, upgraded.state)
+    const store = new JsonFilePlatformStore(resolvedPath, upgraded.state, { durableFileOperations })
     if (!loadedFromDisk || upgraded.changed) await store.persist(upgraded.state)
     return store
   }
 
   async persist (state) {
-    await mkdir(dirname(this.filePath), { recursive: true })
-    const temporaryPath = `${this.filePath}.${process.pid}.tmp`
-    await writeFile(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
-    await rename(temporaryPath, this.filePath)
+    await durableReplaceFile(
+      this.filePath,
+      `${JSON.stringify(state, null, 2)}\n`,
+      this.durableFileOperations,
+    )
   }
 }
 

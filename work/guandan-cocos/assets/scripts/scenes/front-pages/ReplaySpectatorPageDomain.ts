@@ -5,16 +5,17 @@ import {
   SPECTATOR_POLL_INTERVAL_SECONDS,
   spectatorRetryDelaySeconds,
 } from '../../replay/SpectatorPollingPolicy'
-import {
-  DevelopmentSpectatorGateway,
-  type FrontPageGateways,
-  type ReplayDetail,
-  type ReplaySummary,
-  type SpectatorFeed,
-  type SpectatorGateway,
-  type SpectatorMatchSummary,
-} from '../../services/DevelopmentApis'
+import { DevelopmentSpectatorGateway } from '../../services/DevelopmentApis'
+import type {
+  FrontPageGateways,
+  ReplayDetail,
+  ReplaySummary,
+  SpectatorFeed,
+  SpectatorGateway,
+  SpectatorMatchSummary,
+} from '../../services/FrontPageGatewayContracts'
 import { renderReplayBoard } from '../../ui/ReplayBoardView'
+import { neutralReplayViewpoint, playerReplayViewpoint } from '../../ui/ReplayViewpoint'
 import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import type { PageRouter } from '../PageRouter'
 
@@ -52,6 +53,9 @@ export class ReplaySpectatorPageDomain {
   private activeReplayTimeline: ReplayTimeline | null = null
   private readonly spectatorDemoGateway = new DevelopmentSpectatorGateway()
   private destroyed = false
+  private replayListView: { replays: ReplaySummary[], status: string } = { replays: [], status: '' }
+  private spectatorListView: { matches: SpectatorMatchSummary[], status: string } = { matches: [], status: '' }
+  private replayDetailView: { replay: ReplayDetail | null, status: string, returnPage: ReplayReturnPage, timeline?: ReplayTimeline } | null = null
 
   public constructor (private readonly dependencies: ReplaySpectatorPageDependencies) {}
 
@@ -127,7 +131,7 @@ export class ReplaySpectatorPageDomain {
     if (this.isDisposed()) return
     this.spectatorBackgrounded = false
     const session = this.spectatorFeedSession
-    if (!session || !this.isCurrentSpectatorSession(session) || (session.feed && shouldStopSpectatorPolling(session.feed))) return
+    if (!session || !this.isCurrentSpectatorSession(session) || (session.feed && this.shouldStopPolling(session.feed))) return
     session.syncStatus = '已回到前台，正在同步最新公开进展…'
     this.renderSpectatorFeed(session)
     this.startSpectatorPolling(session)
@@ -148,6 +152,16 @@ export class ReplaySpectatorPageDomain {
     if (this.destroyed) return
     this.stop()
     this.destroyed = true
+  }
+
+  public reflow (): void {
+    const route = this.dependencies.router.current
+    if (route === 'replay-list') this.renderReplayList(this.replayListView.replays, this.replayListView.status)
+    else if (route === 'replay-detail' && this.replayDetailView) {
+      const view = this.replayDetailView
+      this.renderReplayDetail(view.replay, view.status, view.returnPage, view.timeline)
+    } else if (route === 'spectator-list') this.renderSpectatorList(this.spectatorListView.matches, this.spectatorListView.status)
+    else if (route === 'spectator-feed' && this.spectatorFeedSession) this.renderSpectatorFeed(this.spectatorFeedSession)
   }
 
   private async refreshReplayList (token: number): Promise<void> {
@@ -191,11 +205,12 @@ export class ReplaySpectatorPageDomain {
   }
 
   private renderSpectatorList (matches: SpectatorMatchSummary[], status: string): void {
+    this.spectatorListView = { matches, status }
     const ui = this.dependencies.router.open('spectator-list')
     ui.menuLabel('延迟观战（实验）', 0, 220, 42)
     ui.menuLabel(status, 0, 174, 18)
     matches.slice(0, 4).forEach((match, index) => {
-      const state = match.status === 'running'
+      const state = match.status === 'running' || match.status === 'playing'
         ? `进行中 · 已公开${match.availableEventCount}条`
         : match.status === 'aborted'
           ? match.timelineComplete ? `已终止 · ${match.totalEventCount}条完整记录` : '已终止 · 最后进程延迟中'
@@ -209,6 +224,7 @@ export class ReplaySpectatorPageDomain {
   }
 
   private renderReplayList (replays: ReplaySummary[], status: string): void {
+    this.replayListView = { replays, status }
     const ui = this.dependencies.router.open('replay-list')
     ui.menuLabel('我的牌谱', 0, 220, 42)
     ui.menuLabel(status, 0, 174, 18)
@@ -227,12 +243,13 @@ export class ReplaySpectatorPageDomain {
     returnPage: ReplayReturnPage,
     timeline?: ReplayTimeline,
   ): void {
+    this.replayDetailView = { replay, status, returnPage, timeline }
     const ui = this.dependencies.router.open('replay-detail')
     ui.menuLabel('牌谱回放', 0, 300, 40)
     ui.menuLabel(status, 0, 262, 16)
     if (replay && timeline) {
       ui.menuLabel(`房间 ${replay.roomId || '-'} · 胜方 ${replay.winnerTeam || '-'} · 名次 ${replay.ranking.join(' > ')}`, 0, 225, 18)
-      renderReplayBoard(ui, timeline.state, replay.participants)
+      renderReplayBoard(ui, timeline.state, replay.participants, replay.viewerSeat ? playerReplayViewpoint(replay.viewerSeat) : neutralReplayViewpoint())
       this.renderReplayControls(ui, timeline, () => this.renderReplayDetail(replay, status, returnPage, timeline))
     }
     this.sizedButton(ui, returnPage === 'player-center' ? '返回个人中心' : '返回牌谱', 0, -310, 220, 40, 17, () => {
@@ -256,7 +273,7 @@ export class ReplaySpectatorPageDomain {
       const merge = session.timeline.merge(feed.events)
       session.feed = feed
       session.consecutiveFailures = 0
-      if (shouldStopSpectatorPolling(feed)) {
+      if (this.shouldStopPolling(feed)) {
         session.syncStatus = '公开时间线已完整，自动追帧已停止'
       } else if (merge.addedCount && merge.followedEnd) {
         session.syncStatus = `已自动追到最新 · 新增 ${merge.addedCount} 条公开事件`
@@ -266,7 +283,7 @@ export class ReplaySpectatorPageDomain {
         session.syncStatus = `自动追帧中 · 每 ${SPECTATOR_POLL_INTERVAL_SECONDS} 秒检查公开进展`
       }
       this.renderSpectatorFeed(session)
-      if (!shouldStopSpectatorPolling(feed)) this.scheduleSpectatorPoll(session, token, SPECTATOR_POLL_INTERVAL_SECONDS)
+      if (!this.shouldStopPolling(feed)) this.scheduleSpectatorPoll(session, token, SPECTATOR_POLL_INTERVAL_SECONDS)
     } catch (error) {
       if (!this.isCurrentSpectatorPoll(session, token)) return
       session.consecutiveFailures += 1
@@ -315,14 +332,14 @@ export class ReplaySpectatorPageDomain {
     ui.menuLabel(`${source}${feed?.tableLabel ?? '延迟观战'} · 延迟 ${feed?.delaySeconds ?? 30} 秒`, 0, 300, 36)
     const state = !feed
       ? '正在建立公开时间线'
-      : feed.status === 'running'
+      : feed.status === 'running' || feed.status === 'playing'
         ? `对局进行中 · 当前公开 ${timeline.eventCount}/${feed.totalEventCount} 条`
         : feed.status === 'aborted'
           ? feed.timelineComplete ? `牌桌已终止 · ${feed.abortReason ?? '安全退出'}` : '牌桌已终止 · 最后进程延迟中'
           : feed.timelineComplete ? '对局已结束 · 时间线完整' : '对局已结束 · 最后进程延迟中'
     ui.menuLabel(`${state} · 不展示任何隐藏手牌`, 0, 258, 16)
     ui.menuLabel(session.syncStatus, 0, 228, 16)
-    renderReplayBoard(ui, timeline.state)
+    renderReplayBoard(ui, timeline.state, {}, neutralReplayViewpoint())
     this.renderReplayControls(ui, timeline, () => this.renderSpectatorFeed(session))
     if (timeline.newerEventCount > 0) {
       this.sizedButton(ui, `有新进展 ${timeline.newerEventCount} 条 · 回到最新`, 0, -282, 330, 36, 17, () => {
@@ -409,6 +426,11 @@ export class ReplaySpectatorPageDomain {
     this.activeReplayTimeline?.pause()
     this.replayPlaybackToken += 1
     if (clearActiveTimeline) this.activeReplayTimeline = null
+  }
+
+  private shouldStopPolling (feed: SpectatorFeed): boolean {
+    const status = feed.status === 'playing' ? 'running' : feed.status === 'completed' ? 'finished' : feed.status
+    return shouldStopSpectatorPolling({ status, timelineComplete: feed.timelineComplete })
   }
 
   private isCurrentRequest (token: number, route: 'replay-list' | 'replay-detail' | 'spectator-list'): boolean {

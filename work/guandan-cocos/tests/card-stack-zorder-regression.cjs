@@ -17,6 +17,12 @@ assert.doesNotMatch(
   /if \(left\.selected !== right\.selected\) return left\.selected \? 1 : -1/,
   'raw selected state must not reorder members inside a stack',
 )
+const orderStart = handController.indexOf('const orderedNodes =')
+const orderEnd = handController.indexOf('orderedNodes.forEach', orderStart)
+assert.notEqual(orderStart, -1)
+assert.notEqual(orderEnd, -1)
+assert.doesNotMatch(handController.slice(orderStart, orderEnd), /selected|locked/, 'visual state must not participate in sibling ordering')
+assert.doesNotMatch(handController, /node\.setScale/, 'hand layout must never scale individual card nodes')
 
 const orderCards = entries => {
   return entries.slice().sort((left, right) => {

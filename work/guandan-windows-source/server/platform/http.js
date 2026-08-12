@@ -171,6 +171,26 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
       const { body } = await readBody(request)
       return writeJson(response, 200, success({ grant: await service.grantMerchantPoints(user.id, body, request.headers['idempotency-key']) }), corsOrigin)
     }
+    if (method === 'POST' && route === '/api/v1/friend-rooms/create') {
+      const user = await requireUser()
+      const { body } = await readBody(request)
+      return writeJson(response, 200, success({ entry: await service.createFriendRoom(user.id, body) }), corsOrigin)
+    }
+    if (method === 'POST' && route === '/api/v1/friend-rooms/active') {
+      const user = await requireUser()
+      const { body } = await readBody(request)
+      return writeJson(response, 200, success({ entry: await service.recoverActiveFriendRoom(user.id, body) }), corsOrigin)
+    }
+    if (method === 'POST' && route === '/api/v1/matches/recover') {
+      const user = await requireUser()
+      const { body } = await readBody(request)
+      return writeJson(response, 200, success({ entry: await service.recoverActiveMatch(user.id, body) }), corsOrigin)
+    }
+    if (method === 'POST' && route === '/api/v1/friend-rooms/join') {
+      const user = await requireUser()
+      const { body } = await readBody(request)
+      return writeJson(response, 200, success({ entry: await service.joinFriendRoom(user.id, body) }), corsOrigin)
+    }
     if (method === 'POST' && route === '/api/v1/match/join') {
       const user = await requireUser()
       const { body } = await readBody(request)
@@ -210,9 +230,8 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
         secret: spectatorEventSecret,
         now: now(),
       })
-      if (body?.type === 'room-closed') {
+      if (body?.type === 'game-start' || body?.type === 'match-ended' || body?.type === 'seat-left' || body?.type === 'room-closed') {
         const lifecycleEventId = String(request.headers['x-game-event-id'] || '')
-        if (lifecycleEventId !== eventId) throw badRequest('EVENT_ID_MISMATCH', '牌桌终止事件的高权限事件ID不一致')
         verifyGameResultSignature({
           rawBody,
           signature: request.headers['x-game-signature'],
@@ -220,8 +239,12 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
           secret: gameResultSecret,
           now: now(),
         })
+        if (lifecycleEventId !== eventId) throw badRequest('EVENT_ID_MISMATCH', '牌桌生命周期事件的高权限事件ID不一致')
       }
-      return writeJson(response, 200, success({ event: await service.acceptSpectatorEvent(eventId, body) }), corsOrigin)
+      const accepted = body?.type === 'game-start'
+        ? await service.claimGameStart(eventId, body)
+        : await service.acceptSpectatorEvent(eventId, body)
+      return writeJson(response, 200, success({ event: accepted }), corsOrigin)
     }
     throw notFound('ROUTE_NOT_FOUND', '接口不存在')
   } catch (error) {

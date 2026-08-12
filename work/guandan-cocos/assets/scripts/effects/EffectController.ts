@@ -1,5 +1,5 @@
 import { _decorator, Component, Node, SpriteFrame, Texture2D, Tween, Vec3, tween } from 'cc'
-import { PlayType, type PlayAction, type PlayerId } from '../core/generated'
+import type { PlayAction, PlayerId } from '../core/generated'
 import type { AudioEvent } from '../audio/AudioProfiles'
 import { loadGameAsset } from '../services/GameAssetLoader'
 import { BombEffectRenderer } from './BombEffectRenderer'
@@ -7,9 +7,11 @@ import { COMMERCIAL_BOMB_EFFECT_KEYS, isCommercialBombEffectKey } from './Archiv
 import { CardBlastReaction, type CardBlastReactionTarget } from './CardBlastReaction'
 import { CardFlightController } from './CardFlightController'
 import { EffectAssetCatalog, type EffectAssetEntry } from './EffectAssetCatalog'
+import { EffectActionPresentationCoordinator, type PlayEffectPresentation } from './EffectActionPresentationCoordinator'
 import { EFFECT_SHAKE } from './EffectDesignSystem'
 import { EffectHandle, type EffectCancelReason } from './EffectHandle'
 import { EffectNodePool } from './EffectNodePool'
+import { EffectPlaybackCoordinator } from './EffectPlaybackCoordinator'
 import { DEFAULT_EFFECT_POLICY, resolveEffectPolicy, type EffectPolicy, type EffectPolicyOverrides } from './EffectPolicy'
 import { EffectProfileResolver } from './EffectProfileResolver'
 import { isBombEffectKey } from './EffectRecipes'
@@ -17,7 +19,6 @@ import type { EffectRenderContext } from './EffectRenderContext'
 import { EffectRendererRegistry } from './EffectRendererRegistry'
 import type { FlowEffectKind, TributeFlowEvent } from './FlowEffectTypes'
 import { LegacyCoordinateAdapter } from './LegacyCoordinateAdapter'
-import { decideActionEffectSync } from './NetworkEffectSyncPolicy'
 import { SixBombRenderer } from './SixBombRenderer'
 import { TransientEffectNodePool } from './TransientEffectNodePool'
 import type { CardFlightOrigin, EffectProfile, EffectQuality, PlayEffectEvent, ShakeStrength } from './EffectTypes'
@@ -46,13 +47,7 @@ export type EffectAssetAudit = Readonly<{
   rejected: number
 }>
 
-export type PlayEffectPresentation = Readonly<{
-  deferAction: (action: PlayAction, actionIndex: number) => string
-  beginAction: (action: PlayAction, actionIndex: number, ticket: string) => void
-  revealCard: (action: PlayAction, actionIndex: number, cardId: string, ticket: string) => void
-  revealAction: (action: PlayAction, actionIndex: number, ticket: string) => void
-  resetPresentation: (actionCount: number) => void
-}>
+export type { PlayEffectPresentation } from './EffectActionPresentationCoordinator'
 
 /** One non-blocking scheduler for flights, pattern feedback, sound, haptics and recovery. */
 @ccclass('EffectController')
@@ -68,18 +63,25 @@ export class EffectController extends Component {
   private readonly transientPool = new TransientEffectNodePool()
   private readonly legacyCoordinates = new LegacyCoordinateAdapter()
   private readonly cardBlastReaction = new CardBlastReaction()
+  private readonly actionPresentation = new EffectActionPresentationCoordinator<Vec3>()
+  private readonly playback = new EffectPlaybackCoordinator({
+    isAvailable: () => this.node.isValid,
+    getFlight: () => this.flight,
+    withQuality: <T>(quality: EffectQuality, work: () => T): T => this.withQuality(quality, work),
+    preparePlayImpact: (profile, event, wildcardUsed) => this.preparePlayImpact(profile, event, wildcardUsed),
+    renderPlayImpact: (profile, event, wildcardUsed) => this.renderPlayImpact(profile, event, wildcardUsed),
+    prepareContext: context => this.renderers.prepare(context),
+    renderContext: context => this.renderers.render(context),
+    playSound: sound => this.soundPlayer?.(sound),
+    playActionVoice: action => this.actionVoicePlayer?.(action),
+    vibrate: kind => this.vibrate(kind),
+    reportError: (message, error) => console.warn(message, error),
+  })
   private quality: EffectQuality = 'full'
   private hapticEnabled = true
-  private lastActionCount: number | null = null
-  private pendingLocalOrigins: CardFlightOrigin[] = []
   private majorHandle: EffectHandle | null = null
   private shakeHandle: EffectHandle | null = null
   private majorLevel = 0
-  private preparationGeneration = 0
-  private playStartQueue: Promise<void> = Promise.resolve()
-  private readonly queuedVisibleHandles = new Set<EffectHandle>()
-  private readonly pendingPlayHandles = new Set<EffectHandle>()
-  private readonly pendingPreparedHandles = new Set<EffectHandle>()
   private soundPlayer: ((event: AudioEvent) => void) | null = null
   private actionVoicePlayer: ((action: PlayAction) => void) | null = null
   private busyListener: ((busy: boolean) => void) | null = null
@@ -92,8 +94,6 @@ export class EffectController extends Component {
   private trusteeState: boolean | null = null
   private trusteeTargetWorldPosition: Vec3 | null = null
   private cardBlastTargets: CardBlastTargetProvider | null = null
-  private playPresentation: PlayEffectPresentation | null = null
-  private pendingPresentationBaseline: number | null = null
 
   public setup (tableRoot: Node, flightRoot: Node, topRoot: Node, soundPlayer: (event: AudioEvent) => void, actionVoicePlayer: (action: PlayAction) => void, busyListener: (busy: boolean) => void, cardBlastTargets?: CardBlastTargetProvider): void {
     this.tableRoot = tableRoot
@@ -126,18 +126,11 @@ export class EffectController extends Component {
     if (qualityChanged || (previousMajorLimit > 0 && this.policy.maxMajorEffectCount === 0)) this.skipAll('quality-off')
   }
 
-  public captureLocalOrigins (origins: CardFlightOrigin[]): void { this.pendingLocalOrigins = origins }
+  public captureLocalOrigins (origins: CardFlightOrigin[]): void { this.actionPresentation.captureLocalOrigins(origins) }
 
   /** Places an authored UI animation, such as the real hand deal, in the same visible lane. */
   public waitForPresentation (completion: Promise<void>, finish?: () => void): EffectHandle {
-    return this.enqueueVisibleEffect(() => {
-      const handle = new EffectHandle(() => { try { finish?.() } catch { /* best-effort authored UI cleanup */ } })
-      void completion.then(
-        () => { if (handle.isActive) handle.complete() },
-        error => { console.warn('[effects] presentation barrier failed', error); if (handle.isActive) handle.cancel('failed') },
-      )
-      return handle
-    })
+    return this.playback.waitForPresentation(completion, finish)
   }
 
   /** Development-only style entry point: no action cursor or rule state is mutated. */
@@ -194,43 +187,15 @@ export class EffectController extends Component {
     target: TargetProvider,
     presentation?: PlayEffectPresentation,
   ): void {
-    if (presentation) this.playPresentation = presentation
-    const activePresentation = presentation ?? this.playPresentation
-    if (activePresentation && this.pendingPresentationBaseline !== null) {
-      activePresentation.resetPresentation(this.pendingPresentationBaseline)
-      this.pendingPresentationBaseline = null
-    }
-    const sync = decideActionEffectSync(this.lastActionCount, actions.length)
-    if (sync !== 'play-next') {
-      if (sync === 'recovery') this.cancelAll('recovery')
-      this.lastActionCount = actions.length
-      // A duplicate render commonly occurs while a local network action is
-      // pending. Keep its captured card origins until the authoritative append.
-      if (sync !== 'duplicate') {
-        this.pendingLocalOrigins = []
-        activePresentation?.resetPresentation(actions.length)
-      }
-      return
-    }
-    const actionIndex = actions.length - 1
-    const action = actions[actionIndex]
-    this.lastActionCount = actions.length
-    const fallback = source(action.playerId)
-    const selected = action.playerId === humanId
-      ? action.cards.map(card => this.pendingLocalOrigins.find(origin => origin.cardId === card.id)?.worldPosition ?? fallback)
-      : action.cards.map(() => fallback)
-    this.pendingLocalOrigins = []
-    const ticket = activePresentation?.deferAction(action, actionIndex) ?? null
-    this.play({
-      action,
-      actionIndex,
+    this.actionPresentation.syncActions(
+      actions,
       humanId,
-      sourcePositions: selected,
-      targetWorldPosition: target(action.playerId),
-      onFlightStart: () => { if (ticket) activePresentation?.beginAction(action, actionIndex, ticket) },
-      onCardArrive: card => { if (ticket) activePresentation?.revealCard(action, actionIndex, card.id, ticket) },
-      onFlightFinish: () => { if (ticket) activePresentation?.revealAction(action, actionIndex, ticket) },
-    })
+      source,
+      target,
+      presentation,
+      () => this.cancelAll('recovery'),
+      request => this.play({ ...request, onCardArrive: card => request.onCardArrive?.(card.id) }),
+    )
   }
 
   public playSettlement (won: boolean, levelUp: number, quality?: EffectQuality): void {
@@ -287,13 +252,7 @@ export class EffectController extends Component {
 
   public resetForRecovery (actionCount = 0): void {
     this.skipAll('recovery')
-    this.lastActionCount = actionCount
-    if (this.playPresentation) {
-      this.playPresentation.resetPresentation(actionCount)
-      this.pendingPresentationBaseline = null
-    } else {
-      this.pendingPresentationBaseline = actionCount
-    }
+    this.actionPresentation.resetForRecovery(actionCount)
   }
 
   protected onDestroy (): void {
@@ -306,113 +265,8 @@ export class EffectController extends Component {
   }
 
   private play (event: PlayEffectEvent): void {
-    const effectQuality = this.quality
     const profile = this.resolver.resolve(event.action, this.quality)
-    const rendererOwnsBombFlight = isBombEffectKey(profile.key)
-    const wildcardUsed = Boolean(event.action.resolution?.wildcardUsages?.length)
-    const generation = this.preparationGeneration
-    let presentationStarted = false
-    let presentationFinished = false
-    let flightHandle: EffectHandle | null = null
-    let impactHandle: EffectHandle | null = null
-    const beginPresentation = (): void => {
-      if (presentationStarted) return
-      presentationStarted = true
-      try { event.onFlightStart?.() } catch { /* stale presentation tickets are harmless */ }
-    }
-    const finishPresentation = (): void => {
-      if (presentationFinished) return
-      presentationFinished = true
-      try { event.onFlightFinish?.() } catch { /* presentation callbacks cannot own the lane */ }
-    }
-    const playEvent: PlayEffectEvent = { ...event, onFlightFinish: finishPresentation }
-    const handle = new EffectHandle(reason => {
-      if (flightHandle?.isActive) flightHandle.cancel(reason === 'completed' ? 'skipped' : reason)
-      if (impactHandle?.isActive) impactHandle.cancel(reason === 'completed' ? 'skipped' : reason)
-      if (reason !== 'recovery' && reason !== 'destroyed') {
-        beginPresentation()
-        finishPresentation()
-      }
-    })
-    this.pendingPlayHandles.add(handle)
-    handle.onFinish(() => this.pendingPlayHandles.delete(handle))
-    const renderImpact = (): void => {
-      if (!handle.isActive || !this.node.isValid || generation !== this.preparationGeneration) return
-      try {
-        this.withQuality(effectQuality, () => {
-          if (!rendererOwnsBombFlight && profile.sound) this.soundPlayer?.(profile.sound)
-          if (wildcardUsed) this.soundPlayer?.('wildcard')
-          if (!rendererOwnsBombFlight) this.vibrate(profile.haptic)
-          impactHandle = this.renderPlayImpact(profile, playEvent, wildcardUsed)
-        })
-      } catch (error) {
-        console.warn(`[effects] impact render failed: ${profile.key}`, error)
-        impactHandle = EffectHandle.completed('failed')
-      }
-    }
-    // One visible action owns the lane through flight and impact. Each flight
-    // card still lands on its own timeline and reveals its matching table card.
-    const start = async (): Promise<void> => {
-      if (!handle.isActive) return
-      if (!this.node.isValid || generation !== this.preparationGeneration) { handle.cancel('unavailable'); return }
-      if (effectQuality === 'off') {
-        beginPresentation()
-        try { this.actionVoicePlayer?.(event.action) } catch (error) { console.warn('[effects] action voice failed', error) }
-        try {
-          if (profile.sound) this.soundPlayer?.(profile.sound)
-          if (wildcardUsed) this.soundPlayer?.('wildcard')
-        } catch (error) { console.warn('[effects] semantic audio failed', error) }
-        handle.complete()
-        return
-      }
-      if (event.action.type === PlayType.Pass) {
-        beginPresentation()
-        try { this.actionVoicePlayer?.(event.action) } catch (error) { console.warn('[effects] action voice failed', error) }
-        try { this.soundPlayer?.('pass') } catch (error) { console.warn('[effects] pass sound failed', error) }
-        handle.complete()
-        return
-      }
-      const cardFramesReady = await this.withQuality(effectQuality, () => this.preparePlayImpact(profile, playEvent, wildcardUsed))
-      if (!handle.isActive) return
-      if (!this.node.isValid || generation !== this.preparationGeneration) { handle.cancel('unavailable'); return }
-      beginPresentation()
-      try { this.actionVoicePlayer?.(event.action) } catch (error) { console.warn('[effects] action voice failed', error) }
-      if (!rendererOwnsBombFlight) {
-        if (!cardFramesReady || !this.flight) {
-          try {
-            if (profile.sound) this.soundPlayer?.(profile.sound)
-            if (wildcardUsed) this.soundPlayer?.('wildcard')
-          } catch (error) { console.warn('[effects] fallback semantic audio failed', error) }
-          handle.complete()
-          return
-        }
-        flightHandle = this.flight.play(
-          event.action.cards,
-          event.sourcePositions,
-          event.targetWorldPosition,
-          profile.flightMs,
-          renderImpact,
-          (card, cardIndex) => playEvent.onCardArrive?.(card, cardIndex),
-        )
-        const flightReason = await flightHandle.finished
-        if (!handle.isActive) return
-        if (flightReason !== 'completed') { handle.cancel(flightReason); return }
-        const impactReason = impactHandle?.isActive ? await impactHandle.finished : impactHandle?.finishReason
-        if (!handle.isActive) return
-        if (impactReason && impactReason !== 'completed') handle.cancel(impactReason)
-        else handle.complete()
-        return
-      }
-      impactHandle = this.withQuality(effectQuality, () => this.renderPlayImpact(profile, playEvent, wildcardUsed))
-      const bombReason = impactHandle.isActive ? await impactHandle.finished : impactHandle.finishReason ?? 'unavailable'
-      if (!handle.isActive) return
-      if (bombReason === 'completed') handle.complete()
-      else handle.cancel(bombReason)
-    }
-    this.playStartQueue = this.playStartQueue.then(start, start).catch(error => {
-      console.warn(`[effects] impact preparation failed: ${profile.key}`, error)
-      if (handle.isActive) handle.cancel('failed')
-    })
+    this.playback.play(event, this.quality, profile)
   }
 
   private renderPlayImpact (profile: EffectProfile, event: PlayEffectEvent, wildcardUsed: boolean): EffectHandle {
@@ -455,33 +309,7 @@ export class EffectController extends Component {
   ): EffectHandle {
     const context = this.makeRenderContext(profile, event, metadata, sourceWorldPositions, targetWorldPosition)
     if (!context) return EffectHandle.completed('unavailable')
-    return prepare ? this.renderPreparedContext(context) : this.renderers.render(context)
-  }
-
-  private renderPreparedContext (context: EffectRenderContext): EffectHandle {
-    const generation = this.preparationGeneration
-    let child: EffectHandle | null = null
-    const handle = new EffectHandle(reason => {
-      if (!child?.isActive) return
-      if (reason === 'completed') child.complete()
-      else child.cancel(reason)
-    })
-    this.pendingPreparedHandles.add(handle)
-    handle.onFinish(() => this.pendingPreparedHandles.delete(handle))
-    void this.renderers.prepare(context).then(ready => {
-      if (!handle.isActive) return
-      if (!ready || !this.node.isValid || generation !== this.preparationGeneration) { handle.cancel('unavailable'); return }
-      child = this.renderers.render(context)
-      child.onFinish(reason => {
-        if (!handle.isActive) return
-        if (reason === 'completed') handle.complete()
-        else handle.cancel(reason)
-      })
-    }).catch(error => {
-      context.services?.reportError?.(context.profile.key, error)
-      if (handle.isActive) handle.cancel('failed')
-    })
-    return handle
+    return prepare ? this.playback.renderPreparedContext(context) : this.renderers.render(context)
   }
 
   private makeRenderContext (
@@ -561,40 +389,6 @@ export class EffectController extends Component {
     try { return work() } finally { this.quality = previous }
   }
 
-  private enqueueVisibleEffect (startEffect: () => EffectHandle): EffectHandle {
-    const generation = this.preparationGeneration
-    let child: EffectHandle | null = null
-    const handle = new EffectHandle(reason => {
-      if (!child?.isActive) return
-      if (reason === 'completed') child.complete()
-      else child.cancel(reason)
-    })
-    this.queuedVisibleHandles.add(handle)
-    handle.onFinish(() => this.queuedVisibleHandles.delete(handle))
-    const settle = (reason: EffectCancelReason | 'completed'): void => {
-      if (!handle.isActive) return
-      if (reason === 'completed') handle.complete()
-      else handle.cancel(reason)
-    }
-    const start = async (): Promise<void> => {
-      if (!handle.isActive) return
-      if (!this.node.isValid || generation !== this.preparationGeneration) { handle.cancel('unavailable'); return }
-      try {
-        child = startEffect()
-        if (!child.isActive) { settle(child.finishReason ?? 'unavailable'); return }
-        settle(await child.finished)
-      } catch (error) {
-        console.warn('[effects] visible presentation failed', error)
-        if (handle.isActive) handle.cancel('failed')
-      }
-    }
-    this.playStartQueue = this.playStartQueue.then(start, start).catch(error => {
-      console.warn('[effects] visible presentation queue failed', error)
-      if (handle.isActive) handle.cancel('failed')
-    })
-    return handle
-  }
-
   private loadSpriteFrame (asset: EffectAssetEntry): Promise<SpriteFrame | null> {
     const path = asset.resourcePath
     if (!path) return Promise.resolve(null)
@@ -657,31 +451,17 @@ export class EffectController extends Component {
   }
 
   private cancelAll (reason: EffectCancelReason): void {
-    this.preparationGeneration += 1
-    this.playStartQueue = Promise.resolve()
-    const pendingPlayHandles = Array.from(this.pendingPlayHandles)
-    this.pendingPlayHandles.clear()
-    pendingPlayHandles.forEach(handle => handle.cancel(reason))
-    const queuedVisibleHandles = Array.from(this.queuedVisibleHandles)
-    this.queuedVisibleHandles.clear()
-    queuedVisibleHandles.forEach(handle => handle.cancel(reason))
+    this.playback.cancelAll(reason)
     this.renderers.cancelAll(reason)
-    this.cancelPendingPrepared(reason)
     this.skipMajor(reason)
     this.flight?.skipAll(reason)
     this.cardBlastReaction.cancel(reason)
     this.transientPool.releaseAll()
     this.clearTransientNodes()
-    this.pendingLocalOrigins = []
+    this.actionPresentation.clearPendingOrigins()
     this.trusteeHandle = null
     this.trusteeState = null
     this.trusteeTargetWorldPosition = null
-  }
-
-  private cancelPendingPrepared (reason: EffectCancelReason): void {
-    const handles = Array.from(this.pendingPreparedHandles)
-    this.pendingPreparedHandles.clear()
-    handles.forEach(handle => handle.cancel(reason))
   }
 
   private destroyTransient (node: Node): void {

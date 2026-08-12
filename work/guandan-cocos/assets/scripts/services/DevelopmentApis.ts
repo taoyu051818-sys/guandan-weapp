@@ -1,298 +1,45 @@
-export const MATCH_QUEUE_IDS = ['quick', 'classic_50', 'classic_300', 'classic_2000', 'classic_10000', 'rookie_cup', 'weekend_cup', 'master_cup', 'lingshui_16_cup'] as const
-export type MatchQueueId = typeof MATCH_QUEUE_IDS[number]
+export * from './FrontPageGatewayContracts'
 
-export type MatchTicket = {
-  ticketId: string
-  queueId: MatchQueueId
-  status: 'matching' | 'matched' | 'cancelled'
-  roomId?: string
-  gameEndpoint?: string
-  joinToken?: string
-  seat?: 'p1' | 'p2' | 'p3' | 'p4'
-  expiresAt?: number
-}
-
-export interface MatchmakingGateway {
-  joinQueue(queueId: MatchQueueId, assignment?: { tournamentId: string, assignmentId: string }): Promise<MatchTicket>
-  getStatus(ticketId: string): Promise<MatchTicket>
-  cancel(ticketId: string): Promise<void>
-}
-
-export type ShopProduct = {
-  id: string
-  name: string
-  pointsPrice: number
-  description: string
-  category: string
-  stock: number
-  imageUrl?: string
-}
-
-export type ShopOrder = {
-  orderId: string
-  productId: string
-  quantity: number
-  totalPoints: number
-  status: 'created' | 'paid' | 'cancelled' | 'fulfilled'
-}
-
-export interface ShopGateway {
-  listProducts(): Promise<ShopProduct[]>
-  createOrder(productId: string, quantity: number, expectedPointsPrice?: number): Promise<ShopOrder>
-}
-
-export type WalletSnapshot = { points: number, diamonds: number }
-
-export interface WalletGateway {
-  getWallet(): Promise<WalletSnapshot>
-}
-
-export type UserProfile = { id: string, accountId: string, displayName: string, comprehensiveScore: number, avatarUrl?: string }
-
-export interface AuthGateway {
-  getProfile(): Promise<UserProfile>
-  signOut(): void
-}
-
-export type PlayerStatsSnapshot = {
-  gamesPlayed: number
-  wins: number
-  firstPlaceFinishes: number
-  bombsPlayed: number
-  elo: number
-}
-
-export type PlayerRatingSnapshot = {
-  games: number
-  wins: number
-  eloOffset: number
-  baseScore: number
-  comprehensiveScore: number
-}
-
-export type RecentMatchSummary = {
-  eventId: string
-  replayId: string
-  matchId: string
-  roomId: string
-  place: number
-  won: boolean
-  tournamentId?: string | null
-  finishedAt: number
-}
-
-export type PlayerDashboard = {
-  user: UserProfile
-  rating: PlayerRatingSnapshot
-  stats: PlayerStatsSnapshot
-  season: null | { id: string, name: string, status: string, progress: { score: number, gamesPlayed: number, wins: number } }
-  recentMatches: RecentMatchSummary[]
-}
-
-export interface PlayerCenterGateway { getDashboard(): Promise<PlayerDashboard> }
-
-export type TournamentSummary = {
-  id: string
-  name: string
-  description: string
-  status: 'open' | 'scheduled' | 'running' | 'finished'
-  startsAt?: number
-  entryPoints: number
-  queueId: MatchQueueId
-  enrolled: boolean
-  format?: 'fixed16-latin-3'
-  capacity?: number
-  checkedInCount?: number
-  roundsTotal?: number
-  currentRound?: number
-  advanceCount?: number
-  myStanding?: { played: number, points: number, rank: number, advanced: boolean }
-}
-
-export type TournamentStanding = {
-  userId: string
-  displayName: string
-  played: number
-  wins: number
-  firstPlaces: number
-  points: number
-  opponentPoints: number
-  rank: number
-  advanced: boolean
-  qualificationStatus: 'pending' | 'qualified' | 'eliminated'
-}
-
-export type TournamentStandings = {
-  tournament: TournamentSummary
-  standings: TournamentStanding[]
-  provisional: boolean
-  cutoffRank: number
-  viewerStanding: TournamentStanding | null
-}
-
-export type TournamentAssignment = {
-  assignmentId: string
-  roundNumber: number
-  tableNumber: number
-  status: 'pending' | 'matching' | 'matched' | 'completed' | 'blocked'
-  matchId?: string
-}
-
-export type TournamentState = {
-  phase: 'check-in' | 'round-active' | 'blocked' | 'finished'
-  tournament: TournamentSummary
-  capacity: number
-  checkedInCount: number
-  roundNumber: number
-  roundsTotal: number
-  tablesTotal: number
-  tablesSettled: number
-  cutoffRank: number
-  viewerEntry: { enrolled: boolean, checkedIn: boolean, rosterLocked: boolean }
-  assignment: TournamentAssignment | null
-  viewerStanding?: TournamentStanding
-}
-
-export interface TournamentGateway {
-  listTournaments(): Promise<TournamentSummary[]>
-  enroll(tournamentId: string, expectedEntryPoints?: number): Promise<TournamentSummary>
-  checkIn(tournamentId: string): Promise<TournamentState>
-  getState(tournamentId: string): Promise<TournamentState>
-  getStandings(tournamentId: string): Promise<TournamentStandings>
-}
-
-export type SeasonTask = { id: string, name: string, target: number, rewardPoints: number, progress: number, completed: boolean, claimed: boolean, cadence: string }
-export type SeasonTaskList = { season: null | { id: string, name: string, status: string }, tasks: SeasonTask[] }
-export interface SeasonGateway { listTasks(): Promise<SeasonTaskList>, claim(taskId: string): Promise<void> }
-
-export type ReplaySummary = { id: string, eventId: string, matchId: string, roomId: string, ranking: string[], winnerTeam: string, finishedAt: number, eventCount: number }
-/**
- * Public replay events intentionally contain only information that was visible
- * at the table. In particular there are no card ids, private hands or platform
- * user ids. The optional semantic fields let the replay renderer reconstruct a
- * deterministic public table instead of guessing from a text label.
- */
-export type ReplayEvent = {
-  sequence: number
-  at: number
-  type: string
-  roundSequence?: number
-  playerId?: string
-  cards?: Array<{ rank: string, suit: string }>
-  playType?: string
-  automatic?: boolean
-  ranking?: string[]
-  winnerTeam?: string
-  isGameWon?: boolean
-  reason?: string
-  text?: string
-}
-export type ReplayDetail = ReplaySummary & { participants: Record<string, string>, events: ReplayEvent[] }
-export interface ReplayGateway { list(): Promise<ReplaySummary[]>, get(replayId: string): Promise<ReplayDetail> }
-
-export type SpectatorMatchStatus = 'running' | 'finished' | 'aborted'
-export type SpectatorMatchSummary = {
-  matchId: string
-  tableLabel: string
-  mode: MatchQueueId
-  status: SpectatorMatchStatus
-  startedAt: number
-  finishedAt: number | null
-  abortedAt: number | null
-  abortReason: string | null
-  delaySeconds: number
-  availableEventCount: number
-  totalEventCount: number
-  timelineComplete: boolean
-}
-export type SpectatorFeed = SpectatorMatchSummary & { availableThrough: number, events: ReplayEvent[] }
-export interface SpectatorGateway {
-  list(delaySeconds?: number): Promise<SpectatorMatchSummary[]>
-  getFeed(matchId: string, delaySeconds?: number): Promise<SpectatorFeed>
-}
-
-export type MerchantStatus = 'pending' | 'active' | 'suspended' | 'rejected'
-export type MerchantRole = 'owner' | 'manager' | 'cashier'
-export type MerchantStoreStatus = 'active' | 'inactive'
-export type MerchantEmployeeStatus = 'active' | 'inactive'
-export type MerchantGrantStatus = 'posted' | 'reversed'
-
-export type MerchantProfile = {
-  id: string
-  ownerUserId: string
-  name: string
-  contactName: string
-  status: MerchantStatus
-  dailyPointLimit: number
-  createdAt: number
-}
-
-export type MerchantStore = {
-  id: string
-  merchantId: string
-  name: string
-  address: string
-  status: MerchantStoreStatus
-  createdAt: number
-}
-
-export type MerchantEmployee = {
-  id: string
-  merchantId: string
-  userId: string
-  role: Exclude<MerchantRole, 'owner'>
-  status: MerchantEmployeeStatus
-  updatedAt: number
-}
-
-export type MerchantPointGrant = {
-  id: string
-  merchantId: string
-  storeId: string
-  operatorUserId: string
-  recipientUserId: string
-  amount: number
-  note: string
-  status: MerchantGrantStatus
-  createdAt: number
-  duplicate?: boolean
-}
-
-export type MerchantConsole = {
-  merchant: MerchantProfile
-  role: MerchantRole
-  stores: MerchantStore[]
-  employees: MerchantEmployee[]
-  grants: MerchantPointGrant[]
-  grantedPoints: number
-}
-
-export type MerchantApplication = { name: string, contactName?: string }
-export type MerchantStoreDraft = { name: string, address?: string }
-export type MerchantEmployeeDraft = { employeeUserId: string, role: Exclude<MerchantRole, 'owner'> }
-export type MerchantPointGrantDraft = { storeId: string, recipientUserId: string, amount: number, note?: string }
-
-export interface MerchantGateway {
-  getConsole(): Promise<MerchantConsole>
-  apply(application: MerchantApplication): Promise<MerchantProfile>
-  createStore(store: MerchantStoreDraft): Promise<MerchantStore>
-  addEmployee(employee: MerchantEmployeeDraft): Promise<MerchantEmployee>
-  grantPoints(grant: MerchantPointGrantDraft): Promise<MerchantPointGrant>
-}
-
-export type FrontPageGateways = {
-  configured: boolean
-  auth: AuthGateway
-  matchmaking: MatchmakingGateway
-  shop: ShopGateway
-  wallet: WalletGateway
-  tournaments: TournamentGateway
-  playerCenter: PlayerCenterGateway
-  seasons: SeasonGateway
-  replays: ReplayGateway
-  spectator: SpectatorGateway
-  merchant: MerchantGateway
-}
+import type {
+  AuthGateway,
+  FrontPageGateways,
+  FriendRoomGateway,
+  MatchmakingGateway,
+  MatchQueueId,
+  MatchTicket,
+  MerchantApplication,
+  MerchantConsole,
+  MerchantEmployee,
+  MerchantEmployeeDraft,
+  MerchantGateway,
+  MerchantPointGrant,
+  MerchantPointGrantDraft,
+  MerchantProfile,
+  MerchantStore,
+  MerchantStoreDraft,
+  PlayerCenterGateway,
+  PlayerDashboard,
+  ReplayDetail,
+  ReplayEvent,
+  ReplayGateway,
+  ReplaySummary,
+  SeasonGateway,
+  SeasonTaskList,
+  ShopGateway,
+  ShopOrder,
+  ShopProduct,
+  SpectatorFeed,
+  SpectatorGateway,
+  SpectatorMatchSummary,
+  TournamentGateway,
+  TournamentStanding,
+  TournamentStandings,
+  TournamentState,
+  TournamentSummary,
+  UserProfile,
+  WalletGateway,
+  WalletSnapshot,
+} from './FrontPageGatewayContracts'
 
 export const SAMPLE_PRODUCTS: ShopProduct[] = [
   { id: 'tissue', name: '柔韧抽纸', pointsPrice: 900, description: '三层柔韧抽纸，示例规格3包。', category: '居家', stock: 99 },
@@ -334,8 +81,8 @@ export const SAMPLE_REPLAYS: ReplaySummary[] = [
 ]
 
 export const SAMPLE_SPECTATOR_MATCHES: SpectatorMatchSummary[] = [
-  { matchId: 'demo-live-match', tableLabel: '快速匹配 · DEMO01桌', mode: 'quick', status: 'running', startedAt: Date.now() - 8 * 60_000, finishedAt: null, abortedAt: null, abortReason: null, delaySeconds: 30, availableEventCount: 3, totalEventCount: 5, timelineComplete: false },
-  { matchId: 'demo-match', tableLabel: '周末赛 · DEMO02桌', mode: 'weekend_cup', status: 'finished', startedAt: Date.now() - 90 * 60_000, finishedAt: Date.now() - 60 * 60_000, abortedAt: null, abortReason: null, delaySeconds: 30, availableEventCount: 6, totalEventCount: 6, timelineComplete: true },
+  { matchId: 'demo-live-match', tableLabel: '快速匹配 · DEMO01桌', mode: 'quick', status: 'playing', startedAt: Date.now() - 8 * 60_000, finishedAt: null, abortedAt: null, abortReason: null, delaySeconds: 30, availableEventCount: 3, totalEventCount: 5, timelineComplete: false },
+  { matchId: 'demo-match', tableLabel: '周末赛 · DEMO02桌', mode: 'weekend_cup', status: 'completed', startedAt: Date.now() - 90 * 60_000, finishedAt: Date.now() - 60 * 60_000, abortedAt: null, abortReason: null, delaySeconds: 30, availableEventCount: 6, totalEventCount: 6, timelineComplete: true },
   { matchId: 'demo-aborted-match', tableLabel: '快速匹配 · DEMO03桌', mode: 'quick', status: 'aborted', startedAt: Date.now() - 20 * 60_000, finishedAt: null, abortedAt: Date.now() - 10 * 60_000, abortReason: 'empty-timeout', delaySeconds: 30, availableEventCount: 6, totalEventCount: 6, timelineComplete: true },
 ]
 
@@ -372,6 +119,11 @@ export class DevelopmentMatchmakingGateway implements MatchmakingGateway {
   public async joinQueue (_queueId: MatchQueueId, _assignment?: { tournamentId: string, assignmentId: string }): Promise<MatchTicket> { throw new FeatureInDevelopmentError('比赛匹配') }
   public async getStatus (_ticketId: string): Promise<MatchTicket> { throw new FeatureInDevelopmentError('比赛匹配') }
   public async cancel (_ticketId: string): Promise<void> { throw new FeatureInDevelopmentError('取消匹配') }
+}
+export class DevelopmentFriendRoomGateway implements FriendRoomGateway {
+  public async create (): Promise<never> { throw new FeatureInDevelopmentError('平台好友房') }
+  public async join (): Promise<never> { throw new FeatureInDevelopmentError('平台好友房') }
+  public async cancel (): Promise<void> {}
 }
 
 /** Products stay local for UI development; ordering intentionally has no backend implementation. */
@@ -437,7 +189,7 @@ export class DevelopmentReplayGateway implements ReplayGateway {
       { sequence: 6, at: startedAt + 44_000, type: 'play', roundSequence: 1, playerId: 'p3', cards: [{ rank: '9', suit: 'spade' }, { rank: '9', suit: 'heart' }, { rank: '9', suit: 'club' }, { rank: '9', suit: 'diamond' }], playType: 'Bomb', automatic: false },
       { sequence: 7, at: summary.finishedAt, type: 'round-end', roundSequence: 1, ranking: summary.ranking, winnerTeam: summary.winnerTeam, isGameWon: true },
     ]
-    return { ...summary, eventCount: events.length, participants: { p1: '陵水玩家', p2: '牌友二', p3: '队友', p4: '牌友四' }, events }
+    return { ...summary, eventCount: events.length, participants: { p1: '陵水玩家', p2: '牌友二', p3: '队友', p4: '牌友四' }, viewerSeat: 'p1', events }
   }
 }
 export class DevelopmentSpectatorGateway implements SpectatorGateway {
@@ -445,7 +197,7 @@ export class DevelopmentSpectatorGateway implements SpectatorGateway {
 
   public async list (delaySeconds = 30): Promise<SpectatorMatchSummary[]> {
     return SAMPLE_SPECTATOR_MATCHES.map(item => {
-      if (item.status !== 'running') return { ...item, delaySeconds }
+      if (item.status !== 'running' && item.status !== 'playing') return { ...item, delaySeconds }
       const reads = this.runningFeedReads.get(item.matchId) ?? 0
       return { ...item, delaySeconds, availableEventCount: Math.min(item.totalEventCount, Math.max(3, 2 + reads)) }
     })
@@ -460,11 +212,12 @@ export class DevelopmentSpectatorGateway implements SpectatorGateway {
       { sequence: 4, at: summary.startedAt + 18_000, type: 'play', roundSequence: 1, playerId: 'p2', cards: [{ rank: 'K', suit: 'heart' }], playType: 'Single', automatic: false },
       { sequence: 5, at: summary.startedAt + 30_000, type: 'pass', roundSequence: 1, playerId: 'p3', automatic: true },
     ]
-    if (summary.status === 'finished') events.push({ sequence: 6, at: summary.finishedAt ?? Date.now(), type: 'round-end', roundSequence: 1, ranking: ['p2', 'p4', 'p1', 'p3'], winnerTeam: 'teamB', isGameWon: true })
+    if (summary.status === 'finished' || summary.status === 'completed') events.push({ sequence: 6, at: summary.finishedAt ?? Date.now(), type: 'round-end', roundSequence: 1, ranking: ['p2', 'p4', 'p1', 'p3'], winnerTeam: 'teamB', isGameWon: true })
     if (summary.status === 'aborted') events.push({ sequence: 6, at: summary.abortedAt ?? Date.now(), type: 'room-closed', roundSequence: 1, reason: summary.abortReason ?? 'empty-timeout' })
-    const readCount = summary.status === 'running' ? (this.runningFeedReads.get(summary.matchId) ?? 0) + 1 : 0
-    if (summary.status === 'running') this.runningFeedReads.set(summary.matchId, readCount)
-    const visibleEvents = summary.status === 'running' ? events.slice(0, Math.min(events.length, 2 + readCount)) : events
+    const playing = summary.status === 'running' || summary.status === 'playing'
+    const readCount = playing ? (this.runningFeedReads.get(summary.matchId) ?? 0) + 1 : 0
+    if (playing) this.runningFeedReads.set(summary.matchId, readCount)
+    const visibleEvents = playing ? events.slice(0, Math.min(events.length, 2 + readCount)) : events
     return {
       ...summary,
       delaySeconds,
@@ -487,6 +240,8 @@ export const createDevelopmentGateways = (): FrontPageGateways => ({
   configured: false,
   auth: new DevelopmentAuthGateway(),
   matchmaking: new DevelopmentMatchmakingGateway(),
+  friendRooms: new DevelopmentFriendRoomGateway(),
+  matchRecovery: { recover: async () => null, confirm: () => undefined, abandon: () => undefined },
   shop: new DevelopmentShopGateway(),
   wallet: new DevelopmentWalletGateway(),
   tournaments: new DevelopmentTournamentGateway(),

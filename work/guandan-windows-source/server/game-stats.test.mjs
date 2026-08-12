@@ -20,6 +20,10 @@ assert.equal(stats.p2.playTypes.Pair, 1)
 assert.equal(stats.p2.tributeActions, 1)
 assert.equal(stats.p3.returnTributeActions, 1)
 
+const tournamentStats = createGameStatsBySeat()
+recordAuthoritativeAction(tournamentStats, 'p1', { kind: 'play', playType: 'StraightFlush' }, { straightFlushAsBomb: false })
+assert.equal(tournamentStats.p1.bombsPlayed, 0, '赛事规则关闭同花顺炸弹时不得计入炸弹统计')
+
 const resultStats = gameStatsForResult(stats)
 stats.p1.playTypes.Bomb = 999
 assert.equal(resultStats.p1.playTypes.Bomb, 1, '结算统计必须是有界克隆，不能被房间后续修改污染')
@@ -28,6 +32,7 @@ const room = {
   matchId: 'mat-stats',
   roomId: '135790',
   roundSequence: 7,
+  spectatorSequence: 12,
   userIdsBySeat: { p1: 'u1', p2: 'u2', p3: 'u3', p4: 'u4' },
   statsBySeat: stats,
 }
@@ -39,10 +44,10 @@ const result = {
 const event = buildGameResultEvent(room, result, 123456789)
 assert.equal(event.eventId, 'game:mat-stats:7')
 assert.equal(event.finishedAt, 123456789)
+assert.equal(event.finalSpectatorSequence, 12, '结算必须声明观战通道的最终序号，供平台等待尾事件')
 assert.equal(event.statsBySeat.p1.bombsPlayed, 3, '签名结算事件必须携带服务端权威炸弹累计')
 assert.equal(event.statsBySeat.p2.timeoutActions, 2)
 assert.equal(event.statsBySeat.p2.trusteeActions, 2)
 assert.equal(event.statsBySeat.p3.returnTributeActions, 1)
 
 console.log('weapp authoritative game stats passed')
-

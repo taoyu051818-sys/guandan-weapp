@@ -1,143 +1,54 @@
-import { _decorator, Component, EventTarget } from 'cc'
-import type { EngineState, PlayerId, Rank, SettlementResult, TributeState } from '../core/generated'
-import { decideNetworkEffectSync, type ForcedNetworkRecoveryReason, type NetworkEffectCursor, type NetworkEffectSync } from '../effects/NetworkEffectSyncPolicy'
+import { _decorator, Component, EventTarget, sys } from 'cc'
+import type { PlayerId } from '../core/generated'
+import type { ForcedNetworkRecoveryReason } from '../effects/NetworkEffectSyncPolicy'
 import { GameSession } from '../session/GameSession'
-import { CocosSocketClient, type NetworkRequestResult } from './CocosSocketClient'
+import { CocosSocketClient } from './CocosSocketClient'
+import { LobbyCleanupTracker } from './LobbyCleanupTracker'
+import { LobbyCommandSender } from './LobbyCommandSender'
+import { LobbyConnectionEventCoordinator } from './LobbyConnectionEventCoordinator'
+import { isEntryAttemptId, LobbyEntryAttemptTracker } from './LobbyEntryAttempt'
+import { LobbyMatchedEntryCoordinator } from './LobbyMatchedEntryCoordinator'
+import { LobbyResumeConnectionWatchdog } from './LobbyResumeConnectionWatchdog'
+import {
+  DEFAULT_FRIEND_ROOM_SETTINGS,
+  createClearedRoomPatch,
+  createLobbySnapshot,
+  createRoomMetadataDefaults,
+  type FriendRoomSettings,
+  type LobbyNetworkResult,
+  type LobbySnapshot,
+  type MatchedRoomEntry,
+  type NetworkRoom,
+  type PendingRoomEntry,
+  type RoomSnapshotWire,
+} from './LobbyModels'
+import { LobbyMessageRouter } from './LobbyMessageRouter'
+import type { LobbySocketClient, LobbySocketListener, NetworkRequestResult } from './LobbySocketClient'
+import { LobbyResumeSessionStore, type LobbyResumeStorage } from './LobbyResumeSession'
+export { DEFAULT_FRIEND_ROOM_SETTINGS } from './LobbyModels'
+export type { LobbySocketClient } from './LobbySocketClient'
+export type {
+  DissolveVoteChoice,
+  FriendRoomSettings,
+  LobbyNetworkResult,
+  LobbyRoomStatus,
+  LobbySnapshot,
+  MatchEndedReason,
+  MatchedRoomEntry,
+  NetworkDeadlineAction,
+  NetworkDissolveVote,
+  NetworkMatchEnded,
+  NetworkRoom,
+  NetworkRoundEndedPacket,
+  NetworkRoundPacket,
+  NetworkScoreboard,
+  NetworkStatePacket,
+  NetworkTrustee,
+  NetworkViewerRoundStats,
+  TrusteeReason,
+} from './LobbyModels'
 
-export type FriendRoomSettings = {
-  mode: 'classic'
-  rounds: number
-  scoring: 'double-3' | 'double-4'
-  scoreVisibility: 'live' | 'hidden'
-  turnSeconds: 20 | 40 | 60
-  trusteeSeconds: 0 | 15 | 30 | 60
-  totalTimeMinutes: 0 | 20 | 30 | 60
-  spectator: 'off' | 'live' | 'delayed-round'
-  autoSort: boolean
-  disableInteraction: boolean
-  sortOrder: 'desc' | 'asc'
-  authoritativeValidation: true
-}
-export const DEFAULT_FRIEND_ROOM_SETTINGS: FriendRoomSettings = {
-  mode: 'classic',
-  rounds: 4,
-  scoring: 'double-3',
-  scoreVisibility: 'live',
-  turnSeconds: 40,
-  trusteeSeconds: 15,
-  totalTimeMinutes: 0,
-  spectator: 'off',
-  autoSort: true,
-  disableInteraction: true,
-  sortOrder: 'desc',
-  authoritativeValidation: true,
-}
-export type NetworkRoom = { roomId: string, hostName: string, playerCount: number, roomSettings?: FriendRoomSettings }
-export type LobbyRoomStatus = 'idle' | 'joining' | 'ready' | 'rejoining' | 'leaving'
-export type NetworkDeadlineAction = 'play' | 'tribute' | 'returnTribute' | 'finishTribute'
-export type TrusteeReason = 'manual' | 'timeout' | 'disconnected'
-export type NetworkTrustee = { reason: TrusteeReason, since: number }
-export type DissolveVoteChoice = 'pending' | 'agree' | 'refuse' | 'offline'
-export type NetworkDissolveVote = {
-  initiator: PlayerId
-  votes: Record<PlayerId, DissolveVoteChoice>
-  expiresAt: number
-}
-export type NetworkScoreboard = {
-  roundsPlayed: number
-  currentLevel: Rank
-  teamLevels: Record<'teamA' | 'teamB', Rank>
-}
-export type LobbySnapshot = {
-  connected: boolean
-  rooms: NetworkRoom[]
-  roomId: string | null
-  members: PlayerId[]
-  myPlayerId: PlayerId | null
-  roomStatus: LobbyRoomStatus
-  error: string | null
-  turnDeadlineAt?: number | null
-  deadlinePlayerId?: PlayerId | null
-  deadlineAction?: NetworkDeadlineAction | null
-  trustees?: Record<PlayerId, NetworkTrustee | null>
-  consecutiveTimeouts?: Record<PlayerId, number>
-  lobbyReadyRequired?: boolean
-  lobbyReadyPlayerIds?: PlayerId[]
-  botPlayerIds?: PlayerId[]
-  roundReadyPlayerIds?: PlayerId[]
-  dissolveVote?: NetworkDissolveVote | null
-  roomSettings?: FriendRoomSettings | null
-  scoreboard?: NetworkScoreboard | null
-}
-export type LobbyNetworkResult = NetworkRequestResult | { requestId: null, requestType: string, responseType: 'client-error', ok: false, message: string }
-export type NetworkStatePacket = { roomId: string, version: number, state: EngineState, effectSync: NetworkEffectSync }
-export type NetworkRoundPacket = NetworkStatePacket & { tribute: TributeState | null }
-export type NetworkRoundEndedPacket = { result: SettlementResult, effectSync: NetworkEffectSync }
-export type MatchedRoomEntry = {
-  roomId: string
-  gameEndpoint: string
-  gameTicket: string
-  seat: PlayerId
-  expiresAt?: number
-  displayName?: string
-}
-type Wire<T> = { type: string, requestId?: number } & T
-type RoomSnapshotWire = Wire<{
-  roomId: string
-  myPlayerId: PlayerId
-  resumeToken?: string
-  state?: EngineState | null
-  phase?: 'lobby' | 'playing' | 'tribute' | 'settlement'
-  tribute?: TributeState | null
-  roundResult?: SettlementResult | null
-  version?: number
-  turnDeadlineAt?: number | null
-  deadlinePlayerId?: PlayerId | null
-  deadlineAction?: NetworkDeadlineAction | null
-  trustees?: Record<PlayerId, NetworkTrustee | null>
-  consecutiveTimeouts?: Record<PlayerId, number>
-  lobbyReadyRequired?: boolean
-  lobbyReadyPlayerIds?: PlayerId[]
-  botPlayerIds?: PlayerId[]
-  roundReadyPlayerIds?: PlayerId[]
-  dissolveVote?: NetworkDissolveVote | null
-  roomSettings?: FriendRoomSettings | null
-  scoreboard?: NetworkScoreboard | null
-  memberPlayerIds?: PlayerId[]
-}>
-type LiveMetadataWire = Wire<{
-  roomId?: string
-  version?: number
-  currentTurn?: PlayerId | null
-  turnDeadlineAt?: number | null
-  deadlinePlayerId?: PlayerId | null
-  deadlineAction?: NetworkDeadlineAction | null
-  trustees?: Record<PlayerId, NetworkTrustee | null>
-  consecutiveTimeouts?: Record<PlayerId, number>
-  lobbyReadyRequired?: boolean
-  lobbyReadyPlayerIds?: PlayerId[]
-  botPlayerIds?: PlayerId[]
-  roundReadyPlayerIds?: PlayerId[]
-  dissolveVote?: NetworkDissolveVote | null
-  roomSettings?: FriendRoomSettings | null
-  scoreboard?: NetworkScoreboard | null
-  outcome?: 'rejected' | 'expired' | null
-}>
-type PendingRoomEntry = {
-  generation: number
-  requestId: number
-  requestType: 'createRoom' | 'joinRoom' | 'rejoinRoom'
-  responseType: 'roomCreated' | 'roomJoined' | 'roomRejoined'
-  roomId: string
-  expectedPlayerId?: PlayerId
-  matched: boolean
-}
-
-const MATCHED_ENTRY_MAX_ATTEMPTS = 10
-const MATCHED_ENTRY_RETRY_SECONDS = 0.5
-const MATCHED_ENTRY_WATCHDOG_SECONDS = 6
-const emptyTrustees = (): Record<PlayerId, NetworkTrustee | null> => ({ p1: null, p2: null, p3: null, p4: null })
-const emptyTimeouts = (): Record<PlayerId, number> => ({ p1: 0, p2: 0, p3: 0, p4: 0 })
+const ROOM_CLEANUP_WATCHDOG_SECONDS = 6
 
 const { ccclass, property } = _decorator
 
@@ -148,157 +59,93 @@ export class LobbyController extends Component {
   public session: GameSession | null = null
 
   public readonly events = new EventTarget()
-  public snapshot: LobbySnapshot = {
-    connected: false,
-    rooms: [],
-    roomId: null,
-    members: [],
-    myPlayerId: null,
-    roomStatus: 'idle',
-    error: null,
-    turnDeadlineAt: null,
-    deadlinePlayerId: null,
-    deadlineAction: null,
-    trustees: emptyTrustees(),
-    consecutiveTimeouts: emptyTimeouts(),
-    lobbyReadyRequired: false,
-    lobbyReadyPlayerIds: [],
-    botPlayerIds: [],
-    roundReadyPlayerIds: [],
-    dissolveVote: null,
-    roomSettings: null,
-    scoreboard: null,
-  }
-  private readonly client = new CocosSocketClient()
+  public snapshot: LobbySnapshot = createLobbySnapshot()
+  private client: LobbySocketClient = new CocosSocketClient()
+  private readonly clientListenerDisposers: Array<() => void> = []
+  private readonly entryAttempts = new LobbyEntryAttemptTracker()
+  private readonly cleanup = new LobbyCleanupTracker()
+  private readonly commands = new LobbyCommandSender({
+    client: () => this.client,
+    snapshot: () => this.snapshot,
+    emitResult: result => this.events.emit('guandan:network-result', result),
+    reportError: message => this.reportError(message),
+  })
+  private readonly messages = new LobbyMessageRouter({
+    listen: (type, listener) => this.listen(type, listener),
+    snapshot: () => this.snapshot,
+    patch: next => this.patch(next),
+    emit: (type, ...args) => this.events.emit(type, ...args),
+    isRoomCleaning: roomId => this.cleanup.isCleaning(roomId),
+    handleRequestResult: result => this.handleRequestResult(result),
+    applyRoomEntry: (message, members) => this.applyRoomEntry(message, members),
+    closeRoom: message => this.closeRoomLocally(message),
+    reportError: message => this.reportError(message),
+  })
+  private readonly matchedEntries = new LobbyMatchedEntryCoordinator({
+    connected: () => this.snapshot.connected,
+    connect: endpoint => this.client.connect(endpoint),
+    begin: (requestType, responseType, roomId, payload, expectedPlayerId) =>
+      this.beginRoomEntry(requestType, responseType, roomId, payload, expectedPlayerId, true),
+    cancelPending: requestId => this.cancelPendingMatchedRequest(requestId),
+    resetTransport: () => { this.client.close(); this.patch({ connected: false }) },
+    close: message => this.closeRoomLocally(message, false),
+    requestRecovery: abandonAttemptId => this.events.emit('guandan:platform-recovery-required', abandonAttemptId ? { abandonAttemptId } : {}),
+    patch: next => this.patch(next),
+    reportError: (message, next) => this.reportError(message, next),
+    schedule: (callback, delay) => this.scheduleOnce(callback, delay),
+  })
+  private readonly resumeConnections = new LobbyResumeConnectionWatchdog({
+    schedule: (callback, delay) => this.scheduleOnce(callback, delay),
+    onExhausted: message => {
+      this.closeRoomForRecovery(message)
+      this.events.emit('guandan:platform-recovery-required', {})
+    },
+  })
+  private resumeSessions = new LobbyResumeSessionStore(sys.localStorage)
+  private socketBound = false
   private endpoint = ''
   private resumeToken: string | null = null
-  private lastVersion = -1
-  private effectSyncCursor: NetworkEffectCursor | null = null
-  private lastAppliedStateSync: { roomId: string, version: number, effectSync: NetworkEffectSync } | null = null
-  private readonly processedRoomEvents = new Set<string>()
-  private readonly processedVersionedEvents = new Set<string>()
-  private pendingMatchedRoom: MatchedRoomEntry | null = null
+  private activeMatchId: string | null = null
   private entryGeneration = 0
   private pendingRoomEntry: PendingRoomEntry | null = null
-  private matchedJoinInFlight = false
-  private matchedJoinAttempts = 0
-  private readonly cleanupRequestRooms = new Map<number, string>()
-  private readonly cleanupRoomIds = new Set<string>()
+  private readonly connectionEvents = new LobbyConnectionEventCoordinator({
+    snapshot: () => this.snapshot,
+    resumeToken: () => this.resumeToken,
+    matchedConnected: () => this.matchedEntries.handleConnected(),
+    matchedDisconnected: () => this.matchedEntries.handleDisconnected(),
+    resumePending: () => this.resumeConnections.pending,
+    startResumeWatchdog: () => this.resumeConnections.start(),
+    recordResumeFailure: () => this.resumeConnections.recordFailure(),
+    beginEntry: (requestType, responseType, roomId, payload, expectedPlayerId) =>
+      this.beginRoomEntry(requestType, responseType, roomId, payload, expectedPlayerId),
+    invalidateEntry: () => this.invalidateRoomEntryRequest(),
+    closeForRecovery: message => this.closeRoomForRecovery(message),
+    requestPlatformRecovery: () => this.events.emit('guandan:platform-recovery-required', {}),
+    refreshRooms: () => { this.refreshRooms() },
+    patch: next => this.patch(next),
+    reportDisconnect: message => this.events.emit('guandan:network-error', message),
+  })
+
+  /** Replaces the production WebSocket adapter before Cocos calls onLoad. */
+  public setSocketClient (client: LobbySocketClient): void {
+    if (this.socketBound) throw new Error('LobbySocketClient 必须在 onLoad 前注入')
+    if (client === this.client) return
+    this.client.close()
+    this.client = client
+  }
+
+  public setResumeStorage (storage: LobbyResumeStorage): void {
+    if (this.socketBound) throw new Error('LobbyResumeStorage 必须在 onLoad 前注入')
+    this.resumeSessions = new LobbyResumeSessionStore(storage)
+  }
 
   protected onLoad (): void {
+    this.socketBound = true
     if (!this.session) this.session = this.getComponent(GameSession)
-    this.client.on('connected', () => {
-      if (this.pendingMatchedRoom) {
-        this.patch({ connected: true, roomStatus: 'joining', error: null })
-        if (this.rejectExpiredMatchedEntry()) return
-        this.attemptMatchedRoomEntry()
-        return
-      }
-      const { roomId, myPlayerId } = this.snapshot
-      const canResume = Boolean(roomId && myPlayerId && this.resumeToken)
-      this.patch({ connected: true, roomStatus: canResume ? 'rejoining' : 'idle', error: null })
-      if (roomId && myPlayerId && this.resumeToken) {
-        const requestId = this.beginRoomEntry(
-          'rejoinRoom',
-          'roomRejoined',
-          roomId,
-          { roomId, myPlayerId, resumeToken: this.resumeToken },
-          myPlayerId,
-        )
-        if (requestId === null) this.closeRoomLocally('无法恢复房间，请重新加入')
-      } else {
-        this.refreshRooms()
-      }
-    })
-    this.client.on('disconnected', () => {
-      const retryMatchedEntry = Boolean(this.pendingMatchedRoom)
-      this.invalidateRoomEntryRequest()
-      this.patch({
-        connected: false,
-        roomStatus: retryMatchedEntry ? 'joining' : this.snapshot.roomId && this.resumeToken ? 'rejoining' : 'idle',
-        error: '网络连接已断开，正在重新连接',
-      })
-      this.events.emit('guandan:network-error', '网络连接已断开，正在重新连接')
-    })
-    this.client.on('requestResult', (result: NetworkRequestResult) => this.handleRequestResult(result))
-    this.client.on('error', (message: Wire<{ message?: string }>) => {
-      // Direct request rejects are already routed through requestResult, where
-      // their request id can be matched to the correct pending game action.
-      if (typeof message.requestId === 'number') return
-      this.reportError(message.message ?? '网络错误')
-    })
-    this.client.on('roomList', (message: Wire<{ rooms?: NetworkRoom[] }>) => this.patch({ rooms: message.rooms ?? [] }))
-    this.client.on('roomCreated', (message: RoomSnapshotWire) => this.applyRoomEntry(message, message.memberPlayerIds ?? ['p1']))
-    this.client.on('roomJoined', (message: RoomSnapshotWire) => this.applyRoomEntry(message, message.memberPlayerIds ?? this.snapshot.members))
-    this.client.on('roomRejoined', (message: RoomSnapshotWire) => this.applyRoomEntry(message, message.memberPlayerIds ?? this.snapshot.members))
-    this.client.on('roomMembers', (message: LiveMetadataWire & { memberPlayerIds?: PlayerId[] }) => {
-      if (this.applyLiveMetadata(message)) this.patch({ members: message.memberPlayerIds ?? [] })
-    })
-    this.client.on('lobbyReadyUpdated', (message: LiveMetadataWire) => {
-      if (!this.applyLiveMetadata(message)) return
-      this.events.emit('guandan:lobby-ready', this.snapshot.lobbyReadyPlayerIds ?? [])
-    })
-    this.client.on('turnDeadline', (message: LiveMetadataWire) => {
-      if (!this.applyLiveMetadata(message)) return
-      this.events.emit('guandan:turn-deadline', {
-        currentTurn: message.currentTurn ?? null,
-        turnDeadlineAt: this.snapshot.turnDeadlineAt ?? null,
-        deadlinePlayerId: this.snapshot.deadlinePlayerId ?? null,
-        deadlineAction: this.snapshot.deadlineAction ?? null,
-      })
-    })
-    this.client.on('trusteeUpdated', (message: LiveMetadataWire) => {
-      if (!this.applyLiveMetadata(message)) return
-      this.events.emit('guandan:trustee', this.snapshot.trustees ?? emptyTrustees())
-    })
-    this.client.on('roundReadyUpdated', (message: LiveMetadataWire) => {
-      if (!this.applyLiveMetadata(message)) return
-      this.events.emit('guandan:round-ready', this.snapshot.roundReadyPlayerIds ?? [])
-    })
-    this.client.on('dissolveVoteUpdated', (message: LiveMetadataWire) => {
-      if (!this.applyLiveMetadata(message)) return
-      this.events.emit('guandan:dissolve-vote', { vote: this.snapshot.dissolveVote ?? null, outcome: message.outcome ?? null })
-    })
-    this.client.on('turnTimedOut', (message: LiveMetadataWire & { playerId?: PlayerId, action?: NetworkDeadlineAction, enteredTrustee?: boolean }) => {
-      if (!this.applyLiveMetadata(message)) return
-      this.events.emit('guandan:turn-timeout', { playerId: message.playerId ?? null, action: message.action ?? null, enteredTrustee: Boolean(message.enteredTrustee) })
-    })
-    this.client.on('gameState', (message: LiveMetadataWire & { state?: EngineState }) => {
-      this.applyLiveMetadata(message)
-      if (!message.state || !this.acceptRoomMessage(message.roomId) || !this.acceptVersion('game-state', message.version)) return
-      this.patch({ error: null })
-      const packet = this.statePacket(message.state, message.roomId, message.version)
-      if (packet) this.events.emit('guandan:network-state', packet)
-    })
-    this.client.on('roundEnded', (message: LiveMetadataWire & { result?: SettlementResult }) => {
-      this.applyLiveMetadata(message)
-      if (!message.result || !this.acceptRoomMessage(message.roomId) || !this.acceptVersion('round-ended', message.version)) return
-      this.emitRoundEnded(message.result, message.roomId, message.version)
-    })
-    this.client.on('roundPrepared', (message: LiveMetadataWire & { state?: EngineState, tribute?: TributeState }) => {
-      this.applyLiveMetadata(message)
-      if (!message.state || !this.acceptRoomMessage(message.roomId) || !this.acceptVersion('round-prepared', message.version)) return
-      const packet = this.statePacket(message.state, message.roomId, message.version, 'round-reset')
-      if (packet) this.events.emit('guandan:round-prepared', { ...packet, tribute: message.tribute ?? null } satisfies NetworkRoundPacket)
-    })
-    this.client.on('tributeUpdated', (message: LiveMetadataWire & { state?: EngineState, tribute?: TributeState }) => {
-      this.applyLiveMetadata(message)
-      if (!message.state || !this.acceptRoomMessage(message.roomId) || !this.acceptVersion('tribute-updated', message.version)) return
-      const packet = this.statePacket(message.state, message.roomId, message.version)
-      if (packet) this.events.emit('guandan:round-prepared', { ...packet, tribute: message.tribute ?? null } satisfies NetworkRoundPacket)
-    })
-    this.client.on('chat', (message: Wire<{ roomId?: string, playerId?: PlayerId, text?: string }>) => {
-      if (this.acceptRoomMessage(message.roomId) && message.playerId && message.text) this.events.emit('guandan:chat', { playerId: message.playerId, text: message.text })
-    })
-    this.client.on('hostLeft', (message: Wire<{ roomId?: string }>) => {
-      if (this.acceptRoomMessage(message.roomId)) this.closeRoomLocally('房主已离开，房间已关闭')
-    })
-    this.client.on('roomDissolved', (message: Wire<{ roomId?: string, reason?: string }>) => {
-      if (this.acceptRoomMessage(message.roomId)) this.closeRoomLocally(message.reason === 'vote-approved' ? '全员同意，房间已解散' : '房间已解散')
-    })
-    this.client.on('roomKicked', (message: Wire<{ roomId?: string, reason?: string }>) => {
-      if (this.acceptRoomMessage(message.roomId)) this.closeRoomLocally('已被房主移出房间')
-    })
+    this.listen('connected', () => this.connectionEvents.handleConnected())
+    this.listen('disconnected', () => this.connectionEvents.handleDisconnected())
+    this.messages.bind()
+    this.restoreResumeSession()
   }
 
   public connect (endpoint: string): void {
@@ -309,25 +156,25 @@ export class LobbyController extends Component {
 
   /** Enters a room reserved by the platform matchmaking coordinator. */
   public enterMatchedRoom (entry: MatchedRoomEntry): void {
-    if (!/^\d{6}$/.test(entry.roomId) || !entry.gameEndpoint || !entry.gameTicket || !['p1', 'p2', 'p3', 'p4'].includes(entry.seat)) {
+    if (
+      !/^\d{6}$/.test(entry.roomId) || !entry.gameEndpoint || !entry.gameTicket
+      || !['p1', 'p2', 'p3', 'p4'].includes(entry.seat)
+      || !isEntryAttemptId(entry.entryAttemptId)
+    ) {
       this.reportError('匹配服务返回了无效的入桌信息')
       return
     }
-    if (this.isMatchedEntryExpired(entry)) {
+    if (LobbyMatchedEntryCoordinator.isExpired(entry)) {
       this.reportError('匹配入桌凭证已过期，请重新匹配')
+      const abandonAttemptId = entry.recoveryAttemptId ?? (entry.ticketPurpose === 'rejoin' ? entry.entryAttemptId : undefined)
+      this.events.emit('guandan:platform-recovery-required', abandonAttemptId ? { abandonAttemptId } : {})
       return
     }
     this.clearRoomIdentity()
-    this.pendingMatchedRoom = entry
     this.endpoint = entry.gameEndpoint
     this.session?.enterLobby()
-    this.patch({ roomId: entry.roomId, myPlayerId: entry.seat, members: [], lobbyReadyRequired: false, lobbyReadyPlayerIds: [], botPlayerIds: [], roomSettings: null, scoreboard: null, roomStatus: 'joining', error: null })
-    void this.client.connect(entry.gameEndpoint)
-      .then(() => this.attemptMatchedRoomEntry())
-      .catch(error => {
-        if (!this.pendingMatchedRoom) return
-        this.reportError(error instanceof Error ? error.message : '无法连接匹配牌桌', { connected: false, roomStatus: 'joining' })
-      })
+    this.patch({ roomId: entry.roomId, myPlayerId: entry.seat, members: [], lobbyReadyRequired: false, lobbyReadyPlayerIds: [], botPlayerIds: [], roomSettings: null, scoreboard: null, entryKind: null, capabilities: null, roomStatus: 'joining', recoveryAvailable: false, error: null })
+    this.matchedEntries.start(entry)
   }
 
   public refreshRooms (): number | null { return this.send('listRooms') }
@@ -369,52 +216,52 @@ export class LobbyController extends Component {
   public chat (text: string): number | null { return this.sendRoomIntent('chat', { text }) }
   public leaveRoom (): void { this.exitRoom('leaveRoom') }
   public safeExit (): void { this.exitRoom('safeExit') }
+  public recoverActiveMatch (): void {
+    if (!this.snapshot.recoveryAvailable) return
+    this.patch({ recoveryAvailable: false, error: null })
+    this.events.emit('guandan:platform-recovery-required', { manual: true })
+  }
+
+  public offerActiveMatchRecovery (message?: string): void { this.patch({ recoveryAvailable: true, ...(message ? { error: message } : {}) }) }
 
   private exitRoom (intent: 'leaveRoom' | 'safeExit'): void {
+    if (this.snapshot.gameStartPending) { this.reportError('平台确认开局期间暂不能离开房间'); return }
     const roomId = this.snapshot.roomId
+    const recoveryAvailable = intent === 'safeExit' && !this.snapshot.matchEnded
     if (roomId && this.snapshot.connected) {
       this.patch({ roomStatus: 'leaving' })
       this.send(intent, { roomId })
     }
     this.clearRoomIdentity()
-    this.patch({
-      roomId: null,
-      members: [],
-      myPlayerId: null,
-      roomStatus: 'idle',
-      turnDeadlineAt: null,
-      deadlinePlayerId: null,
-      deadlineAction: null,
-      trustees: emptyTrustees(),
-      consecutiveTimeouts: emptyTimeouts(),
-      lobbyReadyRequired: false,
-      lobbyReadyPlayerIds: [],
-      botPlayerIds: [],
-      roundReadyPlayerIds: [],
-      dissolveVote: null,
-      roomSettings: null,
-      scoreboard: null,
-    })
+    this.patch({ ...createClearedRoomPatch(), recoveryAvailable })
     this.session?.leaveToMenu()
   }
 
-  protected onDestroy (): void { this.client.close() }
+  protected onDestroy (): void {
+    const disposers = this.clientListenerDisposers.splice(0)
+    for (const dispose of disposers) {
+      try {
+        dispose()
+      } catch (error) {
+        console.warn('Unable to remove a lobby socket listener.', error)
+      }
+    }
+    this.socketBound = false
+    this.matchedEntries.clear()
+    this.resumeConnections.clear()
+    this.client.close()
+  }
+
+  private listen<T> (type: string, listener: LobbySocketListener<T>): void {
+    this.clientListenerDisposers.push(this.client.on(type, listener))
+  }
 
   private sendRoomIntent (type: string, payload: Record<string, unknown> = {}): number | null {
-    if (!this.snapshot.roomId || this.snapshot.roomStatus !== 'ready') return null
-    return this.send(type, { roomId: this.snapshot.roomId, ...payload })
+    return this.commands.roomIntent(type, payload)
   }
 
   private send (type: string, payload?: unknown): number | null {
-    try {
-      return this.client.send(type, payload)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '网络未连接'
-      const result = { requestId: null, requestType: type, responseType: 'client-error', ok: false, message } satisfies LobbyNetworkResult
-      this.events.emit('guandan:network-result', result)
-      this.reportError(message)
-      return null
-    }
+    return this.commands.send(type, payload)
   }
 
   private canBeginManualEntry (): boolean {
@@ -439,19 +286,21 @@ export class LobbyController extends Component {
   ): number | null {
     const generation = ++this.entryGeneration
     this.pendingRoomEntry = null
-    const requestId = this.send(requestType, payload)
+    let entryPayload = payload
+    try {
+      if (requestType !== 'rejoinRoom') entryPayload = this.entryAttempts.decorate(payload, matched)
+    } catch {
+      this.reportError('当前环境无法生成安全入桌凭证，请升级客户端后重试')
+      return null
+    }
+    const requestId = this.send(requestType, entryPayload)
     if (requestId === null) return null
     this.pendingRoomEntry = { generation, requestId, requestType, responseType, roomId, expectedPlayerId, matched }
     return requestId
   }
 
   private handleRequestResult (result: NetworkRequestResult): void {
-    const cleanupRoomId = this.cleanupRequestRooms.get(result.requestId)
-    if (cleanupRoomId) {
-      this.cleanupRequestRooms.delete(result.requestId)
-      if (!Array.from(this.cleanupRequestRooms.values()).includes(cleanupRoomId)) this.cleanupRoomIds.delete(cleanupRoomId)
-      return
-    }
+    if (this.cleanup.consumeResult(result.requestId)) return
     this.events.emit('guandan:network-result', result)
     if (result.ok) return
     const message = result.message ?? '服务器拒绝了请求'
@@ -460,24 +309,12 @@ export class LobbyController extends Component {
       if (!pending || pending.requestId !== result.requestId || pending.requestType !== result.requestType || pending.generation !== this.entryGeneration) return
       this.invalidateRoomEntryRequest()
       if (pending.matched) {
-        if (this.rejectExpiredMatchedEntry()) return
-        if (this.matchedJoinAttempts < MATCHED_ENTRY_MAX_ATTEMPTS && this.isRetriableMatchedEntryFailure(message)) {
-          const retryGeneration = this.entryGeneration
-          this.patch({ roomStatus: 'joining', error: '比赛匹配暂未完成，正在重试' })
-          // An arrow callback is required here: Cocos Component.scheduleOnce
-          // does not promise to restore a method reference's `this` binding.
-          this.scheduleOnce(() => {
-            if (retryGeneration !== this.entryGeneration || !this.pendingMatchedRoom) return
-            this.attemptMatchedRoomEntry()
-          }, MATCHED_ENTRY_RETRY_SECONDS)
-          return
-        }
-        this.bestEffortLeaveRoom(pending.roomId)
-        this.failMatchedRoomEntry('比赛匹配失败，请稍后重试')
+        this.matchedEntries.handleFailure(message, result.code)
         return
       }
       if (pending.requestType === 'rejoinRoom') {
-        this.closeRoomLocally(`房间恢复失败：${message}`)
+        this.closeRoomForRecovery(`房间恢复失败：${message}`)
+        this.events.emit('guandan:platform-recovery-required', {})
         return
       }
       this.patch({ roomStatus: 'idle', error: message })
@@ -495,31 +332,28 @@ export class LobbyController extends Component {
     if (!message.roomId || !message.myPlayerId || !message.resumeToken) {
       this.bestEffortLeaveRoom(message.roomId)
       this.invalidateRoomEntryRequest()
-      if (pending.matched) this.failMatchedRoomEntry('服务器未返回安全的重连凭证，请重新匹配')
-      else if (pending.requestType === 'rejoinRoom') this.closeRoomLocally('服务器未返回安全的重连凭证，请重新加入')
+      if (pending.matched) this.matchedEntries.reject('服务器未返回安全的重连凭证，请重新匹配')
+      else if (pending.requestType === 'rejoinRoom') {
+        this.closeRoomForRecovery('服务器未返回安全的重连凭证，请重新加入')
+        this.events.emit('guandan:platform-recovery-required', {})
+      }
       else this.patch({ roomStatus: 'idle', error: '服务器未返回安全的重连凭证，请重新加入' })
       return
     }
-    const recoveryReason: ForcedNetworkRecoveryReason = pending.requestType === 'rejoinRoom' ? 'reconnect' : 'initial-snapshot'
+    const recoveryReason: ForcedNetworkRecoveryReason = pending.responseType === 'roomRejoined' ? 'reconnect' : 'initial-snapshot'
+    const matchedEntry = this.matchedEntries.current
+    const matchId = matchedEntry?.matchId ?? this.activeMatchId
     this.pendingRoomEntry = null
     this.entryGeneration += 1
-    this.pendingMatchedRoom = null
-    this.matchedJoinInFlight = false
-    this.matchedJoinAttempts = 0
-    this.enterRoom(message.roomId, message.myPlayerId, message.resumeToken, members)
-    this.applyLiveMetadata(message)
-    if (!message.state) return
-    const version = this.normalizedVersion(message.version)
-    this.lastVersion = Math.max(this.lastVersion, version)
-    const packet = this.statePacket(message.state, message.roomId, version, recoveryReason)
-    if (!packet) return
-    const phase = message.phase ?? (message.roundResult ? 'settlement' : message.tribute ? 'tribute' : 'playing')
-    if (phase === 'tribute') {
-      this.events.emit('guandan:round-prepared', { ...packet, tribute: message.tribute ?? null } satisfies NetworkRoundPacket)
-      return
-    }
-    this.events.emit('guandan:network-state', packet)
-    if (phase === 'settlement' && message.roundResult) this.emitRoundEnded(message.roundResult, message.roomId, version, packet.effectSync)
+    this.matchedEntries.complete()
+    this.entryAttempts.clearMatched()
+    this.enterRoom(message.roomId, message.myPlayerId, message.resumeToken, members, matchId)
+    if (matchedEntry) this.events.emit('guandan:room-entry-confirmed', {
+      entryAttemptId: matchedEntry.entryAttemptId,
+      recoveryAttemptId: matchedEntry.recoveryAttemptId,
+      ticketPurpose: matchedEntry.ticketPurpose ?? 'entry',
+    })
+    this.messages.applyEntrySnapshot(message, recoveryReason)
   }
 
   private isExpectedRoomEntry (message: RoomSnapshotWire, pending: PendingRoomEntry | null): pending is PendingRoomEntry {
@@ -550,240 +384,76 @@ export class LobbyController extends Component {
     if (!pending || (!matchesPendingRequest && !conflictsWithPendingSeat)) return
     this.invalidateRoomEntryRequest()
     if (pending.matched) {
-      this.failMatchedRoomEntry('匹配服务返回了与请求不一致的牌桌信息')
+      this.matchedEntries.reject('匹配服务返回了与请求不一致的牌桌信息')
       return
     }
     if (pending.requestType === 'rejoinRoom') {
-      this.closeRoomLocally('房间恢复响应与请求不一致，请重新加入')
+      this.closeRoomForRecovery('房间恢复响应与请求不一致，请重新加入')
+      this.events.emit('guandan:platform-recovery-required', {})
       return
     }
     this.patch({ roomStatus: 'idle', error: '服务器返回了与请求不一致的房间信息' })
   }
 
-  private enterRoom (roomId: string, myPlayerId: PlayerId, resumeToken: string, members: PlayerId[]): void {
+  private enterRoom (roomId: string, myPlayerId: PlayerId, resumeToken: string, members: PlayerId[], matchId: string | null): void {
     const isNewRoom = roomId !== this.snapshot.roomId || resumeToken !== this.resumeToken
-    if (isNewRoom) {
-      this.lastVersion = -1
-      this.effectSyncCursor = null
-      this.lastAppliedStateSync = null
-      this.processedRoomEvents.clear()
-      this.processedVersionedEvents.clear()
-    }
+    if (isNewRoom) this.messages.reset()
     this.resumeToken = resumeToken
+    this.activeMatchId = matchId
+    this.resumeConnections.clear()
     this.patch({
       roomId,
       myPlayerId,
       members,
       roomStatus: 'ready',
+      recoveryAvailable: false,
       error: null,
-      ...(isNewRoom
-        ? { turnDeadlineAt: null, deadlinePlayerId: null, deadlineAction: null, trustees: emptyTrustees(), consecutiveTimeouts: emptyTimeouts(), lobbyReadyRequired: false, lobbyReadyPlayerIds: [], botPlayerIds: [], roundReadyPlayerIds: [], dissolveVote: null, roomSettings: null, scoreboard: null }
-        : {}),
+      ...(isNewRoom ? createRoomMetadataDefaults() : {}),
     })
+    if (!this.resumeSessions.save({ version: 1, endpoint: this.endpoint, roomId, seat: myPlayerId, resumeToken, ...(matchId ? { matchId } : {}) })) {
+      this.patch({ error: '当前设备无法保存断线恢复凭证；本次牌局可继续，应用重启后需重新进入' })
+      this.events.emit('guandan:network-error', '无法保存断线恢复凭证，本次牌局仍可继续')
+    }
     this.session?.joinRoom(roomId, myPlayerId)
   }
 
-  private emitRoundEnded (result: SettlementResult, roomId?: string, version?: number, effectSync = this.effectSyncForVersion(roomId, version)): void {
-    const normalizedRoomId = roomId ?? this.snapshot.roomId
-    if (!normalizedRoomId) return
-    const key = `round-ended:${normalizedRoomId}:${this.normalizedVersion(version)}`
-    if (this.processedRoomEvents.has(key)) return
-    this.processedRoomEvents.add(key)
-    this.events.emit('guandan:round-ended', { result, effectSync } satisfies NetworkRoundEndedPacket)
-  }
-
-  private acceptRoomMessage (roomId?: string): boolean {
-    return Boolean(
-      this.snapshot.roomId &&
-      this.snapshot.roomStatus === 'ready' &&
-      (!roomId || !this.cleanupRoomIds.has(roomId)) &&
-      (!roomId || roomId === this.snapshot.roomId),
-    )
-  }
-
-  private applyLiveMetadata (message: LiveMetadataWire): boolean {
-    if (!this.acceptRoomMessage(message.roomId)) return false
-    const normalized = this.normalizedVersion(message.version)
-    if (normalized < this.lastVersion) return false
-    if (normalized > this.lastVersion) {
-      this.lastVersion = normalized
-      this.processedVersionedEvents.clear()
-    }
-    const next: Partial<LobbySnapshot> = {}
-    if (Object.prototype.hasOwnProperty.call(message, 'turnDeadlineAt')) next.turnDeadlineAt = message.turnDeadlineAt ?? null
-    if (Object.prototype.hasOwnProperty.call(message, 'deadlinePlayerId')) next.deadlinePlayerId = message.deadlinePlayerId ?? null
-    if (Object.prototype.hasOwnProperty.call(message, 'deadlineAction')) next.deadlineAction = message.deadlineAction ?? null
-    if (message.trustees) next.trustees = message.trustees
-    if (message.consecutiveTimeouts) next.consecutiveTimeouts = message.consecutiveTimeouts
-    if (Object.prototype.hasOwnProperty.call(message, 'lobbyReadyRequired')) next.lobbyReadyRequired = Boolean(message.lobbyReadyRequired)
-    if (message.lobbyReadyPlayerIds) next.lobbyReadyPlayerIds = message.lobbyReadyPlayerIds
-    if (message.botPlayerIds) next.botPlayerIds = message.botPlayerIds
-    if (message.roundReadyPlayerIds) next.roundReadyPlayerIds = message.roundReadyPlayerIds
-    if (Object.prototype.hasOwnProperty.call(message, 'dissolveVote')) next.dissolveVote = message.dissolveVote ?? null
-    if (Object.prototype.hasOwnProperty.call(message, 'roomSettings')) next.roomSettings = message.roomSettings ?? null
-    if (Object.prototype.hasOwnProperty.call(message, 'scoreboard')) next.scoreboard = message.scoreboard ?? null
-    if (Object.keys(next).length > 0) this.patch(next)
-    return true
-  }
-
-  private acceptVersion (eventType: string, version?: number): boolean {
-    const normalized = this.normalizedVersion(version)
-    if (normalized < this.lastVersion) return false
-    if (normalized > this.lastVersion) {
-      this.lastVersion = normalized
-      this.processedVersionedEvents.clear()
-    }
-    const key = `${eventType}:${normalized}`
-    if (this.processedVersionedEvents.has(key)) return false
-    this.processedVersionedEvents.add(key)
-    return true
-  }
-
-  private normalizedVersion (version?: number): number { return Number.isInteger(version) ? Number(version) : Math.max(this.lastVersion, 0) }
-
-  private statePacket (state: EngineState, roomId?: string, version?: number, forceRecovery?: ForcedNetworkRecoveryReason): NetworkStatePacket | null {
-    const normalizedRoomId = roomId ?? this.snapshot.roomId ?? ''
-    const normalizedVersion = this.normalizedVersion(version)
-    const decision = decideNetworkEffectSync(this.effectSyncCursor, {
-      roomId: normalizedRoomId,
-      version: normalizedVersion,
-      actionCount: state.playArea.length,
-      forceRecovery,
-    })
-    if (decision.kind === 'drop') return null
-    this.effectSyncCursor = decision.cursor
-    this.lastAppliedStateSync = { roomId: normalizedRoomId, version: normalizedVersion, effectSync: decision.sync }
-    return { roomId: normalizedRoomId, version: normalizedVersion, state, effectSync: decision.sync }
-  }
-
-  private effectSyncForVersion (roomId?: string, version?: number): NetworkEffectSync {
-    const normalizedRoomId = roomId ?? this.snapshot.roomId ?? ''
-    const normalizedVersion = this.normalizedVersion(version)
-    if (this.lastAppliedStateSync?.roomId === normalizedRoomId && this.lastAppliedStateSync.version === normalizedVersion) {
-      return this.lastAppliedStateSync.effectSync
-    }
-    return { mode: 'incremental' }
-  }
-
-  private closeRoomLocally (message: string): void {
+  private closeRoomLocally (message: string, compensateReservation = true): void {
     const hadRoom = Boolean(this.snapshot.roomId)
     this.clearRoomIdentity()
-    this.patch({
-      roomId: null,
-      members: [],
-      myPlayerId: null,
-      roomStatus: 'idle',
-      error: message,
-      turnDeadlineAt: null,
-      deadlinePlayerId: null,
-      deadlineAction: null,
-      trustees: emptyTrustees(),
-      consecutiveTimeouts: emptyTimeouts(),
-      lobbyReadyRequired: false,
-      lobbyReadyPlayerIds: [],
-      botPlayerIds: [],
-      roundReadyPlayerIds: [],
-      dissolveVote: null,
-      roomSettings: null,
-      scoreboard: null,
-    })
+    this.patch(createClearedRoomPatch(message))
     this.session?.enterLobby()
-    if (hadRoom) this.events.emit('guandan:room-closed', message)
+    if (hadRoom) this.events.emit('guandan:room-closed', message, { compensateReservation })
     if (this.snapshot.connected) this.refreshRooms()
+  }
+
+  private closeRoomForRecovery (message: string): void {
+    this.client.close()
+    this.patch({ connected: false })
+    this.closeRoomLocally(message, false)
   }
 
   private clearRoomIdentity (): void {
     this.invalidateRoomEntryRequest()
-    this.pendingMatchedRoom = null
-    this.matchedJoinAttempts = 0
+    this.matchedEntries.clear()
+    this.entryAttempts.clearMatched()
     this.resumeToken = null
-    this.lastVersion = -1
-    this.effectSyncCursor = null
-    this.lastAppliedStateSync = null
-    this.processedRoomEvents.clear()
-    this.processedVersionedEvents.clear()
-  }
-
-  private attemptMatchedRoomEntry (): void {
-    const entry = this.pendingMatchedRoom
-    if (!entry || !this.snapshot.connected || this.matchedJoinInFlight) return
-    if (this.rejectExpiredMatchedEntry()) return
-    this.matchedJoinInFlight = true
-    this.matchedJoinAttempts += 1
-    const payload = { roomId: entry.roomId, gameTicket: entry.gameTicket }
-    const requestId = entry.seat === 'p1'
-      ? this.beginRoomEntry('createRoom', 'roomCreated', entry.roomId, { ...payload, hostName: entry.displayName ?? '匹配玩家' }, entry.seat, true)
-      : this.beginRoomEntry('joinRoom', 'roomJoined', entry.roomId, payload, entry.seat, true)
-    if (requestId === null) {
-      this.matchedJoinInFlight = false
-      return
-    }
-    const watchdogGeneration = this.entryGeneration
-    // Keep this arrow-bound for Cocos scheduleOnce; the generation/request
-    // guards also make callbacks from an earlier attempt harmless.
-    this.scheduleOnce(() => {
-      const pending = this.pendingRoomEntry
-      if (!pending || pending.generation !== watchdogGeneration || pending.requestId !== requestId || !pending.matched) return
-      const roomId = pending.roomId
-      this.invalidateRoomEntryRequest()
-      if (this.rejectExpiredMatchedEntry()) return
-      if (this.matchedJoinAttempts < MATCHED_ENTRY_MAX_ATTEMPTS) {
-        const retryGeneration = this.entryGeneration
-        this.patch({ roomStatus: 'joining', error: '匹配入桌响应超时，正在恢复席位' })
-        // The server treats the same ticket jti as an idempotent entry retry and
-        // returns the original resume token if the first response was lost.
-        this.scheduleOnce(() => {
-          if (retryGeneration !== this.entryGeneration || !this.pendingMatchedRoom) return
-          if (this.snapshot.connected) {
-            this.attemptMatchedRoomEntry()
-            return
-          }
-          const reconnectEntry = this.pendingMatchedRoom
-          void this.client.connect(reconnectEntry.gameEndpoint)
-            .then(() => {
-              if (retryGeneration !== this.entryGeneration || this.pendingMatchedRoom !== reconnectEntry) return
-              this.patch({ connected: true, roomStatus: 'joining', error: null })
-              this.attemptMatchedRoomEntry()
-            })
-            .catch(error => {
-              if (retryGeneration === this.entryGeneration && this.pendingMatchedRoom === reconnectEntry) {
-                this.reportError(error instanceof Error ? error.message : '无法恢复匹配牌桌', { connected: false, roomStatus: 'joining' })
-              }
-            })
-        }, MATCHED_ENTRY_RETRY_SECONDS)
-        return
-      }
-      this.bestEffortLeaveRoom(roomId)
-      this.failMatchedRoomEntry('匹配入桌多次超时，请重新匹配')
-    }, MATCHED_ENTRY_WATCHDOG_SECONDS)
+    this.activeMatchId = null
+    this.resumeSessions.clear()
+    this.resumeConnections.clear()
+    this.messages.reset()
   }
 
   private invalidateRoomEntryRequest (): void {
     this.entryGeneration += 1
     this.pendingRoomEntry = null
-    this.matchedJoinInFlight = false
   }
 
-  private isMatchedEntryExpired (entry: MatchedRoomEntry): boolean {
-    if (entry.expiresAt === undefined) return false
-    return !Number.isFinite(entry.expiresAt) || entry.expiresAt <= Date.now()
-  }
-
-  private rejectExpiredMatchedEntry (): boolean {
-    const entry = this.pendingMatchedRoom
-    if (!entry || !this.isMatchedEntryExpired(entry)) return false
-    if (this.matchedJoinAttempts > 0) this.bestEffortLeaveRoom(entry.roomId)
-    this.failMatchedRoomEntry('匹配入桌凭证已过期，请重新匹配')
-    return true
-  }
-
-  private isRetriableMatchedEntryFailure (message: string): boolean {
-    return /房间不存在|牌桌尚未准备|房主尚未进入|暂时不可用|请稍后重试/.test(message)
-  }
-
-  private failMatchedRoomEntry (message: string): void {
-    this.pendingMatchedRoom = null
-    this.closeRoomLocally(message)
+  private cancelPendingMatchedRequest (requestId: number): string | null {
+    const pending = this.pendingRoomEntry
+    if (!pending || !pending.matched || pending.requestId !== requestId) return null
+    const roomId = pending.roomId
+    this.invalidateRoomEntryRequest()
+    return roomId
   }
 
   private bestEffortLeaveRoom (roomId?: string, message?: RoomSnapshotWire): void {
@@ -796,19 +466,26 @@ export class LobbyController extends Component {
       this.resumeToken === message.resumeToken,
     )
     if (isAcceptedCurrentRoom) return
-    try {
-      const requestId = this.client.send('leaveRoom', { roomId })
-      this.cleanupRequestRooms.set(requestId, roomId)
-      this.cleanupRoomIds.add(roomId)
-      this.scheduleOnce(() => {
-        if (this.cleanupRequestRooms.get(requestId) !== roomId) return
-        this.cleanupRequestRooms.delete(requestId)
-        if (!Array.from(this.cleanupRequestRooms.values()).includes(roomId)) this.cleanupRoomIds.delete(roomId)
-      }, MATCHED_ENTRY_WATCHDOG_SECONDS)
-    } catch {
-      // The connection may have closed between validation and cleanup. The
-      // server's disconnect handling is the remaining best-effort release.
-    }
+    this.cleanup.request(
+      roomId,
+      target => this.client.send('leaveRoom', { roomId: target }),
+      callback => this.scheduleOnce(callback, ROOM_CLEANUP_WATCHDOG_SECONDS),
+    )
+  }
+
+  private restoreResumeSession (): void {
+    const restored = this.resumeSessions.restore()
+    if (!restored) return
+    this.endpoint = restored.endpoint
+    this.resumeToken = restored.resumeToken
+    this.activeMatchId = restored.matchId ?? null
+    this.session?.enterLobby()
+    this.patch({ roomId: restored.roomId, myPlayerId: restored.seat, members: [], roomStatus: 'rejoining', error: null })
+    this.resumeConnections.start()
+    void this.client.connect(restored.endpoint).catch(error => {
+      if (this.resumeToken !== restored.resumeToken || this.snapshot.roomStatus !== 'rejoining') return
+      this.reportError(error instanceof Error ? error.message : '无法恢复房间', { connected: false })
+    })
   }
 
   private reportError (message: string, next: Partial<LobbySnapshot> = {}): void {

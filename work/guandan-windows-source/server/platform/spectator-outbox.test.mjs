@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { nodeSyncDurableFileOperations } from '../durable-file.js'
 import { gameResultSignature, spectatorEventSignature } from './crypto.js'
 import { loadGameSecurityConfig } from './config.js'
 import { SpectatorEventReporter } from './spectator-event-reporter.js'
@@ -92,7 +93,29 @@ try {
   const conflictStore = new JsonSpectatorOutboxStore({ filePath: join(root, 'conflict.json') })
   assert.equal(conflictStore.add(firstEvent), true)
   assert.equal(conflictStore.add(firstEvent), false, '相同事件正文必须幂等')
+  assert.equal(conflictStore.add(Object.fromEntries(Object.entries(firstEvent).reverse())), false, '字段顺序变化不能改变 outbox 事件身份')
   assert.throws(() => conflictStore.add({ ...firstEvent, type: 'pass' }), /不同正文/)
+
+  const failurePath = join(root, 'failure', 'spectator-outbox.json')
+  const stableStore = new JsonSpectatorOutboxStore({ filePath: failurePath })
+  stableStore.add(firstEvent)
+  const injectedFailure = new Error('injected spectator outbox rename failure')
+  const failingStore = new JsonSpectatorOutboxStore({
+    filePath: failurePath,
+    durableFileOperations: {
+      ...nodeSyncDurableFileOperations,
+      replace () { throw injectedFailure },
+    },
+  })
+  assert.throws(
+    () => failingStore.add({ ...closeEvent, eventId: `${closeEvent.eventId}:failure`, sequence: 3 }),
+    error => error === injectedFailure,
+    'rename 失败必须向调用方暴露',
+  )
+  assert.deepEqual(failingStore.pending(), [firstEvent], '持久化失败不能提前提交内存 outbox')
+  assert.deepEqual(new JsonSpectatorOutboxStore({ filePath: failurePath }).pending(), [firstEvent], '故障后 reopen 必须保留上一份 outbox')
+  assert.deepEqual(readdirSync(dirname(failurePath)), ['spectator-outbox.json'], '故障后不能遗留临时文件')
+  assert.equal(statSync(dirname(failurePath)).mode & 0o777, 0o700, 'outbox 目录必须只允许服务账号访问')
 
   const corruptPath = join(root, 'corrupt.json')
   writeFileSync(corruptPath, '{not-json')

@@ -1,4 +1,4 @@
-import type { SpectatorMatchStatus } from '../services/DevelopmentApis'
+import type { SpectatorMatchStatus } from '../services/FrontPageGatewayContracts'
 
 export const SPECTATOR_POLL_INTERVAL_SECONDS = 3
 export const SPECTATOR_MAX_RETRY_DELAY_SECONDS = 12

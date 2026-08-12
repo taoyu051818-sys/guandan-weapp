@@ -26,6 +26,8 @@ export type EffectLabPageDependencies = {
 export class EffectLabPageDomain {
   private page = 0
   private quality: EffectQuality = 'full'
+  private generation = 0
+  private preserveNextShellHide = false
 
   public constructor (private readonly dependencies: EffectLabPageDependencies) {}
 
@@ -35,9 +37,11 @@ export class EffectLabPageDomain {
       this.dependencies.showNotice('实验室不可用', '缺少固定测试牌局。')
       return
     }
-    this.dependencies.previewFixture('match-opening', 'full')
+    const generation = ++this.generation
+    this.preserveNextShellHide = true
+    try { this.dependencies.previewFixture('match-opening', 'full') } finally { this.preserveNextShellHide = false }
     this.dependencies.scheduleOnce(() => {
-      if (!this.dependencies.isDisposed()) this.show(0)
+      if (this.isCurrent(generation)) this.show(0)
     }, 0)
   }
 
@@ -75,7 +79,7 @@ export class EffectLabPageDomain {
       const labels: Record<EffectQuality, string> = { full: '完整', reduced: '精简', off: '关闭' }
       this.sizedButton(
         ui,
-        `${labels[quality]}${this.quality === quality ? ' ✓' : ''}`,
+        `${labels[quality]}${this.quality === quality ? ' 已选' : ''}`,
         drawerX + (index - 1) * (qualityWidth + 8),
         top - (compact ? 55 : 65),
         qualityWidth,
@@ -88,8 +92,11 @@ export class EffectLabPageDomain {
     const fixtureStep = compact ? 50 : 56
     fixtures.slice(this.page * pageSize, (this.page + 1) * pageSize).forEach((fixture, index) => {
       this.sizedButton(ui, `${fixture.label} · ${fixture.kind}\n${fixture.description}`, drawerX, fixtureStartY - index * fixtureStep, drawerWidth - 24, compact ? 46 : 50, 18, () => {
+        const generation = ++this.generation
         this.dependencies.previewFixture(fixture.id, this.quality)
-        if (fixture.id === 'match-opening') this.dependencies.scheduleOnce(() => this.show(this.page), 0)
+        if (fixture.id === 'match-opening') this.dependencies.scheduleOnce(() => {
+          if (this.isCurrent(generation)) this.show(this.page)
+        }, 0)
       })
     })
     const navigationY = this.dependencies.screen.safeBottomY(compact ? 72 : 78)
@@ -105,6 +112,20 @@ export class EffectLabPageDomain {
 
   public reflow (): void {
     if (this.dependencies.router.current === 'effect-lab') this.show(this.page)
+  }
+
+  public cancelPending (): void { this.generation += 1 }
+
+  public handleShellHidden (): void {
+    if (this.preserveNextShellHide) {
+      this.preserveNextShellHide = false
+      return
+    }
+    this.cancelPending()
+  }
+
+  private isCurrent (generation: number): boolean {
+    return generation === this.generation && !this.dependencies.isDisposed()
   }
 
   private sizedButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, action: () => void): Node {

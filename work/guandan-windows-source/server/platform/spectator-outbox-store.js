@@ -1,5 +1,11 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import {
+  durableReplaceFileSync,
+  hardenPrivateFileSync,
+  nodeSyncDurableFileOperations,
+} from '../durable-file.js'
+import { canonicalJsonFingerprint } from './canonical-json.js'
 
 const schemaVersion = 1
 const emptySnapshot = () => ({ schemaVersion, events: [] })
@@ -34,8 +40,10 @@ const validateSnapshot = parsed => {
  * this is intentionally not a multi-instance queue or a dead-letter store.
  */
 export class JsonSpectatorOutboxStore {
-  constructor ({ filePath = '' } = {}) {
+  constructor ({ filePath = '', durableFileOperations = nodeSyncDurableFileOperations } = {}) {
     this.filePath = filePath ? resolve(filePath) : ''
+    this.durableFileOperations = durableFileOperations
+    if (this.configured) hardenPrivateFileSync(this.filePath, this.durableFileOperations)
     this.events = this.configured ? this.load().events : []
   }
 
@@ -58,7 +66,7 @@ export class JsonSpectatorOutboxStore {
     const safeEvent = clone(event)
     const sameId = this.events.find(item => item.eventId === safeEvent.eventId)
     if (sameId) {
-      if (JSON.stringify(sameId) !== JSON.stringify(safeEvent)) throw new Error('同一个观战 outbox eventId 对应不同正文')
+      if (canonicalJsonFingerprint(sameId) !== canonicalJsonFingerprint(safeEvent)) throw new Error('同一个观战 outbox eventId 对应不同正文')
       return false
     }
     if (this.events.some(item => item.matchId === safeEvent.matchId && item.sequence === safeEvent.sequence)) {
@@ -82,9 +90,6 @@ export class JsonSpectatorOutboxStore {
   save (events = this.events) {
     if (!this.configured) return
     const snapshot = { schemaVersion, savedAt: Date.now(), events }
-    mkdirSync(dirname(this.filePath), { recursive: true, mode: 0o700 })
-    const temporaryPath = `${this.filePath}.${process.pid}.tmp`
-    writeFileSync(temporaryPath, `${JSON.stringify(snapshot)}\n`, { mode: 0o600 })
-    renameSync(temporaryPath, this.filePath)
+    durableReplaceFileSync(this.filePath, `${JSON.stringify(snapshot)}\n`, this.durableFileOperations)
   }
 }

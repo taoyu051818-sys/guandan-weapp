@@ -3,12 +3,12 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const projectRoot = path.resolve(__dirname, '..')
-const compilerPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript/lib/typescript.js'
+const { compilerPath, loadTypeScript } = require('./support/typescript.cjs')
 const designPath = path.join(projectRoot, 'assets/scripts/effects/EffectDesignSystem.ts')
 const primitivesPath = path.join(projectRoot, 'assets/scripts/effects/EffectPrimitives.ts')
 
 assert.equal(fs.existsSync(compilerPath), true, 'Cocos Creator TypeScript compiler is required')
-const ts = require(compilerPath)
+const ts = loadTypeScript()
 const read = filePath => fs.readFileSync(filePath, 'utf8')
 
 const loadPureTs = (filePath, dependencies = {}) => {
@@ -101,7 +101,7 @@ assert.deepEqual(firstColor, new MockColor(255, 91, 36, 255), 'rgba must clamp a
 
 assert.deepEqual(Object.values(design.EFFECT_LAYERS), [0, 10, 20, 30, 40, 50, 60])
 assert.deepEqual(Object.keys(design.EFFECT_TYPE_SCALE), ['micro', 'caption', 'badge', 'title', 'hero'])
-assert.deepEqual(Object.values(design.EFFECT_TYPE_SCALE).map(token => token.fontSize), [18, 24, 34, 46, 54])
+assert.deepEqual(Object.values(design.EFFECT_TYPE_SCALE).map(token => token.fontSize), [20, 24, 34, 46, 54])
 for (const level of [0, 1, 2, 3]) {
   const value = design.EFFECT_TIMELINES[level]
   assert.equal(value.impactAtMs <= value.settleAtMs, true)

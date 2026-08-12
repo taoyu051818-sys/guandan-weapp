@@ -4,8 +4,8 @@ const Module = require('node:module')
 const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
-const typescriptPath = '/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/node_modules/typescript'
-const ts = require(typescriptPath)
+const { loadTypeScript, typescriptPath } = require('./support/typescript.cjs')
+const ts = loadTypeScript()
 const compile = (sourcePath) => {
   const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -14,7 +14,20 @@ const compile = (sourcePath) => {
   const runtime = new Module(sourcePath, module)
   runtime.filename = sourcePath
   runtime.paths = Module._nodeModulePaths(path.dirname(sourcePath))
-  runtime._compile(output, sourcePath)
+  const previousTypeScriptLoader = Module._extensions['.ts']
+  Module._extensions['.ts'] = (targetModule, filename) => {
+    const dependency = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+      fileName: filename,
+    }).outputText
+    targetModule._compile(dependency, filename)
+  }
+  try {
+    runtime._compile(output, sourcePath)
+  } finally {
+    if (previousTypeScriptLoader) Module._extensions['.ts'] = previousTypeScriptLoader
+    else delete Module._extensions['.ts']
+  }
   return runtime.exports
 }
 
@@ -41,11 +54,13 @@ void (async () => {
   const first = await development.getFeed('demo-live-match', 30)
   const second = await development.getFeed('demo-live-match', 30)
   const third = await development.getFeed('demo-live-match', 30)
+  assert.equal(first.status, 'playing', 'development coverage must use the canonical active status')
   assert.deepEqual(first.events.map(event => event.sequence), [1, 2, 3], 'development feed must begin with a reviewable delayed prefix')
   assert.deepEqual(second.events.map(event => event.sequence), [1, 2, 3, 4])
   assert.deepEqual(third.events.map(event => event.sequence), [1, 2, 3, 4, 5], 'development polling must visibly demonstrate incremental follow mode')
   assert.equal(third.totalEventCount, 5)
   const finished = await development.getFeed('demo-match', 30)
+  assert.equal(finished.status, 'completed', 'development coverage must use the canonical completed status')
   assert.equal(finished.events.length, 6)
   assert.equal(finished.timelineComplete, true)
   process.stdout.write('spectator polling policy and development feed regression checks passed\n')

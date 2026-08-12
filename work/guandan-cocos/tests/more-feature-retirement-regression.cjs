@@ -8,11 +8,14 @@ const frontPage = read('assets/scripts/scenes/FrontPageController.ts')
 const playerCenterDomain = read('assets/scripts/scenes/front-pages/PlayerCenterPageDomain.ts')
 const replaySpectatorDomain = read('assets/scripts/scenes/front-pages/ReplaySpectatorPageDomain.ts')
 const settingsRulesDomain = read('assets/scripts/scenes/front-pages/SettingsRulesPageDomain.ts')
-const merchantDomain = read('assets/scripts/scenes/front-pages/MerchantPageDomain.ts')
+const ruleHelpProjection = read('assets/scripts/ui/RuleHelpProjection.ts')
+const merchantDomain = read('migration/merchant/MerchantPageDomain.ts')
 const lobbyDomain = read('assets/scripts/scenes/front-pages/LobbyPageDomain.ts')
+const lobbyPlayerProfile = read('assets/scripts/scenes/front-pages/LobbyPlayerProfilePresenter.ts')
 const gameScene = read('assets/scripts/scenes/GameScene.ts')
 const pageRouter = read('assets/scripts/scenes/PageRouter.ts')
 const gameSession = read('assets/scripts/session/GameSession.ts')
+const gameSessionModel = read('assets/scripts/session/GameSessionModel.ts')
 
 const section = (start, end) => frontPage.slice(frontPage.indexOf(start), frontPage.indexOf(end))
 const moreMenu = section('private showMoreMenu', 'public openEffectLabTable')
@@ -25,7 +28,7 @@ for (const retiredEntry of ['个人中心', '赛季任务', '我的牌谱', '双
   assert.equal(moreMenu.includes(retiredEntry), false, `${retiredEntry} must not return to the ordinary More menu`)
 }
 
-const profile = lobbyDomain.slice(lobbyDomain.indexOf('private renderLobbyPlayerProfile'), lobbyDomain.indexOf('private refreshLobbyDashboard'))
+const profile = lobbyPlayerProfile.slice(lobbyPlayerProfile.indexOf('public render'), lobbyPlayerProfile.indexOf('private resolveLocalAccountId'))
 assert.match(profile, /LobbyPlayerProfileHitArea[\s\S]*dependencies\.showPlayerCenter/, 'the lobby profile lane must be the player-center entry')
 const playerCenter = playerCenterDomain.slice(playerCenterDomain.indexOf('public async show'), playerCenterDomain.indexOf('private async showSeasonTasks'))
 assert.match(playerCenter, /settle\(this\.dependencies\.gateways\.playerCenter\.getDashboard\(\)\)/)
@@ -68,13 +71,14 @@ assert.match(rulesDialog, /RulesPrevious[\s\S]*上一页[\s\S]*RulesNext[\s\S]*�
 assert.match(settingsRulesDomain, /dependencies\.router\.closeModal\(\)/)
 assert.match(frontPage, /const reopenRules = this\.settingsRulesPage\.rulesVisible[\s\S]*if \(reopenRules\) this\.settingsRulesPage\.showRules\(\)/, 'viewport changes must preserve the open rules modal')
 assert.match(lobbyDomain, /router\.current === 'menu' && !this\.dependencies\.rulesVisible\(\)\) this\.renderMenu\(\)/, 'late profile refreshes must not dismiss the rules modal')
-for (const copy of ['基础与目标', '牌型与识别', '大小与压牌', '出牌与配合', '升级与胜负']) assert.match(settingsRulesDomain, new RegExp(copy))
+assert.match(rulesDialog, /projectRuleHelp\(this\.dependencies\.session\.ruleProfile\)/, 'rule help must project the active explicit profile')
+for (const copy of ['基础与目标', '牌型与识别', '大小与压牌', '出牌与配合', '升级与胜负']) assert.match(ruleHelpProjection, new RegExp(copy))
 assert.match(pageRouter, /openModal[\s\S]*closeModal[\s\S]*destroyModalRoot/)
 assert.doesNotMatch(pageRouter, /'tutorial'/)
 
 const settings = settingsRulesDomain.slice(settingsRulesDomain.indexOf('public showSettings'), settingsRulesDomain.indexOf('private closeRules'))
 assert.doesNotMatch(settings, /视觉主题|visualTheme|切换视觉主题/, 'the unused visual-theme preference must not be exposed in Settings')
-assert.match(gameSession, /visualTheme/, 'the persisted visual-theme field must remain readable for save compatibility')
+assert.match(gameSessionModel, /visualTheme/, 'the persisted visual-theme field must remain readable for save compatibility')
 
 for (const retiredRoute of ["'grouping'", "'stats'"]) assert.equal(pageRouter.includes(retiredRoute), false, `${retiredRoute} route must be retired`)
 for (const retiredWire of ['GroupingController', 'groupingResult', 'beginGrouping', 'showGrouping', 'drawGrouping', 'enterRound', 'showStats']) {

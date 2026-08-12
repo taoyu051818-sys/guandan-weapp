@@ -42,14 +42,15 @@ These generated clips remain as small fail-safe candidates. Missing optional cli
 - Authorization: use in this project was confirmed by the user on 2026-08-04.
 - Normalized catalog: `third_party/licenses/gameabc2-audio/catalog.json`.
 - Download manifest and SHA-256 checksums: `third_party/licenses/gameabc2-audio/manifest.json`.
-- Runtime selection: `assets/game-assets/audio/voices/licensed/`.
+- Runtime selection: `assets/game-assets/audio/voices/licensed/` (25 reachable clips).
+- Source-only archive: `art-source/audio/licensed-archive/` (2 clips, never imported by Cocos).
 - Reproducible import: `node scripts/import-licensed-audio.mjs`.
 
-All 27 MP3 entries were downloaded and retained under semantic, collision-free names. Deal, pass, bomb, straight flush and defeat replace the generated placeholders at runtime while keeping those placeholders as fallbacks. Unambiguous straight, single-card and pair announcements are selected from the actual `PlayAction`; missing ranks keep the generic card sound. The unusually long source entry labelled “等等，轿夫抬杠子对A” is archived locally but deliberately not auto-played until its intended product use is confirmed.
+All 27 MP3 entries are retained under semantic, collision-free names. The 25 reachable clips include deal, pass, bomb and defeat runtime fallbacks plus unambiguous straight, single-card and pair announcements selected from the actual `PlayAction`. The source straight-flush clip is superseded by the sole canonical NiuMa announcement, while the unusually long “等等，轿夫抬杠子对A” entry remains unconfirmed; both live only in the source archive outside Cocos `assets/`.
 
 The source list's PNG “炸弹特效图汇总” was rejected during visual curation. It is recorded under `excluded` for auditability and was neither downloaded nor added to the runtime. No other image from this collection was imported.
 
-## NiuMa client-cocos card components and curated audio
+## NiuMa client-cocos card background and curated audio
 
 - Source: https://github.com/niuma-wj/client-cocos
 - License: MIT
@@ -59,9 +60,9 @@ The source list's PNG “炸弹特效图汇总” was rejected during visual cur
 - Reproducible audio import: `NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-audio.mjs`.
 - Reproducible optional Male pack import: `NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-male-audio.mjs`.
 - Reproducible BGM import: `NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-bgm.mjs`.
-- Used for: the optional `classic` card skin; complete Female and Male single/pair announcements and selected semantically explicit pattern announcements (steel plate/“钢板” excluded); pack-specific pass variants; countdown 0–5; game-start, victory and defeat cues; one exact-copy quick-chat sentence in each voice pack; one optional looping background track.
+- Used for: the `classic` card surface background; complete Female and Male single/pair announcements and selected semantically explicit pattern announcements (steel plate/“钢板” excluded); pack-specific pass variants; countdown 0–5; game-start, victory and defeat cues; one exact-copy quick-chat sentence in each voice pack; one optional looping background track.
 
-Only the 49 PNG components required for face-up cards were selected. Upstream `.meta` files and its prefab, hand-selection, networking and game-state code were not copied. Cocos Creator 3.8.8 owns the imported metadata in this project. The full upstream license is retained both under `third_party/licenses/` and beside the runtime asset selection.
+Only `bg_front.png` remains from the former NiuMa face-up card selection. Upstream prefabs, hand-selection, networking and game-state code were not copied. Cocos Creator 3.8.8 owns the imported metadata in this project. The full upstream license is retained both under `third_party/licenses/` and beside the runtime asset selection because the background and audio remain in use.
 
 The 48 selected MP3 files and 1 selected OGG quick-chat file are recorded with their source paths, byte counts and SHA-256 hashes in `third_party/licenses/niuma-client-cocos-audio.json`. Cocos `.meta` files are retained for every runtime clip. The semantic controller rotates `pass1/2/3`, selects the exact countdown second, layers the start cue before the existing deal event, and keeps current generated/authorized fallbacks.
 
@@ -85,6 +86,15 @@ The following source files are explicitly excluded and remain absent from runtim
 - Female and Male `phrase01.ogg` plus `phrase03.ogg` through `phrase09.ogg`: excluded individually; none is remapped to approximate or unrelated neutral copy.
 
 The repository-wide MIT notice is preserved, but the audio pack has no separate per-file provenance statement. Keep the pinned revision, manifest and hashes with any redistribution, and complete listening/rights review before production release.
+
+## Project-authorized classic card face assets
+
+- Authorization: supplied and approved by the user for this project on 2026-08-11.
+- Lossless source set: `art-source/cards/reference/` (36 WebP files with alpha).
+- Runtime selection: `assets/game-assets/cards/classic/` (36 derived RGBA PNG files plus the retained NiuMa `bg_front.png`).
+- Used for: red and black rank artwork, solid corner/HUD suit icons, outlined lower-card suit artwork, and the two joker faces.
+
+The source WebP files are preserved outside `assets/` to keep the runtime bundle platform-safe. The current WeChat Android target cannot be assumed to decode WebP, so the runtime uses alpha-preserving PNG. Rank artwork stays at its source size; suit and joker artwork is downsampled to roughly twice its largest logical display size. Existing Cocos `.meta` files are retained to keep texture UUIDs stable. J, Q and K now use the same approved outlined suit artwork as number cards; the twelve former `role_*` portraits have been removed.
 
 ## User-supplied lobby and battle presentation assets
 

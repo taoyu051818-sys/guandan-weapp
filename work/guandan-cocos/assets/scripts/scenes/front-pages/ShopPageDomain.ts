@@ -1,5 +1,5 @@
 import { Node, Vec3 } from 'cc'
-import type { FrontPageGateways, ShopProduct } from '../../services/DevelopmentApis'
+import type { FrontPageGateways, ShopProduct } from '../../services/FrontPageGatewayContracts'
 import { SAMPLE_PRODUCTS } from '../../services/DevelopmentApis'
 import type { ScreenAdapter } from '../../ui/ScreenAdapter'
 import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
@@ -31,6 +31,8 @@ export class ShopPageDomain {
   private pendingProductId: string | null = null
   private products: ShopProduct[]
   private dataState: RemoteDataState
+  private statusText = ''
+  private selectedProduct: ShopProduct | null = null
 
   public constructor (private readonly dependencies: ShopPageDependencies) {
     this.products = dependencies.gateways.configured ? [] : SAMPLE_PRODUCTS
@@ -50,6 +52,8 @@ export class ShopPageDomain {
   }
 
   private render (statusText: string): void {
+    this.statusText = statusText
+    this.selectedProduct = null
     const ui = this.dependencies.router.open('shop')
     ui.menuLabel('积分生活商城', 0, 225, 44)
     ui.menuLabel(statusText, 0, 175, 18)
@@ -90,6 +94,11 @@ export class ShopPageDomain {
   private showProduct (product: ShopProduct): void {
     if (this.dependencies.isDisposed()) return
     this.dependencies.issuePageRequest()
+    this.selectedProduct = product
+    this.renderProduct(product)
+  }
+
+  private renderProduct (product: ShopProduct): void {
     const ui = this.dependencies.router.open('product')
     ui.menuLabel(product.name, 0, 175, 42)
     ui.menuLabel(`${product.category}\n${product.description}\n${product.pointsPrice} 积分 · 库存 ${product.stock}`, 0, 65, 23)
@@ -102,23 +111,55 @@ export class ShopPageDomain {
     this.pageButton(ui, '返回商城', -120, () => this.show())
   }
 
+  public reflow (): void {
+    if (this.dependencies.isDisposed()) return
+    if (this.dependencies.router.current === 'shop') this.render(this.statusText)
+    else if (this.dependencies.router.current === 'product' && this.selectedProduct) this.renderProduct(this.selectedProduct)
+  }
+
   private async purchase (product: ShopProduct): Promise<void> {
     if (this.dependencies.isDisposed() || this.pendingProductId) return
     const pageToken = this.dependencies.currentPageRequest()
     this.pendingProductId = product.id
+    let orderId = ''
     try {
-      await this.dependencies.gateways.shop.createOrder(product.id, 1, product.pointsPrice)
-      if (!this.isCurrent(pageToken, 'product')) return
-      const [wallet, products] = await Promise.all([
-        this.dependencies.gateways.wallet.getWallet(),
-        this.dependencies.gateways.shop.listProducts(),
-      ])
-      if (!this.isCurrent(pageToken, 'product')) return
-      this.dependencies.wallet.update(wallet)
-      this.products = products
-      this.show()
+      const order = await this.dependencies.gateways.shop.createOrder(product.id, 1, product.pointsPrice)
+      orderId = order.orderId
     } catch (error) {
       if (this.isCurrent(pageToken, 'product')) this.dependencies.showNotice('商城兑换失败', this.errorDetail(error, '请稍后重试'))
+      if (this.pendingProductId === product.id) this.pendingProductId = null
+      return
+    }
+
+    try {
+      if (!this.isCurrent(pageToken, 'product')) return
+      const [walletResult, productResult] = await Promise.all([
+        settle(this.dependencies.gateways.wallet.getWallet()),
+        settle(this.dependencies.gateways.shop.listProducts()),
+      ])
+      if (!this.isCurrent(pageToken, 'product')) return
+
+      if (walletResult.status === 'fulfilled') this.dependencies.wallet.update(walletResult.value)
+      else this.dependencies.wallet.invalidate()
+      if (productResult.status === 'fulfilled') {
+        this.products = productResult.value
+        this.dataState = this.products.length ? 'fresh' : 'empty'
+      } else this.dataState = this.products.length ? 'stale' : 'unavailable'
+
+      const refreshFailures = [
+        walletResult.status === 'rejected' ? '积分' : '',
+        productResult.status === 'rejected' ? '商品库存' : '',
+      ].filter(Boolean)
+      const status = refreshFailures.length
+        ? `兑换已提交 · ${refreshFailures.join('、')}待刷新`
+        : `兑换成功 · 当前 ${this.dependencies.wallet.value.points} 积分`
+      this.render(status)
+      this.dependencies.showNotice(
+        '兑换成功',
+        refreshFailures.length
+          ? `订单 ${orderId} 已成功提交；${refreshFailures.join('、')}刷新失败，重新进入商城后会自动同步。`
+          : `订单 ${orderId} 已提交，商品与积分已同步。`,
+      )
     } finally {
       if (this.pendingProductId === product.id) this.pendingProductId = null
     }

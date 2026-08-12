@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { extractRuntimeConfig, verifyReleaseRuntimeConfig } from './runtime-client-config.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const buildRoot = path.join(projectRoot, 'build/wechatgame')
@@ -10,6 +11,15 @@ const settingsPath = path.join(buildRoot, 'src/settings.json')
 const startupMetaPath = path.join(projectRoot, 'assets/startup/resource-loading-lingshui-v1.jpg.meta')
 const mainPackageLimit = 4 * 1024 * 1024
 const totalPackageLimit = 30 * 1024 * 1024
+const forbiddenBundleMarkers = [
+  '53e52062-b47e-43f8-b184-fb566cd720bd',
+  '0cedd476-e4cd-4e92-a6d1-b85a9143167c',
+  '0bdc3382-5148-4ac5-9e27-7cdbf08c1968',
+  '1c24bc85-bf61-42fa-a125-c66267f3ee79',
+  'pair_a_phrase',
+  'licensed/straight_flush',
+  'MerchantPageDomain',
+]
 
 const readJson = filePath => JSON.parse(fs.readFileSync(filePath, 'utf8'))
 const toPosix = value => value.split(path.sep).join('/')
@@ -59,6 +69,7 @@ assert.equal(fs.existsSync(path.join(buildRoot, 'assets/game-assets')), false, '
 
 const firstScreen = fs.readFileSync(path.join(buildRoot, 'first-screen.js'), 'utf8')
 const gameBootstrap = fs.readFileSync(path.join(buildRoot, 'game.js'), 'utf8')
+verifyReleaseRuntimeConfig(extractRuntimeConfig(gameBootstrap))
 assert.match(firstScreen, /let useCustomBg = true;/, 'the native first screen must use the custom loading artwork')
 assert.match(firstScreen, /let bgName = 'background\.jpg';/, 'the native first screen must load background.jpg')
 assert.match(firstScreen, /let fitWidth = false;[\s\S]*let fitHeight = false;/, 'the native first screen must use cover sizing')
@@ -75,6 +86,19 @@ const mainAssetFiles = walkFiles(path.join(buildRoot, 'assets/main'))
 const subpackageFiles = walkFiles(gameAssetsRoot)
 assert.ok(mainAssetFiles.some(filePath => path.basename(filePath).startsWith(startupUuid)), 'the in-game loading artwork must stay in the main bundle')
 assert.equal(subpackageFiles.some(filePath => path.basename(filePath).startsWith(startupUuid)), false, 'the loading artwork cannot depend on the subpackage it is waiting for')
+
+const gameAssetsConfig = readJson(path.join(gameAssetsRoot, 'config.json'))
+const publishedAssetPaths = Object.values(gameAssetsConfig.paths ?? {}).map(entry => entry[0])
+const classicTexturePaths = publishedAssetPaths.filter(assetPath => /^cards\/classic\/.+\/texture$/.test(assetPath))
+assert.equal(classicTexturePaths.length, 37, 'the WeChat game-assets package must publish all 37 classic card textures')
+assert.equal(classicTexturePaths.some(assetPath => assetPath.includes('/role_')), false, 'obsolete face-card portraits leaked into the WeChat package')
+assert.equal(subpackageFiles.some(filePath => path.extname(filePath).toLowerCase() === '.webp'), false, 'WeChat Android must not depend on WebP card textures')
+
+for (const filePath of walkFiles(buildRoot)) {
+  const contents = fs.readFileSync(filePath)
+  const marker = forbiddenBundleMarkers.find(candidate => contents.includes(Buffer.from(candidate)))
+  assert.equal(marker, undefined, `archived or migration-only marker leaked into WeChat build: ${marker} (${filePath})`)
+}
 
 const subpackageRoots = subpackages.map(item => item.root.replace(/^\.\//, '').replace(/\/$/, ''))
 const isSubpackagePath = relative => subpackageRoots.some(root => relative === root || relative.startsWith(`${root}/`))
