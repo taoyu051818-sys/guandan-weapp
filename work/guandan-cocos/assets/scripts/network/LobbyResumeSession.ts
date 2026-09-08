@@ -1,4 +1,5 @@
 import type { PlayerId } from '../core/generated'
+import { parseNetworkEndpoint } from '../services/NetworkEndpoint'
 
 export const LOBBY_RESUME_STORAGE_KEY = 'guandan-cocos-lobby-resume-v1'
 
@@ -19,7 +20,7 @@ const isPlayerId = (value: unknown): value is PlayerId =>
 const isEndpoint = (value: unknown): value is string => {
   if (typeof value !== 'string' || value.length > 2048) return false
   try {
-    const protocol = new URL(value).protocol
+    const protocol = parseNetworkEndpoint(value).protocol
     return protocol === 'ws:' || protocol === 'wss:'
   } catch {
     return false

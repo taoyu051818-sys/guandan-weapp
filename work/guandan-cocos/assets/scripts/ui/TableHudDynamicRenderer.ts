@@ -1,4 +1,5 @@
 import { Color, type Graphics, type Label, type Node, type Sprite, Vec3 } from 'cc'
+import { renderSuitAvailability } from './TableHudSuitAvailability'
 import {
   BASE_COUNTER_CLOSED_HEIGHT,
   BASE_COUNTER_OPEN_HEIGHT,
@@ -16,6 +17,7 @@ import {
   type TableGameHudSuit,
 } from './TableGameHudFoundation'
 
+
 export type TableHudCounterRenderInput = Readonly<{
   panel: Node | null
   graphics: Graphics | null
@@ -32,6 +34,8 @@ export type TableHudCounterRenderInput = Readonly<{
 export const renderTableHudCounter = (input: TableHudCounterRenderInput): void => {
   const { panel, graphics, title, toggleLabel, hitArea, dragHandle, state } = input
   if (!panel || !graphics || !title || !toggleLabel || !hitArea) return
+  panel.active = state.counterEnabled !== false
+  if (!panel.active) return
   const expanded = state.counterExpanded
   const height = expanded ? BASE_COUNTER_OPEN_HEIGHT : BASE_COUNTER_CLOSED_HEIGHT
   configureTransform(panel, BASE_COUNTER_WIDTH, height)
@@ -45,7 +49,11 @@ export const renderTableHudCounter = (input: TableHudCounterRenderInput): void =
     configureTransform(dragHandle, 68, height)
   }
 
-  input.suitSprites.forEach(sprite => { sprite.node.active = expanded && Boolean(sprite.spriteFrame) })
+  input.suitSprites.forEach((sprite, suit) => {
+    const possible = state.counterPossibleSuits?.includes(suit) ?? false
+    sprite.node.active = expanded && Boolean(sprite.spriteFrame)
+    renderSuitAvailability(sprite, suit, possible)
+  })
   if (expanded) {
     const tableLeft = -233.75
     const tableRight = 238.25
@@ -89,6 +97,7 @@ export type TableHudSuitRenderInput = Readonly<{
 
 /** Draws one shared suit lane; individual suit nodes remain frameless hit targets. */
 export const renderTableHudSuits = (input: TableHudSuitRenderInput): void => {
+  if (input.bar) input.bar.active = true
   const { graphics } = input
   if (!graphics) return
   const barSize = nodeContentSize(input.bar, 382, 54)
@@ -125,7 +134,7 @@ export const renderTableHudSuits = (input: TableHudSuitRenderInput): void => {
         graphics.fill()
       }
     }
-    view.sprite.color = available ? new Color(255, 255, 255, 255) : new Color(105, 105, 105, 120)
+    renderSuitAvailability(view.sprite, suit, available)
     const scale = selected ? (pressed ? 1.04 : 1.12) : pressed ? 0.94 : available ? 1 : 0.9
     view.sprite.node.setScale(new Vec3(scale, scale, 1))
   })

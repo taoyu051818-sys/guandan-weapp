@@ -254,13 +254,22 @@ try {
   assert.equal(profile.payload.data.user.comprehensiveScore, users[0].user.comprehensiveScore)
   const renamed = await call(baseUrl, '/api/v1/profile', { method: 'PATCH', token: users[0].token, body: { displayName: '陵水一号' } })
   assert.equal(renamed.payload.data.user.displayName, '陵水一号')
+  const avatarSaved = await call(baseUrl, '/api/v1/profile', { method: 'POST', token: users[0].token,
+    body: { displayName: '陵水一号', avatarUrl: 'asset:ui/common/default-avatar/texture' } })
+  assert.equal(avatarSaved.status, 200, 'WeChat-compatible POST must save profiles')
+  assert.equal((await call(baseUrl, '/api/v1/profile/avatar')).status, 401, 'avatar reads require the account token')
+  assert.equal((await call(baseUrl, '/api/v1/profile/avatar', { token: users[0].token })).payload.data.dataUri, null)
+  assert.equal((await call(baseUrl, '/api/v1/profile', { method: 'POST', token: users[0].token,
+    body: { avatarUrl: 'https://127.0.0.1/secret' } })).status, 400)
+  const afterRenameLogin = await call(baseUrl, '/api/v1/auth/wx-login', { method: 'POST', body: { code: 'valid-1', displayName: '陵水玩家' } })
+  assert.equal(afterRenameLogin.payload.data.user.displayName, '陵水一号', 'login must not erase user-edited nickname')
   const initialDashboard = await call(baseUrl, '/api/v1/me/dashboard', { token: users[0].token })
   assert.equal(initialDashboard.payload.data.user.accountId, users[0].user.accountId)
   assert.equal(initialDashboard.payload.data.user.comprehensiveScore, initialDashboard.payload.data.rating.comprehensiveScore)
   assert.deepEqual({ games: initialDashboard.payload.data.rating.games, wins: initialDashboard.payload.data.rating.wins, eloOffset: initialDashboard.payload.data.rating.eloOffset }, { games: 0, wins: 0, eloOffset: 0 })
   assert.equal('elo' in initialDashboard.payload.data.stats, false, '旧 stats.elo 不得继续冒充综合分')
   assert.equal(initialDashboard.payload.data.stats.gamesPlayed, 0)
-  assert.equal(initialDashboard.payload.data.season.name, '陵水夏季赛季')
+  assert.equal(initialDashboard.payload.data.season.name, '陵水联调赛季')
   const initialTasks = await call(baseUrl, '/api/v1/season/tasks', { token: users[0].token })
   assert.equal(initialTasks.payload.data.tasks.length, 3)
   assert.ok(initialTasks.payload.data.tasks.every(task => task.claimed === false))
@@ -399,7 +408,7 @@ try {
       const queuedEvent = JSON.parse(options.body)
       retryCalls.push(queuedEvent.sequence)
       if (queuedEvent.sequence === 1 && transientFailures-- > 0) throw new Error('temporary outage')
-      return { ok: true, async json () { return { ok: true, data: { event: { sequence: queuedEvent.sequence } } } } }
+      return { ok: true, async json () { return { ok: true, data: { event: { eventId: queuedEvent.eventId, matchId: queuedEvent.matchId, sequence: queuedEvent.sequence, accepted: true } } } } }
     },
   })
   const recoveredHead = retryingReporter.enqueue({ ...firstSpectatorEvent, matchId: 'retry-match', eventId: 'retry:1', sequence: 1 })
@@ -758,10 +767,10 @@ try {
   }
 
   const completedTasks = await call(baseUrl, '/api/v1/season/tasks', { token: users[0].token })
-  assert.equal(completedTasks.payload.data.tasks.find(task => task.id === 'daily-play-1').completed, true)
+  assert.equal(completedTasks.payload.data.tasks.find(task => task.id === 'integration-daily-play-1').completed, true)
   const taskClaimOptions = { method: 'POST', token: users[0].token, headers: { 'idempotency-key': 'claim-daily-1' } }
-  const taskClaim = await call(baseUrl, '/api/v1/season/tasks/daily-play-1/claim', taskClaimOptions)
-  const duplicateTaskClaim = await call(baseUrl, '/api/v1/season/tasks/daily-play-1/claim', taskClaimOptions)
+  const taskClaim = await call(baseUrl, '/api/v1/season/tasks/integration-daily-play-1/claim', taskClaimOptions)
+  const duplicateTaskClaim = await call(baseUrl, '/api/v1/season/tasks/integration-daily-play-1/claim', taskClaimOptions)
   assert.equal(taskClaim.payload.data.claim.duplicate, false)
   assert.equal(duplicateTaskClaim.payload.data.claim.duplicate, true)
   assert.equal((await call(baseUrl, '/api/v1/wallet', { token: users[0].token })).payload.data.wallet.balance, 8_780)
@@ -985,7 +994,10 @@ assert.notEqual(highWaiting.matchId, lowMatches[0].matchId, '四万分差不应�
 assert.equal((await ratingMatchService.getMatchStatus(ratingMatchUsers.high, highWaiting.matchId)).status, 'matching')
 ratingMatchClock += 120_000
 const relaxedMatch = await ratingMatchService.joinMatch(ratingMatchUsers.low5, { mode: 'classic_50' })
-assert.equal(relaxedMatch.matchId, highWaiting.matchId, '等待两分钟后应逐步放宽到四万分差')
+assert.notEqual(relaxedMatch.matchId, highWaiting.matchId, '超过七秒的旧桌应先由机器人补齐，后来玩家进入新桌')
+const highBotFilled = await ratingMatchService.getMatchStatus(ratingMatchUsers.high, highWaiting.matchId)
+assert.equal(highBotFilled.status, 'matched')
+assert.equal(highBotFilled.botCount, 3)
 const otherQueueMatch = await ratingMatchService.joinMatch(ratingMatchUsers['other-queue'], { mode: 'classic_300' })
 assert.notEqual(otherQueueMatch.matchId, highWaiting.matchId, '即使等待放宽也不得跨经典场次')
 

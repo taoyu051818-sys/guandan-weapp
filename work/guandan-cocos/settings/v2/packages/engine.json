@@ -39,7 +39,7 @@
             "_value": false
           },
           "mask": {
-            "_value": false
+            "_value": true
           },
           "graphics": {
             "_value": true
@@ -199,6 +199,7 @@
           "gfx-webgl",
           "graphics",
           "intersection-2d",
+          "mask",
           "tween",
           "ui",
           "ui-skew"

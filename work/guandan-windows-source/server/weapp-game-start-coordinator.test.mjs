@@ -31,7 +31,8 @@ const coordinator = createWeAppGameStartCoordinator({
   isShuttingDown: () => false,
   isFriendRoom: () => false,
   isMatchRoom: () => true,
-  seatHasLiveConnection: () => true,
+  seatHasLiveConnection: (target, playerId) => Boolean(target.seats[playerId]),
+  seatIsOccupied: (target, playerId) => Boolean(target.seats[playerId] || target.botPlayerIds?.includes(playerId)),
   enqueueServerOperation: operation => Promise.resolve().then(operation),
   commitRuntimeState: async () => {
     events.push('commit')
@@ -74,6 +75,22 @@ const room = {
   seats: { p1: 'host', p2: 'guest-2', p3: 'guest-3', p4: 'guest-4' },
 }
 rooms.set(room.roomId, room)
+
+const botRoom = {
+  roomId: '777777',
+  matchId: 'match-bots',
+  state: null,
+  ticketBound: true,
+  seats: { p1: 'host', p2: null, p3: null, p4: null },
+  botPlayerIds: ['p2', 'p3', 'p4'],
+  version: 0,
+  spectatorSequence: 0,
+  pendingSpectatorEvents: [],
+}
+assert.equal(coordinator.autoStartMatchedRoom(botRoom), true, '一名玩家加三个签名机器人应视为四席到齐')
+assert.equal(botRoom.pendingGameStartEvent?.type, 'game-start')
+const missingHumanRoom = { ...botRoom, roomId: '888888', pendingGameStartEvent: null, botPlayerIds: ['p3', 'p4'] }
+assert.equal(coordinator.autoStartMatchedRoom(missingHumanRoom), false, '未签名为机器人的空席不得自动开局')
 
 const event = coordinator.prepare(room)
 assert.equal(coordinator.prepare(room), event, 'preparing an existing claim must be idempotent')

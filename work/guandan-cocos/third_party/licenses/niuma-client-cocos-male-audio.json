@@ -388,5 +388,8 @@
       "sourcePhraseIndex": 9,
       "reason": "与当前中性快捷语白名单没有逐字一致的安全映射。"
     }
-  ]
+  ],
+  "runtimeAllowed": false,
+  "retiredAt": "2026-09-07",
+  "retirementReason": "Female-only voice policy. Historical hashes retained for provenance; no male clips in assets."
 }

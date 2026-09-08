@@ -76,15 +76,22 @@ export class CommerceService {
         if (!matchesJsonFingerprint(previous.fingerprint, request)) throw conflict('IDEMPOTENCY_CONFLICT', '同一个 Idempotency-Key 不能用于不同兑换请求')
         return state.orders[previous.orderId]
       }
-      const product = state.products[safeProductId]
-      if (!product) throw notFound('PRODUCT_NOT_FOUND', '商品不存在')
+      const product = Object.hasOwn(state.products, safeProductId) ? state.products[safeProductId] : null
+      if (!product || typeof product !== 'object' || Array.isArray(product) || product.id !== safeProductId) {
+        throw notFound('PRODUCT_NOT_FOUND', '商品不存在')
+      }
+      if (!Number.isSafeInteger(product.pointsPrice) || product.pointsPrice < 0 || !Number.isSafeInteger(product.stock) || product.stock < 0) {
+        throw conflict('INVALID_PRODUCT_STATE', '商品价格或库存异常，暂不能兑换')
+      }
       if (normalizedExpectedPrice !== null && product.pointsPrice !== normalizedExpectedPrice) {
         throw conflict('PRODUCT_PRICE_CHANGED', '商品兑换价已变更，请刷新后确认', { expected: normalizedExpectedPrice, current: product.pointsPrice })
       }
       if (product.stock < safeQuantity) throw conflict('OUT_OF_STOCK', '商品库存不足', { stock: product.stock })
-      const wallet = state.wallets[userId]
-      if (!wallet) throw notFound('WALLET_NOT_FOUND', '积分账户不存在')
+      const wallet = Object.hasOwn(state.wallets, userId) ? state.wallets[userId] : null
+      if (!wallet || wallet.userId !== userId) throw notFound('WALLET_NOT_FOUND', '积分账户不存在')
+      if (!Number.isSafeInteger(wallet.balance) || wallet.balance < 0) throw conflict('INVALID_WALLET_STATE', '积分余额异常，暂不能兑换')
       const totalPoints = product.pointsPrice * safeQuantity
+      if (!Number.isSafeInteger(totalPoints) || totalPoints < 0) throw conflict('INVALID_ORDER_TOTAL', '兑换总积分超出允许范围')
       const availability = walletAvailability(state, userId, wallet)
       if (availability.available < totalPoints) throw conflict('INSUFFICIENT_POINTS', '可用积分不足', { ...availability, required: totalPoints })
       const order = {

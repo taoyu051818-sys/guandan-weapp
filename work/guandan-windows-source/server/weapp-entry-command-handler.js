@@ -206,6 +206,7 @@ export const createEntryCommandHandler = dependencies => async context => {
     return reply('error', { message: error instanceof Error ? error.message : '入桌票据无效' })
   }
   const claims = ticketStatus.claims
+  if (claims?.seat === 'observer') return reply('error', { message: '牌桌尚未准备，请稍后重试' })
   if (ticketBlockedByClosedRoom(claims)) return reply('error', { code: 'ROOM_CLOSED', message: '该平台房间已经关闭' })
   const entryAttemptId = normalizeEntryAttemptId(payload.entryAttemptId)
   if (entryAttemptId === undefined) return reply('error', { code: 'INVALID_ENTRY_ATTEMPT_ID', message: 'entryAttemptId 必须是22至128位URL安全随机字符串' })

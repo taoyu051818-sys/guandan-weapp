@@ -35,7 +35,7 @@ const normalizeMatchRecoveryEntry = (
     recoveryAttemptId,
     matchId: requireNonEmptyString(source.matchId, '恢复匹配 ID'),
     roomId,
-    seat: source.seat as MatchRecoveryEntry['seat'],
+    seat: source.seat as Extract<MatchRecoveryEntry, { roomKind: 'match' }>['seat'],
     roomKind: 'match',
     ticketPurpose: source.ticketPurpose,
     gameEndpoint: normalizeGameEndpoint(source.gameEndpoint, endpointPolicy),
@@ -51,7 +51,7 @@ export class HttpMatchRecoveryGateway implements MatchRecoveryGateway {
   public constructor (private readonly client: PlatformApiClient, private readonly endpointPolicy: GameEndpointPolicy) {}
 
   public async recover (): Promise<MatchRecoveryEntry | null> {
-    const recoveryAttemptId = this.attempts.current()
+    const recoveryAttemptId = await this.attempts.current()
     const payload = requireRecord(await this.client.request<unknown>('/api/v1/matches/recover', 'POST', { recoveryAttemptId }), '牌局恢复响应')
     if (payload.entry === null) {
       this.attempts.complete(recoveryAttemptId)

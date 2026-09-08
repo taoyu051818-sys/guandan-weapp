@@ -240,6 +240,7 @@ export class GameResultService {
     delete match.abortedAt
     delete match.abortReason
     match.participants.forEach(participant => {
+      if (participant.seat === 'observer' && state.activeMatchByUser[participant.userId] === event.matchId) delete state.activeMatchByUser[participant.userId]
       participant.status = 'completed'
       participant.completedAt = now
       delete participant.abortedAt

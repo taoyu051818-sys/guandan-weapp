@@ -20,9 +20,9 @@ export const projectMatchEndedPresentation = (
       : `${viewerWon ? '我方' : '对方'}通过 A 关 · 已完成 ${ended.roundsPlayed} 局`
     : ended.reason === 'time-limit'
       ? `房间时限已到 · 已完成 ${ended.roundsPlayed} 局`
-      : `已完成 ${ended.configuredRounds} 局`
+      : ended.reason === 'single-round' ? '随机级牌 · 单局结算' : `已完成 ${ended.configuredRounds} 局`
   return {
-    title: `本场结束 · ${outcome}`,
+    title: `${ended.reason === 'single-round' ? '本局结束' : '本场结束'} · ${outcome}`,
     detail: `${progress}\n我方 ${ended.scores[viewerTeam]} · 对方 ${ended.scores[opponentTeam]}`,
   }
 }

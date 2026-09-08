@@ -15,6 +15,11 @@ export class LobbyCommandSender {
 
   public roomIntent (type: string, payload: Record<string, unknown> = {}): number | null {
     const snapshot = this.dependencies.snapshot()
+    const hostAction = snapshot.isRoomHost && ['startGame', 'kickMember', 'addBot', 'removeBot'].includes(type)
+    if (snapshot.roomRole === 'observer' && !hostAction && !['sitDown', 'standUp', 'watchPlayer'].includes(type)) {
+      this.dependencies.reportError('观战中不能准备或操作手牌')
+      return null
+    }
     if (!snapshot.roomId || snapshot.roomStatus !== 'ready' || snapshot.matchEnded) return null
     if (snapshot.gameStartPending) {
       this.dependencies.reportError('平台确认开局期间暂不能操作')
@@ -26,9 +31,9 @@ export class LobbyCommandSender {
       : commandPayload)
   }
 
-  public send (type: string, payload?: unknown): number | null {
+  public send (type: string, payload?: unknown, retryRequestId?: number): number | null {
     try {
-      return this.dependencies.client().send(type, payload)
+      return this.dependencies.client().send(type, payload, retryRequestId)
     } catch (error) {
       const message = error instanceof Error ? error.message : '网络未连接'
       this.dependencies.emitResult({

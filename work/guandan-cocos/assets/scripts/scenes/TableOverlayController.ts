@@ -18,7 +18,6 @@ export interface TableOverlayControllerDependencies {
   playerName: (playerId: PlayerId) => string
   leaveTable: () => void
   playVoice: (voice: string) => void
-  playChatPulse: (playerId: PlayerId, ownBubbleNode: Node) => void
   refreshPresentation: () => void
   schedule: (callback: () => void, intervalSeconds: number) => void
   scheduleOnce: (callback: () => void, delaySeconds: number) => void
@@ -33,6 +32,8 @@ export class TableOverlayController {
   private dissolveDialog: Node | null = null
   private dissolveCountdownLabel: Label | null = null
   private quickChatNodes: Node[] = []
+  private quickChatPanel: Node | null = null
+  private readonly seatChatLabels = new Map<PlayerId, Label>()
   private quickChatMuted = false
   private tableVisible = false
   private disposed = false
@@ -45,6 +46,15 @@ export class TableOverlayController {
     this.ownChatLabel.verticalAlign = Label.VerticalAlign.CENTER
     this.ownChatLabel.color = new Color(245, 239, 215)
     this.ownChatLabel.node.active = false
+    for (const id of ['p1', 'p2', 'p3', 'p4'] as const) {
+      const label = dependencies.ui.label(`SeatChat-${id}`, 0, 0, 22)
+      label.node.getComponent(UITransform)?.setContentSize(300, 48)
+      label.overflow = Label.Overflow.SHRINK
+      label.verticalAlign = Label.VerticalAlign.CENTER
+      label.color = new Color(255, 246, 209)
+      label.node.active = false
+      this.seatChatLabels.set(id, label)
+    }
 
     this.finishToastLabel = dependencies.ui.label('FinishToast', 0, 98, 26)
     this.finishToastLabel.node.getComponent(UITransform)?.setContentSize(560, 56)
@@ -67,6 +77,7 @@ export class TableOverlayController {
       this.clearQuickChatPanel()
       this.finishToastLabel.node.active = false
       this.ownChatLabel.node.active = false
+      this.seatChatLabels.forEach(label => { label.node.active = false })
       return
     }
     this.renderOwnChat()
@@ -86,7 +97,10 @@ export class TableOverlayController {
       viewport.halfHeight - viewport.safeTop - 235,
       0,
     ))
-    this.clearQuickChatPanel()
+    if (this.quickChatPanel) {
+      this.clearQuickChatPanel()
+      this.toggleQuickChatPanel()
+    }
   }
 
   public renderOwnChat (): void {
@@ -95,8 +109,26 @@ export class TableOverlayController {
     this.dependencies.chat.setViewer(humanId)
     const message = this.dependencies.chat.get(humanId)?.message ?? ''
     this.ownChatLabel.string = message
-    this.ownChatLabel.node.active = this.tableVisible && Boolean(message)
+    // Legacy own label remains the effect anchor, not a second visible bubble.
+    this.ownChatLabel.node.active = false
+    const ids: PlayerId[] = ['p1', 'p2', 'p3', 'p4']
+    this.seatChatLabels.forEach((label, id) => {
+      const place = (ids.indexOf(id) - ids.indexOf(humanId) + 4) % 4
+      const x = place === 1 ? this.viewport.halfWidth - this.viewport.safeRight - 206
+        : place === 3 || place === 0 ? -this.viewport.halfWidth + this.viewport.safeLeft + 206 : -200
+      const y = place === 0 ? -this.viewport.halfHeight + this.viewport.safeBottom + 180 : place === 2 ? 148 : 118
+      label.node.setPosition(new Vec3(x, y, 0))
+      label.string = this.dependencies.chat.get(id)?.message ?? ''
+      label.node.active = this.tableVisible && Boolean(label.string)
+      label.node.setSiblingIndex(this.dependencies.root.children.length - 1)
+    })
+    this.quickChatPanel?.setSiblingIndex(this.dependencies.root.children.length - 1)
+    this.modal?.setSiblingIndex(this.dependencies.root.children.length - 1)
+    this.dissolveDialog?.setSiblingIndex(this.dependencies.root.children.length - 1)
+    this.dependencies.root.children.find(node => node.name === 'ProfileEditorModal' && node.active)?.setSiblingIndex(this.dependencies.root.children.length - 1)
   }
+
+  public get blocksHandInput (): boolean { return Boolean(this.quickChatPanel || this.modal || this.dissolveDialog) }
 
   public chatMessage (playerId: PlayerId): string | undefined {
     if (this.disposed) return undefined
@@ -112,6 +144,9 @@ export class TableOverlayController {
     label.node.active = true
     label.node.setSiblingIndex(this.dependencies.root.children.length - 1)
     const opacity = label.node.getComponent(UIOpacity) ?? label.node.addComponent(UIOpacity)
+    // A repeated tap replaces both the entrance and any pending fade-out.
+    Tween.stopAllByTarget(opacity)
+    Tween.stopAllByTarget(label.node)
     opacity.opacity = 0
     label.node.setScale(new Vec3(0.82, 0.82, 1))
     tween(opacity).to(0.14, { opacity: 255 }).start()
@@ -195,10 +230,16 @@ export class TableOverlayController {
       this.showToast('本好友房已禁止互动')
       return
     }
-    const chatPanelTop = -this.viewport.halfHeight + this.viewport.safeBottom + 535
-    const chatPanelX = -this.viewport.halfWidth + this.viewport.safeLeft + 220
+    const panel = this.createModalShade('QuickChatPanel', 40)
+    this.quickChatPanel = panel
+    panel.on(Node.EventType.TOUCH_END, (event: { target?: Node }) => {
+      if (event.target === panel) this.clearQuickChatPanel()
+    })
+    const chatPanelTop = Math.min(this.viewport.halfHeight - this.viewport.safeTop - 90, 170)
+    const chatPanelX = this.viewport.halfWidth - this.viewport.safeRight - 222
     QUICK_CHAT_PHRASES.forEach((phrase, index) => {
       const node = this.dependencies.ui.quickChatButton(phrase.text, chatPanelX, chatPanelTop - index * 48)
+      node.parent = panel
       node.on(Node.EventType.TOUCH_END, () => {
         this.sendQuickChat(phrase)
         this.clearQuickChatPanel()
@@ -210,6 +251,7 @@ export class TableOverlayController {
       chatPanelX,
       chatPanelTop - QUICK_CHAT_PHRASES.length * 48,
     )
+    mute.parent = panel
     mute.on(Node.EventType.TOUCH_END, this.toggleQuickChatMute, this)
     this.quickChatNodes.push(mute)
   }
@@ -232,6 +274,8 @@ export class TableOverlayController {
     if (opacity) Tween.stopAllByTarget(opacity)
     Tween.stopAllByTarget(this.finishToastLabel.node)
     this.destroyNode(this.ownChatLabel.node)
+    this.seatChatLabels.forEach(label => this.destroyNode(label.node))
+    this.seatChatLabels.clear()
     this.destroyNode(this.finishToastLabel.node)
   }
 
@@ -334,7 +378,6 @@ export class TableOverlayController {
     const decision = this.dependencies.chat.show(packet.playerId, packet.text, phrase?.voice ?? '')
     if (phrase && decision.accepted && !blocked) {
       this.dependencies.playVoice(phrase.voice)
-      this.dependencies.playChatPulse(packet.playerId, this.ownChatLabel.node)
     }
   }
 
@@ -361,7 +404,6 @@ export class TableOverlayController {
       return
     }
     this.dependencies.playVoice(phrase.voice)
-    this.dependencies.playChatPulse(humanId, this.ownChatLabel.node)
   }
 
   private readonly toggleQuickChatMute = (): void => {
@@ -416,9 +458,11 @@ export class TableOverlayController {
 
   private clearQuickChatPanel (): void {
     while (this.quickChatNodes.length) this.destroyNode(this.quickChatNodes.pop() ?? null)
+    this.destroyNode(this.quickChatPanel)
+    this.quickChatPanel = null
   }
 
   private destroyNode (node: Node | null): void {
-    if (node?.isValid) node.destroy()
+    if (node?.isValid) { node.active = false; node.destroy() }
   }
 }

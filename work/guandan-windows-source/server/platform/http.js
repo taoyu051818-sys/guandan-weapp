@@ -1,5 +1,6 @@
 import { PlatformError, badRequest, notFound } from './errors.js'
 import { verifyGameResultSignature, verifySpectatorEventSignature } from './crypto.js'
+import { readProfileAvatar, validateProfilePatch } from './profile-avatar.js'
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
 const success = (data) => ({ ok: true, data, error: null })
@@ -70,10 +71,16 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
       const user = await requireUser()
       return writeJson(response, 200, success({ user: await service.getProfile(user.id) }), corsOrigin)
     }
-    if (method === 'PATCH' && route === '/api/v1/profile') {
+    if ((method === 'PATCH' || method === 'POST') && route === '/api/v1/profile') {
       const user = await requireUser()
       const { body } = await readBody(request)
+      validateProfilePatch(body)
       return writeJson(response, 200, success({ user: await service.updateProfile(user.id, body) }), corsOrigin)
+    }
+    if (method === 'GET' && route === '/api/v1/profile/avatar') {
+      const user = await requireUser()
+      const profile = await service.getProfile(user.id)
+      return writeJson(response, 200, success({ avatarUrl: profile.avatarUrl || '', dataUri: await readProfileAvatar(profile.avatarUrl) }), corsOrigin)
     }
     if (method === 'GET' && route === '/api/v1/me/dashboard') {
       const user = await requireUser()

@@ -10,23 +10,19 @@ const resize = frontPage.slice(frontPage.indexOf('public resize'), frontPage.ind
 const routeOwners = new Map([
   ['lobbyPage', ['menu', 'online', 'classic-rooms', 'friend-room-settings', 'lobby']],
   ['shopPage', ['shop', 'product']],
-  ['competitionPage', ['competition', 'tournament-flow', 'tournament-standings']],
   ['playerCenterPage', ['player-center', 'season-tasks']],
-  ['replaySpectatorPage', ['replay-list', 'replay-detail', 'spectator-list', 'spectator-feed']],
-  ['settingsRulesPage', ['settings']],
+  ['replayPage', ['replay-list', 'replay-detail']],
   ['matchmakingPage', ['matching']],
-  ['effectLabPage', ['effect-lab']],
 ])
 
 for (const [owner, routes] of routeOwners) {
   assert.match(resize, new RegExp(`this\\.${owner}\\.reflow\\(\\)`), `${owner} must own a resize-only render path`)
   for (const route of routes) assert.match(resize, new RegExp(`['"]${route}['"]`), `${route} must be routed during viewport reflow`)
 }
-assert.match(resize, /['"]more['"][\s\S]*showMoreMenu/, 'the local more page must also be rebuilt after viewport changes')
 
 const domains = [
-  'LobbyPageDomain', 'ShopPageDomain', 'CompetitionPageDomain', 'PlayerCenterPageDomain',
-  'ReplaySpectatorPageDomain', 'SettingsRulesPageDomain', 'MatchmakingPageDomain', 'EffectLabPageDomain',
+  'LobbyPageDomain', 'ShopPageDomain', 'PlayerCenterPageDomain',
+  'ReplayPageDomain', 'MatchmakingPageDomain',
 ]
 for (const domain of domains) {
   const source = read(`assets/scripts/scenes/front-pages/${domain}.ts`)

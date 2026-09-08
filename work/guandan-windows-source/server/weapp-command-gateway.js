@@ -12,7 +12,8 @@ export const createCommandGateway = ({
   scheduleGameStartClaim,
   commitRuntimeState,
   stagePendingSideEffects,
-  publishState,
+  publishCurrentRoom,
+  completeRoomExit,
   rememberAccepted,
   reserveAccepted = () => true,
   releaseAccepted = () => {},
@@ -33,6 +34,7 @@ export const createCommandGateway = ({
   const previousAccepted = cacheKey ? acceptedActions.get(cacheKey) : null
   if (previousAccepted) {
     if (previousAccepted.fingerprint !== requestFingerprint) return reply('error', { code: 'IDEMPOTENCY_CONFLICT', message: '同一个 requestId 不能用于不同动作' })
+    if (previousAccepted.completion?.kind === 'room-exit') return completeRoomExit(connection, cacheKey, previousAccepted)
     if (requestedRoom?.pendingRoundFinalization?.cacheKey === cacheKey) {
       try { await finalizePendingRound(requestedRoom) } catch {
         return reply('error', { code: 'PERSISTENCE_PENDING', message: '终局动作仍在等待安全落盘，请稍后用相同 requestId 重试', retryAfterMs: 500 })
@@ -56,9 +58,10 @@ export const createCommandGateway = ({
     }
     if (requestedRoom) stagePendingSideEffects(requestedRoom)
     send(connection, previousAccepted.messageType || 'actionAccepted', previousAccepted.response)
-    if (requestedRoom?.state && previousAccepted.messageType && previousAccepted.messageType !== 'actionAccepted') publishState(requestedRoom)
+    if (requestedRoom && type !== 'chat') publishCurrentRoom(requestedRoom)
     return
   }
+  if (requestedRoom?.closingReason) return reply('error', { code: 'ROOM_CLOSING', message: '房间正在安全关闭，请稍后重试' })
   if (requestedRoom?.pendingRoundFinalization && (idempotentActionTypes.has(type) || ['createRoom', 'joinRoom', 'rejoinRoom'].includes(type))) {
     return reply('error', { code: 'PERSISTENCE_PENDING', message: '本局结算正在等待安全落盘', retryAfterMs: 500 })
   }

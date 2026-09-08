@@ -42,7 +42,10 @@ export class NetworkActionController {
     this.publishHint(hint)
     const requestId = submit()
     if (requestId === null) {
-      this.fail('操作未发送，请检查网络后重试')
+      // The submit path may synchronously publish a more precise rejection
+      // (for example, a lifecycle guard) and cancel this generation. Do not
+      // overwrite that diagnosis with the generic transport fallback.
+      if (this.pending && generation === this.generation) this.fail('操作未发送，请检查网络后重试')
       return false
     }
     this.requestId = requestId

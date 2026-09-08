@@ -131,6 +131,8 @@ const compareSuggestions = (
 ): number =>
   compareBombFamilySuggestions(left, right, ruleProfile) ||
   right.priority - left.priority ||
+  (left.kind === 'triple-with-pair' && right.kind === 'triple-with-pair'
+    ? (left.pairValue ?? 0) - (right.pairValue ?? 0) : 0) ||
   compareText(left.key, right.key)
 
 const straightSequences = (allowAceLowStraight: boolean): number[][] => {
@@ -280,7 +282,7 @@ export const suggestHandGroups = (
         card => card.value,
         true,
       )
-      if (allocation) add(makeSuggestion('triple-with-pair', allocation, tripleValue))
+      if (allocation) add({ ...makeSuggestion('triple-with-pair', allocation, tripleValue), pairValue })
     }
   }
 
@@ -315,6 +317,8 @@ export const selectNonOverlappingSuggestions = (
   const used = new Set<CardId>()
   const selected: HandGroupSuggestion[] = []
   for (const suggestion of suggestions.slice().sort((left, right) => compareSuggestions(left, right, ruleProfile))) {
+    // Auto-arrange preserves valuable pairs. Manual recognition and legal moves stay unrestricted.
+    if (suggestion.kind === 'triple-with-pair' && (suggestion.pairValue ?? Infinity) >= 10) continue
     if (suggestion.cardIds.some(cardId => used.has(cardId))) continue
     selected.push({
       ...suggestion,

@@ -61,13 +61,9 @@ visit(gameScenePath)
 
 const expectedRuntimeModules = [
   'game/GameManager.ts',
-  'game/LocalAITurnController.ts',
+  'game/RoundRecord.ts',
   'game/LocalHandSelectionController.ts',
-  'game/LocalMatchController.ts',
-  'game/LocalMatchEventController.ts',
-  'game/LocalTurnScheduler.ts',
   'game/NetworkActionController.ts',
-  'game/SynchronousLocalAIEngine.ts',
   'session/GameSession.ts',
   'network/LobbyController.ts',
   'audio/CocosAudioController.ts',

@@ -5,8 +5,7 @@ const path = require('node:path')
 const { loadTypeScript } = require('./support/typescript.cjs')
 
 const root = path.resolve(__dirname, '..')
-const sourcePath = path.join(root, 'assets/scripts/ui/RuleHelpProjection.ts')
-const settingsPath = path.join(root, 'assets/scripts/scenes/front-pages/SettingsRulesPageDomain.ts')
+const sourcePath = path.join(root, 'migration/rules/RuleHelpProjection.ts')
 const ts = loadTypeScript()
 const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -31,9 +30,5 @@ assert.match(strictText, /A2345不能组成顺子/)
 assert.match(strictText, /同花顺按普通顺子/)
 assert.match(strictText, /三带二关闭/)
 assert.doesNotMatch(strictText, /同花顺按五张半炸弹/)
-
-const settingsSource = fs.readFileSync(settingsPath, 'utf8')
-assert.match(settingsSource, /projectRuleHelp\(this\.dependencies\.session\.ruleProfile\)/, 'the help modal must project the active explicit RuleProfile')
-assert.doesNotMatch(settingsSource, /const RULE_PAGES/, 'rule-dependent help must not remain a module-level static copy')
 
 process.stdout.write('rule help projection regression checks passed\n')

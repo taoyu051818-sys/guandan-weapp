@@ -62,7 +62,8 @@ const connect = async () => {
   throw new Error('机器人协议测试服务启动超时')
 }
 const waitFor = (socket, type, predicate = () => true, timeoutMs = 5000) => new Promise((resolve, reject) => {
-  const timer = setTimeout(() => reject(new Error(`等待 ${type} 超时`)), timeoutMs)
+  const timeoutError = new Error(`等待 ${type} 超时`)
+  const timer = setTimeout(() => reject(timeoutError), timeoutMs)
   const handler = ({ data }) => {
     const packet = JSON.parse(data)
     if (packet.type !== type || !predicate(packet)) return
@@ -202,6 +203,22 @@ try {
   assert.equal(botAction.trustees.p2, null, '机器人不能伪装成低档托管席位')
   assert.equal(botAction.consecutiveTimeouts.p2, 0, '机器人动作不能累计超时次数')
   assert.ok(botState.state.playArea.some(action => action.playerId === 'p2'))
+
+  // A single real player and three bots are unanimous at proposal time.
+  // There is no second human who could send the final vote to close the room.
+  const dissolveId = nextRequestId++
+  const dissolveAccepted = waitFor(restoredHost, 'actionAccepted', packet => packet.requestId === dissolveId)
+  const dissolved = waitFor(restoredHost, 'roomDissolved', packet => packet.roomId === friendRoomId)
+  send(restoredHost, 'proposeDissolve', { roomId: friendRoomId }, dissolveId)
+  const [acceptance, closed] = await Promise.all([dissolveAccepted, dissolved])
+  assert.equal(acceptance.requestType, 'proposeDissolve')
+  assert.equal(closed.reason, 'vote-approved')
+
+  // Closing retires resume-token acceptance aliases. A duplicate must report
+  // the absent room, never reopen it or run another vote.
+  const duplicateRejected = waitFor(restoredHost, 'error', packet => packet.requestId === dissolveId)
+  send(restoredHost, 'proposeDissolve', { roomId: friendRoomId }, dissolveId)
+  assert.match((await duplicateRejected).message, /当前不在对局中/)
 
   process.stdout.write('weapp friend-room bot protocol smoke passed\n')
 } finally {

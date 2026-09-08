@@ -19,3 +19,7 @@ node_modules/
 
 # Re-downloadable archives; extracted sources and selected assets are retained.
 /work-downloads/
+
+# Local-only visual QA evidence; retain on disk, exclude from the public repository.
+/docs/visual-polish-20260906/
+/docs/friend-room-observer-20260908/

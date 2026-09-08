@@ -1,14 +1,17 @@
-import { Color, EditBox, Node, UITransform, Vec3, tween } from 'cc'
+import { Color, EditBox, type Label, Node, UITransform, Vec3, tween } from 'cc'
 import {
   type FriendRoomSettings,
   LobbyController,
   type LobbySnapshot,
 } from '../../network/LobbyController'
 import type { FrontPageGateways, MatchQueueId, MatchRecoveryEntry } from '../../services/FrontPageGatewayContracts'
-import { writeClipboardText } from '../../services/ClipboardService'
+import { WechatFriendInvite } from '../../services/WechatFriendInvite'
 import { GameSession } from '../../session/GameSession'
 import { ScreenAdapter } from '../../ui/ScreenAdapter'
 import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
+import { resolveLobbyLayout } from '../../ui/LobbyLayoutPolicy'
+import { lobbyLabel, renderLobbyEntries, renderLobbyShop } from '../../ui/LobbyMenuView'
+import { attachLobbyAmbientMotion } from '../../ui/LobbyAmbientMotion'
 import { PageRouter } from '../PageRouter'
 import { FriendRoomSettingsPresenter } from './FriendRoomSettingsPresenter'
 import { FriendRoomPlatformFlow } from './FriendRoomPlatformFlow'
@@ -45,12 +48,9 @@ export type LobbyPageDependencies = {
   scheduleOnce: (callback: () => void, delaySeconds: number) => void
   getLobbyEndpoint: () => string
   showNotice: (title: string, detail?: string) => void
-  dismissRulesState: () => void
-  rulesVisible: () => boolean
-  showRules: () => void
-  showMoreMenu: () => void
   showCompetition: () => void
   showPlayerCenter: () => void
+  editProfile: () => void
   showShop: () => void
   beginMatch: (queueId: MatchQueueId, queueName: string, returnPage: LobbyMatchReturnPage) => void
 }
@@ -64,9 +64,14 @@ export class LobbyPageDomain {
   private readonly friendRoomPlatformFlow: FriendRoomPlatformFlow | null
   private readonly friendRoomPlatformPresenter: FriendRoomPlatformPresenter
   private readonly friendRoomWaitingPresenter: FriendRoomWaitingPresenter
+  private readonly wechatInvite: WechatFriendInvite
   private readonly playerProfilePresenter: LobbyPlayerProfilePresenter
   private destroyed = false
   private reflowing = false
+  private recoveryPending = false
+  private renderedRecoveryAvailable = false
+  private readonly ambientClock = { elapsed: 0 }
+  private primaryAction: { node: Node, title: Label, subtitle: Label } | null = null
 
   public constructor (private readonly dependencies: LobbyPageDependencies) {
     this.friendRoomSettingsPresenter = new FriendRoomSettingsPresenter({
@@ -101,12 +106,24 @@ export class LobbyPageDomain {
           onChanged: () => {
             if (dependencies.router.current === 'lobby' && dependencies.session.snapshot.status === 'lobby') this.renderLobby(dependencies.lobby.snapshot)
           },
-          copyText: writeClipboardText,
         })
       : null
+    this.wechatInvite = new WechatFriendInvite(text => {
+      const flow = this.friendRoomPlatformFlow
+      if (this.isDisposed() || !flow || flow.snapshot.busy) return
+      if (this.recoveryPending) return false
+      if (flow.snapshot.entry?.roomId === text.split('.')[0]) return
+      if (dependencies.lobby.snapshot.roomId || dependencies.lobby.snapshot.recoveryAvailable || !['menu', 'lobby'].includes(dependencies.session.snapshot.status)) {
+        dependencies.showNotice('请先退出当前房间', '结束当前牌局后，再打开好友邀请')
+        return
+      }
+      this.openLobby()
+      void flow.join(text)
+    })
     this.playerProfilePresenter = new LobbyPlayerProfilePresenter({
-      screen: dependencies.screen, session: dependencies.session, player: dependencies.player, wallet: dependencies.wallet,
+      player: dependencies.player, wallet: dependencies.wallet,
       platformConfigured: dependencies.gateways.configured, showPlayerCenter: dependencies.showPlayerCenter,
+      auth: dependencies.gateways.auth, editProfile: dependencies.editProfile,
     })
   }
 
@@ -120,12 +137,12 @@ export class LobbyPageDomain {
       this.dependencies.wallet.invalidate()
     }
     this.dependencies.closeModal()
-    this.dependencies.dismissRulesState()
     this.dependencies.setTableVisible(false)
     this.dependencies.setFriendRoomWaitingVisible(false)
     if (this.dependencies.session.snapshot.status !== 'menu') this.dependencies.session.leaveToMenu()
     if (!this.reflowing && !preserveFriendReservation) this.friendRoomPlatformFlow?.leave()
     this.renderMenu()
+    if (this.friendRoomPlatformFlow) this.dependencies.scheduleOnce(() => { if (!this.isDisposed()) this.wechatInvite.activate() }, 0)
   }
 
   public handoffFriendRoomReservation (): void { this.friendRoomPlatformFlow?.handoffReservation() }
@@ -134,48 +151,32 @@ export class LobbyPageDomain {
     this.friendRoomPlatformFlow?.restoreReservation(entry)
   }
 
+  public setRecoveryPending (pending: boolean): void {
+    if (this.isDisposed() || this.recoveryPending === pending) return
+    this.recoveryPending = pending
+    if (this.dependencies.router.current === 'menu') this.refreshPrimaryAction()
+    if (!pending) this.wechatInvite.activate()
+  }
+
   public renderMenu (): void {
     const ui = this.dependencies.router.open('menu')
     const safeWidth = this.dependencies.screen.safeSize().x
     const safeHeight = this.dependencies.screen.safeSize().y
-    const cardsAreaWidth = Math.min(650, safeWidth * 0.61)
-    const gap = Math.max(10, Math.min(18, cardsAreaWidth * 0.028))
-    const cardWidth = Math.min(190, (cardsAreaWidth - gap * 2) / 3)
-    const cardHeight = cardWidth * 4 / 3
-    const areaRight = this.dependencies.screen.safeRightX(22)
-    const firstCardX = areaRight - cardsAreaWidth + cardWidth / 2
-    const cardY = Math.min(28, Math.max(-2, safeHeight * 0.025))
-    const titleX = firstCardX + (cardWidth * 3 + gap * 2) / 2 - cardWidth / 2
-    ui.outlinedLabel('陵水掼蛋', titleX, this.dependencies.screen.safeTopY(52), Math.min(42, Math.max(31, safeHeight * 0.07)), {
-      width: cardsAreaWidth,
-      color: new Color(255, 239, 164),
-      outlineColor: new Color(58, 44, 24),
-      outlineWidth: 4,
-    })
-    const entries: ReadonlyArray<{ name: string, art: string, action: () => void }> = [
-      { name: 'ClassicEntryCard', art: LOBBY_ART.entryClassic, action: () => this.showClassicRooms() },
-      { name: 'FriendEntryCard', art: LOBBY_ART.entryFriend, action: () => this.showFriendRoomSettings() },
-      { name: 'TournamentEntryCard', art: LOBBY_ART.entryTournament, action: this.dependencies.showCompetition },
-    ]
-    entries.forEach((entry, index) => {
-      ui.imageCard(entry.name, entry.art, firstCardX + index * (cardWidth + gap), cardY, cardWidth, cardHeight, entry.action, 0.04 + index * 0.07)
-    })
-    const cardsLeft = firstCardX - cardWidth / 2
-    this.playerProfilePresenter.render(ui, cardsLeft - 14)
-    this.renderShopShortcut(ui, safeWidth, safeHeight)
-    const utilityY = this.dependencies.screen.safeTopY(112)
-    this.compactButton(ui, '规则', this.dependencies.screen.safeLeftX(62), utilityY, 84, 44, 22, this.dependencies.showRules)
-    this.compactButton(ui, '更多', this.dependencies.screen.safeLeftX(156), utilityY, 84, 44, 22, this.dependencies.showMoreMenu)
-    if (this.dependencies.gateways.configured && this.dependencies.lobby.snapshot.recoveryAvailable) {
-      this.compactButton(ui, '继续牌局', this.dependencies.screen.safeLeftX(260), utilityY, 108, 44, 22, () => this.dependencies.lobby.recoverActiveMatch())
-    }
-    const quickWidth = Math.min(286, Math.max(232, safeWidth * 0.225))
-    const quickHeight = Math.min(76, Math.max(62, safeHeight * 0.105))
-    const quickX = this.dependencies.screen.safeRightX(quickWidth / 2 + 22)
-    const quickY = this.dependencies.screen.safeBottomY(quickHeight / 2 + 18)
-    this.coloredButton(ui, '快速开始\n经典 · 初级场', quickX, quickY, quickWidth, quickHeight, Math.max(22, Math.min(26, quickHeight * 0.34)), new Color(232, 175, 45, 248), () => {
-      this.dependencies.beginMatch('classic_50', '经典 · 初级场 · 底分50', 'menu')
-    })
+    const layout = resolveLobbyLayout({ width: safeWidth, height: safeHeight,
+      left: this.dependencies.screen.safeLeftX(0), right: this.dependencies.screen.safeRightX(0),
+      top: this.dependencies.screen.safeTopY(0), bottom: this.dependencies.screen.safeBottomY(0) })
+    renderLobbyEntries(ui, layout, ([
+      { name: 'ClassicEntryCard', kind: 'classic', art: LOBBY_ART.entryClassic, action: () => this.showClassicRooms() },
+      { name: 'FriendEntryCard', kind: 'friend', art: LOBBY_ART.entryFriend, action: () => this.showFriendRoomSettings() },
+      { name: 'TournamentEntryCard', kind: 'tournament', art: LOBBY_ART.entryTournament, action: this.dependencies.showCompetition },
+    ] as const).map(entry => ({ ...entry, action: () => {
+        if (this.recoveryPending) this.dependencies.showNotice('正在恢复牌局', '请等待当前牌局确认后再选择玩法')
+        else entry.action()
+    } })))
+    this.playerProfilePresenter.render(ui, layout)
+    renderLobbyShop(ui, layout, LOBBY_ART.shopChick, this.dependencies.showShop)
+    const { x, y, width, height } = layout.quick
+    this.renderQuickStart(ui, x, y, width, height, layout.scale)
     if (!this.reflowing) this.refreshLobbyDashboard(this.dependencies.currentPageRequest())
   }
 
@@ -214,6 +215,7 @@ export class LobbyPageDomain {
         pressedFill: new Color(198, 140, 40, 245),
         stroke: active ? new Color(255, 239, 163) : new Color(99, 145, 171, 180),
         textColor: active ? new Color(68, 44, 17) : new Color(235, 242, 238),
+        textOutlineColor: active ? new Color(255, 235, 157) : new Color(28, 36, 32),
         textOutlineWidth: active ? 0 : 1,
         disabled: !mode.available,
         radius: 5,
@@ -292,6 +294,7 @@ export class LobbyPageDomain {
   }
 
   public renderLobby (snapshot: LobbySnapshot): void {
+    if (!this.isDisposed() && this.dependencies.router.current === 'menu' && this.renderedRecoveryAvailable !== Boolean(snapshot.recoveryAvailable)) this.refreshPrimaryAction()
     if (this.isDisposed() || this.dependencies.session.snapshot.status !== 'lobby') return
     this.friendRoomSettingsPresenter.hide()
     if (!this.reflowing && this.pendingFriendRoomSettings && snapshot.connected && snapshot.roomStatus === 'idle' && !snapshot.roomId) {
@@ -330,7 +333,7 @@ export class LobbyPageDomain {
           : '正在连接服务…'
     ui.menuLabel(snapshot.error ?? connectionText, 0, 165, 20)
     if (snapshot.roomStatus === 'joining' && !snapshot.roomId) {
-      ui.menuLabel('请稍候，正在等待服务器确认', 0, 105, 22)
+      ui.menuLabel('', 0, 105, 22)
       this.pageButton(ui, '取消进入', 30, () => this.dependencies.lobby.leaveRoom())
     } else {
       this.pageButton(ui, '设置并创建好友房', 95, () => this.showFriendRoomSettings())
@@ -378,6 +381,7 @@ export class LobbyPageDomain {
     this.destroyed = true
     this.hide()
     this.friendRoomPlatformFlow?.destroy()
+    this.wechatInvite.dispose()
     this.friendRoomSettingsPresenter.dispose()
   }
 
@@ -413,12 +417,13 @@ export class LobbyPageDomain {
 
   private renderFriendTableLobby (ui: RuntimeUiFactory, snapshot: LobbySnapshot): void {
     const platformEntry = this.friendRoomPlatformFlow?.snapshot.entry ?? null
-    this.friendRoomWaitingPresenter.render(ui, snapshot, Boolean(platformEntry))
-    this.friendRoomPlatformPresenter.renderInviteShare(
-      ui,
-      platformEntry?.roomId === snapshot.roomId ? this.friendRoomPlatformFlow?.snapshot.inviteText ?? null : null,
-      () => { void this.friendRoomPlatformFlow?.copyInvite() },
-    )
+    this.friendRoomWaitingPresenter.render(ui, snapshot, Boolean(platformEntry), platformEntry ? () => {
+      try {
+        this.wechatInvite.share(platformEntry.roomId === snapshot.roomId ? this.friendRoomPlatformFlow?.snapshot.inviteText ?? null : null)
+      } catch (error) {
+        this.dependencies.showNotice('暂时无法邀请', error instanceof Error ? error.message : '请稍后重试')
+      }
+    } : undefined)
   }
 
   private leaveFriendRoomToMenu (): void {
@@ -436,52 +441,61 @@ export class LobbyPageDomain {
     ]).then(([dashboardResult, walletResult]) => {
       this.dependencies.player.loading = false
       this.dependencies.player.loadedAt = Date.now()
-      if (dashboardResult.status === 'fulfilled') this.dependencies.player.dashboard = dashboardResult.value
+      if (dashboardResult.status === 'fulfilled') this.dependencies.player.updateDashboard(dashboardResult.value)
       if (walletResult.status === 'fulfilled') this.dependencies.wallet.update(walletResult.value)
       else this.dependencies.wallet.invalidate()
-      if (!this.isDisposed() && requestToken === this.dependencies.currentPageRequest() && this.dependencies.router.current === 'menu' && !this.dependencies.rulesVisible()) this.renderMenu()
+      if (!this.isDisposed() && requestToken === this.dependencies.currentPageRequest() && this.dependencies.router.current === 'menu') this.renderMenu()
     })
-  }
-
-  private renderShopShortcut (ui: RuntimeUiFactory, safeWidth: number, safeHeight: number): void {
-    const size = Math.min(168, Math.max(92, Math.min(safeWidth * 0.14, safeHeight * 0.31)))
-    const x = this.dependencies.screen.safeLeftX(size / 2 + 18)
-    const y = this.dependencies.screen.safeBottomY(size / 2 + 16)
-    const shortcut = new Node('ShopShortcut')
-    shortcut.parent = ui.parent
-    shortcut.setPosition(new Vec3(x, y, 0))
-    shortcut.addComponent(UITransform).setContentSize(size + 6, size + 6)
-    ui.image('ShopChickArtwork', LOBBY_ART.shopChick, 0, 0, size, size, shortcut)
-    ui.outlinedLabel('商城', 0, -size * 0.34, Math.max(24, size * 0.18), {
-      parent: shortcut,
-      width: size - 12,
-      color: new Color(255, 226, 105),
-      outlineColor: new Color(58, 35, 17),
-      outlineWidth: 4,
-    })
-    ui.makeInteractive(shortcut, this.dependencies.showShop, 0.95)
   }
 
   private isDisposed (): boolean { return this.destroyed || this.dependencies.isDisposed() }
 
+  /** Lobby-only treatment: preserve the existing footprint and match route. */
+  private renderQuickStart (ui: RuntimeUiFactory, x: number, y: number, width: number, height: number, s: number): void {
+    const button = ui.button('LobbyQuickStart', '', x, width, height, 22, {
+      fill: new Color(239, 187, 79), pressedFill: new Color(232, 177, 66),
+      stroke: new Color(255, 235, 173), lineWidth: 2 * s, radius: 8 * s,
+    })
+    button.setPosition(new Vec3(x, y, 0))
+    // All decorative layers stay inside the original hit box and inherit its
+    // press/cancel feedback; they never register their own input handlers.
+    ui.panel('QuickStartInnerRim', 0, 0, width - 8 * s, height - 8 * s, {
+      fill: new Color(255, 224, 145, 0), stroke: new Color(174, 110, 27, 125), lineWidth: s, radius: 6 * s,
+    }, button)
+    const title = lobbyLabel(ui, '快速开始', 0, 7 * s, 23, width - 24 * s, s, button, new Color(101, 66, 28))
+    const subtitle = lobbyLabel(ui, '随机级牌 · 单局对战', 0, -11 * s, 12, width - 24 * s, s, button, new Color(101, 66, 28), 0, false)
+    title.node.getComponent(UITransform)?.setContentSize(width - 24 * s, 23 * s)
+    subtitle.node.getComponent(UITransform)?.setContentSize(width - 24 * s, 12 * s)
+    button.on(Node.EventType.TOUCH_END, () => {
+      if (this.isDisposed() || this.recoveryPending || this.dependencies.router.current !== 'menu') return
+      if (this.dependencies.gateways.configured && this.dependencies.lobby.snapshot.recoveryAvailable) this.dependencies.lobby.recoverActiveMatch()
+      else this.dependencies.beginMatch('classic_50', '经典 · 初级场 · 底分50', 'menu')
+    })
+    this.primaryAction = { node: button, title, subtitle }
+    attachLobbyAmbientMotion(button, { width, height, scale: s, clock: this.ambientClock, allowed: () =>
+      !this.recoveryPending && !this.isDisposed() && this.dependencies.router.current === 'menu' &&
+      this.dependencies.session.snapshot.settings.effectQuality === 'full' &&
+      !ui.parent.parent?.children.some(node => node.active && node.name.startsWith('Modal-')),
+    })
+    this.refreshPrimaryAction()
+  }
+
+  private refreshPrimaryAction (): void {
+    if (!this.primaryAction?.node.isValid) return
+    const { node, title, subtitle } = this.primaryAction
+    const recovery = this.dependencies.gateways.configured && Boolean(this.dependencies.lobby.snapshot.recoveryAvailable)
+    this.renderedRecoveryAvailable = recovery
+    title.string = this.recoveryPending ? '正在恢复' : recovery ? '继续牌局' : '快速开始'
+    subtitle.string = this.recoveryPending ? '正在确认牌局状态' : recovery ? '返回尚未结束的牌局' : '随机级牌 · 单局对战'
+    // Keep the existing node, skin and all other lobby artwork still. Pausing
+    // input does not dim readable labels or replay the card entrance tweens.
+    if (this.recoveryPending) node.pauseSystemEvents(true)
+    else node.resumeSystemEvents(true)
+  }
+
   private compactButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, action: () => void): Node {
     const node = ui.button('CompactButton', text, x, width, height, fontSize, {
       fill: new Color(26, 51, 56, 224), pressedFill: new Color(52, 83, 72, 240), stroke: new Color(241, 207, 101, 245), textColor: new Color(255, 240, 181), textOutlineWidth: 2, radius: 6,
-    })
-    node.setPosition(new Vec3(x, y, 0))
-    node.on(Node.EventType.TOUCH_END, action)
-    return node
-  }
-
-  private coloredButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, fill: Color, action: () => void): Node {
-    const node = ui.button('ColoredButton', text, x, width, height, fontSize, {
-      fill,
-      pressedFill: new Color(Math.max(0, fill.r - 28), Math.max(0, fill.g - 28), Math.max(0, fill.b - 28), fill.a),
-      stroke: new Color(255, 235, 151, 255),
-      textColor: new Color(255, 252, 224),
-      textOutlineColor: new Color(43, 58, 37, 255),
-      textOutlineWidth: 3,
-      radius: 7,
     })
     node.setPosition(new Vec3(x, y, 0))
     node.on(Node.EventType.TOUCH_END, action)

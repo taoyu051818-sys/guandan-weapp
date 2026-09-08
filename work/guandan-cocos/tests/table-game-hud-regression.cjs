@@ -89,8 +89,34 @@ const evaluateTypeScriptModule = (filePath, requireDependency = require) => {
   return module.exports
 }
 const safeArea = evaluateTypeScriptModule(safeAreaPath)
-const layoutPolicy = evaluateTypeScriptModule(layoutPolicyPath, request => request === './SafeAreaLayout' ? safeArea : require(request))
+const capsulePolicy = evaluateTypeScriptModule(path.join(projectRoot, 'assets/scripts/ui/WechatCapsuleLayout.ts'))
+const layoutPolicy = evaluateTypeScriptModule(layoutPolicyPath, request => request === './SafeAreaLayout' ? safeArea : request === './WechatCapsuleLayout' ? capsulePolicy : require(request))
 const closeTo = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 0.001, `${message}: expected ${expected}, received ${actual}`)
+
+// Fresh layout, folding and delayed native capsule metrics must use the same anchor.
+for (const viewport of [
+  { width: 1280, height: 720 },
+  { width: 1280, height: 589, nativeCapsule: { left: 430, right: 625, top: 280, bottom: 218 } },
+  { width: 1280, height: 589, safeLeft: 42, safeRight: 42, nativeCapsule: { left: 420, right: 620, top: 280, bottom: 204 } },
+  { width: 900, height: 720, nativeCapsule: { left: 230, right: 448, top: 350, bottom: 280 } },
+]) {
+  const place = (height, drag) => layoutPolicy.resolveTableHudCounterPlacement(viewport, { width: 596, height }, 82, drag)
+  const first = place(42)
+  const opened = place(82)
+  const folded = place(42)
+  const scale = layoutPolicy.resolveTableHudBounds(viewport).scale
+  if (viewport.width === 1280 && !viewport.nativeCapsule) closeTo(first.position.x, 242, 'preserve the reviewed horizontal anchor')
+  assert.deepEqual(first, folded, 'first closed position must equal post-toggle position')
+  closeTo(first.position.x, opened.position.x, 'opening must not change X')
+  closeTo(first.position.y + 21 * scale, opened.position.y + 41 * scale, 'opening must preserve the top edge')
+  assert.deepEqual(place(42, first.anchor), first, 'persisted anchor must be idempotent')
+  const dragged = { x: -100, y: 50 }
+  closeTo(place(42, dragged).position.x, place(82, dragged).position.x, 'dragged counter must not jump on toggle')
+  assert.deepEqual(place(42, place(42, dragged).anchor), place(42, dragged), 'dragged anchor must remain stable')
+}
+assert.match(source, /if \(this\.overlayPositions\.counter\) this\.overlayPositions\.counter = counter\.anchor/, 'initial viewport coordinates must not be cached as a user drag')
+assert.match(source, /EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT, 8\)/, 'two-line summary uses small corners, not a capsule')
+assert.match(foundationSource, /EXPANDED_ROUND_WIDTH = 240/, 'summary removes excess horizontal space')
 
 assert.equal(metadata.importer, 'typescript')
 assert.match(metadata.uuid, /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/)
@@ -130,7 +156,7 @@ for (const counterBoundary of ['publicCardCounts', 'counterExpanded', 'onCounter
 }
 assert.match(foundationSource, /counterExpanded: boolean[\s\S]*cardCounts: Readonly<Partial<Record<TableGameHudCounterRank, number>>>/, 'counter visibility and public counts must remain authoritative HUD state')
 assert.match(foundationSource, /onCounterVisibilityChange\?: \(expanded: boolean\) => void/, 'the restored counter must emit its visibility intent')
-assert.match(presenterSource, /cardCounts: this\.publicCardCounts\(snapshot, humanId\)/, 'the presenter must inject card counts instead of letting the HUD infer game state')
+assert.match(presenterSource, /cardCounts: this\.publicCardCounts\(snapshot, teammate\?\.available \? teammate.playerId : humanId\)/, 'the presenter counts only the authorized displayed hand and public plays')
 assert.match(scene, /setTouchExclusionPredicate\(screenPoint =>/, 'the scene must arbitrate overlapping HUD and hand touches without moving either surface')
 assert.match(presenterSource, /Counts public unknowns only:[\s\S]*rank === '小王' \|\| rank === '大王' \? 2 : 8[\s\S]*players\[humanId\]\.hand\.forEach\(card => remove\(card\.rank\)\)[\s\S]*state\.playArea\.forEach\(action => action\.cards\.forEach\(card => remove\(card\.rank\)\)\)/, 'the counter must subtract only the viewer hand and publicly revealed plays from the two-deck totals')
 assert.match(foundationSource, /BASE_TOOLBAR_WIDTH = 420/, 'the enlarged table tools need their reserved toolbar width')
@@ -150,21 +176,23 @@ const standardLayout = layoutPolicy.resolveTableHudFrameLayout({
   roundSize: { width: 272, height: 84 },
   seatSize: { width: 280, height: 100 },
   suitSize: { width: 480, height: 68 },
-  toolbarSize: { width: 540, height: 70 },
+  toolbarSize: { width: 480, height: 70 },
 })
 assert.equal(standardLayout.bounds.scale, 1, 'the design viewport must preserve 1:1 HUD scale')
 assert.deepEqual(standardLayout.seats.top, { x: -210, y: 218, scale: 1, visible: true }, 'the opposite seat must remain left of the top play area')
 assert.equal(standardLayout.top.back.visible, true)
 assert.equal(standardLayout.top.round.visible, true)
-const bottomGap = standardLayout.bottom.toolbar.x - 540 * standardLayout.bottom.toolbar.scale / 2
-  - (standardLayout.bottom.suitBar.x + 480 * standardLayout.bottom.suitBar.scale / 2)
-closeTo(bottomGap, layoutPolicy.TABLE_HUD_BOTTOM_GROUP_GAP * standardLayout.bottom.toolbar.scale, 'suit and toolbar groups must remain adjacent')
+assert.ok(standardLayout.bottom.suitBar.x - 480 * standardLayout.bottom.suitBar.scale / 2 > standardLayout.seats.bottom.x + 100, 'straight-flush tools must reserve the local player information lane')
+closeTo(standardLayout.bottom.toolbar.x + 480 * standardLayout.bottom.toolbar.scale / 2, standardLayout.bounds.right - 8, 'hand tools must anchor to the right safe edge')
+closeTo(standardLayout.bottom.suitBar.y, standardLayout.bottom.toolbar.y, 'wide layouts keep both optional tool groups in one bottom control lane')
 
 const operationRow = layoutPolicy.resolveTableHudOperationRow([112, 112, 128])
-assert.deepEqual(operationRow, { size: { width: 494, height: 112 }, timerX: -191, actionXs: [-69, 53, 183] }, 'the human operation row geometry must preserve its established positions')
+assert.deepEqual(operationRow, { size: { width: 616, height: 112 }, timerX: -252, actionXs: [-130, -8, 122] }, 'the buttons must be centred independently of the adjacent timer')
+assert.deepEqual(layoutPolicy.resolveTableHudOperationRow([112]).actionXs, [0], 'a sole pass action must sit exactly at the centre')
+assert.equal(operationRow.actionXs[0] - 56, -(operationRow.actionXs[2] + 64), 'left/right button bounds balance around zero')
 assert.deepEqual(
   layoutPolicy.clampTableHudOverlayPosition({ x: 999, y: 999 }, operationRow.size, standardLayout.bounds),
-  { x: 385, y: 296 },
+  { x: 324, y: 296 },
   'dragged operations must remain inside the safe viewport',
 )
 assert.equal(layoutPolicy.resolveTableHudBounds({ width: 960, height: 540 }).scale, 0.78, 'small viewports must preserve the legibility floor')
@@ -174,7 +202,7 @@ const narrowLayout = layoutPolicy.resolveTableHudFrameLayout({
   roundSize: { width: 272, height: 84 },
   seatSize: { width: 280, height: 100 },
   suitSize: { width: 480, height: 68 },
-  toolbarSize: { width: 540, height: 70 },
+  toolbarSize: { width: 480, height: 70 },
 })
 closeTo(narrowLayout.bottom.suitBar.x, narrowLayout.bottom.toolbar.x, 'narrow viewports must split bottom tools onto one shared lane')
 assert.ok(narrowLayout.bottom.suitBar.y > narrowLayout.bottom.toolbar.y, 'the straight-flush group must occupy the upper split row')
@@ -227,20 +255,22 @@ const seatConstruction = seatGroupSource.slice(seatGroupSource.indexOf('private 
 assert.match(seatConstruction, /new Node\('DefaultAvatar'\)[\s\S]*addComponent\(Sprite\)/, 'table seats must reserve a real image sprite for the avatar')
 assert.doesNotMatch(seatConstruction, /AvatarText|createLabel\([^\n]*Avatar/, 'table seats must not substitute letters or player names for a missing avatar image')
 const seatRendering = seatGroupSource.slice(seatGroupSource.indexOf('private renderViews'))
-assert.match(seatRendering, /view\.avatarSprite\.spriteFrame = this\.defaultAvatarFrame[\s\S]*active = Boolean\(this\.defaultAvatarFrame\)/)
+assert.match(seatRendering, /place === 'bottom' \? this\.ownAvatarFrame \?\? this\.defaultAvatarFrame : this\.defaultAvatarFrame/)
+assert.match(seatRendering, /active = Boolean\(view\.avatarSprite\.spriteFrame\)/)
 assert.doesNotMatch(seatRendering, /drawPanel\(view\.graphics|roundRect\(-95, -35, 190, 70/, 'seat details must not sit inside one large outer panel')
 
-assert.match(layoutPolicySource, /TABLE_HUD_TURN_OPERATION_ANCHORS[\s\S]*bottom: Object\.freeze\(\{ x: 0, y: -82 \}\)[\s\S]*right: Object\.freeze\(\{ x: 300, y: 0 \}\)[\s\S]*top: Object\.freeze\(\{ x: 0, y: 218 \}\)[\s\S]*left: Object\.freeze\(\{ x: -300, y: 0 \}\)/, 'the turn timer must use the same four operation-area anchors as played cards')
+assert.deepEqual(layoutPolicy.TABLE_HUD_TURN_OPERATION_ANCHORS, { bottom: { x: 0, y: 44 }, top: { x: 0, y: 218 } }, 'only human/top anchors stay fixed; sides must use the shared played-card policy')
+assert.match(scene, /return TABLE_HUD_TURN_OPERATION_ANCHORS\.bottom\.y/, 'legacy and tribute actions must use the same anchor as the active HUD')
 assert.match(source, /humanTurnTimer[\s\S]*desiredParent = humanTurnTimer \? this\.operationOverlay : this\.root/, 'the human timer must join the draggable operation row only on the human turn')
-assert.match(source, /clampTableHudOverlayPosition\([\s\S]*TABLE_HUD_TURN_OPERATION_ANCHORS\[this\.state\.turnPlace\][\s\S]*\{ width: 112, height: 112 \}/, 'other players timers must remain independently clamped at their operation anchors')
+assert.match(source, /clampTableHudOverlayPosition\([\s\S]*turnTimerPosition\(this\.viewport, this\.state\.turnPlace\)[\s\S]*\{ width: 112, height: 112 \}/, 'other players timers share the played-area anchor and retain safe-area bounds')
 assert.match(source, /this\.place\(timerNode, timerPosition\.x, timerPosition\.y, bounds\.scale, 80\)/, 'every seat timer must use the same scale as the human timer')
 assert.doesNotMatch(source, /NON_HUMAN_TIMER_SCALE/, 'other seats must not apply a separate timer scale')
 assert.match(layoutPolicySource, /id: 'seat-top', x: -220, y: TABLE_HUD_TURN_OPERATION_ANCHORS\.top\.y/, 'the opposite seat must sit fully left of the top operation area')
-assert.match(scene, /new Vec3\(-220, 218, 0\)/, 'the legacy seat origin used for card flights must agree with the opposite HUD seat')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableSceneLayout.ts'), 'utf8'), /new Vec3\(-220, 218, 0\)/, 'the legacy seat origin used for card flights must agree with the opposite HUD seat')
 assert.match(turnClock, /private turnPlace[\s\S]*PLAYER_PLACES\[\(PLAYER_ORDER\.indexOf\(activePlayerId\) - PLAYER_ORDER\.indexOf\(humanId\) \+ 4\) % 4\]/, 'the active player must be projected into the viewer-relative operation place')
-assert.match(turnClock, /const turnVisible = multiplayer[\s\S]*: Boolean\(this\.dependencies\.label\.node\.active\) \|\| \(snapshot\.phase === 'playing' && !snapshot\.actionPending\)/, 'local AI turns must keep the timer visible at their operation area')
+assert.doesNotMatch(turnClock, /actOnLocalTimeout/, 'no retired local AI timer remains')
 assert.match(turnClock, /turnSeconds: turnVisible \? \(this\.dependencies\.label\.node\.active \? this\.remainingSeconds : this\.durationSeconds\(\)\) : 0/, 'non-human local turns use the configured duration while hidden recovery clocks expose no invented seconds')
-assert.match(playArea, /relativePlaces = \[new Vec3\(0, -82, 0\), new Vec3\(300, 0, 0\), new Vec3\(0, 218, 0\), new Vec3\(-300, 0, 0\)\]/, 'the opposite player play area must move into the top table lane')
+assert.match(playArea, /playedCardPosition\(this\.viewport, place, count\)/, 'the played fan uses the tested safe-edge and bottom-alignment policy')
 
 assert.doesNotMatch(layoutPolicySource, /id: 'turn-timer'/, 'the floating timer must not participate in lower seat collision resolution')
 assert.match(source, /new Node\('FloatingOperationGroup'\)/, 'timer and operation buttons need one draggable top-layer group')
@@ -250,16 +280,16 @@ assert.match(source, /private bindDragHandle[\s\S]*EventType\.TOUCH_MOVE[\s\S]*e
 assert.match(layoutPolicySource, /clampTableHudOverlayPosition[\s\S]*bounds\.left[\s\S]*bounds\.right[\s\S]*bounds\.bottom[\s\S]*bounds\.top/, 'floating groups must stay inside the current safe bounds')
 assert.match(source, /this\.overlayPositions\.operations \?\? TABLE_HUD_TURN_OPERATION_ANCHORS\.bottom/, 'the draggable turn-action row must default to the human operation area')
 assert.match(source, /toolbar\.parent = parent/, 'lock, arrange and chat tools must remain outside the draggable turn-action row')
-assert.match(layoutPolicySource, /const toolbarX = laneRight - toolbarSize\.width \* singleRowScale \/ 2[\s\S]*const suitX = toolbarX - toolbarSize\.width \* singleRowScale \/ 2 - TABLE_HUD_BOTTOM_GROUP_GAP \* singleRowScale - suitSize\.width \* singleRowScale \/ 2/, 'the straight-flush group must sit immediately beside the lock toolbar instead of anchoring to the far left')
+assert.match(layoutPolicySource, /const suitX = laneLeft \+ suitSize\.width \* singleRowScale \/ 2[\s\S]*const toolbarX = bounds\.right - 8 - toolbarSize\.width \* singleRowScale \/ 2/, 'optional tools reserve the local player lane and keep hand tools at the right safe edge')
 assert.match(source, /this\.turnActionNodes\.forEach\(node => \{ node\.parent = this\.operationOverlay \}\)/, 'authoritative action buttons must be reparented without replacing their callbacks')
 assert.match(source, /visibleActions = this\.turnActionNodes\.filter\(node => node\.isValid && node\.active\)/, 'the row must include only currently valid action buttons')
 assert.match(source, /this\.place\(timerNode, row\.timerX, 0, 1, 2\)/, 'the human timer must occupy the first slot of the shared turn-action row')
 assert.match(source, /Tween\.stopAllByTarget\(node\)[\s\S]*this\.place\(node, row\.actionXs\[index\], 0, 1, 3\)/, 'HUD positioning must cancel stale fallback tweens before laying out action buttons')
 assert.match(scene, /turnActionNodes: \[this\.hintButton, this\.passButton, this\.playButton\]/, 'the scene must supply the fixed 提示/不要/出牌 controls in display order')
 assert.match(presenterSource, /hud\.setTurnActionNodes\(options\.turnActionNodes\)/, 'the presenter must attach the supplied controls to the HUD operation row')
-assert.match(scene, /makeButton\('PassButton', '不要', -185, 112, 54, 28\)/, '不要 must use the same 28px type setting as 出牌')
-assert.match(scene, /makeButton\('HintButton', '提示', -62, 112, 54, 28\)/, '提示 must use the same 28px type setting as 出牌')
-assert.match(scene, /makeButton\('PlayButton', '出牌', 70, 128, 58, 28\)/, '出牌 must remain the most prominent table action')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableSceneNodes.ts'), 'utf8'), /ui\.button\('PassButton', '不要', -185, 112, 54, 28\)/, '不要 must use the same 28px type setting as 出牌')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableSceneNodes.ts'), 'utf8'), /ui\.button\('HintButton', '提示', -62, 112, 54, 28\)/, '提示 must use the same 28px type setting as 出牌')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableSceneNodes.ts'), 'utf8'), /ui\.button\('PlayButton', '出牌', 70, 128, 58, 28\)/, '出牌 must remain the most prominent table action')
 assert.doesNotMatch(scene, /resetButton|ResetButton|'重置'/, 'the table reset control and all of its visibility logic must be retired')
 assert.doesNotMatch(scene, /selectedCardIds\.length && this\.resetButton|playValidation\.canPlay && this\.playButton/, 'selected cards and play diagnosis must not resize the action row')
 assert.match(tableMatchCoordinator, /visible\.forEach[\s\S]*node\.active = true[\s\S]*if \(hud\.mounted\) return[\s\S]*tween\(node\)/, 'fallback action tweens must not fight the HUD-owned row')
@@ -277,9 +307,11 @@ assert.match(counterConstruction, /new Node\(`CounterSuit-\$\{suit\}`\)[\s\S]*ad
 assert.match(source, /public setSuitFrames \(frames: Readonly<Partial<Record<TableGameHudSuit, SpriteFrame>>>\): void \{[\s\S]*buttonSprite\.spriteFrame = frame[\s\S]*counterSprite\.spriteFrame = frame[\s\S]*this\.renderSuitButtons\(\)[\s\S]*this\.renderCounter\(\)/, 'one injected frame set must update both the suit bar and card counter')
 assert.doesNotMatch(hudSources, /[♠♥♣♦]/, 'the HUD must not fall back to device-dependent suit glyphs')
 const suitRendering = dynamicRendererSource.slice(dynamicRendererSource.indexOf('export const renderTableHudSuits'))
+assert.match(suitRendering, /input\.bar\) input\.bar\.active = true/, 'zero candidates must retain the complete suit bar')
 assert.match(suitRendering, /roundRect\(-82, -23, 244, 46, 12\)/, 'the four suits must sit inside one common rounded frame')
 assert.doesNotMatch(suitRendering, /drawButtonSurface|roundRect\([^,\n]+,[^,\n]+,\s*(?:44|48)\s*,/, 'suit rendering must not draw an individual box per glyph')
-assert.match(suitRendering, /available \? new Color\(255, 255, 255, 255\) : new Color\(105, 105, 105, 120\)/, 'unavailable suits must use a low-saturation, low-brightness filter')
+assert.match(suitRendering, /renderSuitAvailability\(view\.sprite, suit, available\)/, 'all suits share the neutral disabled renderer')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/TableHudSuitAvailability.ts'), 'utf8'), /new Color\(155, 162, 171\)/, 'disabled suits use a visible neutral gray, including originally black textures')
 assert.match(suitRendering, /underlineHalfWidth[\s\S]*underlineY[\s\S]*graphics\.moveTo\(x - underlineHalfWidth, underlineY\)[\s\S]*graphics\.lineTo/, 'available suits need a saturated underline cue')
 assert.match(suitRendering, /if \(selected\)[\s\S]*graphics\.circle\(x, 1, pressed \? \(expandedMetrics \? 20 : 17\) : \(expandedMetrics \? 22 : 19\)\)/, 'the selected suit needs a stronger halo cue')
 assert.match(presenterSource, /this\.requestSuitArtwork\(generation\)/, 'the presenter must request packaged suit artwork while mounting the HUD')
@@ -296,6 +328,8 @@ assert.match(toolbarConstruction, /configureTransform\(toolbar, BASE_TOOLBAR_WID
 assert.match(toolbarConstruction, /createButton\(toolbar, 'LockHand', '锁牌', -150, 116, 50, 24\)/, 'lock and restore text must keep its enlarged 24px treatment')
 assert.match(toolbarConstruction, /createButton\(toolbar, 'ArrangeHand', '一键理牌', 0, 164, 50, 26\)/, 'arrange and restore text must keep its enlarged 26px treatment')
 assert.match(toolbarConstruction, /createButton\(toolbar, 'QuickChat', '快捷语', 150, 116, 50, 24\)/, 'quick chat must align visually with the arrangement tools at 24px')
+assert.match(source, /configureToolbarButton\(this\.lockButton, -164, 132, 64, 28\)[\s\S]*configureToolbarButton\(this\.arrangeButton, 0, 172, 64, 30\)[\s\S]*configureToolbarButton\(this\.chatButton, 164, 132, 64, 28\)/, 'expanded hand tools must leave room for the central action lane')
+assert.match(presenterSource, /private counterExpanded = false/, 'the large card counter must start collapsed on compact landscape tables')
 assert.match(workspace, /const baseline = this\.grouping\.getSnapshot\(\)[\s\S]*this\.grouping\.arrange[\s\S]*this\.grouping\.autoGroup[\s\S]*mode: 'smart-arranged', baseline/, 'the first click must checkpoint and enter explicit smart arrangement')
 assert.match(workspace, /this\.arrangementState\.mode === 'smart-arranged'[\s\S]*restoreSnapshot\(this\.arrangementState\.baseline\)[\s\S]*mode: 'point-stacked'/, 'the second click must leave smart arrangement and restore the point-stacked state')
 assert.doesNotMatch(scene, /['"](?:TableHomeButton|ChatButton|ArrangeButton)['"]|toggleArrangePanel/, 'HUD-replaced fallback buttons and their hidden panel must stay retired')
@@ -307,4 +341,71 @@ assert.match(passPresentation, /expiredPassKeys\.add\(key\)[\s\S]*actionNodes\.d
 assert.match(playArea, /if \(lastValidPlay === null\) this\.visibleActionStart = actions\.length/, 'starting a new trick must immediately retire previous action text')
 assert.match(playArea, /public clearPresentation \(\): void[\s\S]*actionNodes\.forEach\(node => this\.destroyNode\(node\)\)/, 'round/table teardown must clear every transient action node')
 
-process.stdout.write('table game HUD regression checks passed (active counter, straight-flush availability, shared suit frame, equal turn timers)\n')
+// Public possibility never receives opponents' card identities or values.
+const { publicStraightFlushPossibleSuits } = evaluateTypeScriptModule(path.join(projectRoot, 'assets/scripts/game/PublicStraightFlushPossibility.ts'))
+const suitsForTest = ['spade', 'heart', 'club', 'diamond']
+const physicalRanks = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A']
+const physicalDeck = suitsForTest.flatMap(suit => physicalRanks.flatMap(rank => [0, 1].map(copy => ({ id: `${suit}-${rank}-${copy}`, suit, rank }))))
+const possibilityInput = { knownHand: [], publicPlays: [], otherHandSizes: [27, 27, 27], level: 9, allowAceLowStraight: true }
+assert.deepEqual(publicStraightFlushPossibleSuits(possibilityInput), suitsForTest)
+assert.deepEqual(publicStraightFlushPossibleSuits({ ...possibilityInput, otherHandSizes: [4, 4, 0] }), [], 'no other seat can hold five cards')
+const leaveUnknown = ids => ({ ...possibilityInput, publicPlays: [{ cards: physicalDeck.filter(c => !ids.includes(c.id)) }], otherHandSizes: [ids.length, 0, 0] })
+const spadeFive = [2, 3, 4, 5, 6].map(rank => `spade-${rank}-0`)
+assert.deepEqual(publicStraightFlushPossibleSuits(leaveUnknown(spadeFive)), ['spade'])
+assert.deepEqual(publicStraightFlushPossibleSuits(leaveUnknown([...spadeFive.slice(0, 4), 'heart-9-0'])), ['spade'], 'one unseen wildcard can fill one gap')
+assert.deepEqual(publicStraightFlushPossibleSuits(leaveUnknown([...spadeFive.slice(0, 3), 'heart-9-0', 'heart-9-1'])), ['spade'], 'two physical wildcard cards can fill two gaps')
+assert.deepEqual(publicStraightFlushPossibleSuits(leaveUnknown([...spadeFive.slice(0, 2), 'heart-9-0', 'heart-9-1', 'club-K-0'])), [], 'two wildcards cannot fill three gaps')
+const aceLowOnly = leaveUnknown(['A', 2, 3, 4, 5].map(rank => `club-${rank}-0`))
+assert.deepEqual(publicStraightFlushPossibleSuits(aceLowOnly), ['club'])
+assert.deepEqual(publicStraightFlushPossibleSuits({ ...aceLowOnly, allowAceLowStraight: false }), [])
+const oneRemainingCopy = leaveUnknown(spadeFive)
+assert.deepEqual(publicStraightFlushPossibleSuits({ ...oneRemainingCopy, publicPlays: [...oneRemainingCopy.publicPlays, ...oneRemainingCopy.publicPlays] }), ['spade'], 'duplicate public actions do not consume the second copy')
+assert.deepEqual(publicStraightFlushPossibleSuits({ ...oneRemainingCopy, knownHand: [physicalDeck.find(c => c.id === 'spade-4-0')] }), [], 'own known cards cannot remain in other players potential straight flushes')
+const heartLevelNatural = leaveUnknown([7, 8, 9, 10, 'J'].map(rank => `heart-${rank}-0`))
+assert.deepEqual(publicStraightFlushPossibleSuits(heartLevelNatural), ['heart'], 'a heart level card can supply its natural rank exactly once')
+assert.match(presenterSource, /counterPossibleSuits: publicStraightFlushPossibleSuits/, 'counter gets an independent public-information projection')
+assert.doesNotMatch(presenterSource, /counterPossibleSuits: hand\.availableSuits/, 'counter must not mirror own hand availability')
+
+const stubNode = () => ({ active: true, children: {}, getChildByName (name) { return this.children[name] }, setPosition () {}, setScale () {} })
+class TestColor { constructor (r, g, b, a) { Object.assign(this, { r, g, b, a }) } }
+class TestVec { constructor (x, y, z) { Object.assign(this, { x, y, z }) } }
+class TestGraphics { moveTo () {} lineTo () {} close () {} fill () {} circle () {} bezierCurveTo () {} }
+class TestNode {
+  constructor (name) { this.name = name; Object.assign(this, stubNode()) }
+  set parent (parent) { parent.children[this.name] = this }
+  addComponent () { return new TestGraphics() }
+}
+const rendererDependency = request => {
+  if (request === './TableHudSuitAvailability') return evaluateTypeScriptModule(path.join(projectRoot, 'assets/scripts/ui/TableHudSuitAvailability.ts'), rendererDependency)
+  if (request === 'cc') return { Color: TestColor, Vec3: TestVec, Graphics: TestGraphics, Node: TestNode }
+  if (request === './TableGameHudFoundation') return {
+    SUITS: suitsForTest, BASE_COUNTER_WIDTH: 596, BASE_COUNTER_OPEN_HEIGHT: 82, BASE_COUNTER_CLOSED_HEIGHT: 42,
+    TABLE_GAME_HUD_COUNTER_RANKS: [], configureTransform () {}, drawTableHudPanel () {}, finiteOr: (v, f) => Number.isFinite(v) ? v : f,
+    nodeContentSize: () => ({ width: 382, height: 54 }),
+  }
+  throw new Error(request)
+}
+const dynamic = evaluateTypeScriptModule(dynamicRendererPath, rendererDependency)
+const graphics = { clear () {}, roundRect () {}, fill () {}, stroke () {}, moveTo () {}, lineTo () {}, circle () {} }
+const suitViews = new Map(suitsForTest.map(suit => [suit, { node: stubNode(), sprite: { node: stubNode(), spriteFrame: {} } }]))
+const emptyBar = stubNode()
+dynamic.renderTableHudSuits({ bar: emptyBar, graphics, buttons: suitViews, availableSuits: [], selectedSuit: 'heart', pressedSuit: null })
+assert.equal(emptyBar.active, true)
+assert.ok([...suitViews.values()].every(v => v.node.active && !v.sprite.enabled && v.sprite.node.children.UnavailableSuit.active))
+const counterSprites = new Map(suitsForTest.map(suit => [suit, { node: stubNode(), spriteFrame: {} }]))
+const counterInput = { panel: stubNode(), graphics, title: { node: stubNode() }, toggleLabel: { node: stubNode() }, hitArea: stubNode(), cells: new Map(), suitSprites: counterSprites, state: { counterExpanded: true, cardCounts: {}, counterPossibleSuits: [] } }
+dynamic.renderTableHudCounter(counterInput)
+assert.equal(counterInput.panel.active, true)
+assert.ok([...counterSprites.values()].every(s => s.node.active && !s.enabled && s.node.children.UnavailableSuit.active), 'zero possibility retains all four gray counter suits')
+counterInput.state.counterPossibleSuits = ['club']
+dynamic.renderTableHudCounter(counterInput)
+assert.equal(counterSprites.get('club').enabled, true)
+assert.equal(counterSprites.get('club').node.children.UnavailableSuit.active, false)
+assert.equal(counterSprites.get('heart').enabled, false)
+assert.ok([...suitViews.values()].every(v => !v.sprite.enabled), 'counter lighting is independent of the hand suit controls')
+dynamic.renderTableHudSuits({ bar: emptyBar, graphics, buttons: suitViews, availableSuits: suitsForTest, selectedSuit: null, pressedSuit: null })
+assert.ok([...suitViews.values()].every(v => v.sprite.enabled && !v.sprite.node.children.UnavailableSuit.active), 'available suits recover their original artwork')
+dynamic.renderTableHudSuits({ bar: emptyBar, graphics, buttons: suitViews, availableSuits: [], selectedSuit: null, pressedSuit: null })
+assert.ok([...suitViews.values()].every(v => Object.keys(v.sprite.node.children).length === 1 && v.sprite.node.children.UnavailableSuit.active), 'repeated state changes reuse the same disabled silhouette')
+
+process.stdout.write('table game HUD regression checks passed (public possibilities, retained gray suits, active counter, equal turn timers)\n')

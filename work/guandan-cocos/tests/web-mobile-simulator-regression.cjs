@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const template = fs.readFileSync(path.join(root, 'build-templates/web-desktop/index.ejs'), 'utf8')
+const style = fs.readFileSync(path.join(root, 'build-templates/web-desktop/style.css'), 'utf8')
+const finalizer = fs.readFileSync(path.join(root, 'scripts/finalize-web-build.mjs'), 'utf8')
+
+assert.match(template, /class="desktop-mobile-simulator"/)
+assert.match(template, /id="MobileStage"/)
+assert.match(template, /id="GameCanvas" width="<%= previewWidth %>" height="<%= previewHeight %>"/)
+assert.match(style, /--simulated-mobile-width:\s*874px/)
+assert.match(style, /--simulated-mobile-height:\s*402px/)
+assert.match(style, /\.desktop-mobile-simulator\s*\{[\s\S]*display:\s*grid;[\s\S]*place-items:\s*center;/)
+assert.match(style, /#MobileStage\s*\{[\s\S]*box-sizing:\s*border-box;[\s\S]*width:\s*var\(--simulated-mobile-width\);[\s\S]*height:\s*var\(--simulated-mobile-height\);[\s\S]*padding:\s*0;[\s\S]*overflow:\s*hidden;/)
+assert.match(style, /#GameDiv\s*\{[\s\S]*width:\s*var\(--simulated-mobile-width\)\s*!important;[\s\S]*height:\s*var\(--simulated-mobile-height\)\s*!important;/)
+assert.doesNotMatch(style, /@media|100vw\s*!important|100vh\s*!important/, 'desktop test shell must not become responsive or full-viewport')
+assert.match(finalizer, /fixed 874x402 desktop mobile simulator shell/)
+
+console.log('fixed 874x402 desktop mobile simulator regression checks passed')

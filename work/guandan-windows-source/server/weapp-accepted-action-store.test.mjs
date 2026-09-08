@@ -29,3 +29,15 @@ store.deleteToken('new')
 assert.equal(store.entries.size, 0, 'retiring a resume token deletes all of its replay identities')
 
 console.log('weapp accepted action store tests passed')
+
+const response = { version: 1, trustees: { p1: null }, nested: [{ score: 2 }] }
+const completion = { kind: 'room-exit', hostLeft: false }
+store.remember('immutable', 'fp', response, 'roomLeft', completion)
+response.trustees.p1 = { reason: 'manual' }
+response.nested[0].score = 9
+completion.hostLeft = true
+assert.deepEqual(store.entries.get('immutable').response, { version: 1, trustees: { p1: null }, nested: [{ score: 2 }] })
+assert.equal(store.entries.get('immutable').completion.hostLeft, false, 'completion metadata is owned by the cache too')
+store.remember('host:exit', 'exit', {}, 'roomLeft')
+store.deleteToken('host', 'host:exit')
+assert.equal(store.entries.has('host:exit'), true, 'host finalization must preserve its own exit receipt')

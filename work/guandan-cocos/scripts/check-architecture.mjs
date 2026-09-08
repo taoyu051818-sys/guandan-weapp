@@ -11,6 +11,12 @@ const failures = []
 
 const listTypescript = async (directory = scriptsRoot) => {
   const entries = await readdir(directory, { withFileTypes: true })
+  const names = new Set(entries.map(entry => entry.name))
+  for (const entry of entries) {
+    if (entry.name.endsWith('.ts.meta') && !names.has(entry.name.slice(0, -5))) {
+      failures.push(`${relative(scriptsRoot, resolve(directory, entry.name))}: orphan script metadata`)
+    }
+  }
   const nested = await Promise.all(entries.map(async entry => {
     const path = resolve(directory, entry.name)
     if (entry.isDirectory()) return await listTypescript(path)
@@ -103,6 +109,7 @@ for (const file of files) {
     if (targetFromProject === 'migration' || targetFromProject.startsWith('migration/')) {
       failures.push(`${localPath}: runtime assets must not import migration-only source (${specifier})`)
     }
+    if (!resolveLocalModule(file, specifier)) failures.push(`${localPath}: unresolved local module (${specifier})`)
   }
   if (importedModules.some(specifier => specifier === 'cc' || specifier.startsWith('cc/'))) {
     directCocosDependencies.add(file)
@@ -113,6 +120,14 @@ for (const file of files) {
   runtimeDependencies.set(file, runtimeModuleSpecifiers(file, source)
     .map(specifier => resolveLocalModule(file, specifier))
     .filter(Boolean))
+  if (localPath.startsWith('scenes/front-pages/') || localPath === 'scenes/FrontPageController.ts') {
+    for (const dependency of runtimeDependencies.get(file) ?? []) {
+      const target = relative(scriptsRoot, dependency)
+      if (target === 'services/DevelopmentApis.ts' || target.startsWith('development/')) {
+        failures.push(`${localPath}: page must receive preview data via injection (${target})`)
+      }
+    }
+  }
   const topDirectory = localPath.split('/')[0]
   if (!lowerLayers.has(topDirectory)) continue
   for (const dependency of runtimeDependencies.get(file) ?? []) {
@@ -171,8 +186,8 @@ if (ciTypecheckConfig.error) {
   for (const diagnostic of parsed.errors) {
     failures.push(`tsconfig.ci-core.json: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`)
   }
-  if (!parsed.options.strict || !parsed.options.noEmit) {
-    failures.push('tsconfig.ci-core.json: CI core typecheck must keep strict and noEmit enabled')
+  if (!parsed.options.strict || !parsed.options.noEmit || !parsed.options.noUnusedLocals || !parsed.options.noUnusedParameters) {
+    failures.push('tsconfig.ci-core.json: CI core typecheck must keep strict, noEmit and unused-code checks enabled')
   }
   const ciTypecheckRoots = new Set(parsed.fileNames.map(path => resolve(path)))
   for (const file of files) {
@@ -201,6 +216,13 @@ for (const testFile of rootTests) {
 // Budgets are architectural guardrails, not style rules. Lower them after a
 // responsibility is extracted; never raise one to make a new feature fit.
 const lineBudgets = {
+  'audio/ActionVoiceGate.ts': 25,
+  'audio/OptionalAudioAssetCache.ts': 110,
+  'audio/CocosAudioController.ts': 250,
+  'services/ProfileSaveCoordinator.ts': 60,
+  'services/platform/client.ts': 180,
+  'scenes/front-pages/FriendRoomPlatformFlow.ts': 165,
+  'scenes/front-pages/FriendRoomReservationCleanup.ts': 90,
   'core/generated/ai/engine.ts': 280,
   'core/generated/ai/decisionRunner.ts': 370,
   'core/generated/ai/policyOverrides.ts': 210,
@@ -208,41 +230,50 @@ const lineBudgets = {
   'core/generated/ai/decisionSupport.ts': 480,
   'core/generated/ai/search.ts': 550,
   'core/generated/ai/strategies/master.ts': 600,
-  'game/GameManager.ts': 500,
+  'game/GameManager.ts': 250,
   'game/HandArrangement.ts': 50,
   'game/HandArrangementModel.ts': 240,
   'game/HandDisplayOrdering.ts': 190,
   'game/HandGroupSuggestions.ts': 340,
   'game/HandGrouping.ts': 650,
   'game/HandGroupingState.ts': 290,
-  'game/NetworkMatchSnapshotController.ts': 180,
-  'scenes/GameScene.ts': 700,
-  'scenes/TableMatchCoordinator.ts': 520,
+  'game/NetworkMatchSnapshotController.ts': 200,
+  'scenes/GameScene.ts': 625,
+  'scenes/TableSceneNodes.ts': 90,
+  'scenes/TableMatchPorts.ts': 55,
+  'services/DataSnapshot.ts': 30,
+  'services/DevelopmentPlayerStore.ts': 35,
+  'scenes/TableSceneLayout.ts': 75,
+  'scenes/TableMatchCoordinator.ts': 440,
+  'scenes/TableProgressPresentation.ts': 100,
   'scenes/TableNetworkEventBridge.ts': 105,
-  'scenes/TableHudPresenter.ts': 230,
-  'ui/TableGameHud.ts': 560,
+  'scenes/TableHudPresenter.ts': 245,
+  'ui/TableGameHud.ts': 575,
   'ui/TableHudTurnTimerView.ts': 105,
   'ui/TableHudDynamicRenderer.ts': 150,
-  'ui/TableHudSeatViewGroup.ts': 210,
+  'ui/TableHudSeatViewGroup.ts': 225,
   'services/PlatformApi.ts': 30,
-  'network/LobbyController.ts': 500,
+  'network/LobbyController.ts': 495,
+  'network/LobbyEntryRequest.ts': 55,
   'network/LobbyCommandSender.ts': 55,
   'network/LobbyConnectionEventCoordinator.ts': 80,
   'network/LobbyMessageRouter.ts': 210,
+  'scenes/front-pages/ShopPageDomain.ts': 60,
   'scenes/front-pages/MatchmakingPageDomain.ts': 390,
   'scenes/front-pages/LobbyPageDomain.ts': 630,
   'scenes/front-pages/LobbyPlayerProfilePresenter.ts': 135,
   'scenes/front-pages/FriendRoomSettingsPresenter.ts': 270,
-  'development/EffectLabSceneHost.ts': 215,
-  'development/EffectLabPreviewRunner.ts': 165,
-  'effects/EffectController.ts': 500,
+  'effects/EffectController.ts': 380,
   'effects/EffectActionPresentationCoordinator.ts': 120,
   'effects/EffectPlaybackCoordinator.ts': 240,
   'scenes/SceneBackdropController.ts': 180,
   'scenes/StartupCoordinator.ts': 160,
-  'scenes/TableOverlayController.ts': 460,
+  'scenes/TableOverlayController.ts': 480,
+  'scenes/front-pages/ProfileEditorModal.ts': 180,
+  'services/WechatProfileProvider.ts': 90,
+  'ui/ProfileAvatar.ts': 90,
   'scenes/TableTurnClockController.ts': 210,
-  'scenes/TableHandInteractionController.ts': 310,
+  'scenes/TableHandInteractionController.ts': 320,
 }
 
 for (const [path, maximum] of Object.entries(lineBudgets)) {

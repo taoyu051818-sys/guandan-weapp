@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createWeAppMatchLifecycle } from './weapp-match-lifecycle.js'
+import './bot-turn-pacing.test.mjs'
 
 const playerIds = ['p1', 'p2', 'p3', 'p4']
 let clock = 10_000
@@ -114,6 +115,17 @@ assert.deepEqual(room.matchEnded, {
   winnerTeam: 'teamA',
 })
 assert.deepEqual(room.roundReady, { p1: false, p2: false, p3: false, p4: false })
+const quickRoom = { ...room, roomId: '345678', entryKind: 'match', matchEnded: null, roundSequence: 0,
+  state: { matchFormat: { kind: 'independent' } }, scores: { teamA: 0, teamB: 1 } }
+lifecycle.consumeRoundSettlement(quickRoom, { isGameWon: false, winnerTeam: 'teamB' })
+assert.equal(quickRoom.matchEnded.reason, 'single-round')
+assert.equal(quickRoom.matchEnded.configuredRounds, 1)
+assert.equal(quickRoom.matchEnded.winnerTeam, 'teamB')
+assert.equal(quickRoom.turnDeadlineAt, null)
+assert.deepEqual(quickRoom.roundReady, { p1: false, p2: false, p3: false, p4: false })
+const upgradeRoom = { ...room, roomId: '456789', roomSettings: { ...room.roomSettings, format: 'upgrade', totalTimeMinutes: 0 }, totalDeadlineAt: null, matchEnded: null, roundSequence: 32 }
+lifecycle.consumeRoundSettlement(upgradeRoom, { isGameWon: false, winnerTeam: 'teamA' })
+assert.equal(upgradeRoom.matchEnded, null, '升级房第33局仍不触发定局终局')
 lifecycle.dispose()
 
 const runDeadlineFailureCase = async ({ bot = false, dispatchMatchIntentImpl, persistFailures = 0 } = {}) => {

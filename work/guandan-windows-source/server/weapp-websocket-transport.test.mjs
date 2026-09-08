@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import {
   frameTextMessage,
+  isProtocolUpgradeRequest,
   sendProtocolMessage,
   upgradeToProtocolConnection,
 } from './weapp-websocket-transport.js'
@@ -51,6 +52,9 @@ const maskedClientFrame = (payload, opcode = 1) => {
 
 assert.deepEqual([...frameTextMessage('ok')], [0x81, 2, 111, 107])
 assert.throws(() => frameTextMessage('x'.repeat(65536)), /WebSocket 消息过大/)
+assert.equal(isProtocolUpgradeRequest(request()), true)
+assert.equal(isProtocolUpgradeRequest({ ...request(), url: '/other' }), false)
+assert.equal(isProtocolUpgradeRequest(request({ upgrade: 'h2c' })), false)
 
 {
   const socket = new TestSocket()

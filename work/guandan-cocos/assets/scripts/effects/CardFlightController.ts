@@ -3,6 +3,7 @@ import type { Card } from '../core/generated'
 import { EffectHandle, type EffectCancelReason } from './EffectHandle'
 import { EffectNodePool } from './EffectNodePool'
 import { preloadVfxCardFrames } from './VfxCardSnapshot'
+import { PLAYED_CARD_SCALE, playedCardSpacing } from '../ui/PlayedCardLayout'
 
 const quadraticPoint = (start: Vec3, control: Vec3, end: Vec3, t: number): Vec3 => {
   const inverse = 1 - t
@@ -14,8 +15,8 @@ const quadraticPoint = (start: Vec3, control: Vec3, end: Vec3, t: number): Vec3 
 }
 
 /** Shared flight/static fan geometry so a landed card never jumps on handoff. */
-export const resolvePlayedCardSpacing = (cardCount: number): number =>
-  Math.min(42, 210 / Math.max(1, cardCount - 1))
+export const PLAYED_CARD_FINAL_SCALE = PLAYED_CARD_SCALE
+export const resolvePlayedCardSpacing = playedCardSpacing
 
 export class CardFlightController {
   private readonly active = new Set<Node>()
@@ -61,27 +62,27 @@ export class CardFlightController {
         node.parent = this.root
         const fallback = sourceWorldPositions[0] ?? targetWorldPosition
         const source = local(sourceWorldPositions[index] ?? fallback)
-        const spread = resolvePlayedCardSpacing(cards.length)
+        const spread = resolvePlayedCardSpacing(cards.length) * PLAYED_CARD_FINAL_SCALE
         const end = new Vec3(target.x + (index - (cards.length - 1) / 2) * spread, target.y, index)
         const distance = Math.hypot(end.x - source.x, end.y - source.y)
         const arcHeight = Math.max(54, Math.min(150, distance * 0.24))
         const control = new Vec3((source.x + end.x) / 2, (source.y + end.y) / 2 + arcHeight, index + 1)
         node.setPosition(source)
+        node.setScale(Vec3.ONE)
         const startAngle = (index - (cards.length - 1) / 2) * 3
         node.setRotationFromEuler(0, 0, startAngle)
         const seconds = durationMs / 1000
         tween(node)
           .delay(index * 0.025)
-          .parallel(
-            tween().update(seconds, (targetNode, rawRatio) => {
-              const ratio = rawRatio ?? 0
-              const progress = (1 - Math.cos(Math.PI * ratio)) / 2
-              targetNode.setPosition(quadraticPoint(source, control, end, progress))
-              targetNode.setRotationFromEuler(0, 0, startAngle * (1 - progress))
-            }),
-            tween().to(seconds * 0.55, { scale: new Vec3(0.94, 0.94, 1) }, { easing: 'sineOut' })
-              .to(seconds * 0.45, { scale: new Vec3(0.86, 0.86, 1) }, { easing: 'sineIn' }),
-          )
+          .update(seconds, (targetNode, rawRatio) => {
+            const ratio = rawRatio ?? 0
+            const progress = (1 - Math.cos(Math.PI * ratio)) / 2
+            // Finish shrinking during flight; the last 20% travels at the landed size.
+            const scale = 1 + (PLAYED_CARD_FINAL_SCALE - 1) * Math.min(1, progress / 0.8)
+            targetNode.setScale(new Vec3(scale, scale, 1))
+            targetNode.setPosition(quadraticPoint(source, control, end, progress))
+            targetNode.setRotationFromEuler(0, 0, startAngle * (1 - progress))
+          })
           .call(() => {
             if (!handle.isActive) return
             this.active.delete(node)

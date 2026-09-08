@@ -1,10 +1,7 @@
 import { gameResultSignature, spectatorEventSignature } from './crypto.js'
 import { JsonSpectatorOutboxStore } from './spectator-outbox-store.js'
-
-const unrefDelay = (delay) => new Promise(resolve => {
-  const timer = setTimeout(resolve, delay)
-  timer.unref?.()
-})
+import { snapshotReportEvent, requireSpectatorAcknowledgement } from './report-event-contract.js'
+import { ReportDeliveryLifetime } from './report-delivery-lifetime.js'
 
 /**
  * 牌局服到平台的低权限公开事件写入器。
@@ -24,8 +21,7 @@ export class SpectatorEventReporter {
     this.retryMaxMs = Math.max(this.retryBaseMs, Number(retryMaxMs) || 30_000)
     this.timeoutMs = Math.max(100, Number(timeoutMs) || 3000)
     this.queues = new Map()
-    this.stopped = new Map()
-    this.retryWaiters = new Map()
+    this.lifetime = new ReportDeliveryLifetime()
     this.operationsByEventId = new Map()
     this.outbox = outbox || (outboxFilePath ? new JsonSpectatorOutboxStore({ filePath: outboxFilePath }) : null)
     if (this.configured && this.outbox) this.restorePending()
@@ -40,9 +36,9 @@ export class SpectatorEventReporter {
   /** Synchronously stages the durable record, then returns its ordered delivery promise. */
   stage (event) {
     if (!this.configured) return Promise.resolve({ skipped: true })
+    event = snapshotReportEvent(event)
     const key = String(event?.matchId || '')
-    const stopped = this.stopped.get(key)
-    if (stopped) throw stopped
+    this.lifetime.assertActive(key)
     if (this.outbox) {
       // A local durable-write failure is retryable. Do not poison the match's
       // network-delivery queue; the caller retains the event in its room snapshot
@@ -75,6 +71,7 @@ export class SpectatorEventReporter {
   }
 
   schedule (key, event) {
+    event = snapshotReportEvent(event)
     const previous = this.queues.get(key) || Promise.resolve()
     // Never catch `previous` here: a stopped head must reject the rest of that
     // match queue, while a transient failure is retained and retried in place.
@@ -95,52 +92,35 @@ export class SpectatorEventReporter {
 
   /** Stops one match queue and wakes an unref'ed retry wait. Primarily used during explicit room/service shutdown. */
   stop (matchId, reason = new Error('观战事件上报已停止')) {
-    const key = String(matchId || '')
-    const error = reason instanceof Error ? reason : new Error(String(reason))
-    this.stopped.set(key, error)
-    const waiter = this.retryWaiters.get(key)
-    if (waiter) {
-      clearTimeout(waiter.timer)
-      this.retryWaiters.delete(key)
-      waiter.reject(error)
-    }
+    this.lifetime.stop(String(matchId || ''), reason)
   }
 
   async reportUntilAccepted (key, event) {
     let retryRound = 0
     while (true) {
-      const stopped = this.stopped.get(key)
-      if (stopped) throw stopped
+      this.lifetime.assertActive(key)
       try {
         const accepted = await this.report(event)
+        this.lifetime.assertActive(key)
         this.outbox?.remove(event.eventId)
         return accepted
       } catch (error) {
-        const stopError = this.stopped.get(key)
-        if (stopError) throw stopError
+        this.lifetime.assertActive(key)
         retryRound += 1
         const delay = Math.min(this.retryMaxMs, this.retryBaseMs * (2 ** Math.min(20, retryRound - 1)))
-        await this.waitForRetry(key, delay)
+        await this.lifetime.wait(key, delay)
       }
     }
   }
 
-  waitForRetry (key, delay) {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        if (this.retryWaiters.get(key)?.timer === timer) this.retryWaiters.delete(key)
-        resolve()
-      }, delay)
-      timer.unref?.()
-      this.retryWaiters.set(key, { timer, reject })
-    })
-  }
-
   async report (event) {
     if (!this.configured) return { skipped: true }
+    event = snapshotReportEvent(event)
+    const key = String(event.matchId || '')
     const rawBody = JSON.stringify(event)
     let lastError
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      this.lifetime.assertActive(key)
       const timestamp = String(this.now())
       try {
         const headers = {
@@ -154,26 +134,29 @@ export class SpectatorEventReporter {
           headers['x-game-timestamp'] = timestamp
           headers['x-game-signature'] = gameResultSignature(rawBody, this.lifecycleSecret, timestamp)
         }
-        const response = await this.fetchImpl(this.endpoint, {
-          method: 'POST',
-          headers,
-          body: rawBody,
-          signal: AbortSignal.timeout(this.timeoutMs),
+        return await this.lifetime.request(key, this.timeoutMs, async signal => {
+          const response = await this.fetchImpl(this.endpoint, {
+            method: 'POST',
+            headers,
+            body: rawBody,
+            signal,
+          })
+          const payload = await response.json().catch(() => null)
+          if (!response.ok || !payload?.ok) {
+            const error = new Error(payload?.error?.message || `观战事件回调失败：HTTP ${response.status}`)
+            error.code = payload?.error?.code
+            error.status = response.status
+            error.details = payload?.error?.details
+            throw error
+          }
+          return requireSpectatorAcknowledgement(payload.data?.event, event)
         })
-        const payload = await response.json().catch(() => null)
-        if (!response.ok || !payload?.ok) {
-          const error = new Error(payload?.error?.message || `观战事件回调失败：HTTP ${response.status}`)
-          error.code = payload?.error?.code
-          error.status = response.status
-          error.details = payload?.error?.details
-          throw error
-        }
-        return payload.data.event
       } catch (error) {
+        this.lifetime.assertActive(key)
         lastError = error
         if (attempt < this.maxAttempts) {
           const delay = Math.min(2000, this.retryBaseMs * (2 ** (attempt - 1)))
-          await unrefDelay(delay)
+          await this.lifetime.wait(key, delay)
         }
       }
     }

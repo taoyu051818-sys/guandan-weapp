@@ -1,6 +1,8 @@
 import { Graphics, type Label, Node, Sprite, SpriteFrame, Texture2D, UITransform } from 'cc'
 import type { PlayerId, Rank } from '../core/generated'
 import type { GameSnapshot } from '../game/GameManager'
+import { publicStraightFlushPossibleSuits } from '../game/PublicStraightFlushPossibility'
+import type { TeammateHandView } from '../game/TeammateHandProjector'
 import type { LobbySnapshot } from '../network/LobbyController'
 import { loadGameAsset, type GameAssetLoadCancel } from '../services/GameAssetLoader'
 import { requestClassicCardFrame } from '../ui/ClassicCardFrameStore'
@@ -15,8 +17,9 @@ import {
   type TableGameHudViewport,
 } from '../ui/TableGameHud'
 import type { TableHandProjection } from './TableHandInteractionController'
-import { projectTableViewer } from './TableSnapshotPresenter'
+import { projectTableSeatStatus, projectTableViewer } from './TableSnapshotPresenter'
 import type { TableTurnClockProjection } from './TableTurnClockController'
+import type { UserProfile } from '../services/FrontPageGatewayContracts'
 
 const TABLE_TIMER_ART_ASSET = 'ui/table/chicken-timer-frame/texture'
 const DEFAULT_AVATAR_ART_ASSET = 'ui/common/default-avatar/texture'
@@ -29,6 +32,8 @@ export type TableHudPresenterDependencies = Readonly<{
   lobbySnapshot: () => LobbySnapshot | null
   isMultiplayer: () => boolean
   turnClock: (snapshot: GameSnapshot, humanId: PlayerId) => TableTurnClockProjection | null
+  ownProfile?: () => UserProfile | null
+  ownAvatarFrame?: () => Promise<SpriteFrame | null>
 }>
 
 export type TableHudMountOptions = Readonly<{
@@ -37,13 +42,28 @@ export type TableHudMountOptions = Readonly<{
   legacySeatNodes: readonly Node[]
 }>
 
+export type TableMatchControls = Readonly<{
+  hint: Node | null
+  pass: Node | null
+  play: Node | null
+  confirmTribute: Node | null
+  finishTribute: Node | null
+  nextRound: Node | null
+  trustee: Node | null
+  hintLabel: Label | null
+  phaseLabel: Label | null
+  levelLabel: Label | null
+  overlayLabel: Label | null
+}>
+
 /** Owns authoritative HUD projection, presentation assets and HUD-only state. */
 export class TableHudPresenter {
   private tableHud: TableGameHud | null = null
-  private counterExpanded = true
+  private counterExpanded = false
   private generation = 0
   private timerLoadCancel: GameAssetLoadCancel | null = null
   private avatarLoadCancel: GameAssetLoadCancel | null = null
+  private ownAvatarKey = ''
 
   public constructor (private readonly dependencies: TableHudPresenterDependencies) {}
 
@@ -80,7 +100,7 @@ export class TableHudPresenter {
     return hudNode
   }
 
-  public render (snapshot: GameSnapshot, humanId: PlayerId, hand: TableHandProjection): void {
+  public render (snapshot: GameSnapshot, humanId: PlayerId, hand: TableHandProjection, teammate: TeammateHandView | null = null): void {
     if (!this.tableHud) return
     const turnClock = this.dependencies.turnClock(snapshot, humanId) ?? {
       turnVisible: false,
@@ -90,19 +110,29 @@ export class TableHudPresenter {
     }
     const humanIndex = PLAYER_ORDER.indexOf(humanId)
     const lobby = this.dependencies.lobbySnapshot()
+    const observing = lobby?.roomRole === 'observer'
+    const own = this.dependencies.ownProfile?.()
+    const avatarKey = observing ? 'observer' : `${own?.id ?? ''}:${own?.avatarUrl ?? ''}`
+    if (avatarKey !== this.ownAvatarKey) {
+      this.ownAvatarKey = avatarKey
+      const generation = this.generation
+      void (observing ? Promise.resolve(null) : this.dependencies.ownAvatarFrame?.())?.then(frame => {
+        if (this.isCurrent(generation) && avatarKey === this.ownAvatarKey) this.tableHud?.setOwnAvatarFrame(frame)
+      })
+    }
     const teamLevels = lobby?.scoreboard?.teamLevels ?? snapshot.teamLevels
     const viewer = projectTableViewer(snapshot.state.players, humanId, teamLevels, snapshot.settlement?.winnerTeam ?? null)
     const ranking = snapshot.settlement?.fullRank ?? snapshot.state.finishedPlayers
-    const rankNames = ['头游', '二游', '三游', '末游']
     const multiplayer = Boolean(this.dependencies.isMultiplayer() && lobby?.roomId)
-    const members = new Set(lobby?.members ?? PLAYER_ORDER)
+    const members = new Set([...(lobby?.members ?? PLAYER_ORDER), ...(lobby?.botPlayerIds ?? [])])
     const seats = PLAYER_ORDER.map((id, index) => {
       const player = snapshot.state.players[id]
       const finishPlace = ranking.indexOf(id) + 1
       return {
+        playerId: id,
         place: PLAYER_PLACES[(index - humanIndex + 4) % 4],
-        name: id === humanId ? `${player.name}（我）` : player.name,
-        status: finishPlace > 0 ? rankNames[finishPlace - 1] : `剩${player.hand.length}张`,
+        name: id === humanId && !observing ? `${own?.displayName || player.name}（我）` : player.name,
+        status: projectTableSeatStatus(player.hand.length, id === humanId, finishPlace),
         avatarText: player.name,
         active: snapshot.phase === 'playing' && snapshot.state.currentTurn === id,
         offline: multiplayer && !members.has(id),
@@ -110,15 +140,28 @@ export class TableHudPresenter {
     })
     this.tableHud.render({
       matchLabel: `本局打 ${String(snapshot.state.currentLevel)}`,
-      levelLabel: `我方 ${String(viewer.viewerLevel)}级 · 对方 ${String(viewer.opponentLevel)}级`,
+      levelLabel: snapshot.state.matchFormat?.kind === 'independent'
+        ? `${snapshot.state.matchFormat.levelMode === 'random' ? '随机级牌' : '固定级牌'} · ${lobby?.entryKind === 'match' ? '单局' : '定局玩法'}`
+        : `我方 ${String(viewer.viewerLevel)}级 · 对方 ${String(viewer.opponentLevel)}级`,
       ...turnClock,
       counterExpanded: this.counterExpanded,
-      cardCounts: this.publicCardCounts(snapshot, humanId),
+      counterEnabled: !(multiplayer && lobby?.lobbyReadyRequired === true && lobby.roomSettings?.counterEnabled === false),
+      cardCounts: this.publicCardCounts(snapshot, teammate?.available ? teammate.playerId : humanId),
+      counterPossibleSuits: publicStraightFlushPossibleSuits({
+        knownHand: snapshot.state.players[teammate?.available ? teammate.playerId : humanId].hand,
+        publicPlays: snapshot.state.playArea,
+        otherHandSizes: PLAYER_ORDER.filter(id => id !== (teammate?.available ? teammate.playerId : humanId)).map(id => snapshot.state.players[id].hand.length),
+        level: snapshot.state.currentLevel,
+        allowAceLowStraight: snapshot.state.ruleProfile.allowA2345Straight,
+      }),
       seats,
       availableSuits: hand.availableSuits,
       selectedSuit: hand.selectedSuit,
       lockAction: hand.lockAction,
       arrangeRestoreAvailable: hand.arrangeRestoreAvailable,
+      handToolsVisible: !observing && snapshot.phase === 'playing' && !snapshot.state.finishedPlayers.includes(humanId),
+      chatEnabled: !observing,
+      handViewLabel: observing ? `${snapshot.state.players[humanId].name}的手牌 · ${lobby?.roomSettings?.spectator === 'live' ? '实时观战' : '延迟观战'} · 点头像切换` : teammate ? (teammate.available ? '队友视角 · 仅观看' : '队友手牌暂不可用') : '',
     })
   }
 

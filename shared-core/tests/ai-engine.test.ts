@@ -155,6 +155,52 @@ describe('createAIEngine', () => {
     });
   });
 
+  it('blocks an enemy sprint with the strongest intact response before random pass logic', () => {
+    const profile = getRuleProfile('classic');
+    const hand = [card('mine-nine', 9), card('mine-king', 'K')];
+    const players = createPlayers(hand);
+    players.p1.hand = [card('enemy-left-a', 3), card('enemy-left-b', 4)];
+    players.p3.hand = createHand('other-enemy');
+    const engine = createAIEngine({ ruleProfile: profile, seed: 1 });
+
+    const decision = engine.makeDecision(
+      hand,
+      { playerId: 'p1', cards: [card('enemy-play', 8)], type: PlayType.Single },
+      'hard',
+      'teamB',
+      players,
+      'p2',
+      createContext(),
+    );
+
+    expect(decision?.map(({ id }) => id)).toEqual(['mine-king']);
+  });
+
+  it('leads a pair instead of a single when an enemy has one card', () => {
+    const profile = getRuleProfile('classic');
+    const hand = [
+      card('pair-six-a', 6),
+      card('pair-six-b', 6, 'heart'),
+      card('mine-ace', 'A'),
+    ];
+    const players = createPlayers(hand);
+    players.p1.hand = [card('enemy-last-card', 10)];
+    players.p3.hand = createHand('other-enemy');
+    const engine = createAIEngine({ ruleProfile: profile, seed: 1 });
+
+    const decision = engine.makeDecision(
+      hand,
+      null,
+      'medium',
+      'teamB',
+      players,
+      'p2',
+      createContext(),
+    );
+
+    expect(getPlayInfo(decision ?? [], profile)?.type).toBe(PlayType.Pair);
+  });
+
   it('isolates remembered plays and decision context between instances', () => {
     const profile = getRuleProfile('classic');
     const first = createAIEngine({ ruleProfile: profile, seed: 11 });

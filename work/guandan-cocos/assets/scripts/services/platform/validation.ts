@@ -1,5 +1,6 @@
 import type { HttpEndpointPolicy, HttpResponse } from './contracts'
 import { isRetryableStatus, PlatformApiError } from './contracts'
+import { parseNetworkEndpoint, type NetworkEndpoint } from '../NetworkEndpoint'
 
 type ApiEnvelope<T> = {
   ok?: boolean
@@ -17,9 +18,9 @@ export const isLocalHostname = (hostname: string): boolean => {
 
 export const normalizeBaseUrl = (value: string, policy: HttpEndpointPolicy): string => {
   const normalized = value.trim().replace(/\/+$/, '')
-  let parsed: URL
-  try { parsed = new URL(normalized) } catch { throw new Error('平台服务地址不是有效 URL') }
-  if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname || parsed.username || parsed.password) throw new Error('平台服务地址必须是不含凭证的 HTTP/HTTPS URL')
+  let parsed: NetworkEndpoint
+  try { parsed = parseNetworkEndpoint(normalized) } catch { throw new Error('平台服务地址不是有效 URL') }
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('平台服务地址必须是不含凭证的 HTTP/HTTPS URL')
   if (parsed.protocol === 'http:' && policy === 'secure-only') throw new Error('生产环境平台服务必须使用 HTTPS')
   if (parsed.protocol === 'http:' && policy === 'allow-localhost-insecure' && !isLocalHostname(parsed.hostname)) throw new Error('非本机平台服务必须使用 HTTPS')
   return normalized

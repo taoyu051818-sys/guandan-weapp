@@ -44,8 +44,8 @@ const collector = createServer((request, response) => {
         ok: true,
         data: {
           event: event.type === 'game-start'
-            ? { accepted: true, duplicate, lifecycleClaim: { accepted: true, status: 'playing', startedAt: Date.now() } }
-            : { accepted: true, duplicate },
+            ? { eventId, matchId: event.matchId, sequence: event.sequence, accepted: true, duplicate, lifecycleClaim: { accepted: true, status: 'playing', startedAt: Date.now() } }
+            : { eventId, matchId: event.matchId, sequence: event.sequence, accepted: true, duplicate },
         },
         error: null,
       }))

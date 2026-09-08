@@ -2,7 +2,6 @@ import { Card, PlayAction, PlayType, Player, PlayerId, Team } from '../../types/
 import type { AIContext } from '../types';
 
 type MediumDeps = {
-  getMinEnemyHand: (players: Record<PlayerId, Player>, myTeam: Team) => number;
   memoGetPlayInfo: (play: Card[]) => { type: PlayType; maxValue: number; length?: number } | null;
   isBombType: (type: PlayType) => boolean;
   pickLowestWinningPlay: (plays: Card[][]) => Card[] | null;
@@ -54,7 +53,6 @@ const chooseTailSafeLead = (
 
 export const chooseMediumOverride = (args: MediumArgs, deps: MediumDeps): Card[] | null | undefined => {
   const { hand, possiblePlays, lastPlay, players, myTeam, aiContext } = args;
-  const enemyMin = deps.getMinEnemyHand(players, myTeam);
   const myLevel = aiContext?.teamLevels?.[myTeam];
   const isAChallenge = myLevel === 'A';
   const tributeAggressiveLead = !!aiContext?.roundMeta?.fromTribute && !aiContext.roundMeta.isAntiTribute;

@@ -1,4 +1,4 @@
-import type { Card, EngineState, HintProtectedGroup, MatchState, PlayerId, PlayValidation, RuleProfile, TributeState } from '../core/generated'
+import type { EngineState, HintProtectedGroup, MatchState, PlayerId, PlayValidation, RuleProfile, TributeState } from '../core/generated'
 import { requestTableHandHint } from '../game/HandHintProtectionProjector'
 import { canSelectPlayingHand } from '../game/HandInteractionPolicy'
 import { handInteractionContext, HandInteractionStateMachine } from '../game/HandInteractionState'
@@ -112,7 +112,10 @@ export class TableHandInteractionController {
 
   public playSelected (): void {
     const snapshot = this.snapshot
-    if (!snapshot) return
+    if (!snapshot || snapshot.state.finishedPlayers.includes(this.dependencies.getHumanId())) return
+    if (snapshot.phase !== 'playing' || snapshot.actionPending ||
+      snapshot.state.currentTurn !== this.dependencies.getHumanId() ||
+      this.dependencies.getRuntimeSettings(this.dependencies.getHumanId()).trustee) return
     if (this.interaction.isLocking) {
       this.dependencies.showToast('请先完成或取消锁牌')
       return
@@ -142,13 +145,17 @@ export class TableHandInteractionController {
   }
 
   public handleArrangeIntent (): HandWorkspaceArrangementResult | null {
-    if (!this.snapshot) return null
+    if (!this.snapshot || this.snapshot.state.finishedPlayers.includes(this.dependencies.getHumanId())) return null
     if (this.interaction.isLocking) {
       this.dependencies.showToast('请先完成或取消锁牌')
       return null
     }
     const humanId = this.dependencies.getHumanId()
     const settings = this.dependencies.getRuntimeSettings(humanId)
+    if (!settings.autoSort) {
+      this.dependencies.showToast('本好友房已关闭一键理牌')
+      return null
+    }
     const result = this.workspace.toggleArrangement({
       direction: settings.sortOrder,
       allowAceLowStraight: settings.ruleProfile.allowA2345Straight,
@@ -301,7 +308,7 @@ export class TableHandInteractionController {
       !snapshot.state.finishedPlayers.includes(humanId)
   }
 
-  /** Clears rule selection only when changing modes during a legal local action window. */
+  /** Changing into lock mode retires a local preselection, including off-turn. */
   private clearCurrentTurnRuleSelection (snapshot: TableHandSnapshot, humanId: PlayerId): void {
     if (canSelectPlayingHand(snapshot.state, humanId, snapshot.actionPending)) {
       this.dependencies.ruleAuthority.clearRuleSelection()

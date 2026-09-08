@@ -38,6 +38,8 @@ export interface HandGroupSuggestion {
   cardIds: CardId[]
   wildcardUsages: SuggestedWildcardUsage[]
   primaryValue: number
+  /** Attachment strength, only for triple-with-pair; lower pairs are spent first. */
+  pairValue?: number
   priority: number
 }
 

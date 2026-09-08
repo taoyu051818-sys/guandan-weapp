@@ -15,7 +15,6 @@ export interface TableTurnClockControllerDependencies {
   isMultiplayer: () => boolean
   lobbySnapshot: () => LobbySnapshot | null
   playCountdown: (seconds: number) => void
-  actOnLocalTimeout: () => void
   schedule: (callback: () => void, intervalSeconds: number) => void
   unschedule: (callback: () => void) => void
   now?: () => number
@@ -40,7 +39,6 @@ const ACTION_LABELS: Readonly<Record<Exclude<NetworkDeadlineAction, 'play'>, str
 /** Owns the table turn clock state, server-deadline projection and tick lifecycle. */
 export class TableTurnClockController {
   private remainingSeconds = DEFAULT_TURN_SECONDS
-  private countdownKey = ''
   private snapshot: GameSnapshot | null = null
   private humanId: PlayerId = 'p1'
   private disposed = false
@@ -55,7 +53,7 @@ export class TableTurnClockController {
     this.humanId = update.humanId
     const multiplayer = this.dependencies.isMultiplayer()
     const lobby = this.dependencies.lobbySnapshot()
-    const networkReady = !multiplayer || lobby?.roomStatus === 'ready'
+    const networkReady = lobby?.roomStatus === 'ready'
     const networkDeadlineAvailable = Boolean(
       multiplayer &&
       networkReady &&
@@ -66,36 +64,14 @@ export class TableTurnClockController {
       lobby.deadlinePlayerId &&
       lobby.deadlineAction,
     )
-    const available = multiplayer
-      ? networkDeadlineAvailable
-      : networkReady && !update.snapshot.actionPending && update.snapshot.phase === 'playing' &&
-        !update.humanFinished && update.snapshot.state.currentTurn === update.humanId
-
+    const available = networkDeadlineAvailable
     this.dependencies.label.node.active = available
     if (!available) {
-      this.countdownKey = ''
       this.syncHud()
       return
     }
 
-    if (multiplayer) {
-      const deadline = lobby?.turnDeadlineAt
-      if (!deadline) {
-        this.dependencies.label.node.active = false
-        this.countdownKey = ''
-        this.syncHud()
-        return
-      }
-      this.countdownKey = `server:${deadline}`
-      this.remainingSeconds = Math.max(0, Math.ceil((deadline - this.now()) / 1000))
-    } else {
-      const snapshot = update.snapshot
-      const key = `${snapshot.phase}:${snapshot.state.currentTurn}:${snapshot.state.playArea.length}:${snapshot.state.finishedPlayers.length}`
-      if (key !== this.countdownKey) {
-        this.countdownKey = key
-        this.remainingSeconds = DEFAULT_TURN_SECONDS
-      }
-    }
+    this.remainingSeconds = Math.max(0, Math.ceil((lobby!.turnDeadlineAt! - this.now()) / 1000))
 
     const countdownY = update.controlsY + 47
     this.dependencies.label.node.setPosition(new Vec3(0, countdownY, 0))
@@ -115,9 +91,7 @@ export class TableTurnClockController {
       lobby.deadlineAction &&
       this.dependencies.label.node.active,
     )
-    const turnVisible = multiplayer
-      ? networkClockVisible
-      : Boolean(this.dependencies.label.node.active) || (snapshot.phase === 'playing' && !snapshot.actionPending)
+    const turnVisible = networkClockVisible
     return {
       turnVisible,
       turnSeconds: turnVisible ? (this.dependencies.label.node.active ? this.remainingSeconds : this.durationSeconds()) : 0,
@@ -128,7 +102,6 @@ export class TableTurnClockController {
 
   reset (): void {
     if (this.disposed) return
-    this.countdownKey = ''
     this.remainingSeconds = DEFAULT_TURN_SECONDS
     this.snapshot = null
     this.dependencies.label.node.active = false
@@ -144,24 +117,16 @@ export class TableTurnClockController {
 
   private readonly tick = (): void => {
     if (this.disposed || !this.dependencies.label.node.active || this.remainingSeconds <= 0) return
-    if (this.dependencies.isMultiplayer()) {
-      const deadline = this.dependencies.lobbySnapshot()?.turnDeadlineAt
-      if (!deadline) {
-        this.dependencies.label.node.active = false
-        this.syncHud()
-        return
-      }
-      const previous = this.remainingSeconds
-      this.remainingSeconds = Math.max(0, Math.ceil((deadline - this.now()) / 1000))
-      if (this.remainingSeconds !== previous) this.playWarningTick()
-      this.refreshLabel()
+    const deadline = this.dependencies.lobbySnapshot()?.turnDeadlineAt
+    if (!this.dependencies.isMultiplayer() || !deadline) {
+      this.dependencies.label.node.active = false
+      this.syncHud()
       return
     }
-
-    this.remainingSeconds -= 1
-    this.playWarningTick()
+    const previous = this.remainingSeconds
+    this.remainingSeconds = Math.max(0, Math.ceil((deadline - this.now()) / 1000))
+    if (this.remainingSeconds !== previous) this.playWarningTick()
     this.refreshLabel()
-    if (this.remainingSeconds === 0) this.dependencies.actOnLocalTimeout()
   }
 
   private playWarningTick (): void {

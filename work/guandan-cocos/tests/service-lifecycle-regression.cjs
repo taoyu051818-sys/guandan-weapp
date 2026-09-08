@@ -87,167 +87,16 @@ const testWechatLoginTimeout = async () => {
   assert.deepEqual(await ready, { kind: 'wechat', code: 'wx-code' })
 }
 
-const testEffectLabGenerationCancellation = async () => {
-  let driver
-  let resolveAudit
-  const scheduled = []
-  const previews = []
-  const notices = []
-  class MockVec3 {
-    static ZERO = new MockVec3(0, 0, 0)
-    constructor (x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z }
-    clone () { return new MockVec3(this.x, this.y, this.z) }
-  }
-  class MockUiTransform {}
-  const cocosRuntime = { Node: class {}, UITransform: MockUiTransform, Vec3: MockVec3 }
-  const previewRunnerModule = loadTs('assets/scripts/development/EffectLabPreviewRunner.ts', {
-    cc: cocosRuntime,
-  })
-  const hostModule = loadTs('assets/scripts/development/EffectLabSceneHost.ts', {
-    './EffectLabPreviewRunner': previewRunnerModule,
-    './EffectLab': {
-      createEffectLab: nextDriver => {
-        driver = nextDriver
-        return {
-          list: () => [],
-          inspect: () => null,
-          trigger: id => {
-            if (id === 'sequence') driver.playSequence({ mode: 'seat-matrix', steps: [{ fixtureId: 'bomb', delayMs: 100 }] })
-            if (id === 'diagnostic') driver.runDiagnostic({ check: 'runtime-assets' })
-            return { fixture: { id } }
-          },
-        }
-      },
-    },
-  })
-  const effects = {
-    resetForRecovery: () => {},
-    previewAction: action => previews.push(action),
-    skipAll: () => {},
-    auditRuntimeAssets: () => new Promise(resolve => { resolveAudit = resolve }),
-    diagnostics: () => ({ registeredRendererKeys: [] }),
-  }
-  const host = new hostModule.EffectLabSceneHost({
-    effects,
-    audio: null,
-    flightRoot: { active: false },
-    topEffectRoot: { active: false, getComponent: () => null },
-    getEffectQuality: () => 'full',
-    hasLiveTableSnapshot: () => false,
-    openEffectLabTable: () => {},
-    startFixedMatch: () => {},
-    scheduleOnce: (callback, delaySeconds) => scheduled.push({ callback, delaySeconds }),
-    showNotice: (title, detail) => notices.push({ title, detail }),
-  })
-
-  host.trigger('sequence')
-  const staleStep = scheduled[0]
-  host.trigger('replacement')
-  staleStep.callback()
-  assert.deepEqual(previews, [], 'a delayed sequence step from an older preview generation must be inert')
-
-  host.trigger('diagnostic')
-  host.trigger('replacement')
-  resolveAudit({ loaded: 1, bundled: 1, migrationCandidates: 0, rejected: 0, missing: [] })
-  await Promise.resolve()
-  await Promise.resolve()
-  assert.deepEqual(notices, [], 'a diagnostic result from an older preview generation must not reopen UI')
-}
-
-const testEffectLabTableHandoffCancellation = () => {
-  let domain
-  let scheduled
-  let mounted = 0
-  const page = loadTs('assets/scripts/scenes/front-pages/EffectLabPageDomain.ts', {
-    cc: { BlockInputEvents: class {}, Color: class {}, Node: MockNode, Vec3: class {} },
-  })
-  const dependencies = {
-    router: { current: 'more' },
-    screen: {},
-    isDisposed: () => false,
-    listFixtures: () => [{ id: 'match-opening' }],
-    previewFixture: () => domain.handleShellHidden(),
-    scheduleOnce: callback => { scheduled = callback },
-    showMenu: () => {},
-    showNotice: () => {},
-  }
-  domain = new page.EffectLabPageDomain(dependencies)
-  domain.show = () => { mounted += 1 }
-
-  domain.openTable()
-  scheduled()
-  assert.equal(mounted, 1, 'the fixed-match hide must hand off to the delayed EffectLab drawer')
-
-  domain.openTable()
-  domain.handleShellHidden()
-  scheduled()
-  assert.equal(mounted, 1, 'a later shell hide must cancel the pending drawer generation')
-}
-
 class MockNode {
   static EventType = { TOUCH_END: 'touch-end' }
   setPosition () {}
   on () {}
 }
 
-const testCommittedShopOrderRefreshFailure = async () => {
-  const notices = []
-  const opened = []
-  let route = 'product'
-  let invalidations = 0
-  const ui = {
-    menuLabel: () => ({}),
-    button: () => new MockNode(),
-  }
-  const router = {
-    get current () { return route },
-    open: next => { route = next; opened.push(next); return ui },
-  }
-  const product = { id: 'rice', name: '大米', description: '5kg', category: '粮油', pointsPrice: 3200, stock: 2 }
-  const shop = loadTs('assets/scripts/scenes/front-pages/ShopPageDomain.ts', {
-    cc: { Node: MockNode, Vec3: class Vec3 {} },
-    '../../services/DevelopmentApis': { SAMPLE_PRODUCTS: [] },
-  })
-  const domain = new shop.ShopPageDomain({
-    router,
-    screen: { safeSize: () => ({ x: 1280 }) },
-    gateways: {
-      configured: true,
-      shop: {
-        createOrder: async () => ({ orderId: 'order-1', productId: product.id, quantity: 1, totalPoints: 3200, status: 'paid' }),
-        listProducts: async () => [{ ...product, stock: 1 }],
-      },
-      wallet: { getWallet: async () => { throw new Error('wallet refresh unavailable') } },
-    },
-    wallet: {
-      fresh: true,
-      value: { points: 5000, diamonds: 0 },
-      update: () => assert.fail('a failed wallet refresh must not install invented balances'),
-      invalidate: () => { invalidations += 1 },
-    },
-    isDisposed: () => false,
-    issuePageRequest: () => 1,
-    currentPageRequest: () => 1,
-    setTableVisible: () => {},
-    showMenu: () => {},
-    showNotice: (title, detail) => notices.push({ title, detail }),
-  })
-
-  await domain.purchase(product)
-  assert.equal(route, 'shop', 'a committed order must leave the stale product action instead of inviting a duplicate tap')
-  assert.equal(opened.at(-1), 'shop')
-  assert.equal(invalidations, 1)
-  assert.match(notices.at(-1).title, /兑换成功/)
-  assert.doesNotMatch(notices.at(-1).title, /失败/)
-  assert.match(notices.at(-1).detail, /订单.*成功|订单.*提交/)
-}
-
 ;(async () => {
   await testAssetTimeoutAndCancellation()
   await testWechatLoginTimeout()
-  await testEffectLabGenerationCancellation()
-  testEffectLabTableHandoffCancellation()
-  await testCommittedShopOrderRefreshFailure()
+  assert.doesNotMatch(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/front-pages/ShopPageDomain.ts'), 'utf8'), /purchase\s*\(|createOrder\s*\(|dependencies\.(gateways|wallet)/, 'preview has no transaction capability')
   process.stdout.write('service lifecycle regression checks passed\n')
 })().catch(error => {
   console.error(error)

@@ -100,6 +100,7 @@ export class MerchantService {
   async createStore (userId, { name, address } = {}, idempotencyKey) {
     const key = requireIdempotencyKey(idempotencyKey)
     const safeName = normalizeText(name, '', 60)
+    const safeAddress = normalizeText(address, '', 120)
     if (!safeName) throw badRequest('STORE_NAME_REQUIRED', '门店名称不能为空')
     const now = this.now()
     return this.store.transaction(state => {
@@ -107,12 +108,18 @@ export class MerchantService {
       if (!['owner', 'manager'].includes(context.role)) throw forbidden('只有商户负责人或管理员可以创建门店')
       const idem = `${context.merchant.id}:store:${key}`
       const previous = state.merchantIdempotency[idem]
-      if (previous) return state.merchantStores[previous]
+      if (previous) {
+        const existing = Object.hasOwn(state.merchantStores, previous) ? state.merchantStores[previous] : null
+        if (!existing || existing.merchantId !== context.merchant.id || existing.name !== safeName || (existing.address ?? '') !== safeAddress) {
+          throw conflict('IDEMPOTENCY_CONFLICT', '同一个 Idempotency-Key 不能用于不同门店创建请求')
+        }
+        return existing
+      }
       const store = {
         id: `str_${this.createId()}`,
         merchantId: context.merchant.id,
         name: safeName,
-        address: normalizeText(address, '', 120),
+        address: safeAddress,
         status: 'active',
         createdAt: now,
       }

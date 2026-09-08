@@ -1,6 +1,7 @@
 import { CLASSIC_STAKES, classicStakeForMode } from './classic-stakes.js'
 import { badRequest, conflict, forbidden, notFound } from './errors.js'
 import { friendRoomKind } from './friend-room-service.js'
+import { MatchBotFill, MATCH_BOT_FILL_DELAY_MS } from './match-bot-fill.js'
 import { calculateComprehensiveScore } from './rating.js'
 import { selectRatingMatch } from './rating-matchmaking.js'
 import { getCurrentTournamentAssignment, markTournamentAssignmentMatched } from './tournament-orchestrator.js'
@@ -34,6 +35,7 @@ export class MatchmakingService {
     ensurePlayerRating,
     ensureParticipantEntryAttemptId,
     friendRooms,
+    botFillDelayMs = MATCH_BOT_FILL_DELAY_MS,
   } = {}) {
     if (!store || !gameTickets || typeof createId !== 'function' || typeof ensurePlayerRating !== 'function' || !friendRooms) {
       throw new TypeError('MatchmakingService 缺少 store/gameTickets/createId/ensurePlayerRating/friendRooms')
@@ -47,6 +49,15 @@ export class MatchmakingService {
     this.ensurePlayerRating = ensurePlayerRating
     this.ensureParticipantEntryAttemptId = ensureParticipantEntryAttemptId
     this.friendRooms = friendRooms
+    this.botFill = new MatchBotFill({
+      gameTickets,
+      createEntryAttemptId,
+      createRoomId,
+      ensurePlayerRating,
+      ensureParticipantEntryAttemptId,
+      removeOpenQueueMatch: (state, mode, matchId) => this.removeOpenQueueMatch(state, mode, matchId),
+      delayMs: botFillDelayMs,
+    })
   }
 
   openQueueMatches (state, mode) {
@@ -57,6 +68,11 @@ export class MatchmakingService {
       .filter(match => match?.mode === mode && match.status === 'matching' && match.participants.some(item => item.status === 'matching'))
     state.matchQueues[mode] = matches.map(match => match.id)
     return matches
+  }
+
+  useGameTickets (gameTickets) {
+    this.gameTickets = gameTickets
+    this.botFill.gameTickets = gameTickets
   }
 
   removeOpenQueueMatch (state, mode, matchId) {
@@ -146,6 +162,9 @@ export class MatchmakingService {
       status: participant.status,
       joinedAt: participant.joinedAt,
       entryAttemptId: ticketEntryAttemptId,
+      humanPlayerCount: match.participants.filter(item => !item.isBot && ['matching', 'matched', 'playing'].includes(item.status)).length,
+      botCount: match.participants.filter(item => item.isBot && ['matched', 'playing'].includes(item.status)).length,
+      ...(match.status === 'matching' && this.botFill.enabledFor(match) ? { botFillAt: this.botFill.deadlineFor(match) } : {}),
       ...(match.tournamentId ? { tournamentId: match.tournamentId, assignmentId: match.assignmentId, roundNumber: match.roundNumber, tableNumber: match.tableNumber } : {}),
     }
     if (participant.status !== 'matched') return base
@@ -217,6 +236,7 @@ export class MatchmakingService {
     const now = this.now()
     return this.store.transaction(state => {
       ensureMatchCollections(state)
+      this.botFill.fillExpired(state, now)
       const tournament = Object.values(state.tournaments).find(item => item.queueId === safeMode)
       if (tournament) {
         if (!state.enrollments[`${userId}:${tournament.id}`]) throw forbidden('请先报名该赛事再进入匹配')
@@ -272,24 +292,17 @@ export class MatchmakingService {
       }
       state.activeMatchByUser[userId] = match.id
       const waiting = match.participants.filter(item => item.status === 'matching')
-      if (waiting.length === 4) {
-        match.status = 'matched'; match.matchedAt = now; match.roomId = this.createRoomId(state)
-        waiting.forEach((participant, index) => {
-          const issued = this.gameTickets.issue({ userId: participant.userId, matchId: match.id, roomId: match.roomId, seat: seats[index], entryAttemptId: this.ensureParticipantEntryAttemptId(participant) })
-          Object.assign(participant, { status: 'matched', seat: seats[index], ...issued })
-        })
-        match.entryDeadlineAt = Math.min(...waiting.map(participant => participant.expiresAt))
-        state.spectatorFeeds[match.id] = { matchId: match.id, mode: match.mode, startedAt: now, finishedAt: null, events: [] }
-        this.removeOpenQueueMatch(state, safeMode, match.id)
-      }
+      if (waiting.length === 4) this.botFill.complete(state, match, now)
       return this.view(match, userId)
     })
   }
 
   async getStatus (userId, matchId) {
     const now = this.now()
-    await this.expireIfNeeded(now)
-    return this.store.read(state => {
+    return this.store.transaction(state => {
+      ensureMatchCollections(state)
+      this.expireAll(state, now)
+      this.botFill.fillExpired(state, now)
       const match = state.matches[matchId]
       if (!match) throw notFound('MATCH_NOT_FOUND', '匹配记录不存在')
       return this.view(match, userId)
@@ -299,6 +312,8 @@ export class MatchmakingService {
   async cancel (userId, matchId) {
     const now = this.now()
     return this.store.transaction(state => {
+      ensureMatchCollections(state)
+      this.botFill.fillExpired(state, now)
       const match = state.matches[matchId]
       if (!match) throw notFound('MATCH_NOT_FOUND', '匹配记录不存在')
       const participant = match.participants.find(item => item.userId === userId)

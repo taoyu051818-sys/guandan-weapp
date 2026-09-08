@@ -7,6 +7,7 @@ import { LobbyCleanupTracker } from './LobbyCleanupTracker'
 import { LobbyCommandSender } from './LobbyCommandSender'
 import { LobbyConnectionEventCoordinator } from './LobbyConnectionEventCoordinator'
 import { isEntryAttemptId, LobbyEntryAttemptTracker } from './LobbyEntryAttempt'
+import { isExpectedRoomEntry, LobbyEntryRequest } from './LobbyEntryRequest'
 import { LobbyMatchedEntryCoordinator } from './LobbyMatchedEntryCoordinator'
 import { LobbyResumeConnectionWatchdog } from './LobbyResumeConnectionWatchdog'
 import {
@@ -15,10 +16,8 @@ import {
   createLobbySnapshot,
   createRoomMetadataDefaults,
   type FriendRoomSettings,
-  type LobbyNetworkResult,
   type LobbySnapshot,
   type MatchedRoomEntry,
-  type NetworkRoom,
   type PendingRoomEntry,
   type RoomSnapshotWire,
 } from './LobbyModels'
@@ -63,6 +62,7 @@ export class LobbyController extends Component {
   private client: LobbySocketClient = new CocosSocketClient()
   private readonly clientListenerDisposers: Array<() => void> = []
   private readonly entryAttempts = new LobbyEntryAttemptTracker()
+  private readonly entryRequest = new LobbyEntryRequest()
   private readonly cleanup = new LobbyCleanupTracker()
   private readonly commands = new LobbyCommandSender({
     client: () => this.client,
@@ -86,7 +86,7 @@ export class LobbyController extends Component {
     connect: endpoint => this.client.connect(endpoint),
     begin: (requestType, responseType, roomId, payload, expectedPlayerId) =>
       this.beginRoomEntry(requestType, responseType, roomId, payload, expectedPlayerId, true),
-    cancelPending: requestId => this.cancelPendingMatchedRequest(requestId),
+    pendingRoom: requestId => this.pendingMatchedRoom(requestId),
     resetTransport: () => { this.client.close(); this.patch({ connected: false }) },
     close: message => this.closeRoomLocally(message, false),
     requestRecovery: abandonAttemptId => this.events.emit('guandan:platform-recovery-required', abandonAttemptId ? { abandonAttemptId } : {}),
@@ -158,7 +158,7 @@ export class LobbyController extends Component {
   public enterMatchedRoom (entry: MatchedRoomEntry): void {
     if (
       !/^\d{6}$/.test(entry.roomId) || !entry.gameEndpoint || !entry.gameTicket
-      || !['p1', 'p2', 'p3', 'p4'].includes(entry.seat)
+      || !['p1', 'p2', 'p3', 'p4', 'observer'].includes(entry.seat)
       || !isEntryAttemptId(entry.entryAttemptId)
     ) {
       this.reportError('匹配服务返回了无效的入桌信息')
@@ -173,7 +173,7 @@ export class LobbyController extends Component {
     this.clearRoomIdentity()
     this.endpoint = entry.gameEndpoint
     this.session?.enterLobby()
-    this.patch({ roomId: entry.roomId, myPlayerId: entry.seat, members: [], lobbyReadyRequired: false, lobbyReadyPlayerIds: [], botPlayerIds: [], roomSettings: null, scoreboard: null, entryKind: null, capabilities: null, roomStatus: 'joining', recoveryAvailable: false, error: null })
+    this.patch({ roomId: entry.roomId, myPlayerId: entry.seat === 'observer' ? 'p1' : entry.seat, members: [], lobbyReadyRequired: false, lobbyReadyPlayerIds: [], botPlayerIds: [], roomSettings: null, scoreboard: null, entryKind: null, capabilities: null, roomStatus: 'joining', recoveryAvailable: false, error: null })
     this.matchedEntries.start(entry)
   }
 
@@ -196,6 +196,9 @@ export class LobbyController extends Component {
   }
   public startGame (): number | null { return this.sendRoomIntent('startGame') }
   public setLobbyReady (): number | null { return this.sendRoomIntent('setLobbyReady') }
+  public standUp (): number | null { return this.sendRoomIntent('standUp') }
+  public sitDown (playerId: PlayerId): number | null { return this.sendRoomIntent('sitDown', { playerId }) }
+  public watchPlayer (playerId: PlayerId): number | null { return this.sendRoomIntent('watchPlayer', { playerId }) }
   public cancelLobbyReady (): number | null { return this.sendRoomIntent('cancelLobbyReady') }
   public kickMember (playerId: PlayerId): number | null { return this.sendRoomIntent('kickMember', { playerId }) }
   public addBot (playerId: PlayerId): number | null { return this.sendRoomIntent('addBot', { playerId }) }
@@ -249,6 +252,7 @@ export class LobbyController extends Component {
     this.socketBound = false
     this.matchedEntries.clear()
     this.resumeConnections.clear()
+    this.entryRequest.clear()
     this.client.close()
   }
 
@@ -287,13 +291,15 @@ export class LobbyController extends Component {
     const generation = ++this.entryGeneration
     this.pendingRoomEntry = null
     let entryPayload = payload
+    let requestId: number | null
     try {
       if (requestType !== 'rejoinRoom') entryPayload = this.entryAttempts.decorate(payload, matched)
+      requestId = this.entryRequest.send(requestType, entryPayload, matched || requestType === 'rejoinRoom',
+        (type, body, retryId) => this.commands.send(type, body, retryId))
     } catch {
       this.reportError('当前环境无法生成安全入桌凭证，请升级客户端后重试')
       return null
     }
-    const requestId = this.send(requestType, entryPayload)
     if (requestId === null) return null
     this.pendingRoomEntry = { generation, requestId, requestType, responseType, roomId, expectedPlayerId, matched }
     return requestId
@@ -325,7 +331,7 @@ export class LobbyController extends Component {
 
   private applyRoomEntry (message: RoomSnapshotWire, members: PlayerId[]): void {
     const pending = this.pendingRoomEntry
-    if (!this.isExpectedRoomEntry(message, pending)) {
+    if (!isExpectedRoomEntry(message, pending, this.entryGeneration, this.snapshot.roomStatus)) {
       this.rejectUnexpectedRoomEntry(message, pending)
       return
     }
@@ -347,6 +353,7 @@ export class LobbyController extends Component {
     this.entryGeneration += 1
     this.matchedEntries.complete()
     this.entryAttempts.clearMatched()
+    this.entryRequest.clear()
     this.enterRoom(message.roomId, message.myPlayerId, message.resumeToken, members, matchId)
     if (matchedEntry) this.events.emit('guandan:room-entry-confirmed', {
       entryAttemptId: matchedEntry.entryAttemptId,
@@ -354,18 +361,6 @@ export class LobbyController extends Component {
       ticketPurpose: matchedEntry.ticketPurpose ?? 'entry',
     })
     this.messages.applyEntrySnapshot(message, recoveryReason)
-  }
-
-  private isExpectedRoomEntry (message: RoomSnapshotWire, pending: PendingRoomEntry | null): pending is PendingRoomEntry {
-    return Boolean(
-      pending &&
-      pending.generation === this.entryGeneration &&
-      message.requestId === pending.requestId &&
-      message.type === pending.responseType &&
-      message.roomId === pending.roomId &&
-      (!pending.expectedPlayerId || message.myPlayerId === pending.expectedPlayerId) &&
-      this.snapshot.roomStatus === (pending.requestType === 'rejoinRoom' ? 'rejoining' : 'joining'),
-    )
   }
 
   private rejectUnexpectedRoomEntry (message: RoomSnapshotWire, pending: PendingRoomEntry | null): void {
@@ -436,6 +431,7 @@ export class LobbyController extends Component {
     this.invalidateRoomEntryRequest()
     this.matchedEntries.clear()
     this.entryAttempts.clearMatched()
+    this.entryRequest.clear()
     this.resumeToken = null
     this.activeMatchId = null
     this.resumeSessions.clear()
@@ -448,12 +444,11 @@ export class LobbyController extends Component {
     this.pendingRoomEntry = null
   }
 
-  private cancelPendingMatchedRequest (requestId: number): string | null {
+  private pendingMatchedRoom (requestId: number): string | null {
     const pending = this.pendingRoomEntry
     if (!pending || !pending.matched || pending.requestId !== requestId) return null
-    const roomId = pending.roomId
-    this.invalidateRoomEntryRequest()
-    return roomId
+    // Keep accepting a late success while the watchdog waits to retransmit.
+    return pending.roomId
   }
 
   private bestEffortLeaveRoom (roomId?: string, message?: RoomSnapshotWire): void {
@@ -492,9 +487,9 @@ export class LobbyController extends Component {
     this.patch({ ...next, error: message })
     this.events.emit('guandan:network-error', message)
   }
-
   private patch (next: Partial<LobbySnapshot>): void {
     this.snapshot = { ...this.snapshot, ...next }
+    if (next.roomRole && this.snapshot.myPlayerId) this.session?.setRoomView(this.snapshot.myPlayerId, next.roomRole === 'observer')
     this.events.emit('guandan:lobby', this.snapshot)
   }
 }

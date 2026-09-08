@@ -26,6 +26,7 @@ const sync = loadPure('LobbySyncTracker', { '../effects/NetworkEffectSyncPolicy'
 const { LobbyMessageRouter } = loadPure('LobbyMessageRouter', {
   './LobbyModels': models,
   './LobbySyncTracker': sync,
+  './FriendRoomViewReceiver': loadPure('FriendRoomViewReceiver'),
 })
 const { LobbyCommandSender } = loadPure('LobbyCommandSender', {
   '../core/generated/protocol': { commandRequiresExpectedVersion: type => type === 'play' },

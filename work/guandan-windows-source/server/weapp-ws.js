@@ -7,32 +7,39 @@ import { loadGameSecurityConfig } from './platform/config.js'
 import { GameResultReporter } from './platform/result-reporter.js'
 import { SpectatorEventReporter } from './platform/spectator-event-reporter.js'
 import { buildGameResultEvent, createGameStatsBySeat, ensureGameStatsBySeat, recordAuthoritativeAction } from './game-stats.js'
-import { JsonRoomStateStore, markSnapshotAcceptancesDurable, roomForPersistence, roomFromPersistence } from './room-state-store.js'
+import { JsonRoomStateStore, roomForPersistence, roomFromPersistence } from './room-state-store.js'
 import { normalizeFriendRoomSettings } from './friend-room-settings.js'
+import { createRoomOpeningState, isSingleRoundMatch } from './match-format-policy.js'
 import { createRoomBotPolicy } from './master-bot-policy.js'
-import { createInitialMatchState, migrateLegacyMatchState } from './game-session.js'
-import { sendProtocolMessage, upgradeToProtocolConnection } from './weapp-websocket-transport.js'
+import { migrateLegacyMatchState } from './game-session.js'
+import { isProtocolUpgradeRequest, sendProtocolMessage, upgradeToProtocolConnection } from './weapp-websocket-transport.js'
 import { createRoomPublisher, phaseForRoom } from './weapp-room-publisher.js'
 import { createCommandRouter } from './weapp-command-router.js'
 import { createGameCommandHandler, GAME_COMMAND_TYPES } from './weapp-game-command-handler.js'
 import { createLobbyCommandHandler, LOBBY_COMMAND_TYPES } from './weapp-lobby-command-handler.js'
 import { createEntryCommandHandler, ENTRY_COMMAND_TYPES } from './weapp-entry-command-handler.js'
 import { createCommandGateway } from './weapp-command-gateway.js'
+import { createCommandPublication } from './weapp-command-publication.js'
+import { createRoomExit, EXIT_COMMAND_TYPES } from './weapp-room-exit.js'
 import { createWeAppMatchLifecycle } from './weapp-match-lifecycle.js'
+import { botSeatBindingsMatch } from './weapp-match-bot-seats.js'
 import { createWeAppGameStartCoordinator } from './weapp-game-start-coordinator.js'
 import { restoreWeAppRuntime } from './weapp-runtime-recovery.js'
 import { GLOBAL_OPERATION_KEY, createWeAppOperationScheduler, operationKeyForCommand } from './weapp-operation-scheduler.js'
 import { createAcceptedActionStore } from './weapp-accepted-action-store.js'
 
+import { createRuntimePersistence } from './weapp-runtime-persistence.js'
+import { createRoomMetadata } from './weapp-room-metadata.js'
+import { createRoomExpiry } from './weapp-room-expiry.js'
+import { roomMember } from './friend-room-members.js'
+import { createFriendRoomObserverRuntime, FRIEND_VIEW_COMMANDS } from './friend-room-observer-runtime.js'
+
 const require = createRequire(import.meta.url)
-const { PlayType, createGame, getRuleProfile } = require('../../../shared-core/dist')
+const { PlayType, getRuleProfile } = require('../../../shared-core/dist')
 const { validateCommandRequestId, validateExpectedVersion } = require('../../../shared-core/dist/protocol')
 const ids = ['p1', 'p2', 'p3', 'p4']
 const rooms = new Map()
 const connections = new Map()
-const hostExpiryTimers = new Map()
-const emptyRoomExpiryTimers = new Map()
-const dissolveTimers = new Map()
 const sideEffectStageRetryTimers = new Map()
 const sideEffectCompletionHandlers = new Map()
 const maxAcceptedActions = 512
@@ -41,6 +48,7 @@ const acceptedActions = acceptedActionStore.entries
 const closedRoomTombstones = new Map()
 const roomBotPolicies = new Map()
 const idempotentActionTypes = new Set([
+  ...FRIEND_VIEW_COMMANDS,
   'startGame', 'setLobbyReady', 'cancelLobbyReady', 'kickMember', 'addBot', 'removeBot',
   'play', 'pass', 'nextRound', 'readyNextRound', 'roundReady', 'ready', 'cancelRoundReady', 'cancelReady',
   'setTrustee', 'cancelTrustee', 'proposeDissolve', 'dissolveVote', 'voteDissolve', 'chat',
@@ -136,69 +144,10 @@ const isFriendRoom = room => !isMatchRoom(room)
 const entryDeadlineForClaims = claims => claims?.roomKind === 'friend'
   ? Number(claims.roomExpiresAt)
   : Number(claims?.exp) * 1000
-const createRoomRecord = ({ roomId, hostName = '等待房主', hostConnectionId = null, ticketClaims = null, roomSettings = null }) => {
-  const userIdsBySeat = { p1: null, p2: null, p3: null, p4: null }
-  const ticketJtisBySeat = { p1: null, p2: null, p3: null, p4: null }
-  const ticketExpiresAtBySeat = { p1: null, p2: null, p3: null, p4: null }
-  if (ticketClaims?.seat) userIdsBySeat[ticketClaims.seat] = ticketClaims.sub
-  if (ticketClaims?.seat) ticketJtisBySeat[ticketClaims.seat] = ticketClaims.jti
-  if (ticketClaims?.seat) ticketExpiresAtBySeat[ticketClaims.seat] = ticketClaims.exp
-  return {
-    roomId,
-    hostName,
-    roomSettings: normalizeFriendRoomSettings(roomSettings ?? ticketClaims?.roomSettings),
-    rulePreset: 'classic',
-    seats: { p1: hostConnectionId, p2: null, p3: null, p4: null },
-    resumeTokens: { p1: hostConnectionId ? createResumeToken() : null, p2: null, p3: null, p4: null },
-    userIdsBySeat,
-    ticketJtisBySeat,
-    ticketExpiresAtBySeat,
-    matchId: ticketClaims?.matchId || null,
-    ticketBound: Boolean(ticketClaims),
-    entryKind: ticketClaims ? entryKindForClaims(ticketClaims) : 'friend',
-    botPlayerIds: [],
-    botSeed: createBotSeed(),
-    botPolicyCheckpoint: null,
-    state: null,
-    matchStartedAt: null,
-    totalDeadlineAt: null,
-    matchEnded: null,
-    tribute: null,
-    roundResult: null,
-    teamLevels: { teamA: 2, teamB: 2 },
-    aFailStreaks: { teamA: 0, teamB: 0 },
-    scores: { teamA: 0, teamB: 0 },
-    lastRoundRank: [],
-    roundSequence: 0,
-    spectatorSequence: 0,
-    pendingSpectatorEvents: [],
-    pendingResultEvent: null,
-    pendingRoundFinalization: null,
-    pendingGameStartEvent: null,
-    pendingGameStartRequest: null,
-    gameStartClaimedAt: null,
-    gameStartReconnectDeadlineAt: null,
-    entryDeadlineAt: ticketClaims ? entryDeadlineForClaims(ticketClaims) : null,
-    closingReason: null,
-    revokedFriendUserIds: [],
-    revokedTicketJtis: [],
-    turnDeadlineAt: null,
-    deadlinePlayerId: null,
-    deadlineAction: null,
-    trustees: { p1: null, p2: null, p3: null, p4: null },
-    consecutiveTimeouts: { p1: 0, p2: 0, p3: 0, p4: 0 },
-    lobbyReady: { p1: false, p2: false, p3: false, p4: false },
-    roundReady: { p1: false, p2: false, p3: false, p4: false },
-    dissolveVote: null,
-    chatLastAcceptedAt: { p1: 0, p2: 0, p3: 0, p4: 0 },
-    chatLastPhraseAt: { p1: {}, p2: {}, p3: {}, p4: {} },
-    statsBySeat: createGameStatsBySeat(),
-    roundStatsBySeat: createGameStatsBySeat(),
-    version: 0,
-    gameVersion: 0,
-  }
-}
 
+const { createRoomRecord, isBotPlayer, ensureBotMetadata, ensureLobbyMetadata, ensureLiveMetadata } = createRoomMetadata({
+  playerIds: ids, createResumeToken, createBotSeed, entryKindForClaims, entryDeadlineForClaims,
+})
 const inspectEntryTicket = (payload, expected = {}) => gameTicketVerifier.inspectWithConsumptionStatus(payload.gameTicket, expected)
 const friendTicketMatchesRoom = (room, claims) => {
   if (room.entryKind !== 'friend' || claims.roomKind !== 'friend') return false
@@ -214,7 +163,9 @@ const ticketMatchesRoom = (room, claims) => {
   return (!room.ticketBound || (
     room.matchId === claims.matchId
     && room.entryKind === entryKindForClaims(claims)
+    && room.matchMode === claims.matchMode
     && (room.entryKind !== 'friend' || friendTicketMatchesRoom(room, claims))
+    && (room.entryKind === 'friend' || botSeatBindingsMatch(room, claims))
   ))
     && room.roomId === String(claims.roomId)
 }
@@ -239,7 +190,7 @@ const rememberClosedRoomTombstone = room => {
   closedRoomTombstones.set(room.roomId, { roomId: room.roomId, matchId: room.matchId, until })
 }
 const reportCompletedGame = (room, result) => {
-  if (!resultReporter.configured || !result.isGameWon) return
+  if (!resultReporter.configured || (!result.isGameWon && !isSingleRoundMatch(room))) return
   if (!ids.every(id => typeof room.userIdsBySeat?.[id] === 'string')) {
     console.warn(`Skip game result callback for ${room.roomId}: ticket user mapping is incomplete`)
     return
@@ -278,12 +229,12 @@ const reportSpectatorRoundEnd = (room, result) => reportSpectatorEvent(room, {
   roundSequence: room.roundSequence,
   ranking: result.fullRank,
   winnerTeam: result.winnerTeam,
-  isGameWon: Boolean(result.isGameWon),
+  isGameWon: Boolean(result.isGameWon || isSingleRoundMatch(room)),
 })
 const reportSpectatorClosed = (room, reason) => {
   // 正常“过 A”已经通过结算回调进入 finished；随后全员离桌只是资源回收，
   // 不能再发 room-closed 把它伪装成异常终止。
-  if (room.roundResult?.isGameWon) return
+  if (room.roundResult?.isGameWon || (isSingleRoundMatch(room) && room.matchEnded)) return
   return reportSpectatorEvent(room, {
     type: 'room-closed',
     roundSequence: Math.max(1, room.roundSequence || 1),
@@ -291,88 +242,18 @@ const reportSpectatorClosed = (room, reason) => {
   })
 }
 const send = sendProtocolMessage
-const broadcast = (room, type, payload = {}, except = null) => ids.forEach((id) => {
+const broadcast = (room, type, payload = {}, except = null) => { ids.forEach((id) => {
   const connection = connections.get(room.seats[id])
   if (connection && connection !== except) send(connection, type, payload)
-})
-const clearRoomTimer = (timers, roomId) => {
-  const timer = timers.get(roomId)
-  if (timer) clearTimeout(timer)
-  timers.delete(roomId)
-}
-const clearDissolveTimer = (roomId) => clearRoomTimer(dissolveTimers, roomId)
-const clearEmptyRoomExpiry = (roomId) => clearRoomTimer(emptyRoomExpiryTimers, roomId)
-const ensureBotMetadata = (room) => {
-  const supplied = Array.isArray(room.botPlayerIds) ? room.botPlayerIds : []
-  room.botPlayerIds = ids.slice(1).filter(id => supplied.includes(id))
-  room.botPlayerIds.forEach(id => {
-    if (room.seats) room.seats[id] = null
-    if (room.resumeTokens) room.resumeTokens[id] = null
-    if (room.userIdsBySeat) room.userIdsBySeat[id] = null
-    if (room.ticketJtisBySeat) room.ticketJtisBySeat[id] = null
-    if (room.ticketExpiresAtBySeat) room.ticketExpiresAtBySeat[id] = null
-  })
-}
-const isBotPlayer = (room, playerId) => {
-  ensureBotMetadata(room)
-  return room.botPlayerIds.includes(playerId)
-}
+}); if (['roomDissolved', 'hostLeft'].includes(type)) for (const member of room.friendMembers || []) {
+  if (!member.seat) { const connection = connections.get(member.connectionId); if (connection) send(connection, type, payload) }
+} }
 const seatHasLiveConnection = (room, playerId) => {
   const connection = connections.get(room.seats[playerId])
   return Boolean(connection?.acceptingCommands && !connection.socket.destroyed)
 }
 const seatIsOccupied = (room, playerId) => seatHasLiveConnection(room, playerId) || isBotPlayer(room, playerId)
-const hasConnectedHuman = room => ids.some(id => seatHasLiveConnection(room, id))
-const ensureLobbyMetadata = (room) => {
-  ensureBotMetadata(room)
-  room.lobbyReady ||= { p1: false, p2: false, p3: false, p4: false }
-  ids.forEach(id => { room.lobbyReady[id] = Boolean(room.lobbyReady[id]) })
-  room.botPlayerIds.forEach(id => { room.lobbyReady[id] = true })
-}
-const ensureLiveMetadata = (room) => {
-  ensureBotMetadata(room)
-  room.trustees ||= { p1: null, p2: null, p3: null, p4: null }
-  room.consecutiveTimeouts ||= { p1: 0, p2: 0, p3: 0, p4: 0 }
-  room.roundReady ||= { p1: false, p2: false, p3: false, p4: false }
-  room.turnDeadlineAt ??= null
-  room.deadlinePlayerId ??= null
-  room.deadlineAction ??= null
-  room.dissolveVote ??= null
-  room.matchStartedAt ??= null
-  room.totalDeadlineAt ??= null
-  room.matchEnded ??= null
-  room.pendingSpectatorEvents = Array.isArray(room.pendingSpectatorEvents) ? room.pendingSpectatorEvents : []
-  room.pendingResultEvent ??= null
-  room.pendingRoundFinalization ??= null
-  room.pendingGameStartEvent ??= null
-  room.pendingGameStartRequest ??= null
-  room.gameStartClaimedAt = Number.isSafeInteger(room.gameStartClaimedAt) ? room.gameStartClaimedAt : null
-  room.gameStartReconnectDeadlineAt = Number.isSafeInteger(room.gameStartReconnectDeadlineAt)
-    ? room.gameStartReconnectDeadlineAt
-    : null
-  room.entryDeadlineAt ??= null
-  room.closingReason ??= null
-  room.entryKind = room.ticketBound && room.entryKind !== 'friend' ? 'match' : 'friend'
-  room.revokedFriendUserIds = Array.isArray(room.revokedFriendUserIds)
-    ? [...new Set(room.revokedFriendUserIds.filter(userId => typeof userId === 'string' && userId))]
-    : []
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  room.revokedTicketJtis = Array.isArray(room.revokedTicketJtis)
-    ? room.revokedTicketJtis.filter(item => (
-        item && typeof item.jti === 'string' && item.jti && Number.isFinite(item.exp) && item.exp > nowSeconds
-      ))
-    : []
-  room.statsBySeat = ensureGameStatsBySeat(room.statsBySeat)
-  room.roundStatsBySeat = ensureGameStatsBySeat(room.roundStatsBySeat)
-  room.roomSettings = normalizeFriendRoomSettings(room.roomSettings)
-  if (room.state?.players) {
-    ids.forEach(id => {
-      if (!isBotPlayer(room, id)) return
-      room.state.players[id].isAI = true
-      room.state.players[id].name = `机器人${id.slice(1)}`
-    })
-  }
-}
+const hasConnectedHuman = room => ids.some(id => seatHasLiveConnection(room, id)) || room.friendMembers?.some(member => connections.has(member.connectionId))
 const recordRoomAction = (room, playerId, action) => {
   room.statsBySeat = ensureGameStatsBySeat(room.statsBySeat)
   room.roundStatsBySeat = ensureGameStatsBySeat(room.roundStatsBySeat)
@@ -406,30 +287,22 @@ const {
   ensureLiveMetadata,
   isFriendRoom,
   seatIsOccupied,
+  captureObservers: (...args) => friendObservers.capture(...args),
+  publishObservers: room => friendObservers.publish(room),
 })
-const clearHostExpiry = (roomId) => { const timer = hostExpiryTimers.get(roomId); if (timer) { clearTimeout(timer); hostExpiryTimers.delete(roomId) } }
-const scheduleEmptyRoomExpiry = (room) => {
-  clearEmptyRoomExpiry(room.roomId)
-  if (!room.state || hasConnectedHuman(room)) return
-  emptyRoomExpiryTimers.set(room.roomId, setTimeout(() => {
-    emptyRoomExpiryTimers.delete(room.roomId)
-    void enqueueServerOperation(() => closeRoomWithoutAck(room, 'empty-timeout'), `empty room expiry ${room.roomId}`, room.roomId)
-  }, EMPTY_ROOM_TIMEOUT_MS))
-}
-const scheduleHostExpiry = (roomId, timeoutMs = 15000) => {
-  clearHostExpiry(roomId)
-  hostExpiryTimers.set(roomId, setTimeout(() => {
-    hostExpiryTimers.delete(roomId)
-    const room = rooms.get(roomId)
-    if (room && !seatHasLiveConnection(room, 'p1')) {
-      void enqueueServerOperation(() => closeRoomWithoutAck(room, 'host-left', 'hostLeft'), `host expiry ${roomId}`, roomId)
-    }
-  }, timeoutMs))
-}
+const roomExpiry = createRoomExpiry({
+  rooms, seatHasLiveConnection, hasConnectedHuman,
+  enqueueServerOperation: (...args) => enqueueServerOperation(...args),
+  closeRoomWithoutAck: (...args) => closeRoomWithoutAck(...args),
+  commitRuntimeState: () => commitRuntimeState(), publishDissolveVote,
+  emptyRoomTimeoutMs: EMPTY_ROOM_TIMEOUT_MS,
+})
+const { clearHostExpiry, clearEmptyRoomExpiry, clearDissolveTimer,
+  scheduleHostExpiry, scheduleEmptyRoomExpiry, scheduleDissolveExpiry } = roomExpiry
 const listRooms = () => [...rooms.entries()].filter(([, room]) => !room.ticketBound && seatHasLiveConnection(room, 'p1')).map(([roomId, room]) => ({ roomId, hostName: room.hostName, playerCount: ids.filter(id => seatIsOccupied(room, id)).length, roomSettings: normalizeFriendRoomSettings(room.roomSettings), version: room.version }))
 const broadcastRooms = () => connections.forEach(connection => send(connection, 'roomList', { rooms: listRooms() }))
 const playerIn = (room, connectionId) => ids.find(id => room.seats[id] === connectionId) || null
-const membershipsFor = connection => [...rooms.values()].filter(room => playerIn(room, connection.id))
+const membershipsFor = connection => [...rooms.values()].filter(room => playerIn(room, connection.id) || roomMember(room, connection.id))
 const syncConnectionRoomId = connection => {
   const memberships = membershipsFor(connection)
   connection.roomId = memberships.length === 1 ? memberships[0].roomId : null
@@ -438,7 +311,7 @@ const syncConnectionRoomId = connection => {
 const entryConflictFor = (connection, requestedRoomId) => membershipsFor(connection).find(room => room.roomId !== requestedRoomId) || null
 const resumeTokenFor = (room, connection) => {
   const playerId = room && playerIn(room, connection.id)
-  return playerId ? room.resumeTokens[playerId] : null
+  return roomMember(room, connection.id)?.resumeToken || (playerId ? room.resumeTokens[playerId] : null)
 }
 const actionCacheKey = (room, connection, requestId) => {
   const resumeToken = resumeTokenFor(room, connection)
@@ -460,41 +333,11 @@ const persistedRuntimeSnapshot = () => ({
   acceptedActions: [...acceptedActions.entries()].slice(-maxAcceptedActions),
   closedRoomTombstones: [...closedRoomTombstones.values()],
 })
-let runtimeDirty = false
-let persistTimer = null
-const markAllAcceptedActionsDurable = () => {
-  for (const [key, accepted] of acceptedActions) acceptedActions.set(key, { ...accepted, pendingDurability: false })
-}
-const schedulePersistRetry = () => {
-  if (!roomStateStore.configured || persistTimer || shuttingDown) return
-  persistTimer = setTimeout(() => { void flushRuntimeState() }, Math.max(100, PERSIST_DEBOUNCE_MS))
-  persistTimer.unref?.()
-}
-const flushRuntimeState = async ({ throwOnError = false } = {}) => {
-  if (!roomStateStore.configured) { markAllAcceptedActionsDurable(); return }
-  if (!runtimeDirty) return
-  if (persistTimer) clearTimeout(persistTimer)
-  persistTimer = null
-  runtimeDirty = false
-  const snapshot = persistedRuntimeSnapshot()
-  const writtenAcceptances = new Map(snapshot.acceptedActions.map(([key, accepted]) => [key, accepted]))
-  try {
-    await roomStateStore.save(snapshot)
-    markSnapshotAcceptancesDurable(acceptedActions, writtenAcceptances)
-  } catch (error) {
-    runtimeDirty = true
-    console.error('Failed to persist WeApp room state:', error instanceof Error ? error.message : error)
-    schedulePersistRetry()
-    if (throwOnError) throw error
-  }
-}
-const persistRuntimeState = () => {
-  if (!roomStateStore.configured) return
-  runtimeDirty = true
-  if (persistTimer) return
-  persistTimer = setTimeout(() => { void flushRuntimeState() }, PERSIST_DEBOUNCE_MS)
-  persistTimer.unref?.()
-}
+const runtimePersistence = createRuntimePersistence({
+  roomStateStore, acceptedActions, persistedRuntimeSnapshot,
+  debounceMs: PERSIST_DEBOUNCE_MS, isShuttingDown: () => shuttingDown,
+})
+const { persistRuntimeState, flushRuntimeState } = runtimePersistence
 const enqueueServerOperation = (operation, label = 'server operation', roomId = null) => {
   const queued = roomId
     ? operationScheduler.enqueue(roomOperationKey(roomId), operation, label)
@@ -600,7 +443,7 @@ const {
   consumeRoundSettlement, finalizePendingRound, finishTributeState, markOfflineReady, prepareNextRound,
   restoreTurnDeadline, schedulePendingRoundFinalization, syncRoomFromMatchState,
 } = matchLifecycle
-const finalizeRemovedRoom = (room, reason = 'vote-approved', eventType = 'roomDissolved') => {
+const finalizeRemovedRoom = (room, reason = 'vote-approved', eventType = 'roomDissolved', keepAcceptedKey = null) => {
   clearDissolveTimer(room.roomId)
   clearHostExpiry(room.roomId)
   clearEmptyRoomExpiry(room.roomId)
@@ -609,9 +452,9 @@ const finalizeRemovedRoom = (room, reason = 'vote-approved', eventType = 'roomDi
   room.turnDeadlineAt = null
   room.deadlinePlayerId = null
   room.deadlineAction = null
-  for (const token of Object.values(room.resumeTokens || {})) acceptedActionStore.deleteToken(token)
+  for (const token of [...Object.values(room.resumeTokens || {}), ...(room.friendMembers || []).map(member => member.resumeToken)]) acceptedActionStore.deleteToken(token, keepAcceptedKey)
   broadcast(room, eventType, { roomId: room.roomId, reason, version: room.version })
-  const affectedConnections = ids.map(id => connections.get(room.seats[id])).filter(Boolean)
+  const affectedConnections = [...new Set([...Object.values(room.seats), ...(room.friendMembers || []).map(member => member.connectionId)])].map(id => connections.get(id)).filter(Boolean)
   roomBotPolicies.delete(room.roomId)
   affectedConnections.forEach(syncConnectionRoomId)
   broadcastRooms()
@@ -637,41 +480,10 @@ const closeRoomWithoutAck = async (room, reason, eventType = 'roomDissolved', sp
   }
   finalizeRemovedRoom(room, reason, eventType)
 }
-const scheduleDissolveExpiry = (room) => {
-  clearDissolveTimer(room.roomId)
-  const expiresAt = room.dissolveVote?.expiresAt
-  if (!expiresAt) return
-  dissolveTimers.set(room.roomId, setTimeout(() => {
-    void enqueueServerOperation(async () => {
-      if (!rooms.has(room.roomId) || room.dissolveVote?.expiresAt !== expiresAt) return
-      room.dissolveVote = null
-      room.version += 1
-      clearDissolveTimer(room.roomId)
-      await commitRuntimeState()
-      publishDissolveVote(room, 'expired')
-    }, `dissolve expiry ${room.roomId}`, room.roomId)
-  }, Math.max(0, expiresAt - Date.now())))
-}
-const initializeRoomMatch = (room, { matched = false } = {}) => {
+const initializeRoomMatch = room => {
   resetRoomBotPolicy(room)
   room.roundStatsBySeat = createGameStatsBySeat()
-  const dealt = createGame(2, 'p1', ruleProfileForRoom(room), shuffleRandom)
-  ids.forEach(id => {
-    const isAI = matched ? false : isBotPlayer(room, id)
-    dealt.players[id].isAI = isAI
-    dealt.players[id].name = isAI ? `机器人${id.slice(1)}` : `玩家${id.slice(1)}`
-  })
-  room.state = createInitialMatchState({
-    players: dealt.players,
-    ruleProfile: ruleProfileForRoom(room),
-    currentLevel: 2,
-    dealerId: 'p1',
-    teamLevels: room.teamLevels || { teamA: 2, teamB: 2 },
-    aFailStreaks: room.aFailStreaks || { teamA: 0, teamB: 0 },
-    scores: room.scores || { teamA: 0, teamB: 0 },
-    revision: Math.max(1, Number(room.gameVersion) + 1 || 1),
-    roundId: Math.max(1, Number(room.roundSequence) + 1 || 1),
-  })
+  room.state = createRoomOpeningState(room, ruleProfileForRoom(room), shuffleRandom, isBotPlayer)
   syncRoomFromMatchState(room)
 }
 const ensureTicketBindings = (room) => {
@@ -696,7 +508,7 @@ const gameStartCoordinator = createWeAppGameStartCoordinator({
   emptyRoomTimeoutMs: EMPTY_ROOM_TIMEOUT_MS,
   testPersistFailures: process.env.NODE_ENV === 'test' && process.env.WEAPP_TEST_FAIL_GAME_START_PERSIST_ONCE === '1' ? 1 : 0,
   isShuttingDown: () => shuttingDown,
-  isFriendRoom, isMatchRoom, seatHasLiveConnection, enqueueServerOperation,
+  isFriendRoom, isMatchRoom, seatHasLiveConnection, seatIsOccupied, enqueueServerOperation,
   commitRuntimeState, persistRuntimeState, spectatorEventReporter,
   initializeRoomMatch, armMatchDuration, armTurnDeadline, closeRoomWithoutAck,
   publishRoomMembers, publishLobbyReady, publishState, rememberAccepted, send,
@@ -724,7 +536,7 @@ const consumeCommandBudget = connection => {
   return false
 }
 
-const gameCommandHandler = createGameCommandHandler({
+const gameCommandDependencies = {
   ids, rooms, connections, acceptedActions,
   dissolveTimeoutMs: DISSOLVE_TIMEOUT_MS,
   quickChatIntervalMs: QUICK_CHAT_INTERVAL_MS,
@@ -760,7 +572,10 @@ const gameCommandHandler = createGameCommandHandler({
   scheduleEmptyRoomExpiry,
   broadcastRooms,
   send,
-})
+}
+const publishCurrentRoom = createCommandPublication({ publishRoomMembers, publishLobbyReady, publishState, publishTribute, publishRoundEnded, publishRoundReady, publishTrustees, publishTurnStatus, publishDissolveVote })
+const gameCommandHandler = createGameCommandHandler(gameCommandDependencies)
+const roomExit = createRoomExit({ ...gameCommandDependencies, publishCurrentRoom, enqueueServerOperation })
 const lobbyCommandHandler = createLobbyCommandHandler({
   ids, rooms, connections, playerIn,
   isMatchRoom, isFriendRoom, seatIsOccupied, ensureLobbyMetadata,
@@ -787,21 +602,11 @@ const lobbyCommandHandler = createLobbyCommandHandler({
   publishRoomMembers,
   broadcastRooms,
 })
-const entryCommandHandler = createEntryCommandHandler({
-  ids, rooms, acceptedActions,
-  maxRooms: MAX_ROOMS,
-  gameTicketVerifier,
-  inspectEntryTicket,
-  ticketBlockedByClosedRoom,
-  normalizeEntryAttemptId,
-  pendingSeatReleaseFor,
-  actionFingerprint,
-  sameToken,
-  seatHasAnotherActiveConnection,
-  clearEmptyRoomExpiry,
-  restoreOfflineDissolveVote,
-  commitRuntimeState,
-  stagePendingSideEffects,
+const entryDependencies = {
+  ids, rooms, acceptedActions, maxRooms: MAX_ROOMS,
+  gameTicketVerifier, inspectEntryTicket, ticketBlockedByClosedRoom, normalizeEntryAttemptId,
+  pendingSeatReleaseFor, actionFingerprint, sameToken, seatHasAnotherActiveConnection,
+  clearEmptyRoomExpiry, restoreOfflineDissolveVote, commitRuntimeState, stagePendingSideEffects,
   send,
   publishRoomMembers,
   publishDissolveVote,
@@ -832,18 +637,23 @@ const entryCommandHandler = createEntryCommandHandler({
   isBotPlayer,
   seatIsOccupied,
   ensureLobbyMetadata,
-})
+}
+const friendObservers = createFriendRoomObserverRuntime({ ...entryDependencies, connections })
+const legacyEntryCommandHandler = createEntryCommandHandler(entryDependencies)
+const entryCommandHandler = async context => { if (!await friendObservers.enter(context)) await legacyEntryCommandHandler(context) }
 const commandRouter = createCommandRouter([
+  { types: FRIEND_VIEW_COMMANDS, handle: friendObservers.handle },
   { types: ENTRY_COMMAND_TYPES, handle: entryCommandHandler },
   { types: LOBBY_COMMAND_TYPES, handle: lobbyCommandHandler },
   { types: GAME_COMMAND_TYPES, handle: gameCommandHandler },
+  { types: EXIT_COMMAND_TYPES, handle: roomExit.handle },
 ])
 
 const handleCommand = createCommandGateway({
   rooms, acceptedActions, idempotentActionTypes, actionCacheKey, actionFingerprint,
   validateCommandRequestId, validateExpectedVersion, playerIn, isFriendRoom,
   finalizePendingRound, scheduleGameStartClaim, commitRuntimeState, stagePendingSideEffects,
-  publishState, rememberAccepted, reserveAccepted: acceptedActionStore.reserve,
+  publishCurrentRoom, completeRoomExit: roomExit.complete, rememberAccepted, reserveAccepted: acceptedActionStore.reserve,
   releaseAccepted: acceptedActionStore.release, listRooms, send, router: commandRouter,
 })
 
@@ -902,6 +712,10 @@ const handleConnectionClosed = connection => {
     const preparedRooms = new Set()
     for (const room of memberships) {
       const playerId = playerIn(room, connection.id)
+      const member = roomMember(room, connection.id)
+      const wasHost = member ? member.userId === room.friendHostUserId : playerId === 'p1'
+      if (member) member.connectionId = null
+      if (wasHost && !room.state && !room.ticketBound) scheduleHostExpiry(room.roomId, 15000)
       if (playerId) {
         room.version += 1
         room.seats[playerId] = null
@@ -912,7 +726,6 @@ const handleConnectionClosed = connection => {
           if (markOfflineReady(room, playerId)) preparedRooms.add(room.roomId)
           if (!room.roundResult && room.deadlinePlayerId === playerId) armTurnDeadline(room, { publish: false })
         } else if (room.ticketBound) scheduleEntryDeadline(room)
-        else if (playerId === 'p1') scheduleHostExpiry(room.roomId, 15000)
       }
     }
     connections.delete(connection.id)
@@ -933,7 +746,10 @@ const handleConnectionClosed = connection => {
   }, 'WeApp disconnect cleanup')
 }
 
-const server = createServer((_, response) => { response.writeHead(404); response.end() })
+const server = createServer(
+  { shouldUpgradeCallback: isProtocolUpgradeRequest },
+  (_, response) => { response.writeHead(404); response.end() },
+)
 server.on('upgrade', (request, socket) => {
   upgradeToProtocolConnection({
     request,
@@ -962,7 +778,7 @@ const restorePersistedRuntime = async () => {
 }
 const port = security.wsPort
 await restorePersistedRuntime()
-server.listen(port, () => console.log(`Guandan WeApp WebSocket server running on port ${port}`))
+server.listen(port, security.host, () => console.log(`Guandan WeApp WebSocket server running at ${security.host}:${port}`))
 
 const shutdown = async signal => {
   if (shuttingDown) return
@@ -970,11 +786,14 @@ const shutdown = async signal => {
   console.log(`Stopping Guandan WeApp server after ${signal}`)
   connections.forEach(connection => { connection.acceptingCommands = false })
   const serverClosed = new Promise(resolve => server.close(resolve))
-  for (const timers of [hostExpiryTimers, emptyRoomExpiryTimers, dissolveTimers, sideEffectStageRetryTimers]) { for (const timer of timers.values()) clearTimeout(timer); timers.clear() }
+  roomExpiry.dispose()
+  friendObservers.dispose()
+  roomExit.dispose()
+  for (const timer of sideEffectStageRetryTimers.values()) clearTimeout(timer)
+  sideEffectStageRetryTimers.clear()
   matchLifecycle.dispose()
   gameStartCoordinator.dispose()
-  if (persistTimer) clearTimeout(persistTimer)
-  persistTimer = null
+  runtimePersistence.cancelPendingTimer()
   let failed = false
   try {
     resultReporter.stop(new Error(`server shutdown: ${signal}`))

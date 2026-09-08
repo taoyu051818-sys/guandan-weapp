@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -23,6 +23,7 @@ const fileSet = new Set(files.map(file => resolve(file)))
 const localDependencies = new Map()
 const staticModulePattern = /\b(?:import|export)\s+(?:[^'";]*?\sfrom\s*)?['"]([^'"]+)['"]/g
 const dynamicImportPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+const requirePattern = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g
 const resolveLocalModule = (file, specifier) => {
   if (!specifier.startsWith('.')) return null
   const base = resolve(dirname(file), specifier)
@@ -44,7 +45,14 @@ for (const file of files) {
   const specifiers = [
     ...source.matchAll(staticModulePattern),
     ...source.matchAll(dynamicImportPattern),
+    ...source.matchAll(requirePattern),
   ].map(match => match[1])
+  for (const specifier of specifiers.filter(value => value.startsWith('.'))) {
+    const base = resolve(dirname(file), specifier)
+    if (![base, `${base}.js`, `${base}.json`, join(base, 'index.js')].some(existsSync)) {
+      throw new Error(`${relative(serverDir, file)} imports missing local module: ${specifier}`)
+    }
+  }
   localDependencies.set(file, specifiers.map(specifier => resolveLocalModule(file, specifier)).filter(Boolean))
 }
 
@@ -103,7 +111,15 @@ for (const testFile of serverTestFiles) {
 // into the two server composition roots. Lower after each extraction; never
 // raise merely to fit a new feature.
 const lineBudgets = {
-  'platform/service.js': 800,
+  'platform/storage.js': 180,
+  'platform/state-migrations.js': 270,
+  'platform/report-event-contract.js': 30,
+  'platform/report-delivery-lifetime.js': 90,
+  'platform/result-reporter.js': 200,
+  'platform/spectator-event-reporter.js': 180,
+  'platform/service.js': 460,
+  'platform/spectator-event-service.js': 375,
+  'platform/state-collections.js': 25,
   'platform/account-service.js': 240,
   'platform/commerce-service.js': 140,
   'platform/tournament-service.js': 270,
@@ -112,7 +128,11 @@ const lineBudgets = {
   'platform/merchant-service.js': 220,
   'platform/matchmaking-service.js': 350,
   'platform/game-result-service.js': 320,
-  'weapp-ws.js': 1000,
+  'weapp-ws.js': 825,
+  'weapp-runtime-persistence.js': 65,
+  'weapp-room-metadata.js': 145,
+  'weapp-room-expiry.js': 75,
+  'weapp-room-expiry-jobs.js': 50,
   'weapp-match-lifecycle.js': 520,
   'weapp-game-start-coordinator.js': 320,
   'weapp-runtime-recovery.js': 130,
@@ -121,9 +141,11 @@ const lineBudgets = {
   'weapp-websocket-transport.js': 160,
   'weapp-room-publisher.js': 200,
   'weapp-command-gateway.js': 150,
+  'weapp-command-publication.js': 35,
+  'weapp-room-exit.js': 125,
   'weapp-entry-command-handler.js': 350,
   'weapp-lobby-command-handler.js': 180,
-  'weapp-game-command-handler.js': 330,
+  'weapp-game-command-handler.js': 245,
 }
 for (const [localPath, budget] of Object.entries(lineBudgets)) {
   const file = join(serverDir, localPath)

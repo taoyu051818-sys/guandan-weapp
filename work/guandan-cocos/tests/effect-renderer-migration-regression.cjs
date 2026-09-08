@@ -17,8 +17,8 @@ const retiredRendererPaths = [
   path.join(projectRoot, 'assets/scripts/effects/SignaturePatternEffectRenderer.ts'),
   path.join(projectRoot, 'assets/scripts/effects/CardPatternEffectRenderer.ts'),
   path.join(projectRoot, 'assets/scripts/effects/FlowEffectRenderer.ts'),
+  path.join(projectRoot, 'assets/scripts/effects/FlowEffectTypes.ts'),
 ]
-const flowEffectTypesPath = path.join(projectRoot, 'assets/scripts/effects/FlowEffectTypes.ts')
 const effectControllerPath = path.join(projectRoot, 'assets/scripts/effects/EffectController.ts')
 const effectPlaybackPath = path.join(projectRoot, 'assets/scripts/effects/EffectPlaybackCoordinator.ts')
 const actionPresentationPath = path.join(projectRoot, 'assets/scripts/effects/EffectActionPresentationCoordinator.ts')
@@ -396,7 +396,7 @@ function verifyLegacyManifest () {
 }
 
 async function main () {
-  const sourcePaths = [effectHandlePath, effectRendererPath, effectRenderContextPath, rendererRegistryPath, assetCatalogPath, effectRecipesPath, bombRendererPath, sixBombRendererPath, flowEffectTypesPath, effectPlaybackPath, actionPresentationPath, cardBlastReactionPath, archivedPlayVisualsPath, playAreaControllerPath, handControllerPath, gameScenePath]
+  const sourcePaths = [effectHandlePath, effectRendererPath, effectRenderContextPath, rendererRegistryPath, assetCatalogPath, effectRecipesPath, bombRendererPath, sixBombRendererPath, effectPlaybackPath, actionPresentationPath, cardBlastReactionPath, archivedPlayVisualsPath, playAreaControllerPath, handControllerPath, gameScenePath]
   for (const sourcePath of sourcePaths) {
     assert.equal(fs.existsSync(sourcePath), true, `missing migration source: ${sourcePath}`)
     assert.equal(fs.existsSync(`${sourcePath}.meta`), true, `missing Cocos metadata: ${sourcePath}.meta`)
@@ -413,7 +413,6 @@ async function main () {
   const recipesSource = read(effectRecipesPath)
   const bombSource = read(bombRendererPath)
   const sixBombSource = read(sixBombRendererPath)
-  const flowEffectTypesSource = read(flowEffectTypesPath)
   const controllerSource = read(effectControllerPath)
   const effectPlaybackSource = read(effectPlaybackPath)
   const actionPresentationSource = read(actionPresentationPath)
@@ -465,7 +464,6 @@ async function main () {
   assert.match(sixBombSource, /new EffectHandle/, 'six-card bomb must own its cleanup lifetime')
   assert.doesNotMatch(sixBombSource, /BlockInputEvents|Button/, 'visual overlays must not intercept card input')
   assert.doesNotMatch(sixBombSource, /GuanDan\/Room\/Effect|核爆炸|爆炸_BG|掼蛋飞机/, 'six-card bomb must remain independent of rejected legacy bitmaps')
-  assert.match(flowEffectTypesSource, /@deprecated 未达到商业化标准[\s\S]*resolveFlowEffectRecipe[\s\S]*=> null/, 'flow recipes must remain explicitly retired and non-runnable')
   assert.doesNotMatch(controllerSource, /CardPatternEffectRenderer|SignaturePatternEffectRenderer|FlowEffectRenderer|CARD_PATTERN_EFFECT_KEYS|FLOW_EFFECT_KEYS/, 'production dispatch must not import an unapproved renderer')
   assert.doesNotMatch(vfxCardSnapshotSource, /\bGraphics\b|\bLabel\b|CardView/, 'VFX card snapshots must remain Sprite-only')
   assert.match(vfxCardSnapshotSource, /resolveClassicCardPlan\(cardDisplay\(card\)\)/, 'VFX snapshots must share the approved classic-card resolver')
@@ -549,9 +547,10 @@ async function main () {
   assert.match(cardFlightSource, /quadraticPoint\(/)
   assert.match(cardFlightSource, /\.update\(seconds,/, 'ordinary card flight must share the continuous Bezier motion grammar')
   assert.match(cardFlightSource, /preloadVfxCardFrames\(cards\)[\s\S]*this\.pool\.acquireCard\(card\)/, 'a cold cache must finish all card art before the projectile is acquired')
-  assert.match(cardFlightSource, /export const resolvePlayedCardSpacing = \(cardCount: number\): number =>[\s\S]*Math\.min\(42, 210 \/ Math\.max\(1, cardCount - 1\)\)/, 'flight and landed fans must share one reviewed spacing formula')
+  assert.match(cardFlightSource, /export const resolvePlayedCardSpacing = playedCardSpacing/, 'flight and landed fans share the pure layout geometry')
   assert.match(cardFlightSource, /const spread = resolvePlayedCardSpacing\(cards\.length\)/, 'the projectile endpoints must use the shared played-card spacing')
-  assert.match(playAreaControllerSource, /import \{ resolvePlayedCardSpacing \} from '\.\.\/effects\/CardFlightController'[\s\S]*const spacing = resolvePlayedCardSpacing\(action\.cards\.length\)/, 'landed table cards must preserve the projectile fan positions without a handoff jump')
+  assert.match(playAreaControllerSource, /import \{ PLAYED_CARD_FINAL_SCALE, resolvePlayedCardSpacing \} from '\.\.\/effects\/CardFlightController'[\s\S]*const spacing = resolvePlayedCardSpacing\(action\.cards\.length\)/, 'landed table cards share the final scale and spacing with projectiles')
+  assert.match(cardFlightSource, /const spread = resolvePlayedCardSpacing\(cards\.length\) \* PLAYED_CARD_FINAL_SCALE/, 'flight destinations must equal the already-scaled static fan positions')
   assert.match(cardFlightSource, /cards\.forEach\(\(card, index\) => \{[\s\S]*?\.call\(\(\) => \{[\s\S]*?this\.pool\.releaseCard\(node\)\s*try \{ onCardArrive\?\.\(card, index\)/, 'every flight card must reveal its table counterpart only after that projectile is released')
   assert.match(cardFlightSource, /if \(completed === cards\.length\) \{[\s\S]*?try \{ onArrive\?\.\(\) \}[\s\S]*?finally \{ handle\.complete\(\) \}/, 'impact callbacks must complete the flight handle through finally even when presentation code throws')
   assert.equal((cardFlightSource.match(/onCardArrive\?\.\(card, index\)/g) || []).length, 1, 'the per-card arrival callback must have one deterministic call site inside the card loop')
@@ -568,13 +567,13 @@ async function main () {
   assert.match(actionPresentationSource, /const ticket = activePresentation\?\.deferAction\(action, actionIndex\) \?\? null[\s\S]*onFlightStart: \(\) => \{ if \(ticket\) activePresentation\?\.beginAction\(action, actionIndex, ticket\) \}[\s\S]*onCardArrive: cardId => \{ if \(ticket\) activePresentation\?\.revealCard\(action, actionIndex, cardId, ticket\) \}[\s\S]*onFlightFinish: \(\) => \{ if \(ticket\) activePresentation\?\.revealAction\(action, actionIndex, ticket\) \}/, 'effect dispatch must carry one ticket through flight start, every card arrival and final recovery reveal')
   assert.doesNotMatch(controllerSource, /\bLandingPulse\b|\bshowLandingPulse\b/, 'the generic landing pulse must stay removed from the production pipeline')
   assert.match(effectPlaybackSource, /const flightReason = await flightHandle\.finished[\s\S]*if \(flightReason !== 'completed'\) \{ handle\.cancel\(flightReason\); return \}[\s\S]*const impactReason = impactHandle\?\.isActive \? await impactHandle\.finished[\s\S]*if \(impactReason && impactReason !== 'completed'\) handle\.cancel\(impactReason\)[\s\S]*else handle\.complete\(\)/, 'the outer play handle and visible queue must own the complete flight and impact lifetimes')
-  assert.match(controllerSource, /private renderFlow[\s\S]*kind === 'victory'[\s\S]*kind === 'defeat'[\s\S]*EffectHandle\.completed\('unavailable'\)/, 'retired flow visuals must stay unavailable while semantic settlement audio survives')
+  assert.doesNotMatch(controllerSource, /renderFlow|playSettlement/, 'retired flow shims must be removed, not merely disabled')
   assert.match(effectPlaybackSource, /private enqueueVisibleEffect \(startEffect: \(\) => EffectHandle\)[\s\S]*const reason = child\.isActive \? await child\.finished[\s\S]*if \(reason === 'completed'\) handle\.complete\(\)/, 'authored card presentation barriers must retain the shared visible lane')
   assert.doesNotMatch(controllerSource, /allowArchivedVisuals|showSweep\(|PatternSweep/, 'EffectLab and live play must not retain a hidden path back to retired sweeps')
   assert.match(controllerSource, /(cancelAll|skipAll|clear)\(['"]recovery['"]\)/, 'recovery must use the unified renderer cleanup path')
   assert.match(controllerSource, /(cancelAll|skipAll|clear)\(['"]destroyed['"]\)/, 'scene destruction must use the unified renderer cleanup path')
   assert.match(controllerSource, /private cancelAll\s*\(/, 'the unified cleanup call sites must have one concrete implementation')
-  assert.match(controllerSource, /private clearTransientNodes\s*\(/, 'transient labels and roots need one bounded cleanup implementation')
+  assert.match(controllerSource, /this\.transientPool\.releaseAll\(\)/, 'live renderer nodes must still use pooled cleanup')
   assert.match(controllerSource, /private playShake\s*\(/, 'registered renderers need a cancellable shake service')
   assert.match(controllerSource, /private skipMajor\s*\([^)]*reason/, 'major cleanup must preserve recovery/destroy reasons')
 

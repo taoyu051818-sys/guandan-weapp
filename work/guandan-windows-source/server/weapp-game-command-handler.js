@@ -7,26 +7,46 @@ export const GAME_COMMAND_TYPES = [
   'setTrustee', 'cancelTrustee',
   'proposeDissolve', 'dissolveVote', 'voteDissolve',
   'tribute', 'returnTribute', 'finishTribute',
-  'chat', 'leaveRoom', 'safeExit',
+  'chat',
 ]
 
 export const createGameCommandHandler = dependencies => async context => {
-  const { type, payload, connection, requestId, cacheKey, requestFingerprint, reply, rememberActionAcceptance, acceptAction } = context
+  const { type, payload, connection, requestId, cacheKey, reply, rememberActionAcceptance, acceptAction } = context
   const {
-    ids, rooms, connections, dissolveTimeoutMs, quickChatIntervalMs, quickChatRepeatMs, quickChatPhrases,
-    playerIn, ensureLiveMetadata, ensureLobbyMetadata, isFriendRoom, applyRoomSettlementPolicy,
+    ids, rooms, dissolveTimeoutMs, quickChatIntervalMs, quickChatRepeatMs, quickChatPhrases,
+    playerIn, ensureLiveMetadata, isFriendRoom, applyRoomSettlementPolicy,
     syncRoomFromMatchState, recordRoomAction, reportSpectatorAction, consumeRoundSettlement,
-    armTurnDeadline, finalizePendingRound, publishState, publishRoundEnded, prepareNextRound,
+    armTurnDeadline, finalizePendingRound, publishState, prepareNextRound,
     publishTribute, publishRoundReady, publishTrustees, publishTurnStatus, scheduleDissolveExpiry,
     publishDissolveVote, clearDissolveTimer, rememberClosedRoomTombstone, reportSpectatorClosed,
     commitRuntimeState, stagePendingSideEffects, persistRuntimeState, finalizeRemovedRoom,
-    reportSpectatorEvent, finishTributeState, broadcast, rememberAccepted, syncConnectionRoomId,
-    markOfflineReady, publishRoomMembers, scheduleEmptyRoomExpiry, broadcastRooms, deleteAcceptedActionIdentity, send,
+    reportSpectatorEvent, finishTributeState, broadcast, send,
   } = dependencies
+
+  // Both a final human vote and an already-unanimous human + bot proposal
+  // must follow the same durable close / acceptance path.
+  const closeApprovedVote = async room => {
+    room.closingReason = 'vote-approved'
+    rememberClosedRoomTombstone(room)
+    reportSpectatorClosed(room, 'dissolved')
+    await commitRuntimeState()
+    stagePendingSideEffects(room)
+    rooms.delete(room.roomId)
+    const accepted = rememberActionAcceptance(room)
+    try { await commitRuntimeState() } catch (error) {
+      rooms.set(room.roomId, room)
+      if (cacheKey) { dependencies.acceptedActions.delete(cacheKey); connection.acceptedCacheKeys.delete(requestId) }
+      persistRuntimeState()
+      throw error
+    }
+    send(connection, 'actionAccepted', accepted)
+    finalizeRemovedRoom(room)
+  }
 
   if (type === 'play' || type === 'pass') {
     const room = rooms.get(String(payload.roomId || connection.roomId || ''))
     const playerId = room && playerIn(room, connection.id)
+    if (room && !playerId) return reply('error', { code: 'OBSERVER_READ_ONLY', message: '观战位不能出牌' })
     if (!room || !playerId || !room.state) return reply('error', { message: '对局尚未开始' })
     ensureLiveMetadata(room)
     if (room.trustees[playerId]) return reply('error', { message: '请先取消托管再操作' })
@@ -64,7 +84,6 @@ export const createGameCommandHandler = dependencies => async context => {
       } else {
         await acceptAction(room)
         publishState(room)
-        if (roundResult) publishRoundEnded(room, roundResult)
       }
     } catch (error) { reply('error', { message: error instanceof Error ? error.message : '出牌失败' }) }
     return
@@ -124,6 +143,7 @@ export const createGameCommandHandler = dependencies => async context => {
     room.botPlayerIds.forEach(id => { votes[id] = 'agree' })
     room.dissolveVote = { initiator: playerId, votes, expiresAt: Date.now() + dissolveTimeoutMs }
     room.version += 1
+    if (ids.every(id => votes[id] === 'agree')) return closeApprovedVote(room)
     scheduleDissolveExpiry(room)
     await acceptAction(room)
     publishDissolveVote(room)
@@ -144,22 +164,7 @@ export const createGameCommandHandler = dependencies => async context => {
       return
     }
     if (ids.every(id => room.dissolveVote.votes[id] === 'agree')) {
-      room.closingReason = 'vote-approved'
-      rememberClosedRoomTombstone(room)
-      reportSpectatorClosed(room, 'dissolved')
-      await commitRuntimeState()
-      stagePendingSideEffects(room)
-      rooms.delete(room.roomId)
-      const accepted = rememberActionAcceptance(room)
-      try { await commitRuntimeState() } catch (error) {
-        rooms.set(room.roomId, room)
-        if (cacheKey) { dependencies.acceptedActions.delete(cacheKey); connection.acceptedCacheKeys.delete(requestId) }
-        persistRuntimeState()
-        throw error
-      }
-      send(connection, 'actionAccepted', accepted)
-      finalizeRemovedRoom(room)
-      return
+      return closeApprovedVote(room)
     }
     await acceptAction(room)
     publishDissolveVote(room)
@@ -222,69 +227,5 @@ export const createGameCommandHandler = dependencies => async context => {
     await acceptAction(room)
     broadcast(room, 'chat', { roomId: room.roomId, playerId, text, version: room.version })
     return
-  }
-  if (type === 'leaveRoom' || type === 'safeExit') {
-    const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    const playerId = room && playerIn(room, connection.id)
-    if (!room || !playerId) return reply('error', { message: '当前不在房间中' })
-    room.version += 1
-    let preparedNextRound = false
-    let removedRoom = false
-    if (room.state) {
-      ensureLiveMetadata(room)
-      room.seats[playerId] = null
-      room.trustees[playerId] = { reason: 'disconnected', since: Date.now() }
-      if (room.dissolveVote?.votes[playerId] === 'pending') room.dissolveVote.votes[playerId] = 'offline'
-      preparedNextRound = markOfflineReady(room, playerId)
-      if (!room.roundResult && room.deadlinePlayerId === playerId) armTurnDeadline(room, { publish: false })
-    } else if (playerId === 'p1') {
-      room.closingReason = 'host-left'
-      rememberClosedRoomTombstone(room)
-      reportSpectatorClosed(room, 'host-left')
-      await commitRuntimeState()
-      stagePendingSideEffects(room)
-      rooms.delete(room.roomId)
-      removedRoom = true
-    } else {
-      const departingUserId = room.userIdsBySeat?.[playerId]
-      const departingTicketJti = room.ticketJtisBySeat?.[playerId]
-      const departingTicketExp = room.ticketExpiresAtBySeat?.[playerId]
-      room.seats[playerId] = null
-      deleteAcceptedActionIdentity(room.resumeTokens[playerId])
-      room.resumeTokens[playerId] = null
-      ensureLobbyMetadata(room)
-      room.lobbyReady[playerId] = false
-      if (room.entryKind === 'friend' && departingUserId) {
-        if (departingTicketJti && Number.isFinite(departingTicketExp)) room.revokedTicketJtis.push({ jti: departingTicketJti, exp: departingTicketExp })
-        room.userIdsBySeat[playerId] = null
-        room.ticketJtisBySeat[playerId] = null
-        room.ticketExpiresAtBySeat[playerId] = null
-        reportSpectatorEvent(room, { type: 'seat-left', playerId, userId: departingUserId, reason: 'left', roundSequence: 1 })
-      }
-    }
-    const response = { requestId, roomId: room.roomId, version: room.version, seatReserved: Boolean(room.state) }
-    rememberAccepted(cacheKey, requestFingerprint, response, 'roomLeft')
-    if (cacheKey) connection.acceptedCacheKeys.set(requestId, cacheKey)
-    try { await commitRuntimeState() } catch (error) {
-      if (removedRoom) rooms.set(room.roomId, room)
-      if (cacheKey) { dependencies.acceptedActions.delete(cacheKey); connection.acceptedCacheKeys.delete(requestId) }
-      persistRuntimeState()
-      throw error
-    }
-    if (!removedRoom) stagePendingSideEffects(room)
-    syncConnectionRoomId(connection)
-    send(connection, 'roomLeft', response)
-    if (removedRoom) finalizeRemovedRoom(room, 'host-left', 'hostLeft')
-    else {
-      publishRoomMembers(room)
-      if (room.state) {
-        publishTrustees(room)
-        publishTurnStatus(room)
-        if (room.dissolveVote) publishDissolveVote(room)
-        if (preparedNextRound) publishTribute(room, 'roundPrepared')
-        else if (room.roundResult) publishRoundReady(room)
-        scheduleEmptyRoomExpiry(room)
-      } else broadcastRooms()
-    }
   }
 }

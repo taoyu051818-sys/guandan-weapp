@@ -1,0 +1,229 @@
+import { game, Game, Node } from 'cc'
+import { LobbyController, type LobbySnapshot } from '../network/LobbyController'
+import type { FrontPagePreviewData } from '../services/FrontPagePreviewData'
+import type { FrontPageGateways, MatchRecoveryEntry, MatchTicket } from '../services/FrontPageGatewayContracts'
+import { GameSession } from '../session/GameSession'
+import type { EffectQuality } from '../effects/EffectTypes'
+import { ScreenAdapter } from '../ui/ScreenAdapter'
+import { PageRouter } from './PageRouter'
+import { EffectLabPageDomain } from './front-pages/EffectLabPageDomain'
+import { FrontPagePlayerState } from './front-pages/FrontPagePlayerState'
+import { FrontPageWalletState } from './front-pages/FrontPageWalletState'
+import { LobbyPageDomain } from './front-pages/LobbyPageDomain'
+import { MatchmakingPageDomain } from './front-pages/MatchmakingPageDomain'
+import { PlayerCenterPageDomain } from './front-pages/PlayerCenterPageDomain'
+import { ReplayPageDomain } from './front-pages/ReplayPageDomain'
+import { ShopPageDomain } from './front-pages/ShopPageDomain'
+import { ProfileEditorModal } from './front-pages/ProfileEditorModal'
+import { profileAvatarFrame } from '../ui/ProfileAvatar'
+
+export type FrontPageHost = {
+  refreshProfile?: () => void
+  setTableVisible: (visible: boolean) => void
+  setFriendRoomWaitingVisible: (visible: boolean) => void
+  closeModal: () => void
+  showNotice: (title: string, detail?: string) => void
+  showToast: (message: string) => void
+  scheduleOnce: (callback: () => void, delaySeconds: number) => void
+  getLobbyEndpoint: () => string
+  enterMatchedGame: (ticket: MatchTicket) => void
+  listEffectLabFixtures: () => readonly { id: string, label: string, kind: string, description: string }[]
+  previewEffectLabFixture: (id: string, quality: EffectQuality) => void
+}
+/** Owns front-page navigation and construction; it never mutates a live round. */
+export class FrontPageController {
+  private readonly profileEditor: ProfileEditorModal
+  private readonly router: PageRouter
+  private pageRequestToken = 0
+  private disposed = false
+  private readonly walletState: FrontPageWalletState
+  private readonly playerState: FrontPagePlayerState
+  private readonly shopPage: ShopPageDomain
+  private readonly effectLabPage: EffectLabPageDomain
+  private readonly lobbyPage: LobbyPageDomain
+  private readonly matchmakingPage: MatchmakingPageDomain
+  private readonly playerCenterPage: PlayerCenterPageDomain
+  private readonly replayPage: ReplayPageDomain
+
+  public constructor (
+    root: Node,
+    private readonly session: GameSession,
+    private readonly lobby: LobbyController,
+    private readonly screen: ScreenAdapter,
+    private readonly host: FrontPageHost,
+    private readonly gateways: FrontPageGateways,
+    previews: FrontPagePreviewData,
+  ) {
+    this.router = new PageRouter(root, (previous, next) => {
+      // Matching shares the empty-table presentation used by room waiting;
+      // do not enable stale hands/HUD before the authoritative snapshot arrives.
+      if (previous === 'matching' || next === 'matching') this.host.setFriendRoomWaitingVisible(next === 'matching')
+      if (previous === 'effect-lab' && next !== 'effect-lab') this.effectLabPage.cancelPending()
+    })
+    this.walletState = new FrontPageWalletState(gateways.configured)
+    this.playerState = new FrontPagePlayerState(gateways.configured, previews.dashboard)
+    this.profileEditor = new ProfileEditorModal(root, screen, gateways.auth, profile => {
+      if (this.disposed) return
+      this.playerState.updateProfile(profile)
+      if (this.router.current === 'menu') this.lobbyPage.renderMenu()
+      if (this.router.current === 'player-center') this.playerCenterPage.reflow()
+      this.host.refreshProfile?.()
+    })
+    this.shopPage = new ShopPageDomain({
+      previewProducts: previews.products,
+      router: this.router,
+      screen: this.screen,
+      gateways: this.gateways,
+      wallet: this.walletState,
+      isDisposed: () => this.disposed,
+      issuePageRequest: () => ++this.pageRequestToken,
+      currentPageRequest: () => this.pageRequestToken,
+      setTableVisible: visible => this.host.setTableVisible(visible),
+      showMenu: () => this.lobbyPage.showMenu(),
+      showNotice: (title, detail) => this.host.showNotice(title, detail),
+    })
+    this.effectLabPage = new EffectLabPageDomain({
+      router: this.router,
+      screen: this.screen,
+      isDisposed: () => this.disposed,
+      listFixtures: () => this.host.listEffectLabFixtures(),
+      hasLiveRoom: () => Boolean(this.session.snapshot.isMultiplayer || this.lobby.snapshot.roomId),
+      previewFixture: (id, quality) => this.host.previewEffectLabFixture(id, quality),
+      scheduleOnce: (callback, delaySeconds) => this.host.scheduleOnce(callback, delaySeconds),
+      showMenu: () => this.lobbyPage.showMenu(),
+      showNotice: (title, detail) => this.host.showNotice(title, detail),
+    })
+    this.replayPage = new ReplayPageDomain({
+      router: this.router,
+      gateways: this.gateways,
+      isDisposed: () => this.disposed,
+      issuePageRequest: () => ++this.pageRequestToken,
+      currentPageRequest: () => this.pageRequestToken,
+      scheduleOnce: (callback, delaySeconds) => this.host.scheduleOnce(callback, delaySeconds),
+      showNotice: (title, detail) => this.host.showNotice(title, detail),
+      showPlayerCenter: () => { void this.playerCenterPage.show() },
+    })
+    this.playerCenterPage = new PlayerCenterPageDomain({
+      editProfile: () => this.showProfileEditor(),
+      router: this.router,
+      gateways: this.gateways,
+      player: this.playerState,
+      wallet: this.walletState,
+      isDisposed: () => this.disposed,
+      issuePageRequest: () => ++this.pageRequestToken,
+      currentPageRequest: () => this.pageRequestToken,
+      showMenu: () => this.lobbyPage.showMenu(),
+      showReplayList: () => this.replayPage.showReplayList(),
+      showNotice: (title, detail) => this.host.showNotice(title, detail),
+    })
+    this.matchmakingPage = new MatchmakingPageDomain({
+      animationsEnabled: () => this.session.snapshot.settings.effectQuality === 'full',
+      router: this.router,
+      gateways: this.gateways,
+      isDisposed: () => this.disposed,
+      scheduleOnce: (callback, delaySeconds) => this.host.scheduleOnce(callback, delaySeconds),
+      showNotice: (title, detail) => this.host.showNotice(title, detail),
+      enterMatchedGame: ticket => this.host.enterMatchedGame(ticket),
+      showMenu: () => this.lobbyPage.showMenu(),
+      showOnlinePlay: () => this.lobbyPage.showOnlinePlay(),
+      showClassicRooms: () => this.lobbyPage.showClassicRooms(),
+    })
+    this.lobbyPage = new LobbyPageDomain({
+      editProfile: () => this.showProfileEditor(),
+      router: this.router,
+      session: this.session,
+      lobby: this.lobby,
+      screen: this.screen,
+      gateways: this.gateways,
+      player: this.playerState,
+      wallet: this.walletState,
+      isDisposed: () => this.disposed,
+      issuePageRequest: () => ++this.pageRequestToken,
+      currentPageRequest: () => this.pageRequestToken,
+      invalidateMatchAttempt: () => this.matchmakingPage.invalidate(),
+      closeModal: () => this.host.closeModal(),
+      setTableVisible: visible => this.host.setTableVisible(visible),
+      setFriendRoomWaitingVisible: visible => this.host.setFriendRoomWaitingVisible(visible),
+      scheduleOnce: (callback, delaySeconds) => this.host.scheduleOnce(callback, delaySeconds),
+      getLobbyEndpoint: () => this.host.getLobbyEndpoint(),
+      showNotice: (title, detail) => this.host.showNotice(title, detail),
+      showCompetition: () => this.host.showToast('筹备中'),
+      showPlayerCenter: () => { void this.playerCenterPage.show() },
+      showShop: () => this.shopPage.showPreview(),
+      beginMatch: (queueId, queueName, returnPage) => this.matchmakingPage.begin(queueId, queueName, returnPage),
+    })
+    game.on(Game.EVENT_HIDE, this.handleApplicationHide)
+  }
+
+  public showMenu (): void { this.lobbyPage.showMenu() }
+  public showClassicRooms (): void { this.lobbyPage.showClassicRooms() }
+
+  public showRecoveryMenu (): void { this.lobbyPage.showMenu(true) }
+
+  public showOnlinePlay (): void { this.lobbyPage.showOnlinePlay() }
+
+  public showLobby (compensateReservation = true): void { this.lobbyPage.showLobby(compensateReservation) }
+
+  public handoffFriendRoomReservation (): void { this.lobbyPage.handoffFriendRoomReservation() }
+
+  public restoreFriendRoomReservation (entry: Extract<MatchRecoveryEntry, { roomKind: 'friend' }>): void {
+    this.lobbyPage.restoreFriendRoomReservation(entry)
+  }
+
+  public renderLobby (snapshot: LobbySnapshot): void {
+    // Keep a matched join from flashing the private-room waiting layout before
+    // its identity is confirmed. Errors still go through the existing room flow.
+    if (this.matchmakingPage.entering && snapshot.roomId && !snapshot.error && (snapshot.roomStatus === 'joining' || snapshot.roomStatus === 'rejoining')) return
+    this.lobbyPage.renderLobby(snapshot)
+  }
+  public setRecoveryPending (pending: boolean): void { this.lobbyPage.setRecoveryPending(pending) }
+  public get profileEditorOpen (): boolean { return this.profileEditor.open }
+  public get ownProfile () { return this.playerState.profile ?? this.playerState.dashboard?.user ?? null }
+  public ownAvatarFrame () { return profileAvatarFrame(this.ownProfile, this.gateways.auth) }
+  public showProfileEditor (): void { void this.profileEditor.show(this.ownProfile) }
+
+  public hideAll (): void {
+    if (this.disposed) return
+    this.pageRequestToken += 1
+    this.matchmakingPage.stop()
+    this.replayPage.stop()
+    this.effectLabPage.handleShellHidden()
+    this.lobbyPage.hide()
+    this.router.clear()
+  }
+
+  public resize (width: number, height: number): void {
+    this.profileEditor.reflow()
+    this.router.resize(width, height)
+    if (this.disposed) return
+    const route = this.router.current
+    if (route && ['menu', 'online', 'classic-rooms', 'friend-room-settings', 'lobby'].includes(route)) this.lobbyPage.reflow()
+    else if (route && ['shop', 'product'].includes(route)) this.shopPage.reflow()
+    else if (route && ['player-center', 'season-tasks'].includes(route)) this.playerCenterPage.reflow()
+    else if (route && ['replay-list', 'replay-detail'].includes(route)) this.replayPage.reflow()
+    else if (route === 'matching') this.matchmakingPage.reflow()
+    else if (route === 'effect-lab') this.effectLabPage.reflow()
+  }
+
+  private readonly handleApplicationHide = (): void => {
+    this.replayPage.handleApplicationHide()
+  }
+
+  public destroy (): void {
+    this.profileEditor.close()
+    if (this.disposed) return
+    this.pageRequestToken += 1
+    game.off(Game.EVENT_HIDE, this.handleApplicationHide)
+    this.matchmakingPage.destroy()
+    this.replayPage.destroy()
+    this.effectLabPage.cancelPending()
+    this.lobbyPage.destroy()
+    this.disposed = true
+    this.router.destroy()
+  }
+
+  /** Compatibility facade used by the scene host and development tooling. */
+  public openEffectLabTable (): void { this.effectLabPage.openTable() }
+
+  public showEffectLab (page = 0): void { this.effectLabPage.show(page) }
+}

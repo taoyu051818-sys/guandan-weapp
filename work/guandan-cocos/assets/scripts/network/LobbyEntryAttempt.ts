@@ -6,6 +6,11 @@ export type SecureRandomSource = Readonly<{
 }>
 
 export type EntryAttemptIdFactory = () => string
+export type AsyncEntryAttemptIdFactory = () => string | Promise<string>
+
+type NativeRandomSource = Readonly<{
+  getRandomValues: (options: { length: number, success: (result: { randomValues: ArrayBuffer }) => void, fail: () => void }) => void
+}>
 
 const defaultRandomSource = (): SecureRandomSource => {
   const source = (globalThis as typeof globalThis & { crypto?: SecureRandomSource }).crypto
@@ -32,6 +37,43 @@ export const createEntryAttemptId = (source: SecureRandomSource = defaultRandomS
   const bytes = new Uint8Array(16)
   source.getRandomValues(bytes)
   return encodeBase64Url(bytes)
+}
+
+/** WeChat Mini Game exposes callback-based crypto, not the browser Web Crypto API. */
+export const createEntryAttemptIdAsync = async (): Promise<string> => {
+  const runtime = globalThis as typeof globalThis & {
+    wx?: { getUserCryptoManager?: () => NativeRandomSource, getRandomValues?: NativeRandomSource['getRandomValues'] }
+  }
+  const wx = runtime.wx
+  const native = wx?.getUserCryptoManager?.() ?? (wx?.getRandomValues ? wx as NativeRandomSource : undefined)
+  if (!native?.getRandomValues) return createEntryAttemptId()
+  return new Promise<string>((resolve, reject) => {
+    let settled = false
+    const finish = (id?: string, message?: string): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      if (id) resolve(id)
+      else reject(new Error(message))
+    }
+    const timeout = setTimeout(() => finish(undefined, '安全随机数生成超时，请重试'), 5000)
+    try {
+      native.getRandomValues({
+        length: 16,
+        success: result => {
+          try {
+            const buffer = result?.randomValues
+            if (Object.prototype.toString.call(buffer) !== '[object ArrayBuffer]' || buffer.byteLength !== 16) {
+              finish(undefined, '安全随机数返回无效，请重试')
+              return
+            }
+            finish(encodeBase64Url(new Uint8Array(buffer)))
+          } catch { finish(undefined, '安全随机数返回无效，请重试') }
+        },
+        fail: () => finish(undefined, '安全随机数生成失败，请重试'),
+      })
+    } catch { finish(undefined, '安全随机数生成失败，请重试') }
+  })
 }
 
 export const isEntryAttemptId = (value: unknown): value is string => (

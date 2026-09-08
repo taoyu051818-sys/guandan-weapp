@@ -66,9 +66,9 @@ export class JsonRoomStateStore {
 const emptySeats = () => ({ p1: null, p2: null, p3: null, p4: null })
 
 /** Socket ids are process-local and must never survive a restart. */
-export const roomForPersistence = (room) => ({ ...clone(room), seats: emptySeats() })
+export const roomForPersistence = (room) => ({ ...clone(room), seats: emptySeats(), ...(room.friendMembers ? { friendMembers: room.friendMembers.map(member => ({ ...clone(member), connectionId: null })) } : {}) })
 
-export const roomFromPersistence = (stored) => ({ ...clone(stored), seats: emptySeats() })
+export const roomFromPersistence = (stored) => roomForPersistence(stored)
 
 /** Mark only the exact acceptance objects captured by one successful snapshot. */
 export const markSnapshotAcceptancesDurable = (acceptedActions, writtenAcceptances) => {

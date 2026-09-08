@@ -1,0 +1,122 @@
+// Rejected 2026-09-06 lobby design. Archived outside runtime; do not re-enable.
+import { Color, Node, Tween, UITransform, Vec3, tween } from 'cc'
+import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
+import { coastalIcon, coastalText } from '../../ui/CoastalUi'
+import type { ScreenAdapter } from '../../ui/ScreenAdapter'
+import { LOBBY_ART } from './LobbyPageCatalog'
+
+export type LobbyLandingActions = Readonly<{
+  classic: () => void, friend: () => void, competition: () => void
+  shop: () => void, rules: () => void, more: () => void, start: () => void
+  recovery: boolean, animate: boolean
+}>
+
+/** Design-space rectangles. Values are independent of the table's coordinate system. */
+export const LOBBY_LANDING_RECTS = Object.freeze({
+  classic: { x: 128, y: 76, width: 338, height: 252 },
+  friend: { x: 480, y: 76, width: 374, height: 146 },
+  competition: { x: 480, y: 234, width: 374, height: 94 },
+  start: { x: 554, y: 346, width: 300, height: 48 },
+})
+
+const ink = new Color(23, 54, 81)
+const secondary = new Color(58, 86, 104)
+const white = new Color(245, 250, 253)
+
+/** Finite entry motion only. No callbacks, timers, or tweens survive page disposal. */
+const enter = (node: Node, index: number, enabled: boolean): void => {
+  if (!enabled) return
+  const end = node.position.clone()
+  node.setPosition(end.x, end.y - 12, 0)
+  tween(node).delay(index * .045).to(.24, { position: end }, { easing: 'quadOut' }).start()
+}
+
+/** Stable hit target; press animates only the visual child. Repeated taps do not queue actions. */
+const bind = (hit: Node, visual: Node, action: () => void, animate: boolean): void => {
+  const release = (): void => {
+    Tween.stopAllByTarget(visual)
+    if (animate) tween(visual).to(.1, { scale: Vec3.ONE }, { easing: 'quadOut' }).start()
+    else visual.setScale(Vec3.ONE)
+  }
+  hit.on(Node.EventType.TOUCH_START, () => {
+    Tween.stopAllByTarget(visual)
+    if (animate) tween(visual).to(.08, { scale: new Vec3(.982, .982, 1) }).start()
+    else visual.setScale(new Vec3(.99, .99, 1))
+  })
+  hit.on(Node.EventType.TOUCH_CANCEL, release)
+  hit.on(Node.EventType.TOUCH_END, () => { release(); action() })
+}
+
+export const renderLobbyLanding = (ui: RuntimeUiFactory, screen: ScreenAdapter, actions: LobbyLandingActions, animateEntry = true): number => {
+  const size = screen.safeSize()
+  const scale = Math.min(size.x / 874, size.y / 402)
+  const centerX = (screen.safeLeftX() + screen.safeRightX()) / 2
+  const centerY = (screen.safeTopY() + screen.safeBottomY()) / 2
+  // Only this page dims the scenery. The table backdrop and loading art are untouched.
+  ui.panel('LobbySceneryScrim', centerX, centerY, size.x, size.y, { fill: new Color(13, 38, 70, 83), lineWidth: 0, radius: 0 })
+  ui.panel('LobbyAccountBand', centerX, screen.safeTopY(42), size.x, 84, { fill: new Color(18, 43, 73, 150), lineWidth: 0, radius: 0 })
+  const root = new Node('LobbyLandingDesign874x402')
+  root.parent = ui.parent
+  root.addComponent(UITransform).setContentSize(874, 402)
+  root.setPosition(centerX, centerY, 0)
+  root.setScale(scale, scale, 1)
+  const page = new RuntimeUiFactory(root)
+  const text = (value: string, x: number, y: number, w: number, h: number, font: number, color = white, bold = false): void => {
+    coastalText(page, value, x - 437, 201 - y, w, h, font, { color, bold })
+  }
+  page.panel('LobbyBottomBand', 0, -169, 874, 64, { fill: new Color(19, 46, 78, 212), lineWidth: 0, radius: 0 })
+  text('陵水\n掼蛋', 67, 143, 108, 100, 36, new Color(255, 238, 184), true)
+  text('四人两队\n以牌会友', 67, 224, 102, 62, 16, new Color(235, 245, 251))
+
+  const card = (key: keyof typeof LOBBY_LANDING_RECTS, name: string, fill: Color, action: () => void, index: number): Node => {
+    const box = LOBBY_LANDING_RECTS[key]
+    const hit = new Node(name)
+    hit.parent = root
+    hit.setPosition(box.x + box.width / 2 - 437, 201 - box.y - box.height / 2, 0)
+    hit.addComponent(UITransform).setContentSize(box.width, box.height)
+    const visual = page.panel(`${name}Surface`, 0, 0, box.width, box.height, {
+      fill, stroke: new Color(222, 237, 248), lineWidth: 1.5, radius: 7,
+    }, hit)
+    bind(hit, visual, action, actions.animate)
+    // Entry moves a wrapper; the hit/press transforms have separate owners.
+    enter(hit, index, actions.animate && animateEntry)
+    return visual
+  }
+  const hero = card('classic', 'ClassicEntryCard', new Color(210, 234, 249), actions.classic, 0)
+  page.panel('ClassicTitlePlate', 0, -87, 335, 76, { fill: new Color(247, 251, 251), lineWidth: 0, radius: 5 }, hero)
+  page.image('ClassicEntryCardArtwork', LOBBY_ART.entryClassic, 0, 34, 316, 211, hero)
+  coastalText(page, '经典掼蛋', 0, -77, 300, 48, 38, { parent: hero, color: ink, bold: true })
+  coastalText(page, '经典过 A  ·  选择场次  ›', 0, -109, 300, 25, 16, { parent: hero, color: secondary })
+  page.panel('ClassicCornerBadge', -112, 104, 90, 24, { fill: new Color(33, 102, 145), lineWidth: 0, radius: 4 }, hero)
+  coastalText(page, '经典玩法', -112, 104, 84, 24, 14, { parent: hero, bold: true })
+
+  const friend = card('friend', 'FriendEntryCard', new Color(223, 241, 243), actions.friend, 1)
+  page.image('FriendEntryCardArtwork', LOBBY_ART.entryFriend, 91, 4, 182, 121, friend)
+  coastalText(page, '好友房', -80, 30, 180, 46, 32, { parent: friend, color: ink, bold: true })
+  coastalText(page, '创建房间 · 邀请好友', -79, -7, 185, 26, 15, { parent: friend, color: secondary })
+  coastalText(page, '和熟悉的人打好牌  ›', -79, -44, 185, 26, 14, { parent: friend, color: new Color(31, 104, 119) })
+
+  const competition = card('competition', 'TournamentEntryCard', new Color(43, 64, 79), actions.competition, 2)
+  page.image('TournamentEntryCardArtwork', LOBBY_ART.entryTournament, 113, 0, 135, 90, competition)
+  coastalText(page, '赛事', -105, 17, 130, 36, 27, { parent: competition, bold: true })
+  coastalText(page, '筹备中 · 查看介绍  ›', -77, -18, 190, 26, 15, { parent: competition, color: new Color(204, 222, 232) })
+
+  const items = [
+    { label: '商城', icon: 'shop' as const, action: actions.shop },
+    { label: '玩法说明', icon: 'rules' as const, action: actions.rules },
+    { label: '更多', icon: 'more' as const, action: actions.more },
+  ]
+  items.forEach((item, i) => {
+    const hit = page.panel(`LobbyBottom-${item.icon}`, -379 + i * 91, -167, 76, 54, { fill: new Color(0, 0, 0, 0), lineWidth: 0 })
+    const visual = new Node('UtilityVisual')
+    visual.parent = hit
+    coastalIcon(visual, item.icon, 0, 10, 24)
+    coastalText(page, item.label, 0, -17, 76, 25, 15, { parent: visual })
+    bind(hit, visual, item.action, actions.animate)
+  })
+  const start = card('start', 'LobbyPrimaryAction', new Color(248, 204, 99), actions.start, 3)
+  coastalText(page, actions.recovery ? '返回对局' : '快速开始', 57, 0, 160, 40, 28, { parent: start, color: new Color(97, 56, 18), bold: true })
+  coastalText(page, actions.recovery ? '未结束的牌局' : '经典 · 初级场', -83, 0, 118, 30, 15, { parent: start, color: new Color(102, 69, 27) })
+  // Top-right is intentionally empty for the WeChat capsule.
+  return centerX + 90 * scale
+}

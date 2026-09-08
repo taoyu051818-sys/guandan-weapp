@@ -10,3 +10,18 @@
 *.log
 
 # Keep source audio only; generated mini-program assets are rebuilt by scripts/build-native-weapp.mjs
+
+# Private local configuration must not be published.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/project.private.config.json
+
+# Retired applications belong in an external archive, never in this checkout.
+/work/guandan-weapp/
+/work/guandan-windows-source/src/
+/work/guandan-windows-source/public/
+/work/guandan-windows-source/.trae/
+/work/guandan-cocos/tools/lobby-motion-lab/

@@ -1,8 +1,13 @@
+export type HandGroupBadge = Readonly<{ label: string, tone: 'cyan' | 'purple' }>
+
 export type HandStackGroup = Readonly<{
   id: string
   cardIds: readonly string[]
   /** Present on live HandGrouping projections; omitted by layout-only callers. */
   locked?: boolean
+  /** Relative sorting category only; never reserves a fixed horizontal region. */
+  zone?: 0 | 1 | 2
+  badge?: HandGroupBadge
 }>
 
 export type HandStackSlot = Readonly<{
@@ -12,6 +17,8 @@ export type HandStackSlot = Readonly<{
   stackIndex: number
   stackSize: number
   stackStep: number
+  /** Actual distance to the next lane, shared by visual and touch layout. */
+  nextLaneSpacing: number
   x: number
   y: number
 }>
@@ -41,6 +48,13 @@ export const handStackStep = (cardCount: number): number => {
 }
 
 export const handStackRise = (cardCount: number): number => handStackStep(cardCount) * Math.max(0, cardCount - 1)
+
+const lanePositions = (count: number, width: number): number[] => {
+  const spacing = count <= 1 ? 0 : Math.min(MAX_LANE_SPACING, width / (count - 1))
+  // Centre the occupied lanes as one pack, including tall combinations. Sorting
+  // owns relative order; no type or empty category can pin cards to either side.
+  return Array.from({ length: count }, (_, index) => (index - (count - 1) / 2) * spacing)
+}
 
 /**
  * Produces presentation-only slots. A group consumes one horizontal lane. Its
@@ -74,10 +88,9 @@ export const createHandStackLayout = (
   })
 
   const laneCount = lanes.length
-  const laneSpacing = laneCount <= 1
-    ? 0
-    : Math.min(MAX_LANE_SPACING, Math.max(1, availableWidth) / (laneCount - 1))
-  const centre = (laneCount - 1) / 2
+  const width = Number.isFinite(availableWidth) ? Math.max(1, availableWidth) : 940
+  const positions = lanePositions(laneCount, width)
+  const laneSpacing = laneCount <= 1 ? 0 : Math.min(...positions.slice(1).map((x, index) => x - positions[index]))
   const slots: HandStackSlot[] = []
   let maxRise = 0
   lanes.forEach((lane, laneIndex) => {
@@ -91,7 +104,8 @@ export const createHandStackLayout = (
         stackIndex,
         stackSize: lane.cardIds.length,
         stackStep: step,
-        x: (laneIndex - centre) * laneSpacing,
+        nextLaneSpacing: laneIndex < laneCount - 1 ? positions[laneIndex + 1] - positions[laneIndex] : 78,
+        x: positions[laneIndex],
         y: (lane.cardIds.length - 1 - stackIndex) * step,
       })
     })

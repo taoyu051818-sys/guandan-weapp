@@ -13,6 +13,6 @@ export type NetworkRequestResult = {
 export interface LobbySocketClient {
   connect(endpoint: string): Promise<void>
   on<T>(type: string, listener: LobbySocketListener<T>): () => void
-  send(type: string, payload?: unknown): number
+  send(type: string, payload?: unknown, retryRequestId?: number): number
   close(): void
 }

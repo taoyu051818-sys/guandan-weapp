@@ -1,5 +1,8 @@
 # 开发效果实验室与快捷聊天策略
 
+> 2026-09-08：实验室已按用户要求完整退役。本文以下内容仅为历史记录，所述 UI、`__guandanEffectLab` 控制台接口及固定牌局注入已不可用。固定手牌数据现位于 `tests/fixtures`，只供自动测试。参见 [退役报告](RETIREMENT_PACKAGE_AUDIT_20260908.md)。
+
+
 ## 开发门禁
 
 `assets/scripts/development/EffectLab.ts` 只通过 Cocos `cc/env` 的编译期 `DEV || DEBUG` 标志创建实例：编辑器预览与显式调试构建可用，非调试发行构建中 `createEffectLab()` 恒定返回 `null`。模块不读取 URL、查询参数、LocalStorage 或 SessionStorage，因此不能用 `?effectLab=1` 一类入口绕过。
@@ -11,14 +14,14 @@ __guandanEffectLab.open()
 __guandanEffectLab.list()
 __guandanEffectLab.trigger('play-bomb-small', 'full')
 __guandanEffectLab.trigger('sequence-quality-matrix', 'full')
-__guandanEffectLab.trigger('sequence-style-matrix', 'full')
 __guandanEffectLab.trigger('sequence-seat-matrix', 'full')
+__guandanEffectLab.trigger('match-layout-split')
 __guandanEffectLab.skip()
 __guandanEffectLab.diagnostics()
 await __guandanEffectLab.audit()
 ```
 
-Web 调试包右下角还有一组可换行的调试按钮：`LAB / 牌 / 炸 / 精 / 关 / 连 / 色 / 座 / 资 / 清`。`色` 会依次巡检六个语义色族，`座` 会从下、右、上、左四个座位投掷炸弹；其余按钮用于固定测试牌局、三档质量、快速连续触发、资源审计和跳过清理。除打开按钮外，执行结果都会写回对应按钮的 `data-result`，便于自动化断言；这个 DOM 入口同样只在实验室可用时创建。
+当前入口为大厅“更多 → 牌桌特效测试”，进入固定牌桌后显示可翻页的实验室抽屉。旧版右下角 `LAB / 牌 / 炸 / 精 / 关 / 连 / 色 / 座 / 资 / 清` DOM 工具条已移除；不要按旧说明重新接回。开发桥保留给调试验收，发行构建不可用。
 
 场景可在开发代码中注入驱动器：
 
@@ -50,16 +53,16 @@ const lab = createEffectLab({
 | 分类 | fixture |
 | --- | --- |
 | 固定可玩牌局 | 固定开局、逢人配与炸弹手牌、炸弹压制场景 |
-| 所有牌型 | 单张、对子、三张、顺子、三带二、三连对、钢板、同花顺、四/六/八张炸弹、天王炸、不要 |
-| 掼蛋语义 | 逢人配实际替代，包含 `wildcardUsages` |
-| 语义音频 | `game-start`、`deal`、`play`、`pass`、`countdown`、`bomb`、`straight-flush`、`king-bomb`、`wildcard`、`victory`、`defeat` |
-| 快捷语 | 六个审核后按钮逐项预览；一条播放已核对女声，五条验证静音降级 |
-| 倒计时 | 0、1、2、3、4、5 秒分别触发 |
-| 贡还 | 进贡、还贡、抗贡 |
-| 结算 | 胜利升 1 级、胜利升 3 级、失败 |
-| 独立流程 | 发牌、级牌、托管、左右聊天、玩家出完、匹配成功 |
-| 压力序列 | 快速连续出牌、L3 替换 L2、完整/精简/关闭三档矩阵、六语义色族、四座位炸弹投掷 |
+| 牌桌布局 | `match-layout-all-bombs`（27 张全炸弹）、`match-layout-split`（25 张手牌跟上家的对子）、`match-layout-combinations`（12 张两副钢板）、`match-layout-one-card`（只剩 A，压不过对子）、`match-layout-own-landed`（我方对子已落桌的定格） |
+| 保留商业牌型效果 | 四张、六张、七张、八张炸弹 |
+| 压力序列 | 炸弹完整/精简/关闭三档矩阵、四座位炸弹投掷 |
 | 资源诊断 | 运行时纹理加载、迁移候选隔离、拒绝素材及代码绘制降级 |
+
+其余单项牌型、流光、电子出牌音、流程效果预览及六色巡检均已从运行时清单卸载。代码中的可选驱动接口不代表存在已开放的素材或 fixture；上述表格以实际注册项为准。
+
+布局场景先保持普通叠牌模式，点击实际“一键理牌”按钮检查三区落位，随后选择、取消、提示和恢复。每次切换会重置手牌分组／撤销工作区、20 秒计时和旧桌牌表现，取消旧的短音频，不能继承前一个 fixture 的“已理牌”状态。仍附着联机房间时拒绝启动固定场景，先显示安全退出提示，不覆盖真实牌局。
+
+`split`、`combinations`、`one-card` 是中盘快照，已清空的历史墩不在 `EngineState` 中；因此当前手牌加桌牌可能少于 108 张，但不会复制实体牌或把历史弃牌塞进其他玩家手中。不能把这些场景当成完整牌谱回放。`own-landed` 停在下家操作前：固定适配器不主动调度 AI，适合静态重叠测量，不用它证明 AI 自动推进已经验证。其他场景保留真实 20 秒超时行为，截图必须核对当时手牌数量，不能把超时出牌后的 26 张标成 27 张。
 
 所有动作和固定牌局每次检查都会重新生成，实验室内的点击或调试修改不会污染下一次 fixture。固定牌局允许真实选牌、提示和出牌，但 `GameManager` 会隔离其结算，不写入本地战绩、等级或联机房间版本。
 

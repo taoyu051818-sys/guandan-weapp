@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { extractRuntimeConfig, verifyReleaseRuntimeConfig } from './runtime-client-config.mjs'
+import { execFileSync } from 'node:child_process'
+import { extractRuntimeConfig, verifyWechatRuntimeConfig } from './runtime-client-config.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const buildRoot = path.join(projectRoot, 'build/wechatgame')
+const packageOnly = process.argv.includes('--package-only')
 const gameJsonPath = path.join(buildRoot, 'game.json')
 const settingsPath = path.join(buildRoot, 'src/settings.json')
 const startupMetaPath = path.join(projectRoot, 'assets/startup/resource-loading-lingshui-v1.jpg.meta')
@@ -53,7 +55,18 @@ assert.equal(fs.existsSync(gameJsonPath), true, 'missing build/wechatgame/game.j
 assert.equal(fs.existsSync(settingsPath), true, 'missing build/wechatgame/src/settings.json')
 
 const gameJson = readJson(gameJsonPath)
+const projectConfig = readJson(path.join(buildRoot, 'project.config.json'))
+const wechatProfile = readJson(path.join(projectRoot, 'profiles/v2/packages/wechatgame.json'))
+const expectedAppId = wechatProfile.builder.options.wechatgame.appid
+assert.match(expectedAppId, /^wx[0-9a-f]{16}$/, 'WeChat profile requires a real AppID')
+assert.equal(projectConfig.appid, expectedAppId, 'built AppID differs from the configured WeChat account')
+assert.equal(projectConfig.compileType, 'game', 'the Cocos client must use the WeChat game project type')
+assert.equal(projectConfig.setting?.urlCheck, true, 'the published project must keep domain checks enabled')
+const privateConfigPath = path.join(buildRoot, 'project.private.config.json')
+if (fs.existsSync(privateConfigPath)) assert.notEqual(readJson(privateConfigPath).setting?.urlCheck, false, 'private project settings must not disable domain checks')
 const settings = readJson(settingsPath)
+assert.equal(settings.assets?.server, '', 'WeChat assets must remain local/subpackaged until a remote download domain is explicitly approved')
+assert.deepEqual(settings.assets?.remoteBundles, [], 'unreviewed remote asset domains must not enter the WeChat package')
 const startupMeta = readJson(startupMetaPath)
 const subpackages = gameJson.subpackages ?? []
 const gameAssetsPackage = subpackages.find(item => item.name === 'game-assets')
@@ -69,7 +82,9 @@ assert.equal(fs.existsSync(path.join(buildRoot, 'assets/game-assets')), false, '
 
 const firstScreen = fs.readFileSync(path.join(buildRoot, 'first-screen.js'), 'utf8')
 const gameBootstrap = fs.readFileSync(path.join(buildRoot, 'game.js'), 'utf8')
-verifyReleaseRuntimeConfig(extractRuntimeConfig(gameBootstrap))
+verifyWechatRuntimeConfig(extractRuntimeConfig(gameBootstrap))
+assert.match(gameBootstrap, /globalThis\.__GUANDAN_BUILD_TARGET__ = 'wechatgame'/, 'WeChat target marker must precede the engine adapter')
+assert.ok(gameBootstrap.indexOf('guandan-runtime-config:start') < gameBootstrap.indexOf("require('./web-adapter')"), 'network config must be available before adapter initialization')
 assert.match(firstScreen, /let useCustomBg = true;/, 'the native first screen must use the custom loading artwork')
 assert.match(firstScreen, /let bgName = 'background\.jpg';/, 'the native first screen must load background.jpg')
 assert.match(firstScreen, /let fitWidth = false;[\s\S]*let fitHeight = false;/, 'the native first screen must use cover sizing')
@@ -84,6 +99,12 @@ assert.ok(fs.statSync(nativeBackgroundPath).size <= 400 * 1024, 'native loading 
 const startupUuid = startupMeta.uuid
 const mainAssetFiles = walkFiles(path.join(buildRoot, 'assets/main'))
 const subpackageFiles = walkFiles(gameAssetsRoot)
+const mainScript = fs.readFileSync(path.join(buildRoot, 'assets/main/index.js'), 'utf8')
+assert.ok(mainScript.includes('NetworkEndpoint.ts'), 'stale build: missing mini-game endpoint compatibility parser')
+assert.doesNotMatch(mainScript, /new\s+URL\s*\(/, 'business runtime must not depend on a browser-only URL constructor')
+for (const code of ['GD-S01', 'GD-S02', 'GD-S03', 'GD-S04']) {
+  assert.ok(mainScript.includes(code), `stale build: missing startup diagnostic ${code}`)
+}
 assert.ok(mainAssetFiles.some(filePath => path.basename(filePath).startsWith(startupUuid)), 'the in-game loading artwork must stay in the main bundle')
 assert.equal(subpackageFiles.some(filePath => path.basename(filePath).startsWith(startupUuid)), false, 'the loading artwork cannot depend on the subpackage it is waiting for')
 
@@ -117,4 +138,8 @@ const oversizedEngineArtifacts = mainFiles.filter(filePath => /(?:bullet|spine|\
 assert.deepEqual(oversizedEngineArtifacts, [], 'unused Bullet, Spine, or WASM artifacts leaked into the main package')
 assert.equal(settings.physics?.physicsEngine, '', '3D physics must remain cropped from this 2D client')
 
-console.log(`WeChat build verified: main ${formatMiB(mainBytes)}, game-assets ${formatMiB(subpackageBytes)}, total ${formatMiB(totalBuildBytes)}`)
+execFileSync(process.execPath, [path.join(projectRoot, 'tests/support/wechat-built-startup.cjs')], { cwd: projectRoot, stdio: 'inherit' })
+execFileSync(process.execPath, [path.join(projectRoot, 'scripts/verify-retirement.mjs'), '--wechat'], { cwd: projectRoot, stdio: 'inherit' })
+
+console.log(`WeChat ${packageOnly ? 'package only' : 'release build'} verified: AppID ${expectedAppId}, main ${formatMiB(mainBytes)}, game-assets ${formatMiB(subpackageBytes)}, total ${formatMiB(totalBuildBytes)}`)
+if (packageOnly) console.log('Package inspection includes strict endpoint configuration, but not live WeChat login, backend health or release authorization.')

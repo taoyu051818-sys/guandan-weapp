@@ -1,0 +1,79 @@
+// Historical tests for the rejected 2026-09-06 design; not an active acceptance gate.
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const ts = require('./support/typescript.cjs').loadTypeScript()
+const source = fs.readFileSync(path.join(__dirname, '../assets/scripts/scenes/front-pages/LobbyLandingView.ts'), 'utf8')
+const nodes = [], captions = [], motions = []
+class Vec3 {
+  constructor (x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }) }
+  clone () { return new Vec3(this.x, this.y, this.z) }
+  static ONE = new Vec3(1, 1, 1)
+}
+class Node {
+  static EventType = { TOUCH_START: 'down', TOUCH_END: 'up', TOUCH_CANCEL: 'cancel' }
+  constructor (name) { this.name = name; this.position = new Vec3(); this.events = {}; nodes.push(this) }
+  addComponent () { return { setContentSize: (width, height) => { this.size = { width, height } } } }
+  setPosition (x, y, z) { this.position = typeof x === 'object' ? x.clone() : new Vec3(x, y, z) }
+  setScale (x, y, z) { this.scale = typeof x === 'object' ? x.clone() : new Vec3(x, y, z) }
+  on (event, callback) { this.events[event] = callback }
+}
+class Ui {
+  constructor (parent) { this.parent = parent }
+  panel (name, x, y, w, h, _style, parent = this.parent) {
+    const node = new Node(name); node.parent = parent; node.setPosition(x, y, 0); node.size = { width: w, height: h }; return node
+  }
+  image (...args) { return this.panel(...args) }
+}
+const dependencies = {
+  cc: { Color: class {}, Node, UITransform: class {}, Vec3, Tween: { stopAllByTarget () {} }, tween: node => {
+    const motion = { node, delay () { return this }, to (_duration, value) { this.value = value; return this }, start () { motions.push(this); return this } }
+    return motion
+  } },
+  '../../ui/RuntimeUiFactory': { RuntimeUiFactory: Ui },
+  '../../ui/CoastalUi': { coastalIcon () {}, coastalText: (_ui, text) => captions.push(text) },
+  './LobbyPageCatalog': { LOBBY_ART: {} },
+}
+const mod = { exports: {} }
+Function('module', 'exports', 'require', ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mod, mod.exports, name => {
+  assert.ok(name in dependencies, name); return dependencies[name]
+})
+const { LOBBY_LANDING_RECTS: boxes, renderLobbyLanding } = mod.exports
+const intersection = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
+const entries = Object.values(boxes)
+for (const [i, box] of entries.entries()) {
+  assert.ok(box.x >= 0 && box.y >= 68 && box.x + box.width <= 874 && box.y + box.height <= 402)
+  for (const other of entries.slice(i + 1)) assert.equal(intersection(box, other), 0, 'independent lobby navigation targets must not overlap')
+}
+assert.ok(boxes.classic.width * boxes.classic.height > boxes.friend.width * boxes.friend.height)
+assert.ok(boxes.friend.width * boxes.friend.height > boxes.competition.width * boxes.competition.height)
+for (const [width, height] of [[874, 402], [812, 375], [1280, 720], [1560, 720]]) {
+  nodes.length = 0; motions.length = 0
+  const screen = { safeSize: () => ({ x: width, y: height }), safeLeftX: () => -width / 2, safeRightX: () => width / 2, safeTopY: (m = 0) => height / 2 - m, safeBottomY: () => -height / 2 }
+  const fired = []
+  const actions = Object.fromEntries(['classic', 'friend', 'competition', 'shop', 'rules', 'more', 'start'].map(key => [key, () => fired.push(key)]))
+  renderLobbyLanding(new Ui(new Node('root')), screen, { ...actions, animate: false, recovery: true })
+  assert.equal(motions.length, 0, 'reduced/off skips entry and ambient motion')
+  assert.ok(captions.includes('返回对局'))
+  const design = nodes.find(n => n.name === 'LobbyLandingDesign874x402')
+  assert.ok(design.scale.x * 874 <= width + .001 && design.scale.y * 402 <= height + .001)
+  const hit = nodes.find(n => n.name === 'ClassicEntryCard'), original = hit.position.clone()
+  hit.events.down(); hit.events.cancel()
+  assert.deepEqual(fired, [], 'canceled press must not navigate')
+  assert.deepEqual(hit.position, original, 'press must preserve hit bounds')
+  hit.events.down(); hit.events.up()
+  nodes.find(n => n.name === 'LobbyBottom-more').events.up()
+  nodes.find(n => n.name === 'LobbyPrimaryAction').events.up()
+  assert.deepEqual(fired, ['classic', 'more', 'start'])
+  motions.length = 0
+  renderLobbyLanding(new Ui(new Node('root2')), screen, { ...actions, animate: true, recovery: false }, false)
+  assert.equal(motions.length, 0, 'profile refresh and resize must not replay entrance')
+  renderLobbyLanding(new Ui(new Node('root3')), screen, { ...actions, animate: true, recovery: false }, true)
+  assert.equal(motions.length, 4, 'only four finite entry tweens are scheduled')
+}
+assert.doesNotMatch(source, /repeatForever|setInterval|setTimeout|ParticleSystem|sp\.Skeleton/)
+const domain = fs.readFileSync(path.join(__dirname, '../assets/scripts/scenes/front-pages/LobbyPageDomain.ts'), 'utf8')
+const more = domain.slice(domain.indexOf('private showLobbyMore'), domain.indexOf('public showClassicRooms'))
+assert.match(more, /'返回大厅'[\s\S]*lobbyMoreVisible = false; this\.dependencies\.router\.closeModal\(\)/, 'the PageRouter modal must close through its own owner, not the table notice interface')
+assert.match(more, /LobbyMoreScrim[\s\S]*addComponent\(BlockInputEvents\)/)
+console.log('lobby landing hierarchy, touch, recovery copy and motion regression checks passed')

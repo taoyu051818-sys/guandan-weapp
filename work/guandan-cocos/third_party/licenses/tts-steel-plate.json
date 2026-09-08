@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-07",
+  "provider": "Microsoft Edge online TTS via edge-tts 7.2.8",
+  "projectUrl": "https://github.com/rany2/edge-tts",
+  "voice": "zh-CN-XiaoxiaoNeural",
+  "gender": "female",
+  "text": "钢板！",
+  "rate": "+8%",
+  "synthesized": true,
+  "voiceCloning": false,
+  "authorization": "User requested TTS generation and allowed selecting a project/service. No claim that the tool's license licenses the service output; review service terms before commercial release.",
+  "runtimeDirectory": "assets/game-assets/audio/voices/tts",
+  "assets": [
+    {
+      "file": "steel_plate.wav",
+      "key": "tts/steel_plate",
+      "bytes": 28124,
+      "sha256": "a06c072b0aa6fe68f5027fbffe0695af6a48c237772697a2cd62c98bd8e1fcf6",
+      "sampleRate": 24000,
+      "channels": 1,
+      "bits": 16,
+      "durationSeconds": 0.585
+    }
+  ],
+  "sourceFile": "art-source/audio/tts/steel-plate-edge-raw.mp3",
+  "processing": "Outer silence trimmed with 35 ms leading and 80 ms trailing margins; 6 ms edge fades; peak capped at -3 dBFS.",
+  "deviceVerification": "Pending WeChat physical-device listening; no game build or deployment in this turn."
+}

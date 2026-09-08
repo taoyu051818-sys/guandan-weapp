@@ -1,14 +1,17 @@
-import { _decorator, Color, Component, Graphics, Label, Node, Tween, UIOpacity, UITransform, Vec3, tween } from 'cc'
+import { _decorator, Color, Component, Label, Node, Tween, UIOpacity, UITransform, Vec3, tween } from 'cc'
 import type { PlayAction, PlayerId } from '../core/generated'
 import type { CardBlastReactionTarget } from '../effects/CardBlastReaction'
-import { resolvePlayedCardSpacing } from '../effects/CardFlightController'
+import { PLAYED_CARD_FINAL_SCALE, resolvePlayedCardSpacing } from '../effects/CardFlightController'
 import { mapCardToPresentation } from './CardPresentationMapper'
 import { CardView } from './CardView'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
+import type { TableViewport } from './ScreenAdapter'
+import { playedCardPosition } from './PlayedCardLayout'
 
 const { ccclass } = _decorator
 const order: PlayerId[] = ['p1', 'p2', 'p3', 'p4']
-const relativePlaces = [new Vec3(0, -82, 0), new Vec3(300, 0, 0), new Vec3(0, 218, 0), new Vec3(-300, 0, 0)]
+// Shared central column; opponents' lanes track the safe outer edges on resize.
+const settledScale = new Vec3(PLAYED_CARD_FINAL_SCALE, PLAYED_CARD_FINAL_SCALE, 1)
 const entranceOffsets = [new Vec3(0, -34, 0), new Vec3(34, 0, 0), new Vec3(0, 34, 0), new Vec3(-34, 0, 0)]
 type PendingAction = { key: string, ticket: string, cardIds: Set<string> }
 type ActionCardNodes = { key: string, nodes: Map<string, Node> }
@@ -19,6 +22,7 @@ const actionKey = (action: PlayAction, actionIndex: number): string =>
 /** Displays each seat's newest action, including pass prompts and played-card fans. */
 @ccclass('PlayAreaController')
 export class PlayAreaController extends Component {
+  private viewport: TableViewport = { width: 1280, height: 720, halfWidth: 640, halfHeight: 360, safeLeft: 0, safeRight: 0, safeTop: 0, safeBottom: 0 }
   private actionNodes = new Map<PlayerId, Node>()
   private actionKeys = new Map<PlayerId, string>()
   private actionIndexes = new Map<PlayerId, number>()
@@ -95,10 +99,26 @@ export class PlayAreaController extends Component {
     )
   }
 
-  public getActionWorldPosition (playerId: PlayerId, humanId: PlayerId = 'p1'): Vec3 {
+  public getActionWorldPosition (playerId: PlayerId, humanId: PlayerId = 'p1', cardCount = 1): Vec3 {
     const place = (order.indexOf(playerId) - order.indexOf(humanId) + 4) % 4
     const transform = this.getComponent(UITransform)
-    return transform?.convertToWorldSpaceAR(relativePlaces[place]) ?? this.node.worldPosition.clone().add(relativePlaces[place])
+    const position = this.positionFor(place, cardCount)
+    return transform?.convertToWorldSpaceAR(position) ?? this.node.worldPosition.clone().add(position)
+  }
+
+  private positionFor (place: number, count: number): Vec3 {
+    const { x, y } = playedCardPosition(this.viewport, place, count)
+    return new Vec3(x, y, 0)
+  }
+
+  public layout (viewport: TableViewport): void {
+    this.viewport = viewport
+    this.actionNodes.forEach((node, id) => {
+      Tween.stopAllByTarget(node)
+      const count = this.authoritativeActions[this.actionIndexes.get(id) ?? -1]?.cards.length ?? 1
+      node.setPosition(this.positionFor((order.indexOf(id) - order.indexOf(this.authoritativeHumanId) + 4) % 4, count))
+      if (!node.getChildByName('PassText')) node.setScale(settledScale)
+    })
   }
 
   public render (actions: PlayAction[], humanId: PlayerId = 'p1', lastValidPlay: PlayAction | null | undefined = undefined): void {
@@ -174,25 +194,22 @@ export class PlayAreaController extends Component {
       const root = new Node(`play-${id}`)
       root.parent = this.node
       const place = (order.indexOf(id) - order.indexOf(humanId) + 4) % 4
-      const target = relativePlaces[place]
-      root.setPosition(target.clone().add(entranceOffsets[place]))
+      const target = this.positionFor(place, Math.max(1, action.cards.length))
+      const pending = this.pendingCards.get(actionIndex)
+      root.setPosition(target)
       root.addComponent(UITransform).setContentSize(250, 120)
       const opacity = root.addComponent(UIOpacity)
-      opacity.opacity = 0
+      opacity.opacity = 255
       this.actionNodes.set(id, root)
       this.actionKeys.set(id, key)
       this.actionIndexes.set(id, actionIndex)
-      root.setScale(new Vec3(0.78, 0.78, 1))
-      tween(opacity).to(0.12, { opacity: 255 }).start()
-      tween(root).to(0.18, { position: target, scale: Vec3.ONE }, { easing: 'backOut' }).start()
+      root.setScale(settledScale)
       if (action.type === 'Pass') {
-        const badge = root.addComponent(Graphics)
-        badge.fillColor = new Color(15, 38, 42, 215)
-        badge.strokeColor = new Color(229, 195, 101, 230)
-        badge.lineWidth = 2
-        badge.roundRect(-54, -24, 108, 48, 14)
-        badge.fill()
-        badge.stroke()
+        root.setPosition(target.clone().add(entranceOffsets[place]))
+        root.setScale(new Vec3(0.78, 0.78, 1))
+        opacity.opacity = 0
+        tween(opacity).to(0.12, { opacity: 255 }).start()
+        tween(root).to(0.18, { position: target, scale: Vec3.ONE }, { easing: 'backOut' }).start()
         const textNode = new Node('PassText')
         textNode.parent = root
         textNode.addComponent(UITransform).setContentSize(108, 48)
@@ -217,7 +234,6 @@ export class PlayAreaController extends Component {
       const spacing = resolvePlayedCardSpacing(action.cards.length)
       const nodes = new Map<string, Node>()
       this.cardNodes.set(actionIndex, { key, nodes })
-      const pending = this.pendingCards.get(actionIndex)
       action.cards.forEach((card, index) => {
         const node = new Node(`played-${card.id}`)
         node.parent = root

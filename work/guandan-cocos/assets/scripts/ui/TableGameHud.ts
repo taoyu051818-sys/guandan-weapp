@@ -1,6 +1,8 @@
 import { Color, EventTouch, Graphics, Label, Node, Sprite, SpriteFrame, Tween, UITransform, Vec3 } from 'cc'
 import { TableHudSeatViewGroup } from './TableHudSeatViewGroup'
+import { TableHandViewStatus } from './TableHandViewStatus'
 import { TableHudTurnTimerView } from './TableHudTurnTimerView'
+import { turnTimerPosition } from './PlayedCardLayout'
 import { renderTableHudCounter, renderTableHudSuits } from './TableHudDynamicRenderer'
 import {
   TABLE_GAME_HUD_DESIGN_SIZE,
@@ -9,6 +11,7 @@ import {
   normalizeTableHudViewport,
   resolveTableHudFrameLayout,
   resolveTableHudOperationRow,
+  resolveTableHudCounterPlacement,
 } from './TableHudLayoutPolicy'
 import {
   BASE_COUNTER_CLOSED_HEIGHT,
@@ -40,7 +43,6 @@ import type {
   ButtonView, CounterCell, DraggableOverlay, SuitButtonView,
   TableGameHudActions, TableGameHudCounterRank, TableGameHudState, TableGameHudSuit, TableGameHudViewport,
 } from './TableGameHudFoundation'
-
 export { TABLE_GAME_HUD_DESIGN_SIZE }
 export { TABLE_GAME_HUD_CARD_COUNTER_STATUS, TABLE_GAME_HUD_COUNTER_RANKS } from './TableGameHudFoundation'
 export type {
@@ -73,6 +75,7 @@ export class TableGameHud {
 
   private readonly turnTimer = new TableHudTurnTimerView()
   private readonly seats = new TableHudSeatViewGroup()
+  private readonly handViewStatus = new TableHandViewStatus()
 
   private counterPanel: Node | null = null
   private counterGraphics: Graphics | null = null
@@ -119,8 +122,11 @@ export class TableGameHud {
     this.turnTimer.mount(root)
     this.createCounter(root)
     this.seats.mount(root)
+    this.seats.bindOwnAvatar(() => this.actions.onOwnAvatar?.())
+    this.seats.onSeatAvatar = playerId => this.actions.onSeatAvatar?.(playerId)
     this.createSuitBar(root)
     this.createToolbar(root)
+    this.handViewStatus.mount(root, this.lockButton?.node, this.arrangeButton?.node)
     this.applyExpandedHudMetrics()
     this.renderViews()
     this.layout(this.viewport)
@@ -135,6 +141,7 @@ export class TableGameHud {
       cardCounts: { ...state.cardCounts },
       seats: state.seats.map(seat => ({ ...seat })),
       availableSuits,
+      counterPossibleSuits: normalizeAvailableSuits(state.counterPossibleSuits),
       selectedSuit: state.selectedSuit && availableSuits.includes(state.selectedSuit) ? state.selectedSuit : null,
     }
     this.renderViews()
@@ -152,6 +159,7 @@ export class TableGameHud {
       ...patch,
       cardCounts: patch.cardCounts ? { ...patch.cardCounts } : this.state.cardCounts,
       seats: patch.seats ? patch.seats.map(seat => ({ ...seat })) : this.state.seats,
+      counterPossibleSuits: patch.counterPossibleSuits ? normalizeAvailableSuits(patch.counterPossibleSuits) : this.state.counterPossibleSuits,
       availableSuits,
       selectedSuit: proposedSelectedSuit && availableSuits.includes(proposedSelectedSuit) ? proposedSelectedSuit : null,
     }
@@ -200,8 +208,10 @@ export class TableGameHud {
   /** Screen-space arbitration for controls intentionally drawn above the hand. */
   public hitTestInteractiveScreenPoint (screenPoint: Readonly<{ x: number, y: number }>): boolean {
     if (!this.visible || !this.root?.activeInHierarchy) return false
-    return hitTestVisibleNodes([this.backButton?.node, this.counterPanel, this.suitBar, this.toolbar, this.operationOverlay, this.turnTimer.node], screenPoint)
+    return hitTestVisibleNodes([this.seats.ownAvatarHitNode, this.backButton?.node, this.counterPanel, this.suitBar, this.toolbar, this.operationOverlay, this.turnTimer.node], screenPoint)
   }
+
+  public setOwnAvatarFrame (frame: SpriteFrame | null): void { this.seats.setOwnAvatarFrame(frame) }
 
   /** Applies centered coordinates with independent safe-edge anchoring. */
   public layout (viewport: TableGameHudViewport): void {
@@ -226,19 +236,17 @@ export class TableGameHud {
     this.place(this.roundPanel, layout.top.round.x, layout.top.round.y, layout.top.round.scale, 20)
 
     const counterHeight = this.state.counterExpanded ? BASE_COUNTER_OPEN_HEIGHT : BASE_COUNTER_CLOSED_HEIGHT
-    const counterDefault = {
-      x: bounds.right - 8 - BASE_COUNTER_WIDTH * bounds.scale / 2,
-      y: bounds.top - 8 - counterHeight * bounds.scale / 2,
-    }
-    const counterPosition = clampTableHudOverlayPosition(
-      this.overlayPositions.counter ?? counterDefault,
+    const counter = resolveTableHudCounterPlacement(
+      this.viewport,
       { width: BASE_COUNTER_WIDTH, height: counterHeight },
-      bounds,
+      BASE_COUNTER_OPEN_HEIGHT, this.overlayPositions.counter,
     )
-    this.overlayPositions.counter = counterPosition
-    this.place(this.counterPanel, counterPosition.x, counterPosition.y, bounds.scale, 80)
+    // Automatic anchors follow the current viewport; only a real drag is persisted.
+    if (this.overlayPositions.counter) this.overlayPositions.counter = counter.anchor
+    this.place(this.counterPanel, counter.position.x, counter.position.y, bounds.scale, 80)
 
     this.seats.layout(layout.seats)
+    this.handViewStatus.layout(bounds)
     this.place(this.suitBar, layout.bottom.suitBar.x, layout.bottom.suitBar.y, layout.bottom.suitBar.scale, 20)
     this.place(this.toolbar, layout.bottom.toolbar.x, layout.bottom.toolbar.y, layout.bottom.toolbar.scale, 30)
 
@@ -252,7 +260,7 @@ export class TableGameHud {
     const operationSize = this.layoutHumanOperationRow(humanTurnTimer)
     if (!humanTurnTimer && this.state.turnVisible) {
       const timerPosition = clampTableHudOverlayPosition(
-        TABLE_HUD_TURN_OPERATION_ANCHORS[this.state.turnPlace],
+        turnTimerPosition(this.viewport, this.state.turnPlace),
         { width: 112, height: 112 },
         bounds,
       )
@@ -271,6 +279,7 @@ export class TableGameHud {
   }
 
   public dispose (): void {
+    this.handViewStatus.dispose()
     this.seats.dispose()
     this.turnTimer.dispose()
     this.root?.destroy()
@@ -335,9 +344,9 @@ export class TableGameHud {
 
     if (this.roundPanel) {
       configureTransform(this.roundPanel, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT)
-      configureLabelMetrics(this.roundLabel, 252, 40, 30, 0, 19)
-      configureLabelMetrics(this.levelLabel, 258, 34, 26, 0, -21)
-      if (this.roundGraphics) drawPanel(this.roundGraphics, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT, EXPANDED_ROUND_HEIGHT / 2)
+      configureLabelMetrics(this.roundLabel, EXPANDED_ROUND_WIDTH - 16, 40, 30, 0, 19)
+      configureLabelMetrics(this.levelLabel, EXPANDED_ROUND_WIDTH - 16, 34, 26, 0, -21)
+      if (this.roundGraphics) drawPanel(this.roundGraphics, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT, 8)
     }
 
     if (this.suitBar) configureTransform(this.suitBar, EXPANDED_SUIT_BAR_WIDTH, EXPANDED_SUIT_BAR_HEIGHT)
@@ -351,9 +360,9 @@ export class TableGameHud {
     })
 
     if (this.toolbar) configureTransform(this.toolbar, EXPANDED_TOOLBAR_WIDTH, EXPANDED_TOOLBAR_HEIGHT)
-    this.configureToolbarButton(this.lockButton, -190, 150, 64, 30)
-    this.configureToolbarButton(this.arrangeButton, 0, 210, 64, 32)
-    this.configureToolbarButton(this.chatButton, 190, 150, 64, 30)
+    this.configureToolbarButton(this.lockButton, -164, 132, 64, 28)
+    this.configureToolbarButton(this.arrangeButton, 0, 172, 64, 30)
+    this.configureToolbarButton(this.chatButton, 164, 132, 64, 28)
 
   }
 
@@ -482,10 +491,10 @@ export class TableGameHud {
     this.bindPress(
       this.lockButton.node,
       pressed => this.drawToolButton(this.lockButton, this.state.lockAction !== 'start', pressed),
-      () => this.actions.onHandLockAction?.(),
+      () => { if (this.state.handToolsVisible !== false) this.actions.onHandLockAction?.() },
     )
-    this.bindPress(this.arrangeButton.node, pressed => this.drawToolButton(this.arrangeButton, false, pressed), () => this.actions.onArrange?.())
-    this.bindPress(this.chatButton.node, pressed => this.drawToolButton(this.chatButton, false, pressed), () => this.actions.onChat?.())
+    this.bindPress(this.arrangeButton.node, pressed => this.drawToolButton(this.arrangeButton, false, pressed), () => { if (this.state.handToolsVisible !== false) this.actions.onArrange?.() })
+    this.bindPress(this.chatButton.node, pressed => this.drawToolButton(this.chatButton, false, pressed), () => { if (this.state.chatEnabled !== false) this.actions.onChat?.() })
     this.toolbar = toolbar
   }
 
@@ -497,7 +506,9 @@ export class TableGameHud {
       if (!target) return
       const delta = event.getUIDelta()
       const current = target.position
-      this.overlayPositions[overlay] = { x: current.x + delta.x, y: current.y + delta.y }
+      const foldedOffset = overlay === 'counter' && !this.state.counterExpanded
+        ? (BASE_COUNTER_OPEN_HEIGHT - BASE_COUNTER_CLOSED_HEIGHT) * target.scale.y / 2 : 0
+      this.overlayPositions[overlay] = { x: current.x + delta.x, y: current.y + delta.y - foldedOffset }
       this.layout(this.viewport)
     })
     const finish = (): void => { if (this.activeDrag === overlay) this.activeDrag = null }
@@ -515,6 +526,8 @@ export class TableGameHud {
 
   private renderViews (): void {
     if (!this.root) return
+    this.handViewStatus.render(this.state.handViewLabel ?? '', this.state.handToolsVisible !== false)
+    if (this.chatButton) this.chatButton.node.active = this.state.chatEnabled !== false
     if (this.roundLabel) this.roundLabel.string = this.state.matchLabel
     if (this.levelLabel) this.levelLabel.string = this.state.levelLabel
     this.turnTimer.render(this.state)

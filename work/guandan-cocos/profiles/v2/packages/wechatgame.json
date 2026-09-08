@@ -4,7 +4,7 @@
     "options": {
       "wechatgame": {
         "orientation": "landscapeRight",
-        "appid": "wx3695323aed721e9d",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,
@@ -17,20 +17,20 @@
         "enable": false
       },
       "buildPath": "project://build",
-      "outputName": "wechatgame-001",
+      "outputName": "wechatgame",
       "mainBundleCompressionType": "merge_dep",
       "platform": "wechatgame",
       "mainBundleIsRemote": false,
       "startSceneAssetBundle": false,
       "useBuiltinServer": false,
-      "debug": true,
-      "sourceMaps": "inline",
+      "debug": false,
+      "sourceMaps": false,
       "skipCompressTexture": true
     },
     "taskOptionsMap": {
       "1786117060422": {
         "orientation": "landscape",
-        "appid": "wx6ac3f5090a6b99c5",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,
@@ -38,7 +38,7 @@
       },
       "1786119236334": {
         "orientation": "landscapeRight",
-        "appid": "wx3695323aed721e9d",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,
@@ -46,7 +46,7 @@
       },
       "1786174911012": {
         "orientation": "landscapeRight",
-        "appid": "wx3695323aed721e9d",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,
@@ -54,7 +54,7 @@
       },
       "1786180181144": {
         "orientation": "landscapeRight",
-        "appid": "wx3695323aed721e9d",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,
@@ -62,7 +62,7 @@
       },
       "1786180945289": {
         "orientation": "landscapeRight",
-        "appid": "wx3695323aed721e9d",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,
@@ -70,7 +70,7 @@
       },
       "1786181650622": {
         "orientation": "landscapeRight",
-        "appid": "wx3695323aed721e9d",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,
@@ -78,7 +78,7 @@
       },
       "1786193987284": {
         "orientation": "landscapeRight",
-        "appid": "wx3695323aed721e9d",
+        "appid": "wxa79bf8bc567765a1",
         "buildOpenDataContextTemplate": "",
         "separateEngine": false,
         "highPerformanceMode": false,

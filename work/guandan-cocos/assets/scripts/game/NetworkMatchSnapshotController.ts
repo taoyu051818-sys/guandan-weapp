@@ -1,6 +1,6 @@
 import type { EngineState, MatchState, PlayerId, SettlementResult, TributeState } from '../core/generated'
 import type { NetworkViewerRoundStats } from '../network/LobbyModels'
-import { countPlayerBombs, type LocalRoundRecord, type LocalSessionPhase } from './LocalMatchEventController'
+import { countPlayerBombs, type RoundRecord, type SessionPhase } from './RoundRecord'
 import { mergeGameManagerProjection, projectAuthoritativeState, type GameManagerProjection } from './GameManagerProjection'
 
 export type NetworkMatchSnapshotPorts = Readonly<{
@@ -9,11 +9,10 @@ export type NetworkMatchSnapshotPorts = Readonly<{
   getRoomId: () => string | null
   getHumanId: () => PlayerId
   commit: (state: EngineState, projection: GameManagerProjection) => void
-  retireLocalMatch: () => void
   clearSelection: () => void
   cancelPendingAction: () => void
-  setSessionPhase: (phase: LocalSessionPhase) => void
-  recordRound: (record: LocalRoundRecord) => void
+  setSessionPhase: (phase: SessionPhase) => void
+  recordRound: (record: RoundRecord) => void
   publishHint: (hint: string) => void
 }>
 
@@ -116,9 +115,20 @@ export class NetworkMatchSnapshotController {
   }
 
   private commitProjection (state: EngineState, projection: GameManagerProjection): GameManagerProjection {
-    this.ports.retireLocalMatch()
+    const previous = this.ports.getState()
+    const oldProjection = this.ports.getProjection()
+    const humanId = this.ports.getHumanId()
+    const oldHand = previous?.players[humanId]?.hand ?? []
+    const newHand = state.players[humanId]?.hand ?? []
+    const ids = new Set(newHand.map(card => card.id))
+    // Other seats' actions must not collapse a local preselection. Own actions,
+    // changed hands, lifecycle/round changes and finished views retire it.
+    const keepSelection = previous && projection.phase === 'playing' && oldProjection.phase === 'playing' &&
+      projection.roundId === oldProjection.roundId && !state.finishedPlayers.includes(humanId) &&
+      (previous.currentTurn !== humanId || state.currentTurn === humanId) &&
+      oldHand.length === newHand.length && oldHand.every(card => ids.has(card.id))
     this.ports.commit(state, projection)
-    this.ports.clearSelection()
+    if (!keepSelection) this.ports.clearSelection()
     this.ports.cancelPendingAction()
     this.ports.setSessionPhase(projection.phase)
     return projection

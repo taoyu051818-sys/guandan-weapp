@@ -13,7 +13,7 @@ const tableOverlays = fs.readFileSync(path.join(projectRoot, 'assets/scripts/sce
 const handWorkspace = fs.readFileSync(path.join(projectRoot, 'assets/scripts/game/HandWorkspace.ts'), 'utf8')
 
 assert.match(lobbyModels, /export type NetworkScoreboard = \{[\s\S]*roundsPlayed: number[\s\S]*currentLevel: Rank[\s\S]*teamLevels: Record<'teamA' \| 'teamB', Rank>/)
-assert.match(lobbyModels, /export type LobbySnapshot = \{[\s\S]*scoreboard\?: NetworkScoreboard \| null/)
+assert.match(lobbyModels, /export type LobbySnapshot = RoomViewMetadata & \{[\s\S]*scoreboard\?: NetworkScoreboard \| null/)
 assert.match(lobbyModels, /export type LobbyLiveMetadata = \{[\s\S]*scoreboard\?: NetworkScoreboard \| null/, 'live protocol metadata must carry the optional scoreboard')
 assert.match(lobbyModels, /export type RoomSnapshotWire = LobbyWire<LobbyLiveMetadata &/, 'entry snapshots must compose the shared live metadata contract in the protocol model owner')
 const metadata = lobbyModels.slice(lobbyModels.indexOf('export const projectLobbyLiveMetadata'))
@@ -35,7 +35,8 @@ assert.doesNotMatch(friendSettings, /scoreVisibility|PlayerPoints|shouldHideFrie
 
 const tableHud = tableHudPresenter.slice(tableHudPresenter.indexOf('public render'), tableHudPresenter.indexOf('public update'))
 assert.match(tableHud, /projectTableViewer\(snapshot\.state\.players, humanId, teamLevels/, 'the table summary must use the shared viewer-relative team projection')
-assert.match(tableHud, /levelLabel: `我方 \$\{String\(viewer\.viewerLevel\)\}级 · 对方 \$\{String\(viewer\.opponentLevel\)\}级`/, 'the table summary must retain viewer-relative team levels')
+assert.match(tableHud, /`我方 \$\{String\(viewer\.viewerLevel\)\}级 · 对方 \$\{String\(viewer\.opponentLevel\)\}级`/, 'upgrade tables retain viewer-relative team levels')
+assert.match(tableHud, /matchFormat\?\.kind === 'independent'[\s\S]*随机级牌/, 'independent hands must not imply cumulative upgrades')
 assert.doesNotMatch(tableHud, /snapshot\.scores|scoreLabel|teamScore|比分/, 'the live table must not duplicate levels with a score display')
 
 const chat = tableOverlays.slice(tableOverlays.indexOf('public toggleQuickChatPanel'), tableOverlays.indexOf('private createModalShade'))
@@ -49,3 +50,16 @@ assert.ok(sendInteractionGuard >= 0, 'the phrase handler must recheck the immuta
 assert.ok(localChatMutation > sendInteractionGuard && localVoicePlayback > localChatMutation, 'interaction policy must run before local bubble creation and voice playback')
 
 console.log('friend-room runtime settings regression checks passed')
+const voiceCallback = game.match(/playVoice: voice => (\{ if \(!this\.activeFriendRoomSettings\(\)\?\.disableVoice\)[^\n]+\})/)
+assert.ok(voiceCallback, 'all incoming and outgoing quick-chat voice callbacks must obey room policy')
+const calls = []
+const context = { activeFriendRoomSettings: () => ({ disableVoice: true }), audio: { playVoice: voice => calls.push(voice) } }
+const runVoice = new Function('voice', voiceCallback[1])
+runVoice.call(context, 'chat-thanks')
+assert.deepEqual(calls, [])
+context.activeFriendRoomSettings = () => null
+runVoice.call(context, 'chat-thanks')
+assert.deepEqual(calls, ['chat-thanks'], 'leaving a restricted room restores normal voice policy')
+assert.match(tableHudPresenter, /counterEnabled: !\(multiplayer && lobby\?\.lobbyReadyRequired === true && lobby\.roomSettings\?\.counterEnabled === false\)/)
+const counterRenderer = fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/TableHudDynamicRenderer.ts'), 'utf8')
+assert.match(counterRenderer, /panel\.active = state\.counterEnabled !== false[\s\S]*if \(!panel\.active\) return/)

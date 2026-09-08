@@ -206,6 +206,7 @@ export class FriendRoomService {
       entryAttemptId,
       roomExpiresAt: match.friendRoomExpiresAt,
       roomSettings: match.roomSettings,
+      hostUserId: match.hostUserId,
     })
     Object.assign(participant, issued, { ticketIssuedAt: now })
     this.trackTicket(participant, issued.claims, now)
@@ -218,6 +219,7 @@ export class FriendRoomService {
       matchId: match.id,
       roomId: match.roomId,
       seat: participant.seat,
+      isRoomHost: participant.userId === match.hostUserId,
       roomKind: 'friend',
       gameEndpoint: participant.gameEndpoint,
       gameTicket: participant.gameTicket,
@@ -304,15 +306,16 @@ export class FriendRoomService {
       if (match.inviteCodeHash !== suppliedInviteHash) throw notFound('FRIEND_ROOM_UNAVAILABLE', '好友房不存在或邀请码无效')
       if (Array.isArray(match.bannedUserIds) && match.bannedUserIds.includes(userId)) throw new PlatformError(403, 'FRIEND_ROOM_BANNED', '你已被移出该好友房，不能重新加入')
       if (previous && previous.matchId !== match.id) throw conflict('IDEMPOTENCY_CONFLICT', '同一个 entryAttemptId 不能用于不同好友房加入请求')
-      if (match.status === 'playing') throw conflict('FRIEND_ROOM_ALREADY_STARTED', '好友房已经开始，请使用牌局服重连凭证')
-      if (!['matching', 'matched'].includes(match.status)) return { unavailable: true }
+      if (match.status === 'playing' && match.roomSettings.spectator === 'off') throw conflict('FRIEND_ROOM_ALREADY_STARTED', '好友房已经开始且不允许观战')
+      if (!['matching', 'matched', 'playing'].includes(match.status)) return { unavailable: true }
       const active = this.activeMatchForEntry(state, userId, now)
       if (active && active.id !== match.id) throw conflict('ALREADY_MATCHING', '请先结束当前匹配或牌局')
       let participant = match.participants.find(item => item.userId === userId)
       if (!participant) {
         const occupiedSeats = new Set(match.participants.filter(item => ['matching', 'matched'].includes(item.status) || (item.status === 'cancelled' && !item.ticketRevokedAt && Number(item.expiresAt) > now)).map(item => item.seat))
-        const seat = seats.slice(1).find(candidate => !occupiedSeats.has(candidate))
+        const seat = (match.status !== 'playing' && seats.slice(1).find(candidate => !occupiedSeats.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')
         if (!seat) throw conflict('FRIEND_ROOM_FULL', '好友房席位已满')
+        if (match.participants.filter(item => ['matching', 'matched', 'playing'].includes(item.status)).length >= 12) throw conflict('FRIEND_ROOM_FULL', '房间人数已满')
         participant = { userId, status: 'matching', seat, entryAttemptId: safeAttemptId, joinedAt: now }
         match.participants.push(participant)
       } else {
@@ -326,9 +329,9 @@ export class FriendRoomService {
         }
       }
       if (participant.status === 'cancelled') {
-        const occupiedByOthers = new Set(match.participants.filter(item => item !== participant && (['matching', 'matched'].includes(item.status) || (item.status === 'cancelled' && !item.ticketRevokedAt && Number(item.expiresAt) > now))).map(item => item.seat))
-        if (!seats.slice(1).includes(participant.seat) || occupiedByOthers.has(participant.seat)) {
-          const nextSeat = seats.slice(1).find(candidate => !occupiedByOthers.has(candidate))
+        const occupiedByOthers = new Set(match.participants.filter(item => item !== participant && (['matching', 'matched', 'playing'].includes(item.status) || (item.status === 'cancelled' && !item.ticketRevokedAt && Number(item.expiresAt) > now))).map(item => item.seat))
+        if (match.status === 'playing' || !seats.slice(1).includes(participant.seat) || occupiedByOthers.has(participant.seat)) {
+          const nextSeat = (match.status !== 'playing' && seats.slice(1).find(candidate => !occupiedByOthers.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')
           if (!nextSeat) throw conflict('FRIEND_ROOM_FULL', '好友房席位已满')
           participant.seat = nextSeat
           delete participant.gameTicket
@@ -342,10 +345,11 @@ export class FriendRoomService {
         participant.joinedAt = now
         for (const key of ['cancelledAt', 'leaveReason', 'ticketRevokedAt', 'revokedTicketJti', 'revokedTicketExpiresAt', 'cancellationRequestedAt', 'seatLifecycleConfirmedAt']) delete participant[key]
       }
-      this.ensureTicket(match, participant, now)
+      this.ensureTicket(match, participant, now, { purpose: match.status === 'playing' ? 'rejoin' : 'entry' })
+      if (match.status === 'playing') participant.status = 'playing'
       state.activeMatchByUser[userId] = match.id
       state.friendRoomEntryAttempts[attemptKey] ||= { userId, entryAttemptId: safeAttemptId, action: 'join', fingerprint: requestFingerprint, matchId: match.id, createdAt: now }
-      if (match.participants.filter(item => ['matching', 'matched'].includes(item.status)).length === 4 && match.status === 'matching') {
+      if (match.participants.filter(item => seats.includes(item.seat) && ['matching', 'matched'].includes(item.status)).length === 4 && match.status === 'matching') {
         match.status = 'matched'
         match.matchedAt = now
         match.participants.forEach(item => { if (item.status === 'matching') item.status = 'matched' })
@@ -408,7 +412,7 @@ export class FriendRoomService {
           return structuredClone(previous.receipt.entry)
         }
         this.assertTicketCapacity(participant, now)
-        Object.assign(participant, this.gameTickets.issue({ userId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'friend', purpose, entryAttemptId: safeRecoveryAttemptId, roomExpiresAt: match.friendRoomExpiresAt, roomSettings: match.roomSettings }), { recoveryIssuedAt: now })
+        Object.assign(participant, this.gameTickets.issue({ userId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'friend', purpose, entryAttemptId: safeRecoveryAttemptId, roomExpiresAt: match.friendRoomExpiresAt, roomSettings: match.roomSettings, hostUserId: match.hostUserId }), { recoveryIssuedAt: now })
         this.trackTicket(participant, participant.claims, now)
         const entry = { ...this.entryView(match, participant, safeRecoveryAttemptId, { includeInvite: match.status !== 'playing' && match.hostUserId === userId }), recoveryAttemptId: safeRecoveryAttemptId, roomKind: 'friend' }
         this.saveRecoveryReceipt(participant, safeRecoveryAttemptId, requestFingerprint, entry, now)
@@ -427,7 +431,8 @@ export class FriendRoomService {
         if (previous.participant !== participant || !matchesJsonFingerprint(previous.receipt.fingerprint, request)) throw conflict('RECOVERY_ATTEMPT_CONFLICT', '同一个 recoveryAttemptId 不能恢复不同的牌局绑定')
         return structuredClone(previous.receipt.entry)
       }
-      Object.assign(participant, this.gameTickets.issue({ userId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'match', purpose, entryAttemptId: safeRecoveryAttemptId }), { recoveryIssuedAt: now })
+      const botUserIdsBySeat = Object.fromEntries(match.participants.filter(item => item.isBot && item.seat).map(item => [item.seat, item.userId]))
+      Object.assign(participant, this.gameTickets.issue({ userId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'match', matchMode: participant.claims?.matchMode, purpose, entryAttemptId: safeRecoveryAttemptId, ...(Object.keys(botUserIdsBySeat).length ? { botUserIdsBySeat } : {}) }), { recoveryIssuedAt: now })
       state.activeMatchByUser[userId] = match.id
       const entry = { entryAttemptId: safeRecoveryAttemptId, recoveryAttemptId: safeRecoveryAttemptId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'match', ticketPurpose: participant.claims?.purpose || purpose, gameEndpoint: participant.gameEndpoint, gameTicket: participant.gameTicket, joinToken: participant.gameTicket, expiresAt: participant.expiresAt }
       this.saveRecoveryReceipt(participant, safeRecoveryAttemptId, requestFingerprint, entry, now)

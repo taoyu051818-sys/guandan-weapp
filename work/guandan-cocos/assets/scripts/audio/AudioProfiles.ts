@@ -7,7 +7,6 @@ export const AUDIO_EVENTS = [
   'countdown',
   'bomb',
   'king-bomb',
-  'wildcard',
   'victory',
   'defeat',
 ] as const
@@ -54,15 +53,14 @@ export const AUDIO_EVENT_PROFILES: Readonly<Record<AudioEvent, AudioProfile>> = 
   'game-start': audioProfile('game-start', ['niuma/game_start'], 0.88, 1200),
   deal: audioProfile('deal', ['licensed/deal', 'card'], 0.72, 70),
   play: audioProfile('play', ['card'], 0.82, 45),
-  pass: audioProfile('pass', ['niuma/pass_1', 'licensed/pass', 'pass_1'], 0.9, 160, [
-    ['niuma/pass_1', 'licensed/pass', 'pass_1'],
-    ['niuma/pass_2', 'licensed/pass', 'pass_1'],
-    ['niuma/pass_3', 'licensed/pass', 'pass_1'],
+  pass: audioProfile('pass', ['niuma/pass_1', 'pass_1'], 0.9, 160, [
+    ['niuma/pass_1', 'pass_1'],
+    ['niuma/pass_2', 'pass_1'],
+    ['niuma/pass_3', 'pass_1'],
   ]),
   countdown: COUNTDOWN_AUDIO_PROFILES[5],
   bomb: audioProfile('bomb', ['licensed/bomb', 'bomb', 'card'], 1, 120),
   'king-bomb': audioProfile('king-bomb', ['king_bomb', 'licensed/bomb', 'bomb', 'card'], 1, 220),
-  wildcard: audioProfile('wildcard', ['wildcard', 'card'], 0.92, 120),
   victory: audioProfile('victory', ['niuma/victory', 'win', 'card'], 1, 800),
   defeat: audioProfile('defeat', ['licensed/defeat', 'niuma/defeat', 'pass_1', 'card'], 0.62, 800),
 })
@@ -73,12 +71,12 @@ const LEGACY_AUDIO_EVENTS: Readonly<Record<string, AudioEvent>> = Object.freeze(
   pass_1: 'pass',
   bomb: 'bomb',
   king_bomb: 'king-bomb',
-  wildcard: 'wildcard',
   win: 'victory',
   lose: 'defeat',
 })
 
 export const RETIRED_AUDIO_ROUTES = Object.freeze({
+  wildcard: Object.freeze({ runtimeAllowed: false, reason: '级牌／逢人配专属提示音已移除，只保留正常报牌女声。' }),
   'straight-flush': Object.freeze({
     runtimeAllowed: false,
     reason: '同花顺已由 playActionVoice 唯一播报；第二条语义语音会造成重复报牌，禁止恢复。',

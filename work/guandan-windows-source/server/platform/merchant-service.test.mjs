@@ -23,6 +23,18 @@ await assert.rejects(() => merchants.createStore('owner', { name: '一号店' },
 await store.transaction(draft => { draft.merchants[merchant.id].status = 'active' })
 const firstStore = await merchants.createStore('owner', { name: '一号店', address: '陵水' }, 'store-1')
 assert.deepEqual(await merchants.createStore('owner', { name: '一号店', address: '陵水' }, 'store-1'), firstStore)
+assert.deepEqual(await merchants.createStore('owner', { name: ' 一号店 ', address: ' 陵水 ' }, 'store-1'), firstStore, 'equivalent normalized requests still reuse the original result')
+const beforeConflicts = await store.read(snapshot => snapshot)
+for (const draft of [{ name: '二号店', address: '陵水' }, { name: '一号店', address: '另一地址' }]) {
+  await assert.rejects(merchants.createStore('owner', draft, 'store-1'), error => error.code === 'IDEMPOTENCY_CONFLICT')
+}
+assert.deepEqual(await store.read(snapshot => snapshot), beforeConflicts, 'a reused key with changed content must not create or modify stores')
+assert.equal(beforeConflicts.merchantIdempotency[`${merchant.id}:store:store-1`], firstStore.id, 'legacy string receipts need no schema migration')
+const [replayA, replayB] = await Promise.all([
+  merchants.createStore('owner', { name: '一号店', address: '陵水' }, 'store-1'),
+  merchants.createStore('owner', { name: '一号店', address: '陵水' }, 'store-1'),
+])
+assert.deepEqual(replayA, firstStore); assert.deepEqual(replayB, firstStore)
 await merchants.addEmployee('owner', { employeeUserId: 'cashier', role: 'cashier' })
 
 await assert.rejects(
@@ -54,5 +66,9 @@ assert.equal(consoleView.employees.length, 1)
 assert.equal(consoleView.grantedPoints, 250)
 assert.equal((await store.read(snapshot => snapshot.wallets.customer.balance)), 350)
 assert.equal((await store.read(snapshot => snapshot.ledgerEntries.filter(entry => entry.type === 'merchant_grant').length)), 1)
+
+// A legacy receipt whose record is missing must not silently return success with no store.
+await store.transaction(draft => { delete draft.merchantStores[firstStore.id] })
+await assert.rejects(merchants.createStore('owner', { name: '一号店', address: '陵水' }, 'store-1'), error => error.code === 'IDEMPOTENCY_CONFLICT')
 
 console.log('merchant service tests passed')

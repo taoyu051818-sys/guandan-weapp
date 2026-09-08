@@ -52,6 +52,13 @@ describe('AI decision support boundary', () => {
 
     expect(support.getTeammateId(players, 'p1', 'teamA')).toBe('p3');
     expect(support.getIntent(null, 'p3', 3, 12)).toBe('assist_teammate');
+    expect(support.getIntent(null, 'p3', 0, 12)).toBe('tempo');
+    expect(support.getIntent(
+      { playerId: 'p3', cards: [card('contact', 9)], type: PlayType.Single },
+      'p3',
+      0,
+      12,
+    )).toBe('tempo');
     expect(support.getIntent(null, 'p3', 8, 5)).toBe('block_enemy');
     expect(support.getAdvancedRole('master', players, 'p3')).toBe('support');
   });
@@ -101,5 +108,52 @@ describe('AI decision support boundary', () => {
       'teamA',
       'p3',
     )).toEqual(low);
+  });
+
+  it('feeds without spending a wildcard or splitting a natural bomb when intact cards exist', () => {
+    const { support } = createSubject();
+    const loose = card('loose', 7);
+    const bomb = [card('bomb-a', 12), card('bomb-b', 12), card('bomb-c', 12), card('bomb-d', 12)];
+    const wildcard = { ...card('wildcard', 14), isRedJoker: true };
+    const hand = [loose, ...bomb, wildcard];
+
+    expect(support.chooseFeedPlayByScore(
+      [[wildcard], [bomb[0]], [loose]],
+      PlayType.Single,
+      hand,
+    )).toEqual([loose]);
+    expect(support.getPlayResourceDamage(hand, [bomb[0]])).toMatchObject({
+      bombSplits: 1,
+      wildcardCount: 0,
+    });
+    const sameValueWildcard = { ...card('level-wildcard', 12), isRedJoker: true };
+    expect(support.getPlayResourceDamage([...bomb, sameValueWildcard], bomb)).toMatchObject({
+      bombSplits: 0,
+      wildcardCount: 0,
+    });
+  });
+
+  it('uses the strongest intact response in an urgent block', () => {
+    const { support } = createSubject();
+    const low = card('low', 9);
+    const high = card('high', 13);
+    const pair = [card('pair-a', 14), card('pair-b', 14)];
+    const wildcard = { ...card('wildcard', 15), isRedJoker: true };
+    const hand = [low, high, ...pair, wildcard];
+
+    expect(support.chooseUrgentBlock(
+      hand,
+      [[low], [high], [pair[0]], [wildcard]],
+    )).toEqual([high]);
+  });
+
+  it('does not lead the exact shape a one- or two-card enemy needs', () => {
+    const { support } = createSubject();
+    const single = [card('single', 14)];
+    const pair = [card('pair-a', 6), card('pair-b', 6)];
+    const hand = [...single, ...pair];
+
+    expect(support.choosePressureLead(hand, [single, pair], 1)).toEqual(pair);
+    expect(support.choosePressureLead(hand, [single, pair], 2)).toEqual(single);
   });
 });

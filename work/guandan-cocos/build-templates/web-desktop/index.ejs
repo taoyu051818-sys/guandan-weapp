@@ -20,14 +20,16 @@
     <link rel="stylesheet" type="text/css" href="<%= cssUrl %>"/>
     <link rel="icon" href="favicon.ico"/>
   </head>
-  <body>
+  <body class="desktop-mobile-simulator">
     <h1 class="header">陵水掼蛋</h1>
 
-    <div id="GameDiv" cc_exact_fit_screen="false" style="width: <%= previewWidth %>px; height: <%= previewHeight %>px;">
-      <div id="Cocos3dGameContainer">
-        <canvas id="GameCanvas" width="<%= previewWidth %>" height="<%= previewHeight %>" tabindex="99"></canvas>
+    <main id="MobileStage" aria-label="陵水掼蛋移动端横屏模拟器">
+      <div id="GameDiv" cc_exact_fit_screen="false" style="width: <%= previewWidth %>px; height: <%= previewHeight %>px;">
+        <div id="Cocos3dGameContainer">
+          <canvas id="GameCanvas" width="<%= previewWidth %>" height="<%= previewHeight %>" tabindex="99"></canvas>
+        </div>
       </div>
-    </div>
+    </main>
     <p class="footer">陵水掼蛋</p>
     <%- include(cocosTemplate, {}) %>
   </body>

@@ -1,4 +1,5 @@
 import type { LobbySocketClient, LobbySocketListener, NetworkRequestResult } from './LobbySocketClient'
+import { assertWechatTransportEndpoint } from '../services/WechatNetworkPolicy'
 
 export type { NetworkRequestResult } from './LobbySocketClient'
 
@@ -43,6 +44,7 @@ export class CocosSocketClient implements LobbySocketClient {
   }
 
   public connect (url: string): Promise<void> {
+    try { assertWechatTransportEndpoint(url, 'wss:') } catch (error) { return Promise.reject(error) }
     if (this.socket?.readyState === WebSocket.OPEN && this.connectingUrl === url) return Promise.resolve()
     if (this.connectPromise && this.connectingUrl === url) return this.connectPromise
     this.replaceConnection('连接地址已切换')
@@ -103,9 +105,12 @@ export class CocosSocketClient implements LobbySocketClient {
     return () => group.delete(listener as LobbySocketListener)
   }
 
-  public send (type: string, payload?: unknown): number {
+  public send (type: string, payload?: unknown, retryRequestId?: number): number {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) throw new Error('网络未连接')
-    const requestId = ++this.sequence
+    if (retryRequestId !== undefined && (!Number.isSafeInteger(retryRequestId) || retryRequestId < 1 || retryRequestId > this.sequence)) {
+      throw new Error('重试请求编号无效')
+    }
+    const requestId = retryRequestId ?? ++this.sequence
     this.pendingRequests.set(requestId, type)
     // The authoritative server only returns a requestId for direct replies and
     // rejects. State broadcasts are the acknowledgement for play/pass intents,

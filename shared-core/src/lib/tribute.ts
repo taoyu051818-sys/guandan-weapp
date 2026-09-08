@@ -1,5 +1,6 @@
 import type { Card, PlayerId } from '../types/game'
 import { createDeck } from './deck'
+import { MATCH_LEVELS } from './matchFormat'
 import type {
   BeginPlayAfterTributeCommand,
   GameEvent,
@@ -118,7 +119,11 @@ export const prepareNextRound = (
 ): TributeOperationResult => {
   if (state.phase !== 'settled' || !state.settlement) return failure('MATCH_NOT_SETTLED')
   if (state.settlement.isGameWon) return failure('MATCH_ALREADY_WON')
-  const handsError = validateCanonicalHands(command.dealtHands, state.settlement.currentLevel)
+  const independent = state.matchFormat?.kind === 'independent'
+  const nextLevel = independent ? command.nextLevel : state.settlement.currentLevel
+  if (nextLevel === undefined || !MATCH_LEVELS.includes(nextLevel) ||
+    (independent && state.matchFormat?.levelMode === 'fixed' && nextLevel !== state.matchFormat.levelRank)) return failure('INVALID_NEXT_LEVEL')
+  const handsError = validateCanonicalHands(command.dealtHands, nextLevel)
   if (handsError) return failure(handsError)
   if (state.lastRoundRank.length !== 4) return failure('ROUND_RANK_UNAVAILABLE')
   const [first, second] = state.lastRoundRank
@@ -142,13 +147,15 @@ export const prepareNextRound = (
       role: 'normal',
     }
   })
+  const skipTribute = independent || state.matchFormat?.tributeEnabled === false
   return {
     ok: true,
     state: {
       ...state,
       roundId,
-      phase: 'tribute',
-      currentLevel: state.settlement.currentLevel,
+      phase: skipTribute ? 'playing' : 'tribute',
+      currentLevel: nextLevel,
+      teamLevels: independent ? { teamA: nextLevel, teamB: nextLevel } : state.teamLevels,
       dealerId,
       players,
       currentTurn: dealerId,
@@ -158,12 +165,12 @@ export const prepareNextRound = (
       lastValidPlay: null,
       finishedPlayers: [],
       settlement: null,
-      tribute,
-      roundMeta: { fromTribute: true, isAntiTribute: resisted },
+      tribute: skipTribute ? null : tribute,
+      roundMeta: skipTribute ? null : { fromTribute: true, isAntiTribute: resisted },
     },
     events: [
-      { type: 'ROUND_PREPARED', roundId, mode, status: tribute.status },
-      ...(resisted ? [{ type: 'ANTI_TRIBUTE_DECLARED' as const, mode }] : []),
+      { type: 'ROUND_PREPARED', roundId, mode, status: skipTribute ? 'ready' : tribute.status },
+      ...(!skipTribute && resisted ? [{ type: 'ANTI_TRIBUTE_DECLARED' as const, mode }] : []),
     ],
   }
 }

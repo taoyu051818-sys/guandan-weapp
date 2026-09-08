@@ -2,6 +2,7 @@ import type { EngineState, PlayerId, SettlementResult, TributeState } from '../c
 import type { ForcedNetworkRecoveryReason, NetworkEffectSync } from '../effects/NetworkEffectSyncPolicy'
 import {
   createEmptyTrustees,
+  protocolVersion,
   projectLobbyLiveMetadata,
   type LiveMetadataWire,
   type LobbySnapshot,
@@ -17,7 +18,7 @@ import {
 } from './LobbyModels'
 import type { LobbySocketListener, NetworkRequestResult } from './LobbySocketClient'
 import { LobbySyncTracker } from './LobbySyncTracker'
-
+import { FriendRoomViewReceiver, roomViewMetadata } from './FriendRoomViewReceiver'
 type RouterDependencies = Readonly<{
   listen: <T>(type: string, listener: LobbySocketListener<T>) => void
   snapshot: () => LobbySnapshot
@@ -33,11 +34,15 @@ type RouterDependencies = Readonly<{
 /** Owns live-message envelopes, version gates, snapshot projection and domain events. */
 export class LobbyMessageRouter {
   private readonly sync = new LobbySyncTracker()
-
+  private readonly roomViews = new FriendRoomViewReceiver({
+    snapshot: () => this.dependencies.snapshot(), acceptsRoom: roomId => this.acceptRoomMessage(roomId),
+    reset: () => this.sync.reset(), applySnapshot: (message, reason) => this.applyEntrySnapshot(message, reason),
+  })
   public constructor (private readonly dependencies: RouterDependencies) {}
 
   public bind (): void {
     const listen = this.dependencies.listen
+    listen('roomView', (message: RoomSnapshotWire) => this.roomViews.apply(message))
     listen('requestResult', (result: NetworkRequestResult) => this.dependencies.handleRequestResult(result))
     listen('error', (message: LobbyWire<{ message?: string }>) => {
       if (typeof message.requestId !== 'number') this.dependencies.reportError(message.message ?? '网络错误')
@@ -53,7 +58,7 @@ export class LobbyMessageRouter {
       if (this.applyLiveMetadata('lobby-ready', message)) this.dependencies.emit('guandan:lobby-ready', this.dependencies.snapshot().lobbyReadyPlayerIds ?? [])
     })
     listen('gameStartPending', (message: LiveMetadataWire & { message?: string }) => {
-      if (this.applyLiveMetadata('game-start-pending', message)) this.dependencies.patch({ gameStartPending: true, error: message.message ?? '平台确认中，正在安全开局' })
+      if (this.applyLiveMetadata('game-start-pending', message)) this.dependencies.patch({ gameStartPending: true, error: null })
     })
     listen('matchEnded', (message: LiveMetadataWire) => { this.applyLiveMetadata('match-ended-metadata', message) })
     listen('turnDeadline', (message: LiveMetadataWire) => {
@@ -80,7 +85,8 @@ export class LobbyMessageRouter {
     })
     listen('gameState', (message: LiveMetadataWire & { state?: EngineState }) => {
       if (!message.state || !this.acceptStateEnvelope(message)) return
-      this.applyLiveMetadata('game-state-metadata', message)
+      // A server game state also clears stale pending state from older servers.
+      this.applyLiveMetadata('game-state-metadata', { ...message, gameStartPending: false })
       if (!this.sync.acceptVersion('game-state', message.version)) return
       this.dependencies.patch({ error: null })
       const packet = this.statePacket(message.state, message.roomId, message.version, message.gameVersion)
@@ -124,8 +130,10 @@ export class LobbyMessageRouter {
   /** Projects an already accepted room-entry snapshot in the original event order. */
   public applyEntrySnapshot (message: RoomSnapshotWire, recoveryReason: ForcedNetworkRecoveryReason): void {
     if (!this.acceptRoomMessage(message.roomId)) return
-    const version = this.protocolVersion(message.version) ?? this.sync.normalizedVersion()
-    const gameVersion = this.protocolVersion(message.gameVersion) ?? this.sync.normalizedGameVersion()
+    if (message.roomRole === 'observer' && message.observerClockAt && message.turnDeadlineAt) message = { ...message, turnDeadlineAt: message.turnDeadlineAt + Date.now() - message.observerClockAt }
+    const version = protocolVersion(message.version) ?? this.sync.normalizedVersion()
+    const gameVersion = protocolVersion(message.gameVersion) ?? this.sync.normalizedGameVersion()
+    if (message.roomRole) this.dependencies.patch(roomViewMetadata(message))
     this.applyEntryMetadata(message, version)
     if (!message.state) return
     const packet = this.statePacket(message.state, message.roomId, version, gameVersion, recoveryReason)
@@ -143,17 +151,13 @@ export class LobbyMessageRouter {
 
   private acceptRoomMessage (roomId: unknown): roomId is string {
     const snapshot = this.dependencies.snapshot()
-    return Boolean(
-      typeof roomId === 'string' && /^\d{6}$/.test(roomId) &&
-      snapshot.roomId && /^\d{6}$/.test(snapshot.roomId) &&
-      snapshot.roomStatus === 'ready' &&
-      !this.dependencies.isRoomCleaning(roomId) &&
-      roomId === snapshot.roomId,
-    )
+    return typeof roomId === 'string' && /^\d{6}$/.test(roomId)
+      && snapshot.roomStatus === 'ready' && roomId === snapshot.roomId
+      && !this.dependencies.isRoomCleaning(roomId)
   }
 
   private applyLiveMetadata (eventType: string, message: LiveMetadataWire): boolean {
-    const version = this.protocolVersion(message.version)
+    const version = protocolVersion(message.version)
     if (!this.acceptRoomMessage(message.roomId) || version === null) return false
     if (!this.sync.acceptVersion(`metadata:${eventType}`, version)) return false
     this.projectMetadata(message, version)
@@ -173,12 +177,8 @@ export class LobbyMessageRouter {
 
   private acceptStateEnvelope<T extends LiveMetadataWire> (message: T): message is T & { roomId: string, version: number, gameVersion: number } {
     return this.acceptRoomMessage(message.roomId)
-      && this.protocolVersion(message.version) !== null
-      && this.protocolVersion(message.gameVersion) !== null
-  }
-
-  private protocolVersion (value: unknown): number | null {
-    return Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null
+      && protocolVersion(message.version) !== null
+      && protocolVersion(message.gameVersion) !== null
   }
 
   private statePacket (state: EngineState, roomId?: string, version?: number, gameVersion?: number, forceRecovery?: ForcedNetworkRecoveryReason): NetworkStatePacket | null {

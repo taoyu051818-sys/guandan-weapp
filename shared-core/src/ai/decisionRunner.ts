@@ -145,6 +145,29 @@ export const createDecisionRunner = ({
         return markPass('teammate_yield');
       }
 
+      // Team endgame gates run before humanization and the deeper generic
+      // search. A robot must not randomly pass while an enemy is sprinting,
+      // and on contact/lead it should avoid offering the exact one- or
+      // two-card shape that lets an enemy empty their hand.
+      const enemyLed = Boolean(lastPlay && lastPlay.type !== PlayType.Pass
+        && players[lastPlay.playerId].team !== myTeam);
+      if (difficulty !== 'easy' && enemyLed && lastPlay) {
+        const lastEnemyCount = players[lastPlay.playerId].hand.length;
+        if ((lastEnemyCount > 0 && lastEnemyCount <= 2) || minEnemyHandCount <= 2) {
+          const urgentBlock = support.chooseUrgentBlock(hand, possiblePlays);
+          if (urgentBlock) return urgentBlock;
+        }
+      }
+      if (difficulty !== 'easy' && (!lastPlay || lastPlay.type === PlayType.Pass)
+        && minEnemyHandCount <= 2) {
+        const pressureLead = support.choosePressureLead(
+          hand,
+          possiblePlays,
+          minEnemyHandCount,
+        );
+        if (pressureLead) return pressureLead;
+      }
+
       if (difficulty === 'master' && lastPlay && lastPlay.type !== PlayType.Pass) {
         const lastPlayer = players[lastPlay.playerId];
         if (lastPlayer.team !== myTeam && lastPlayer.hand.length > 6) {

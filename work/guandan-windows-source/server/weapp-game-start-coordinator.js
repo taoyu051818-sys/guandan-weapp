@@ -10,6 +10,7 @@ export const createWeAppGameStartCoordinator = ({
   isFriendRoom,
   isMatchRoom,
   seatHasLiveConnection,
+  seatIsOccupied = seatHasLiveConnection,
   enqueueServerOperation,
   commitRuntimeState,
   persistRuntimeState,
@@ -52,6 +53,7 @@ export const createWeAppGameStartCoordinator = ({
         at: now(),
         roundSequence: 1,
         type: 'game-start',
+        ...(room.friendMembers?.length ? { friendRoster: { ...room.userIdsBySeat } } : {}),
       }
     }
     return room.pendingGameStartEvent
@@ -65,7 +67,7 @@ export const createWeAppGameStartCoordinator = ({
   }
 
   const autoStartMatchedRoom = room => {
-    if (!isMatchRoom(room) || room.state || playerIds.some(id => !seatHasLiveConnection(room, id))) return false
+    if (!isMatchRoom(room) || room.state || playerIds.some(id => !seatIsOccupied(room, id))) return false
     prepare(room)
     return true
   }
@@ -198,7 +200,8 @@ export const createWeAppGameStartCoordinator = ({
     persistRuntimeState()
     clearTimer(entryDeadlineTimers, room.roomId)
     if (accepted) {
-      const hostConnection = connections.get(room.seats.p1)
+      const host = room.friendMembers?.find(member => member.userId === room.friendHostUserId)
+      const hostConnection = connections.get(host ? host.connectionId : room.seats.p1)
       if (hostConnection) send(hostConnection, 'actionAccepted', accepted)
     }
     publishState(room)

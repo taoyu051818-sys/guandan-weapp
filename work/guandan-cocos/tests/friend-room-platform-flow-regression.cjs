@@ -22,6 +22,7 @@ const loadPureTs = filePath => {
   assert.deepEqual(errors, [], `${path.basename(filePath)} must transpile`)
   const loaded = { exports: {} }
   new Function('exports', 'module', 'require', result.outputText)(loaded.exports, loaded, request => {
+    if (request.startsWith('.')) return loadPureTs(path.resolve(path.dirname(filePath), `${request}.ts`))
     throw new Error(`unexpected runtime dependency ${request}`)
   })
   return loaded.exports
@@ -34,7 +35,7 @@ const deferred = () => {
   return { promise, resolve, reject }
 }
 
-const flush = async () => { await Promise.resolve(); await Promise.resolve() }
+const flush = async () => { for (let tick = 0; tick < 12; tick += 1) await Promise.resolve() }
 const settings = {
   mode: 'classic', rounds: 8, scoring: 'double-3', scoreVisibility: 'live', turnSeconds: 40,
   trusteeSeconds: 15, totalTimeMinutes: 0, spectator: 'off', autoSort: true,
@@ -51,8 +52,8 @@ const entry = (overrides = {}) => ({
 async function main () {
   assert.equal(fs.existsSync(sourcePath), true, 'platform friend-room flow is missing')
   assert.equal(fs.existsSync(`${sourcePath}.meta`), true, 'platform friend-room flow needs Cocos metadata')
-  assert.equal(fs.existsSync(clipboardPath), true, 'clipboard adapter is missing')
-  assert.equal(fs.existsSync(`${clipboardPath}.meta`), true, 'clipboard adapter needs Cocos metadata')
+  assert.equal(fs.existsSync(clipboardPath), false, 'retired copy-invitation adapter must stay outside runtime assets')
+  assert.equal(fs.existsSync(`${clipboardPath}.meta`), false, 'retired adapter must not leave orphan Cocos metadata')
   assert.equal(fs.existsSync(presenterPath), true, 'authenticated friend-room UI presenter is missing')
   assert.equal(fs.existsSync(`${presenterPath}.meta`), true, 'authenticated friend-room UI presenter needs Cocos metadata')
   assert.equal(fs.existsSync(waitingPresenterPath), true, 'friend-room waiting presenter is missing')
@@ -60,22 +61,20 @@ async function main () {
   const presenterSource = fs.readFileSync(presenterPath, 'utf8')
   const lobbyPageSource = fs.readFileSync(lobbyPagePath, 'utf8')
   const runtimeUiSource = fs.readFileSync(runtimeUiPath, 'utf8')
-  assert.match(presenterSource, /六位房间号仅用于展示[\s\S]*加入必须粘贴完整邀请口令/, 'platform UI must explain that the visible room id is not a join credential')
-  assert.match(presenterSource, /复制完整邀请口令/, 'room sharing must name the complete invite credential')
+  assert.match(presenterSource, /点击微信邀请卡片即可加入/, 'native invitation is the primary joining route')
+  assert.doesNotMatch(presenterSource, /复制完整邀请口令/, 'the obsolete top-right clipboard action must not return')
   assert.match(runtimeUiSource, /friendRoomInviteInput[\s\S]*粘贴完整邀请口令[\s\S]*InputMode\.ANY/, 'platform invite input must accept the full opaque credential')
   assert.match(lobbyPageSource, /gateways\.configured[\s\S]*new FriendRoomPlatformFlow/, 'platform-configured builds must own an authenticated friend-room flow')
   assert.match(lobbyPageSource, /enterMatchedRoom\(\{[\s\S]*entryAttemptId: entry\.entryAttemptId/, 'HTTP entry identity must be forwarded to the WebSocket room entry')
   assert.match(lobbyPageSource, /showLobby \(compensateReservation = true\)[\s\S]*if \(compensateReservation\) this\.friendRoomPlatformFlow\?\.handleRoomClosed/, 'local recovery resets must preserve the platform reservation while authoritative closure still compensates')
   assert.match(fs.readFileSync(waitingPresenterPath, 'utf8'), /capabilities\?\.canUseBots/, 'bot affordances must follow the authoritative room capability')
   const { FriendRoomPlatformFlow } = loadPureTs(sourcePath)
-  const { writeClipboardText } = loadPureTs(clipboardPath)
 
   const creates = []
   const joins = []
   const cancellations = []
   const entered = []
   const notices = []
-  const copied = []
   let changes = 0
   let disposed = false
   const gateway = {
@@ -89,7 +88,6 @@ async function main () {
     enterMatchedRoom: value => entered.push(value),
     showNotice: (title, detail) => notices.push({ title, detail }),
     onChanged: () => { changes += 1 },
-    copyText: async value => { copied.push(value) },
   })
 
   const createTask = flow.create(settings)
@@ -106,8 +104,50 @@ async function main () {
   assert.equal(flow.snapshot.entry?.matchId, created.matchId)
   assert.equal(flow.snapshot.inviteText, created.inviteText)
   assert.deepEqual(entered, [created], 'a current success must enter the reserved WebSocket seat exactly once')
-  await flow.copyInvite()
-  assert.deepEqual(copied, [created.inviteText], 'sharing must copy the complete invite text, never the six-digit display id')
+  const { WechatFriendInvite, friendInviteFromLaunch, friendInviteQuery } = loadPureTs(path.join(projectRoot, 'assets/scripts/services/WechatFriendInvite.ts'))
+  const arrivals = []
+  const shares = []
+  let shown
+  let detached
+  const launch = { query: { friendRoom: '123456', friendInvite: created.inviteCode } }
+  const nativeInvite = new WechatFriendInvite(text => arrivals.push(text), {
+    getLaunchOptionsSync: () => launch,
+    onShow: listener => { shown = listener }, offShow: listener => { detached = listener },
+    shareAppMessage: options => shares.push(options),
+  })
+  assert.deepEqual(arrivals, [], 'cold launch must wait for the lobby')
+  nativeInvite.activate()
+  nativeInvite.activate()
+  assert.deepEqual(arrivals, [created.inviteText])
+  nativeInvite.share(flow.snapshot.inviteText)
+  assert.equal(shares[0].query, friendInviteQuery(created.inviteText))
+  assert.doesNotMatch(shares[0].query, /signed-ticket|gameTicket|resumeToken/)
+  assert.equal(friendInviteFromLaunch({ query: { friendRoom: '123456', friendInvite: '../bad' } }), null)
+  assert.equal(friendInviteFromLaunch({ query: { friendRoom: ['123456'], friendInvite: created.inviteCode } }), null)
+  shown({ query: {} })
+  assert.equal(arrivals.length, 1)
+  shown({ query: { friendRoom: '654321', friendInvite: created.inviteCode } })
+  assert.equal(arrivals.at(-1), `654321.${created.inviteCode}`)
+  assert.throws(() => nativeInvite.share(null), /邀请暂不可用/)
+  const browserInvite = new WechatFriendInvite(() => {}, {})
+  assert.throws(() => browserInvite.share(created.inviteText), /微信小游戏/)
+  nativeInvite.dispose()
+  assert.equal(detached, shown)
+  shown(launch)
+  assert.equal(arrivals.length, 2, 'disposed launch listener cannot join a room')
+  let recovering = true
+  const deferredArrivals = []
+  const recoveryInvite = new WechatFriendInvite(text => {
+    if (recovering) return false
+    deferredArrivals.push(text)
+  }, { getLaunchOptionsSync: () => launch })
+  recoveryInvite.activate()
+  assert.deepEqual(deferredArrivals, [], 'startup recovery lookup must finish before a new invitation joins')
+  recovering = false
+  recoveryInvite.activate()
+  recoveryInvite.activate()
+  assert.deepEqual(deferredArrivals, [created.inviteText], 'the pending invitation must survive an account recovery lookup')
+  recoveryInvite.dispose()
 
   flow.leave()
   await flush()
@@ -130,13 +170,14 @@ async function main () {
   joins[0].call.resolve(joined)
   await joinTask
   assert.equal(entered.at(-1), joined)
+  assert.equal(flow.snapshot.inviteText, joins[0].value, 'a validated invitation can be shared by the joined guest')
   flow.handleRoomClosed()
   await flush()
   assert.equal(cancellations.at(-1), joined.matchId, 'room close/kick must release any remaining platform lifecycle record')
 
   const handedOff = new FriendRoomPlatformFlow({
     gateway, isDisposed: () => false, enterMatchedRoom: value => entered.push(value),
-    showNotice: (title, detail) => notices.push({ title, detail }), onChanged: () => {}, copyText: async () => {},
+    showNotice: (title, detail) => notices.push({ title, detail }), onChanged: () => {},
   })
   const playingTask = handedOff.create(settings)
   const playingEntry = entry({ matchId: 'match-playing', roomId: '898989' })
@@ -162,16 +203,6 @@ async function main () {
   assert.equal(flow.snapshot.busy, null)
   assert.match(notices.at(-1).detail, /完整的好友房邀请口令/)
 
-  const navigatorWrites = []
-  await writeClipboardText('123456.full-secret', { clipboard: { writeText: async text => navigatorWrites.push(text) } })
-  assert.deepEqual(navigatorWrites, ['123456.full-secret'])
-  const wxWrites = []
-  await writeClipboardText('654321.other-secret', undefined, {
-    setClipboardData: ({ data, success }) => { wxWrites.push(data); success() },
-  })
-  assert.deepEqual(wxWrites, ['654321.other-secret'])
-  await assert.rejects(writeClipboardText('secret', undefined, undefined), /不支持复制/)
-
   let releaseAttempts = 0
   const retryFlow = new FriendRoomPlatformFlow({
     gateway: {
@@ -183,7 +214,6 @@ async function main () {
     enterMatchedRoom: () => {},
     showNotice: (title, detail) => notices.push({ title, detail }),
     onChanged: () => {},
-    copyText: async () => {},
   })
   await retryFlow.create(settings)
   retryFlow.leave()
@@ -195,11 +225,9 @@ async function main () {
   assert.equal(releaseAttempts, 2, 'a later lifecycle exit must retry a transiently failed platform cancellation')
 
   const recoveredCancellations = []
-  const recoveredCopies = []
   const recoveredFlow = new FriendRoomPlatformFlow({
     gateway: { create: async () => created, join: async () => joined, cancel: async matchId => { recoveredCancellations.push(matchId) } },
     isDisposed: () => false, enterMatchedRoom: () => {}, showNotice: () => {}, onChanged: () => {},
-    copyText: async text => { recoveredCopies.push(text) },
   })
   const recoveredHost = entry({
     entryAttemptId: 'hostRecoveryAttempt_Q7mN4vX9kLp', recoveryAttemptId: 'hostRecoveryAttempt_Q7mN4vX9kLp',
@@ -208,8 +236,6 @@ async function main () {
   })
   recoveredFlow.restoreReservation(recoveredHost)
   assert.equal(recoveredFlow.snapshot.inviteText, recoveredHost.inviteText, 'cold-recovered hosts must regain the full share credential')
-  await recoveredFlow.copyInvite()
-  assert.deepEqual(recoveredCopies, [recoveredHost.inviteText])
   recoveredFlow.leave()
   await flush()
   assert.deepEqual(recoveredCancellations, [recoveredHost.matchId], 'a recovered waiting reservation must still compensate on exit')
@@ -220,6 +246,97 @@ async function main () {
   })
   recoveredFlow.restoreReservation(recoveredGuest)
   assert.equal(recoveredFlow.snapshot.inviteText, null, 'guest recovery must retain a neutral non-sharing view')
+
+  for (const order of ['old-first', 'new-first']) {
+    const oldResponse = deferred()
+    const newResponse = deferred()
+    const cancelled = []
+    const adopted = []
+    let requestCount = 0
+    const raceFlow = new FriendRoomPlatformFlow({
+      gateway: {
+        create: () => (++requestCount === 1 ? oldResponse.promise : newResponse.promise),
+        join: async () => { throw new Error('unused') },
+        cancel: async id => { cancelled.push(id) },
+      },
+      isDisposed: () => false, enterMatchedRoom: value => adopted.push(value), showNotice: () => {}, onChanged: () => {},
+    })
+    const room = entry({ matchId: `idempotent-${order}` })
+    const oldTask = raceFlow.create(settings)
+    raceFlow.leave()
+    const newTask = raceFlow.create(settings)
+    if (order === 'old-first') {
+      oldResponse.resolve(room)
+      await oldTask
+      assert.deepEqual(cancelled, [], 'pending new admission may adopt the same idempotent room')
+      newResponse.resolve(room)
+      await newTask
+      raceFlow.handoffReservation()
+    } else {
+      newResponse.resolve(room)
+      await newTask
+      raceFlow.handoffReservation()
+      raceFlow.leave()
+      oldResponse.resolve(room)
+      await oldTask
+    }
+    raceFlow.destroy()
+    await flush()
+    assert.deepEqual(adopted.map(value => value.matchId), [room.matchId])
+    assert.deepEqual(cancelled, [], `${order}: stale compensation must never cancel a handed-off room`)
+  }
+
+  for (const outcome of ['different-room', 'failed', 'destroyed', 'restored']) {
+    const responses = [deferred(), deferred()]
+    const cancelled = []
+    let count = 0
+    const cleanupFlow = new FriendRoomPlatformFlow({
+      gateway: { create: () => responses[count++].promise, join: async () => entry(), cancel: async id => { cancelled.push(id) } },
+      isDisposed: () => false, enterMatchedRoom: () => {}, showNotice: () => {}, onChanged: () => {},
+    })
+    const abandoned = entry({ matchId: `old-${outcome}` })
+    const first = cleanupFlow.create(settings)
+    cleanupFlow.leave()
+    if (outcome === 'restored') {
+      cleanupFlow.restoreReservation(abandoned)
+      responses[0].resolve(abandoned)
+      await first
+      assert.deepEqual(cancelled, [], 'a recovered room owns a late create result too')
+      cleanupFlow.leave()
+    } else {
+      const second = cleanupFlow.create(settings)
+      responses[0].resolve(abandoned)
+      await first
+      assert.deepEqual(cancelled, [])
+      if (outcome === 'destroyed') cleanupFlow.destroy()
+      if (outcome === 'failed') responses[1].reject(new Error('create failed'))
+      else responses[1].resolve(entry({ matchId: 'new-room' }))
+      await second
+    }
+    await flush()
+    assert.equal(cancelled.includes(abandoned.matchId), true, 'unadopted stale reservations must still be released')
+    assert.equal(cancelled.includes('new-room'), outcome === 'destroyed')
+  }
+
+  for (const action of ['complete-release', 'leave-while-releasing', 'failed-release']) {
+    const release = deferred()
+    let creates = 0
+    const guardedFlow = new FriendRoomPlatformFlow({
+      gateway: { create: async () => entry({ matchId: `room-${++creates}` }), join: async () => entry(), cancel: () => release.promise },
+      isDisposed: () => false, onChanged: () => {}, enterMatchedRoom: () => {}, showNotice: () => {},
+    })
+    await guardedFlow.create(settings)
+    guardedFlow.leave()
+    const next = guardedFlow.create(settings)
+    await flush()
+    assert.equal(creates, 1, 'new admission must wait for an already-started cancellation')
+    if (action === 'leave-while-releasing') guardedFlow.leave()
+    if (action === 'failed-release') release.reject(new Error('release failed'))
+    else release.resolve()
+    await next
+    await flush()
+    assert.equal(creates, action === 'complete-release' ? 2 : 1)
+  }
 
   flow.destroy()
   flow.destroy()

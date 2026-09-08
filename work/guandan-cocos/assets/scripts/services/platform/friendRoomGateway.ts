@@ -5,20 +5,23 @@ import type {
   MatchRecoveryEntry,
 } from '../FrontPageGatewayContracts'
 import type { FriendRoomSettings } from '../../network/LobbyModels'
-import { createEntryAttemptId, isEntryAttemptId } from '../../network/LobbyEntryAttempt'
+import { normalizeRoomFormat } from '../../core/generated/lib/matchFormat'
+import { createEntryAttemptIdAsync, isEntryAttemptId } from '../../network/LobbyEntryAttempt'
 import { PlatformApiClient } from './client'
 import { normalizeGameEndpoint } from './competitionDecoders'
 import type { GameEndpointPolicy } from './contracts'
 import { PlatformApiError } from './contracts'
 import { malformedResponse, requireBoolean, requireNonEmptyString, requireRecord } from './validation'
 
-const seats: FriendRoomEntry['seat'][] = ['p1', 'p2', 'p3', 'p4']
+const seats: FriendRoomEntry['seat'][] = ['p1', 'p2', 'p3', 'p4', 'observer']
 const invitePattern = /^(\d{6})\.([A-Za-z0-9_-]{20,128})$/
 
 const normalizeRoomSettings = (value: unknown): FriendRoomSettings => {
   const source = requireRecord(value, '好友房规则')
+  let formatSettings: ReturnType<typeof normalizeRoomFormat>
+  try { formatSettings = normalizeRoomFormat(source) } catch (error) { throw malformedResponse(error instanceof Error ? error.message : '好友房赛制不合法') }
   const rounds = source.rounds
-  if (!Number.isSafeInteger(rounds) || Number(rounds) < 4 || Number(rounds) > 32 || Number(rounds) % 4 !== 0) {
+  if (!Number.isSafeInteger(rounds) || Number(rounds) < (formatSettings ? 1 : 4) || Number(rounds) > 32 || (!formatSettings && Number(rounds) % 4 !== 0)) {
     throw malformedResponse('好友房局数不合法')
   }
   const oneOf = <T extends string | number>(raw: unknown, allowed: readonly T[], context: string): T => {
@@ -28,13 +31,14 @@ const normalizeRoomSettings = (value: unknown): FriendRoomSettings => {
   if (source.mode !== 'classic' || source.authoritativeValidation !== true) throw malformedResponse('好友房权威规则不合法')
   return {
     mode: 'classic',
+    ...formatSettings,
     rounds: Number(rounds),
     scoring: oneOf(source.scoring, ['double-3', 'double-4'] as const, '好友房计分'),
     scoreVisibility: oneOf(source.scoreVisibility, ['live', 'hidden'] as const, '好友房比分展示'),
-    turnSeconds: oneOf(source.turnSeconds, [20, 40, 60] as const, '好友房首出时限'),
+    turnSeconds: oneOf(source.turnSeconds, [15, 20, 30, 40, 60] as const, '好友房首出时限'),
     trusteeSeconds: oneOf(source.trusteeSeconds, [0, 15, 30, 60] as const, '好友房托管时限'),
     totalTimeMinutes: oneOf(source.totalTimeMinutes, [0, 20, 30, 60] as const, '好友房总时限'),
-    spectator: oneOf(source.spectator, ['off', 'live', 'delayed-round'] as const, '好友房观战设置'),
+    spectator: oneOf(source.spectator, ['off', 'live', 'delayed-round', 'delay-15', 'delay-30', 'delay-60'] as const, '好友房观战设置'),
     autoSort: requireBoolean(source.autoSort, '好友房自动理牌'),
     disableInteraction: requireBoolean(source.disableInteraction, '好友房互动设置'),
     sortOrder: oneOf(source.sortOrder, ['desc', 'asc'] as const, '好友房牌序'),
@@ -72,6 +76,7 @@ const normalizeEntry = (
     matchId: requireNonEmptyString(source.matchId, '好友房匹配 ID'),
     roomId,
     seat: source.seat as FriendRoomEntry['seat'],
+    isRoomHost: source.isRoomHost === undefined ? source.seat === 'p1' : requireBoolean(source.isRoomHost, '房主身份'),
     gameEndpoint: normalizeGameEndpoint(source.gameEndpoint, endpointPolicy),
     gameTicket,
     joinToken,
@@ -94,7 +99,7 @@ export const normalizeRecoveredFriendRoomEntry = (
   const entry = normalizeEntry(raw, recoveryAttemptId, endpointPolicy)
   if (entry.recoveryAttemptId !== recoveryAttemptId) throw malformedResponse('好友房恢复幂等 ID 与请求不一致')
   const carriesInvite = source.inviteCode !== undefined || source.invitePayload !== undefined || source.inviteText !== undefined
-  const isWaitingHost = entry.ticketPurpose === 'entry' && entry.seat === 'p1'
+  const isWaitingHost = entry.ticketPurpose === 'entry' && Boolean(entry.isRoomHost)
   if (carriesInvite !== isWaitingHost) throw malformedResponse(isWaitingHost ? '好友房房主恢复邀请口令缺失' : '好友房访客恢复不得携带邀请口令')
   return carriesInvite
     ? { ...entry, recoveryAttemptId, ...normalizeInvitation(source, entry.roomId) }
@@ -119,13 +124,14 @@ const normalizeCreatedEntry = (raw: unknown, attemptId: string, policy: GameEndp
 }
 
 const operationKey = (settings: FriendRoomSettings): string => JSON.stringify([
+  settings.format, settings.levelMode, settings.levelRank, settings.tributeEnabled,
   settings.mode, settings.rounds, settings.scoring, settings.scoreVisibility, settings.turnSeconds,
   settings.trusteeSeconds, settings.totalTimeMinutes, settings.spectator, settings.autoSort,
   settings.disableInteraction, settings.sortOrder, settings.authoritativeValidation,
 ])
 
 export class HttpFriendRoomGateway implements FriendRoomGateway {
-  private readonly uncertainAttempts = new Map<string, string>()
+  private readonly uncertainAttempts = new Map<string, Promise<string>>()
 
   public constructor (private readonly client: PlatformApiClient, private readonly endpointPolicy: GameEndpointPolicy) {}
 
@@ -159,14 +165,16 @@ export class HttpFriendRoomGateway implements FriendRoomGateway {
   }
 
   private async run<T> (operation: string, request: (entryAttemptId: string) => Promise<T>): Promise<T> {
-    const entryAttemptId = this.uncertainAttempts.get(operation) ?? createEntryAttemptId()
-    this.uncertainAttempts.set(operation, entryAttemptId)
+    const attempt = this.uncertainAttempts.get(operation) ?? createEntryAttemptIdAsync()
+    this.uncertainAttempts.set(operation, attempt)
+    let entryAttemptId: string | undefined
     try {
+      entryAttemptId = await attempt
       const result = await request(entryAttemptId)
-      if (this.uncertainAttempts.get(operation) === entryAttemptId) this.uncertainAttempts.delete(operation)
+      if (this.uncertainAttempts.get(operation) === attempt) this.uncertainAttempts.delete(operation)
       return result
     } catch (error) {
-      if (error instanceof PlatformApiError && !error.retryable && this.uncertainAttempts.get(operation) === entryAttemptId) {
+      if ((!entryAttemptId || (error instanceof PlatformApiError && !error.retryable)) && this.uncertainAttempts.get(operation) === attempt) {
         this.uncertainAttempts.delete(operation)
       }
       throw error

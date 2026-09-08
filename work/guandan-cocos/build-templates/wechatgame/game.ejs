@@ -1,3 +1,7 @@
+globalThis.__GUANDAN_BUILD_TARGET__ = 'wechatgame';
+/* guandan-runtime-config:start */
+globalThis.__GUANDAN_RUNTIME_CONFIG__ = Object.freeze({"version":1,"lobbyEndpoint":"wss://api.yutechhn.cn/guandan/weapp","platformEndpoint":"https://api.yutechhn.cn/guandan","platformAllowDevelopmentLogin":false,"platformAllowInsecureEndpoint":false,"platformAllowInsecureGameEndpoint":false});
+/* guandan-runtime-config:end */
 function __initApp () {  // init app
 globalThis.__wxRequire = require;  // FIX: require cannot work in separate engine 
 require('./web-adapter');

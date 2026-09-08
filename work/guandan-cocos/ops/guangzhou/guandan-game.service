@@ -1,0 +1,24 @@
+[Unit]
+Description=Lingshui Guandan authoritative game server
+After=network-online.target guandan-platform.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=guandan
+Group=guandan
+WorkingDirectory=/srv/guandan/current/work/guandan-windows-source
+EnvironmentFile=/srv/guandan/shared/production.env
+ExecStart=/opt/node-v24.19.0/bin/node server/weapp-ws.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/guandan/shared/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,6 @@
-import { Color, Node, Tween, UITransform, Vec3 } from 'cc'
+import { Color, Node, ScrollView, Tween, UITransform, Vec2, Vec3 } from 'cc'
+import { createFriendFormScroll, friendFormAction } from './FriendRoomFormUi'
+import { MATCH_LEVELS } from '../../core/generated/lib/matchFormat'
 import type { FriendRoomSettings } from '../../network/LobbyModels'
 import type { SessionSettings } from '../../session/GameSession'
 import type { ScreenAdapter } from '../../ui/ScreenAdapter'
@@ -6,13 +8,16 @@ import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import type { PageRouter } from '../PageRouter'
 import {
   createDefaultFriendRoomSettings,
+  changeFriendRoomFormat,
+  describeFriendRoomRules,
   FRIEND_ROOM_MODES,
-  FRIEND_ROOM_ROUNDS,
   FRIEND_ROOM_SETTINGS_TABS,
   friendRoomChoiceRows,
+  friendRoomRuleHelp,
   type FriendRoomSettingsTab,
   updateFriendRoomChoice,
   updateFriendRoomRounds,
+  updateFriendRoomLevel,
 } from './FriendRoomSettingsPolicy'
 
 export type FriendRoomSettingsPresenterDependencies = {
@@ -32,13 +37,13 @@ export class FriendRoomSettingsPresenter {
   private viewRoot: Node | null = null
   private generation = 0
   private disposed = false
+  private scroll: ScrollView | null = null
+  private scrollOffset = 0
 
   public constructor (private readonly dependencies: FriendRoomSettingsPresenterDependencies) {}
 
   public get settings (): Readonly<FriendRoomSettings> { return { ...this.settingsDraft } }
-
   public get tab (): FriendRoomSettingsTab { return this.selectedTab }
-
   public show (): void {
     if (this.disposed) return
     this.releaseView()
@@ -68,18 +73,24 @@ export class FriendRoomSettingsPresenter {
     ui.panel('FriendModePanel', leftX, -8, leftWidth, panelHeight, {
       fill: new Color(12, 58, 36, 208), lineWidth: 0, radius: 0,
     })
-    ui.outlinedLabel('好友房', leftX, this.dependencies.screen.safeTopY(94), Math.min(32, Math.max(26, safeHeight * 0.058)), {
-      width: leftWidth, color: new Color(255, 239, 174), outlineColor: new Color(38, 68, 31), outlineWidth: 4,
+    ui.outlinedLabel('好友房', 0, this.dependencies.screen.safeTopY(38), 28, {
+      width: 300, height: 38, color: new Color(255, 239, 174), outlineColor: new Color(38, 68, 31), outlineWidth: 2,
     })
     FRIEND_ROOM_MODES.forEach((mode, index) => {
-      const node = ui.button('FriendModeTab', mode.available ? mode.label : `${mode.label}  锁`, leftX, leftWidth - 18, 50, Math.max(22, Math.min(24, leftWidth * 0.13)), {
-        fill: mode.available ? new Color(222, 170, 54, 245) : new Color(24, 76, 49, 225),
-        stroke: mode.available ? new Color(255, 240, 165) : new Color(112, 151, 105, 190),
-        textColor: mode.available ? new Color(61, 43, 20) : new Color(183, 198, 181),
-        disabled: !mode.available,
+      const active = mode.id === this.settingsDraft.format
+      const node = ui.button('FriendModeTab', mode.label, leftX, leftWidth - 18, 50, Math.max(22, Math.min(24, leftWidth * 0.13)), {
+        fill: active ? new Color(222, 170, 54, 245) : new Color(24, 76, 49, 225),
+        stroke: active ? new Color(255, 240, 165) : new Color(112, 151, 105, 190),
+        textColor: active ? new Color(61, 43, 20) : new Color(183, 198, 181),
+        textOutlineColor: active ? new Color(255, 235, 157) : new Color(28, 36, 32),
         radius: 5,
       })
       node.setPosition(new Vec3(leftX, panelHeight / 2 - 62 - index * Math.min(64, (panelHeight - 75) / 5), 0))
+      if (!active) node.on(Node.EventType.TOUCH_END, this.guard(generation, () => {
+        this.scroll?.scrollToTop(0)
+        this.selectedTab = 'rules'
+        this.setSettings(changeFriendRoomFormat(this.settingsDraft, mode.id))
+      }))
     })
 
     const tabY = panelHeight / 2 - 30
@@ -97,33 +108,41 @@ export class FriendRoomSettingsPresenter {
       node.setPosition(new Vec3(x, tabY, 0))
       if (!active) node.on(Node.EventType.TOUCH_END, this.guard(generation, () => {
         this.selectedTab = tab.id
+        this.scroll?.scrollToTop(0)
         this.show()
       }))
     })
     this.compactButton(ui, '重置', contentRight - 44, tabY, 82, 42, 22, generation, () => {
+      this.scroll?.scrollToTop(0)
       this.setSettings(createDefaultFriendRoomSettings(), true)
     })
-    ui.outlinedLabel('经典过A · 四人组队 · 服务器验牌', contentX, tabY - 42, Math.max(20, Math.min(22, safeHeight * 0.036)), {
+    ui.outlinedLabel(describeFriendRoomRules(this.settingsDraft), contentX, tabY - 42, Math.max(20, Math.min(22, safeHeight * 0.036)), {
       width: contentWidth - 20, height: 28, color: new Color(223, 239, 215), outlineColor: new Color(28, 61, 38), outlineWidth: 2,
     })
 
-    const rowGap = Math.max(37, Math.min(57, (panelHeight - 100) / 5))
-    const rowStart = tabY - 72
-    if (this.selectedTab === 'rules') {
-      this.stepperRow(ui, FRIEND_ROOM_ROUNDS.label, contentX, contentWidth, rowStart, this.settingsDraft.rounds, FRIEND_ROOM_ROUNDS.suffix, FRIEND_ROOM_ROUNDS.minimum, FRIEND_ROOM_ROUNDS.maximum, FRIEND_ROOM_ROUNDS.step, generation, value => {
-        this.setSettings(updateFriendRoomRounds(this.settingsDraft, value))
-      })
-    }
-    const choiceOffset = this.selectedTab === 'rules' ? 1 : 0
-    friendRoomChoiceRows(this.settingsDraft, this.selectedTab).forEach((row, index) => {
-      this.choiceRow(ui, row.label, contentX, contentWidth, rowStart - rowGap * (index + choiceOffset), row.options, row.selected, generation, value => {
+    const rows = friendRoomChoiceRows(this.settingsDraft, this.selectedTab)
+    const rounds = this.selectedTab === 'rules' && this.settingsDraft.format === 'rounds'
+    const fixedLevel = rounds && this.settingsDraft.levelMode === 'fixed'
+    const rowGap = 58
+    ui.outlinedLabel(friendRoomRuleHelp(this.settingsDraft, this.selectedTab), contentX, tabY - 70, 18, { width: contentWidth - 20, height: 26, color: new Color(217, 231, 211), outlineWidth: 1 })
+    const areaTop = tabY - 88
+    const areaBottom = -panelHeight / 2 + 91
+    this.scroll = createFriendFormScroll(viewRoot, contentX, areaTop, areaBottom, contentWidth, (rows.length + Number(rounds) + Number(fixedLevel)) * rowGap)
+    const formUi = new RuntimeUiFactory(this.scroll.content!)
+    let rowIndex = 0
+    rows.forEach(row => {
+      this.choiceRow(formUi, row.label, 0, contentWidth, -29 - rowGap * rowIndex++, row.options, row.selected, generation, value => {
         const nextSettings = updateFriendRoomChoice(this.settingsDraft, row.id, value)
         this.setSettings(nextSettings, nextSettings.sortOrder !== this.settingsDraft.sortOrder)
       })
+      if (rounds && row.id === 'rounds-preset') this.stepperRow(formUi, '自定局数', 0, contentWidth, -29 - rowGap * rowIndex++, this.settingsDraft.rounds, '局', 1, 32, 1, generation, value => this.setSettings(updateFriendRoomRounds(this.settingsDraft, value)))
+      if (fixedLevel && row.id === 'level-mode') this.stepperRow(formUi, '固定打', 0, contentWidth, -29 - rowGap * rowIndex++, MATCH_LEVELS.indexOf(this.settingsDraft.levelRank ?? 2), '', 0, 12, 1, generation, value => this.setSettings(updateFriendRoomLevel(this.settingsDraft, value)), String(this.settingsDraft.levelRank ?? 2))
     })
+    this.scroll.scrollToOffset(new Vec2(0, this.scrollOffset), 0)
+    if ((rows.length + Number(rounds) + Number(fixedLevel)) * rowGap > areaTop - areaBottom) ui.outlinedLabel('上下滑动查看更多设置', contentX, areaBottom - 13, 18, { width: contentWidth, height: 24, color: new Color(210, 225, 207) })
     const actionY = -panelHeight / 2 + 34
-    this.coloredButton(ui, '加入房间', contentX - Math.min(145, contentWidth * 0.2), actionY, Math.min(240, contentWidth * 0.34), 52, 22, new Color(44, 151, 103), generation, this.dependencies.joinRoom)
-    this.coloredButton(ui, '创建房间', contentX + Math.min(145, contentWidth * 0.2), actionY, Math.min(240, contentWidth * 0.34), 52, 22, new Color(223, 164, 47), generation, () => this.dependencies.createRoom({ ...this.settingsDraft }))
+    friendFormAction(ui, '加入房间', contentX - Math.min(145, contentWidth * 0.2), actionY, Math.min(240, contentWidth * 0.34), 52, 22, new Color(44, 151, 103), this.guard(generation, this.dependencies.joinRoom))
+    friendFormAction(ui, '创建房间', contentX + Math.min(145, contentWidth * 0.2), actionY, Math.min(240, contentWidth * 0.34), 52, 22, new Color(223, 164, 47), this.guard(generation, () => this.dependencies.createRoom({ ...this.settingsDraft })))
     this.compactButton(ui, '返回', this.dependencies.screen.safeLeftX(62), this.dependencies.screen.safeTopY(44), 84, 42, 22, generation, this.dependencies.goBack)
   }
 
@@ -158,6 +177,7 @@ export class FriendRoomSettingsPresenter {
     step: number,
     generation: number,
     onChange: (value: number) => void,
+    displayValue?: string,
   ): void {
     ui.panel('FriendSettingsRowBand', centerX, y, width, 42, { fill: new Color(8, 47, 31, 138), lineWidth: 0, radius: 4 })
     const labelWidth = Math.min(112, width * 0.19)
@@ -167,8 +187,8 @@ export class FriendRoomSettingsPresenter {
     })
     const controlsCenter = centerX + labelWidth * 0.36
     const valueWidth = Math.min(150, Math.max(92, width * 0.22))
-    ui.panel('FriendStepperValuePill', controlsCenter, y, valueWidth, 34, { fill: new Color(224, 234, 213, 245), stroke: new Color(129, 158, 117), lineWidth: 1, radius: 17 })
-    ui.outlinedLabel(`${value}${suffix}`, controlsCenter, y, 20, {
+    ui.panel('FriendStepperValuePill', controlsCenter, y, valueWidth, 34, { fill: new Color(224, 234, 213, 245), stroke: new Color(129, 158, 117), lineWidth: 1, radius: 4 })
+    ui.outlinedLabel(displayValue ?? `${value}${suffix}`, controlsCenter, y, 20, {
       width: valueWidth - 12, height: 28, color: new Color(49, 82, 54), outlineColor: new Color(255, 255, 255), outlineWidth: 1,
     })
     this.compactButton(ui, '-', controlsCenter - valueWidth / 2 - 28, y, 38, 34, 22, generation, () => onChange(Math.max(minimum, value - step)))
@@ -223,21 +243,6 @@ export class FriendRoomSettingsPresenter {
     return node
   }
 
-  private coloredButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, fill: Color, generation: number, action: () => void): Node {
-    const node = ui.button('ColoredButton', text, x, width, height, fontSize, {
-      fill,
-      pressedFill: new Color(Math.max(0, fill.r - 28), Math.max(0, fill.g - 28), Math.max(0, fill.b - 28), fill.a),
-      stroke: new Color(255, 235, 151, 255),
-      textColor: new Color(255, 252, 224),
-      textOutlineColor: new Color(43, 58, 37, 255),
-      textOutlineWidth: 3,
-      radius: 7,
-    })
-    node.setPosition(new Vec3(x, y, 0))
-    node.on(Node.EventType.TOUCH_END, this.guard(generation, action))
-    return node
-  }
-
   private guard (generation: number, action: () => void): () => void {
     return () => {
       if (this.disposed || generation !== this.generation || this.dependencies.router.current !== 'friend-room-settings') return
@@ -246,6 +251,8 @@ export class FriendRoomSettingsPresenter {
   }
 
   private releaseView (): void {
+    if (this.scroll?.isValid) this.scrollOffset = this.scroll.getScrollOffset().y
+    this.scroll = null
     if (!this.viewRoot?.isValid) {
       this.viewRoot = null
       return

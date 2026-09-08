@@ -69,7 +69,7 @@ export const requestTableHandHint = (
   workspace: HandWorkspace,
   submit: (groups: readonly HintProtectedGroup[]) => void,
 ): void => {
-  if (!snapshot || snapshot.phase !== 'playing' || settings.trustee ||
+  if (!snapshot || snapshot.phase !== 'playing' || settings.trustee || snapshot.state.currentTurn !== humanId ||
     !canSelectPlayingHand(snapshot.state, humanId, snapshot.actionPending)) return
   if (workspace.isManualSelectionActive) workspace.cancelManualSelection()
   submit(projectHintProtectedGroups(snapshot.state.players[humanId].hand, workspace.snapshot.groups, settings.ruleProfile))

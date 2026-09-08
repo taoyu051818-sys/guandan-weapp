@@ -42,6 +42,7 @@ class FakeComponent {
 class FakeGameSession {
   constructor () { this.joined = []; this.lobbyEntries = 0; this.menuLeaves = 0 }
   joinRoom (roomId, playerId) { this.joined.push({ roomId, playerId }) }
+  setRoomView (myPlayerId, isObserver) { this.view = { myPlayerId, isObserver } }
   enterLobby () { this.lobbyEntries += 1 }
   leaveToMenu () { this.menuLeaves += 1 }
 }
@@ -77,8 +78,8 @@ class FakeSocketClient {
     this.connectCalls.push(endpoint)
     return this.connectBehavior(endpoint, this.connectCalls.length)
   }
-  send (type, payload) {
-    const requestId = ++this.sequence
+  send (type, payload, retryRequestId) {
+    const requestId = retryRequestId ?? ++this.sequence
     this.sent.push({ requestId, type, payload })
     return requestId
   }
@@ -126,8 +127,10 @@ const lobbyConnectionEventCoordinator = loadPureTs(lobbyConnectionEventCoordinat
 const lobbyMessageRouter = loadPureTs(lobbyMessageRouterPath, {
   './LobbyModels': lobbyModels,
   './LobbySyncTracker': lobbySyncTracker,
+  './FriendRoomViewReceiver': loadPureTs(path.join(projectRoot, 'assets/scripts/network/FriendRoomViewReceiver.ts')),
 })
-const lobbyResumeSession = loadPureTs(lobbyResumeSessionPath)
+const networkEndpoint = loadPureTs(path.join(projectRoot, 'assets/scripts/services/NetworkEndpoint.ts'))
+const lobbyResumeSession = loadPureTs(lobbyResumeSessionPath, { '../services/NetworkEndpoint': networkEndpoint })
 const platformMatchRecovery = loadPureTs(platformMatchRecoveryPath)
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
@@ -160,6 +163,7 @@ runtimeModule.require = request => {
   if (request === '../effects/NetworkEffectSyncPolicy') return effectSyncPolicy
   if (request === './LobbyModels') return lobbyModels
   if (request === './LobbyEntryAttempt') return lobbyEntryAttempt
+  if (request === './LobbyEntryRequest') return loadPureTs(path.join(projectRoot, 'assets/scripts/network/LobbyEntryRequest.ts'))
   if (request === './LobbyCleanupTracker') return lobbyCleanupTracker
   if (request === './LobbyCommandSender') return lobbyCommandSender
   if (request === './LobbyConnectionEventCoordinator') return lobbyConnectionEventCoordinator
@@ -271,10 +275,13 @@ async function verifyExpectedRoomAndRejoin () {
   late.socket.emit('disconnected')
   late.socket.emit('connected')
   const currentRejoin = late.socket.sent.findLast(item => item.type === 'rejoinRoom')
-  assert.notEqual(currentRejoin.requestId, oldRejoin.requestId)
+  assert.equal(currentRejoin.requestId, oldRejoin.requestId, 'lost local-resume reply must keep the original token request identity')
   late.socket.emit('roomRejoined', roomMessage('roomRejoined', oldRejoin.requestId, '888888', 'p4', 'resume-late'))
-  assert.equal(late.controller.snapshot.roomStatus, 'idle', 'a late roomRejoined must invalidate same-seat cleanup races')
-  assert.equal(late.session.joined.length, 1, 'a late roomRejoined must not enter the session again')
+  assert.equal(late.controller.snapshot.roomStatus, 'ready', 'a late response for the same logical resume remains valid')
+  assert.equal(late.session.joined.length, 2, 'the resumed session must be restored exactly once')
+  late.socket.emit('roomRejoined', roomMessage('roomRejoined', currentRejoin.requestId, '888888', 'p4', 'resume-late'))
+  assert.equal(late.session.joined.length, 2, 'duplicate success cannot restore a session twice')
+  assert.equal(late.socket.sent.some(item => item.type === 'leaveRoom'), false, 'same-session duplicates cannot trigger destructive cleanup')
 }
 
 async function verifyAuthoritativeRoomMembers () {
@@ -373,7 +380,7 @@ async function verifyGameStartPendingLifecycle () {
     gameStartPending: true, message: '平台尚未确认好友房开局',
   })
   assert.equal(controller.snapshot.gameStartPending, true)
-  assert.match(controller.snapshot.error, /平台.*确认/)
+  assert.equal(controller.snapshot.error, null, 'routine start confirmation is state, not an error banner')
 
   const sentBeforeGuards = socket.sent.length
   assert.equal(controller.startGame(), null)
@@ -385,8 +392,8 @@ async function verifyGameStartPendingLifecycle () {
 
   socket.emit('roomMembers', { roomId, version: 1, gameStartPending: true, memberPlayerIds: ['p1', 'p2', 'p3', 'p4'] })
   assert.equal(controller.snapshot.gameStartPending, true, 'same-version/reconnect metadata must retain the pending projection')
-  socket.emit('gameState', { roomId, version: 2, gameVersion: 1, gameStartPending: false, state: { playArea: [] } })
-  assert.equal(controller.snapshot.gameStartPending, false, 'authoritative game state must clear pending start')
+  socket.emit('gameState', { roomId, version: 2, gameVersion: 1, state: { playArea: [] } })
+  assert.equal(controller.snapshot.gameStartPending, false, 'authoritative game state must clear pending start even when an older server omits the explicit false flag')
   assert.notEqual(controller.setLobbyReady(), null, 'room commands resume after the server clears pending start')
 
   const dissolved = createHarness()
@@ -569,6 +576,19 @@ async function verifyMatchedWatchdogAndReconnect () {
   assert.equal(watchdogJoins.length, 2)
   assert.equal(watchdogJoins[1].payload.gameTicket, 'watchdog-ticket')
   assert.equal(watchdogJoins[1].payload.entryAttemptId, watchdogJoins[0].payload.entryAttemptId, 'watchdog retry must remain the same logical entry attempt')
+  assert.equal(watchdogJoins[1].requestId, watchdogJoins[0].requestId, 'a dropped success must reuse the server receipt key')
+
+  const delayed = createHarness(false)
+  delayed.controller.enterMatchedRoom({ roomId: '666665', seat: 'p2', gameEndpoint: 'ws://game/weapp', gameTicket: 'delayed', entryAttemptId: 'delayedEntry_12345678901234', expiresAt: Date.now() + 60_000 })
+  delayed.socket.emit('connected')
+  await flushPromises()
+  const original = delayed.socket.sent.find(item => item.type === 'joinRoom')
+  runScheduled(delayed.controller, 6)
+  delayed.socket.emit('roomJoined', roomMessage('roomJoined', original.requestId, '666665', 'p2', 'resume-delayed'))
+  runScheduled(delayed.controller, 0.5)
+  assert.equal(delayed.controller.snapshot.roomStatus, 'ready', 'success during retry backoff must still enter the room')
+  assert.equal(delayed.socket.sent.filter(item => item.type === 'joinRoom').length, 1, 'backoff callback must be cancelled after success')
+  assert.equal(delayed.socket.sent.some(item => item.type === 'leaveRoom'), false)
 
   const exhausted = createHarness(false)
   exhausted.controller.enterMatchedRoom({
@@ -600,7 +620,7 @@ async function verifyMatchedWatchdogAndReconnect () {
   assert.equal(reconnect.controller.snapshot.roomStatus, 'joining')
   reconnect.socket.emit('connected')
   const retryRequest = reconnect.socket.sent.filter(item => item.type === 'joinRoom').at(-1)
-  assert.notEqual(retryRequest.requestId, oldRequest.requestId, 'reconnect must create a fresh expected request id')
+  assert.equal(retryRequest.requestId, oldRequest.requestId, 'reconnect must retain the accepted ticket request id')
   assert.equal(oldRequest.payload.entryAttemptId, reconnectEntryAttemptId)
   assert.equal(retryRequest.payload.entryAttemptId, reconnectEntryAttemptId, 'disconnect retry must reuse the HTTP attempt id across connections')
   reconnect.socket.emit('roomJoined', roomMessage('roomJoined', retryRequest.requestId, '777777', 'p3', 'resume-match'))
@@ -790,6 +810,8 @@ async function verifyPlatformRecoveryFailureRetry () {
   const events = new FakeEventTarget()
   const entered = []
   const recoveryNotices = []
+  const pendingStates = []
+  let visibleNotice = null
   let recoveries = 0
   const retryAttemptId = 'recoveryRetryAttempt_Q7mN4vX9kLp'
   const lobby = { snapshot: { roomStatus: 'idle' }, events, enterMatchedRoom: entry => entered.push(entry) }
@@ -808,16 +830,43 @@ async function verifyPlatformRecoveryFailureRetry () {
       confirm: () => undefined,
       abandon: () => undefined,
     },
-    lobby, enterLobby: () => undefined, showNotice: () => undefined,
-    showRecoveryAvailable: message => recoveryNotices.push(message), isDisposed: () => false,
+    lobby, enterLobby: () => undefined, showNotice: (title, detail) => { visibleNotice = { title, detail } },
+    onPendingChanged: pending => pendingStates.push(pending),
+    showRecoveryAvailable: message => { visibleNotice = null; recoveryNotices.push(message) }, isDisposed: () => false,
   })
   coordinator.start()
+  assert.deepEqual(pendingStates, [true], 'recovery must immediately signal pending to the main entrance')
   await flushPromises()
   assert.deepEqual(recoveryNotices, ['temporary platform timeout'], 'transient HTTP failure must restore the explicit retry affordance')
+  assert.deepEqual(visibleNotice, { title: '牌局恢复失败', detail: 'temporary platform timeout' }, 'rebuilding the hall must happen before the error modal, or the user only sees account syncing flash')
+  assert.deepEqual(pendingStates, [true, false], 'failure must release the recovery button without a fake timer')
   events.emit('guandan:platform-recovery-required', {})
   await flushPromises()
   assert.equal(recoveries, 2)
   assert.equal(entered[0].entryAttemptId, retryAttemptId)
+  assert.deepEqual(pendingStates, [true, false, true, false], 'successful retry must also release pending state')
+  coordinator.dispose()
+}
+
+async function verifyEmptyPlatformRecovery () {
+  const events = new FakeEventTarget()
+  const notices = []
+  const pending = []
+  const coordinator = new platformMatchRecovery.PlatformMatchRecoveryCoordinator({
+    configured: true, gateway: { recover: async () => null },
+    lobby: { snapshot: { roomStatus: 'idle' }, events, enterMatchedRoom: () => assert.fail('null recovery must not enter a room') },
+    enterLobby: () => assert.fail('null recovery must not create a replacement match'),
+    showRecoveryAvailable: () => assert.fail('null recovery must not advertise a stale retry'),
+    showNotice: (title, detail) => notices.push({ title, detail }),
+    onPendingChanged: value => pending.push(value), isDisposed: () => false,
+  })
+  coordinator.start()
+  await flushPromises()
+  assert.equal(notices.length, 0, 'normal cold startup without a match stays quiet')
+  events.emit('guandan:platform-recovery-required', { manual: true })
+  await flushPromises()
+  assert.equal(notices[0]?.title, '没有可恢复的牌局', 'an explicit continue action must explain that the room is gone')
+  assert.deepEqual(pending, [true, false, true, false])
   coordinator.dispose()
 }
 
@@ -826,6 +875,7 @@ async function verifyPlatformRecoveryCycleBudget () {
   const entered = []
   const abandoned = []
   const manualRecoveryNotices = []
+  let visibleNotice = null
   let recoveries = 0
   const lobby = { snapshot: { roomStatus: 'idle' }, events, enterMatchedRoom: entry => entered.push(entry) }
   const coordinator = new platformMatchRecovery.PlatformMatchRecoveryCoordinator({
@@ -843,8 +893,8 @@ async function verifyPlatformRecoveryCycleBudget () {
       confirm: () => undefined,
       abandon: attemptId => abandoned.push(attemptId),
     },
-    lobby, enterLobby: () => undefined, showNotice: () => undefined,
-    showRecoveryAvailable: message => manualRecoveryNotices.push(message), isDisposed: () => false,
+    lobby, enterLobby: () => undefined, showNotice: (title, detail) => { visibleNotice = { title, detail } },
+    showRecoveryAvailable: message => { visibleNotice = null; manualRecoveryNotices.push(message) }, isDisposed: () => false,
   })
   coordinator.start()
   await flushPromises()
@@ -855,6 +905,7 @@ async function verifyPlatformRecoveryCycleBudget () {
   assert.equal(recoveries, 3, 'one automatic recovery cycle must cap HTTP tickets across repeated WebSocket rejects')
   assert.equal(abandoned.length, 3, 'even the ticket that exhausts the budget must be retired')
   assert.match(manualRecoveryNotices.at(-1), /手动重试/, 'budget exhaustion must restore an explicit manual recovery path')
+  assert.equal(visibleNotice?.title, '牌局恢复已暂停', 'the recovery budget notice must survive rebuilding the hall')
 
   events.emit('guandan:platform-recovery-required', { manual: true })
   await flushPromises()
@@ -863,6 +914,7 @@ async function verifyPlatformRecoveryCycleBudget () {
 }
 
 async function verifyEntryAttemptGeneratorAndWireProtocol () {
+  await require('./support/lobby-entry-ticket-contract.cjs')({ loadPureTs, projectRoot })
   const bytes = Uint8Array.from({ length: 16 }, (_, index) => index)
   const entryAttemptId = lobbyEntryAttempt.createEntryAttemptId({
     getRandomValues: target => { target.set(bytes); return target },
@@ -879,7 +931,9 @@ async function verifyEntryAttemptGeneratorAndWireProtocol () {
   }
   globalThis.WebSocket = RecordingWebSocket
   try {
-    const { CocosSocketClient } = loadPureTs(cocosSocketClientPath)
+    const { CocosSocketClient } = loadPureTs(cocosSocketClientPath, {
+      '../services/WechatNetworkPolicy': loadPureTs(path.join(projectRoot, 'assets/scripts/services/WechatNetworkPolicy.ts'), { './NetworkEndpoint': networkEndpoint }),
+    })
     const client = new CocosSocketClient()
     await client.connect('wss://game.example/weapp')
     const socket = client.socket
@@ -888,6 +942,11 @@ async function verifyEntryAttemptGeneratorAndWireProtocol () {
     const requestId = client.send('joinRoom', { roomId: '123456', entryAttemptId })
     const wire = JSON.parse(socket.sent.at(-1))
     assert.deepEqual(wire.payload, { roomId: '123456', entryAttemptId }, 'CocosSocketClient must preserve the idempotency key in the request payload')
+    const replayId = client.send('joinRoom', wire.payload, requestId)
+    assert.equal(replayId, requestId)
+    assert.deepEqual(JSON.parse(socket.sent.at(-1)), wire, 'transport must retransmit the exact original request envelope')
+    assert.throws(() => client.send('joinRoom', wire.payload, requestId + 100), /重试请求编号无效/)
+    assert.equal(client.send('listRooms'), requestId + 1, 'retry must not consume the next request sequence')
     socket.onmessage({ data: JSON.stringify({
       type: 'error', requestId, code: 'RECOVERY_NOT_AVAILABLE', message: '恢复票据对应的进行中牌局不存在',
     }) })
@@ -1065,6 +1124,7 @@ async function main () {
   await verifyPlatformRecoveryTicketLifecycle()
   await verifyPlatformRecoveryCoordinator()
   await verifyPlatformRecoveryFailureRetry()
+  await verifyEmptyPlatformRecovery()
   await verifyPlatformRecoveryCycleBudget()
   await verifyNetworkEffectSyncSemantics()
   await verifyEntryAttemptGeneratorAndWireProtocol()

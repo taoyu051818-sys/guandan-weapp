@@ -1,10 +1,8 @@
 import type { PlayerId, Rank, Team } from '../core/generated'
 
-export type GameMode = 'standard' | 'double_open' | 'campaign'
-export type SessionStatus = 'menu' | 'grouping' | 'dealing' | 'playing' | 'tribute' | 'settlement' | 'lobby'
-export type VoicePack = 'female' | 'male'
-export const APPLICATION_AI_DIFFICULTY = 'master' as const
-export const SESSION_SCHEMA_VERSION = 2 as const
+export type SessionStatus = 'menu' | 'playing' | 'tribute' | 'settlement' | 'lobby'
+export type VoicePack = 'female'
+export const SESSION_SCHEMA_VERSION = 3 as const
 
 export type SessionSettings = {
   soundEnabled: boolean
@@ -20,23 +18,20 @@ export type SessionSettings = {
 }
 
 export type PlayerStats = { gamesPlayed: number, wins: number, bombsPlayed: number, firstPlaceFinishes: number, elo: number }
-export type CampaignProgress = { chapter: number, targetWins: number, wins: number, losses: number, completed: boolean, failed: boolean }
 export type RecentMatch = { finishedAt: number, winnerTeam: Team, levelUp: number, currentLevel: Rank, teamLevels: Record<Team, Rank>, scores: Record<Team, number> }
 
 export type SessionSnapshot = {
   schemaVersion: typeof SESSION_SCHEMA_VERSION
   status: SessionStatus
-  gameMode: GameMode
   isMultiplayer: boolean
   roomId: string | null
   myPlayerId: PlayerId
-  difficulty: typeof APPLICATION_AI_DIFFICULTY
+  isObserver?: boolean
   currentLevel: Rank
   dealerId: PlayerId | null
   teamLevels: Record<Team, Rank>
   settings: SessionSettings
   playerStats: PlayerStats
-  campaignProgress: CampaignProgress | null
   recentMatch: RecentMatch | null
 }
 
@@ -57,11 +52,9 @@ const bool = (value: unknown, fallback: boolean): boolean => typeof value === 'b
 export const createDefaultSessionSnapshot = (): SessionSnapshot => ({
   schemaVersion: SESSION_SCHEMA_VERSION,
   status: 'menu',
-  gameMode: 'standard',
   isMultiplayer: false,
   roomId: null,
   myPlayerId: 'p1',
-  difficulty: APPLICATION_AI_DIFFICULTY,
   currentLevel: 2,
   dealerId: null,
   teamLevels: { teamA: 2, teamB: 2 },
@@ -78,7 +71,6 @@ export const createDefaultSessionSnapshot = (): SessionSnapshot => ({
     hapticEnabled: true,
   },
   playerStats: { gamesPlayed: 0, wins: 0, bombsPlayed: 0, firstPlaceFinishes: 0, elo: 1000 },
-  campaignProgress: null,
   recentMatch: null,
 })
 
@@ -95,21 +87,6 @@ const restoreScores = (value: unknown): Record<Team, number> => {
   return { teamA: finite(source.teamA, 0), teamB: finite(source.teamB, 0) }
 }
 
-const restoreCampaign = (value: unknown): CampaignProgress | null => {
-  if (!isRecord(value)) return null
-  const targetWins = Math.max(1, count(value.targetWins, 3))
-  const wins = count(value.wins, 0)
-  const losses = count(value.losses, 0)
-  return {
-    chapter: Math.max(1, count(value.chapter, 1)),
-    targetWins,
-    wins,
-    losses,
-    completed: bool(value.completed, wins >= targetWins),
-    failed: bool(value.failed, losses >= 2),
-  }
-}
-
 const restoreRecentMatch = (value: unknown): RecentMatch | null => {
   if (!isRecord(value) || !teams.includes(value.winnerTeam as Team)) return null
   return {
@@ -122,7 +99,7 @@ const restoreRecentMatch = (value: unknown): RecentMatch | null => {
   }
 }
 
-/** Migrates every historical/partial JSON shape into the current complete schema. */
+/** Whitelists current fields; legacy local-mode/AI/campaign fields are intentionally discarded. */
 export const restoreSessionSnapshot = (value: unknown): SessionSnapshot => {
   const base = createDefaultSessionSnapshot()
   if (!isRecord(value)) return base
@@ -133,7 +110,6 @@ export const restoreSessionSnapshot = (value: unknown): SessionSnapshot => {
     schemaVersion: SESSION_SCHEMA_VERSION,
     // Route, room and seat ownership are transient without an engine/server snapshot.
     status: 'menu',
-    gameMode: oneOf(value.gameMode, ['standard', 'double_open', 'campaign'], base.gameMode),
     isMultiplayer: false,
     roomId: null,
     myPlayerId: 'p1',
@@ -143,7 +119,7 @@ export const restoreSessionSnapshot = (value: unknown): SessionSnapshot => {
     settings: {
       soundEnabled: bool(settings.soundEnabled, base.settings.soundEnabled),
       volume: bounded(settings.volume, base.settings.volume, 0, 1),
-      voicePack: oneOf(settings.voicePack, ['female', 'male'], base.settings.voicePack),
+      voicePack: 'female',
       bgmEnabled: bool(settings.bgmEnabled, base.settings.bgmEnabled),
       bgmVolume: bounded(settings.bgmVolume, base.settings.bgmVolume, 0, 1),
       sortOrder: oneOf(settings.sortOrder, ['asc', 'desc'], base.settings.sortOrder),
@@ -159,7 +135,6 @@ export const restoreSessionSnapshot = (value: unknown): SessionSnapshot => {
       firstPlaceFinishes: count(stats.firstPlaceFinishes, base.playerStats.firstPlaceFinishes),
       elo: count(stats.elo, base.playerStats.elo),
     },
-    campaignProgress: restoreCampaign(value.campaignProgress),
     recentMatch: restoreRecentMatch(value.recentMatch),
   }
 }

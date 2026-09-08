@@ -5,7 +5,7 @@ export type HandInteractionMode =
   | 'tribute'
   | 'blocked'
 
-export type HandInteractionBlockReason = 'off-turn' | 'pending' | 'trustee' | 'finished' | 'settlement'
+export type HandInteractionBlockReason = 'pending' | 'trustee' | 'finished' | 'settlement'
 
 export type HandInteractionState = Readonly<{
   mode: HandInteractionMode
@@ -41,9 +41,7 @@ const baseState = (context: HandInteractionContext): HandInteractionState => {
   if (context.finished) return { mode: 'blocked', blockReason: 'finished' }
   if (context.phase === 'settlement') return { mode: 'blocked', blockReason: 'settlement' }
   if (context.phase === 'tribute') return { mode: 'tribute', blockReason: null }
-  return context.isCurrentTurn
-    ? { mode: 'play', blockReason: null }
-    : { mode: 'blocked', blockReason: 'off-turn' }
+  return { mode: 'play', blockReason: null }
 }
 
 /** Owns the exclusive input mode; card selections stay in their mode-specific stores. */

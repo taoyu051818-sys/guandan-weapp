@@ -203,9 +203,7 @@ export class HandGrouping {
 
   public createLockedGroup (cardIds: readonly CardId[], ruleProfile: RuleProfile, groupIndex?: number): HandGroupId {
     if (!this.canCreateLockedGroup(cardIds, ruleProfile)) throw new Error('Selected cards do not form an unlocked legal combination')
-    const groupId = this.createGroup(cardIds, groupIndex, 'manual', 'manual', true, ruleProfile)
-    if (groupIndex === undefined) this.arrangeLockedZone()
-    return groupId
+    return this.createGroup(cardIds, groupIndex, 'manual', 'manual', true, ruleProfile)
   }
 
   /** Locked groups select atomically from every exposed member; loose stacks only from their bottom card. */
@@ -273,7 +271,8 @@ export class HandGrouping {
     if (requested.length !== cardIds.length) throw new Error('A manual group cannot contain the same cardId twice')
     if (requested.length < 2) throw new Error('A manual group needs at least two cards')
     this.assertKnownCards(requested)
-    const canonicalPlacement = groupIndex === undefined && this.state.layoutMode === 'smart-arranged'
+    // Creation and automatic placement are one user action and one undo record.
+    const canonicalPlacement = groupIndex === undefined && (locked || this.state.layoutMode === 'smart-arranged')
 
     let groupId = ''
     this.commit(draft => {
@@ -325,9 +324,7 @@ export class HandGrouping {
   }
 
   public applySuggestion (suggestion: Pick<HandGroupSuggestion, 'cardIds' | 'kind'>, groupIndex?: number): HandGroupId {
-    const groupId = this.createGroup(suggestion.cardIds, groupIndex, suggestion.kind, 'manual', true)
-    if (groupIndex === undefined) this.arrangeLockedZone()
-    return groupId
+    return this.createGroup(suggestion.cardIds, groupIndex, suggestion.kind, 'manual', true)
   }
 
   /**

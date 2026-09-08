@@ -31,4 +31,38 @@ assert.equal((await store.read(snapshot => snapshot.wallets.user.balance)), 200)
 assert.equal((await store.read(snapshot => snapshot.products.soap.stock)), 6)
 assert.equal((await store.read(snapshot => snapshot.ledgerEntries.length)), 1)
 
+// Reject inherited keys before reading fields; an invalid request cannot poison the next purchase.
+const beforeInvalid = await store.read(snapshot => snapshot)
+const prototypeStock = Object.getOwnPropertyDescriptor(Object.prototype, 'stock')
+for (const productId of ['toString', '__proto__', 'constructor', 'hasOwnProperty', 'absent']) {
+  await assert.rejects(commerce.redeem('user', { productId }, `invalid-${productId}`), error => error.code === 'PRODUCT_NOT_FOUND')
+}
+assert.deepEqual(Object.getOwnPropertyDescriptor(Object.prototype, 'stock'), prototypeStock)
+assert.deepEqual(await store.read(snapshot => snapshot), beforeInvalid, 'invalid IDs change neither balances, stock nor receipts')
+await assert.rejects(commerce.redeem('user', { productId: 'soap', quantity: 5 }, 'after-invalid'), error => error.code === 'INSUFFICIENT_POINTS')
+assert.deepEqual(await store.read(snapshot => snapshot), beforeInvalid)
+
+// Corrupted persisted numbers must fail closed; never guess or repair a player's balance here.
+const rejectsWithoutMutation = async (mutate, code, quantity = 1) => {
+  const isolated = new MemoryPlatformStore(state)
+  await isolated.transaction(mutate)
+  const before = await isolated.read(snapshot => snapshot)
+  const service = new CommerceService({ store: isolated, createId: () => 'guard-test' })
+  await assert.rejects(service.redeem('user', { productId: 'soap', quantity }, 'guard-request'), error => error.code === code)
+  assert.deepEqual(await isolated.read(snapshot => snapshot), before)
+}
+for (const value of [NaN, Infinity, null, '200', -1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+  await rejectsWithoutMutation(draft => { draft.products.soap.pointsPrice = value }, 'INVALID_PRODUCT_STATE')
+  await rejectsWithoutMutation(draft => { draft.products.soap.stock = value }, 'INVALID_PRODUCT_STATE')
+  await rejectsWithoutMutation(draft => { draft.wallets.user.balance = value }, 'INVALID_WALLET_STATE')
+}
+for (const value of [null, [], 'soap', { id: 'another-product', stock: 10, pointsPrice: 200 }]) {
+  await rejectsWithoutMutation(draft => { draft.products.soap = value }, 'PRODUCT_NOT_FOUND')
+}
+await rejectsWithoutMutation(draft => { draft.products.soap.pointsPrice = Number.MAX_SAFE_INTEGER }, 'INVALID_ORDER_TOTAL', 2)
+await rejectsWithoutMutation(draft => { draft.wallets.user.userId = 'another-user' }, 'WALLET_NOT_FOUND')
+await rejectsWithoutMutation(draft => { delete draft.wallets.user }, 'WALLET_NOT_FOUND')
+await store.transaction(draft => { draft.products.soap.pointsPrice = 0; draft.wallets.user.balance = 0 })
+assert.equal((await commerce.redeem('user', { productId: 'soap' }, 'free-product')).totalPoints, 0, 'legitimate zero-price products remain supported')
+
 console.log('commerce service tests passed')

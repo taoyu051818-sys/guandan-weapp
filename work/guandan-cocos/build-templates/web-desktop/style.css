@@ -4,8 +4,17 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #061b18;
+  background: #03110f;
   font-family: Helvetica, Verdana, Arial, sans-serif;
+}
+
+:root {
+  --simulated-mobile-width: 874px;
+  --simulated-mobile-height: 402px;
+  --safe-top: env(safe-area-inset-top);
+  --safe-right: env(safe-area-inset-right);
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-left: env(safe-area-inset-left);
 }
 
 body, canvas, div {
@@ -17,15 +26,40 @@ body, canvas, div {
 
 .header, .footer { display: none; }
 
+.desktop-mobile-simulator {
+  display: grid;
+  place-items: center;
+  min-width: var(--simulated-mobile-width);
+  min-height: var(--simulated-mobile-height);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(21, 105, 88, 0.24), transparent 44%),
+    linear-gradient(145deg, #020a09 0%, #071d19 48%, #020807 100%);
+}
+
+#MobileStage {
+  box-sizing: border-box;
+  width: var(--simulated-mobile-width);
+  height: var(--simulated-mobile-height);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #07120f;
+  box-shadow:
+    0 24px 72px rgba(0, 0, 0, 0.52),
+    0 0 36px rgba(25, 121, 98, 0.14);
+}
+
 #GameDiv {
-  position: fixed !important;
-  inset: 0;
-  width: 100vw !important;
-  height: 100vh !important;
+  position: relative !important;
+  inset: auto !important;
+  width: var(--simulated-mobile-width) !important;
+  height: var(--simulated-mobile-height) !important;
   margin: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+  overflow: hidden !important;
 }
 
 #Cocos3dGameContainer, #GameCanvas {
@@ -33,17 +67,13 @@ body, canvas, div {
   height: 100% !important;
 }
 
-#GameCanvas { background-color: transparent; }
+#GameCanvas {
+  display: block;
+  background-color: transparent;
+}
 
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
-}
-
-:root {
-  --safe-top: env(safe-area-inset-top);
-  --safe-right: env(safe-area-inset-right);
-  --safe-bottom: env(safe-area-inset-bottom);
-  --safe-left: env(safe-area-inset-left);
 }

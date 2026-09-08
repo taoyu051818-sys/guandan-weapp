@@ -133,7 +133,7 @@ export const createFallbackDecision = ({
     });
     if (proactiveLongLead && nearestEnemy > 7 && hand.length >= 14) return proactiveLongLead;
     const teammateFeedType = runtimeIntel.lastTypeByPlayer.get(teammateId);
-    if (teammate.hand.length <= 6 && teammateFeedType
+    if (teammate.hand.length > 0 && teammate.hand.length <= 6 && teammateFeedType
       && teammateFeedType !== PlayType.Bomb
       && teammateFeedType !== PlayType.StraightFlush
       && teammateFeedType !== PlayType.Rocket) {

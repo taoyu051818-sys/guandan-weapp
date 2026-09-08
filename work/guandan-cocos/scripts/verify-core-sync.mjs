@@ -2,6 +2,8 @@ import { readFile, readdir } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { isClientSharedCoreSource } from './core-sync-policy.mjs'
+
 const here = dirname(fileURLToPath(import.meta.url))
 const projectRoot = resolve(here, '..')
 const sourceRoot = resolve(projectRoot, '../../shared-core/src')
@@ -17,7 +19,7 @@ const listTypescript = async (root, directory = root) => {
   return nested.flat().sort()
 }
 
-const sourceFiles = await listTypescript(sourceRoot)
+const sourceFiles = (await listTypescript(sourceRoot)).filter(isClientSharedCoreSource)
 const generatedFiles = await listTypescript(generatedRoot)
 const failures = []
 

@@ -14,9 +14,9 @@ export type LobbyMatchedEntryDependencies = Readonly<{
   connect: (endpoint: string) => Promise<void>
   begin: (
     requestType: PendingRoomEntry['requestType'], responseType: PendingRoomEntry['responseType'],
-    roomId: string, payload: Record<string, unknown>, expectedPlayerId: PlayerId,
+    roomId: string, payload: Record<string, unknown>, expectedPlayerId?: PlayerId,
   ) => number | null
-  cancelPending: (requestId: number) => string | null
+  pendingRoom: (requestId: number) => string | null
   resetTransport: () => void
   close: (message: string) => void
   requestRecovery: (abandonAttemptId?: string) => void
@@ -108,19 +108,21 @@ export class LobbyMatchedEntryCoordinator {
     this.inFlight = true
     this.attempts += 1
     const payload = { roomId: entry.roomId, gameTicket: entry.gameTicket, entryAttemptId: entry.entryAttemptId }
+    const expectedSeat = entry.seat === 'observer' ? undefined : entry.seat
     const requestId = entry.ticketPurpose === 'rejoin'
-      ? this.dependencies.begin('joinRoom', 'roomRejoined', entry.roomId, payload, entry.seat)
+      ? this.dependencies.begin('joinRoom', 'roomRejoined', entry.roomId, payload, expectedSeat)
       : entry.seat === 'p1'
         ? this.dependencies.begin('createRoom', 'roomCreated', entry.roomId, { ...payload, hostName: entry.displayName ?? '匹配玩家' }, entry.seat)
-        : this.dependencies.begin('joinRoom', 'roomJoined', entry.roomId, payload, entry.seat)
+        : this.dependencies.begin('joinRoom', 'roomJoined', entry.roomId, payload, expectedSeat)
     if (requestId === null) { this.inFlight = false; return }
     const generation = this.generation
-    this.dependencies.schedule(() => this.handleWatchdog(generation, requestId), WATCHDOG_SECONDS)
+    const attempt = this.attempts
+    this.dependencies.schedule(() => this.handleWatchdog(generation, attempt, requestId), WATCHDOG_SECONDS)
   }
 
-  private handleWatchdog (generation: number, requestId: number): void {
-    if (generation !== this.generation) return
-    const roomId = this.dependencies.cancelPending(requestId)
+  private handleWatchdog (generation: number, attempt: number, requestId: number): void {
+    if (generation !== this.generation || attempt !== this.attempts) return
+    const roomId = this.dependencies.pendingRoom(requestId)
     if (!roomId || this.rejectExpired()) return
     this.inFlight = false
     if (this.attempts < MAX_ATTEMPTS) {

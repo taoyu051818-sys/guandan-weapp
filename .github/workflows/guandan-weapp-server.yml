@@ -6,6 +6,8 @@ on:
       - 'shared-core/**'
       - 'work/guandan-windows-source/server/**'
       - 'work/guandan-windows-source/package.json'
+      - '.gitignore'
+      - 'scripts/check-repository-boundaries.mjs'
       - '.github/workflows/guandan-weapp-server.yml'
   push:
     branches: [main]
@@ -13,6 +15,8 @@ on:
       - 'shared-core/**'
       - 'work/guandan-windows-source/server/**'
       - 'work/guandan-windows-source/package.json'
+      - '.gitignore'
+      - 'scripts/check-repository-boundaries.mjs'
       - '.github/workflows/guandan-weapp-server.yml'
 
 permissions:
@@ -38,5 +42,5 @@ jobs:
         run: pnpm --dir ../../shared-core install --frozen-lockfile
       - name: Check authoritative server syntax
         run: npm run check:weapp-server
-      - name: Build shared core and run authoritative server tests
-        run: npm run test:weapp-server
+      - name: Build shared core and run full platform/game regressions
+        run: npm run test:server
