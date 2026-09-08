@@ -1,6 +1,8 @@
 import { cp, mkdir, readdir, rm } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { isClientSharedCoreSource } from './core-sync-policy.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appRoot = resolve(here, '..')
@@ -21,5 +23,6 @@ const removeSyncedSources = async directory => {
 }
 
 await removeSyncedSources(coreTarget)
-await cp(coreSource, coreTarget, { recursive: true })
+await cp(coreSource, coreTarget, { recursive: true, filter: source => isClientSharedCoreSource(relative(coreSource, source)) })
+await rm(resolve(coreTarget, 'lib/ai.ts.meta'), { force: true })
 console.log(`Shared core synced to ${coreTarget}`)

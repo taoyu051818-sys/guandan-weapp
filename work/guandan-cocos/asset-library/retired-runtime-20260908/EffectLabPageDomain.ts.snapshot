@@ -1,0 +1,142 @@
+import { BlockInputEvents, Color, Node, Vec3 } from 'cc'
+import type { EffectQuality } from '../../effects/EffectTypes'
+import type { ScreenAdapter } from '../../ui/ScreenAdapter'
+import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
+import type { PageRouter } from '../PageRouter'
+
+export type EffectLabFixture = Readonly<{
+  id: string
+  label: string
+  kind: string
+  description: string
+}>
+
+export type EffectLabPageDependencies = {
+  router: PageRouter
+  screen: ScreenAdapter
+  isDisposed: () => boolean
+  hasLiveRoom?: () => boolean
+  listFixtures: () => readonly EffectLabFixture[]
+  previewFixture: (id: string, quality: EffectQuality) => void
+  scheduleOnce: (callback: () => void, delaySeconds: number) => void
+  showMenu: () => void
+  showNotice: (title: string, detail?: string) => void
+}
+
+/** Owns the development-only table effect drawer and its local controls. */
+export class EffectLabPageDomain {
+  private page = 0
+  private quality: EffectQuality = 'full'
+  private generation = 0
+  private preserveNextShellHide = false
+
+  public constructor (private readonly dependencies: EffectLabPageDependencies) {}
+
+  /** Starts the deterministic table before mounting the drawer above it. */
+  public openTable (): void {
+    if (this.dependencies.hasLiveRoom?.()) {
+      this.dependencies.showNotice('当前仍在联机房间', '请先安全退出联机房间，再打开固定牌局测试。')
+      return
+    }
+    if (!this.dependencies.listFixtures().some(fixture => fixture.id === 'match-opening')) {
+      this.dependencies.showNotice('实验室不可用', '缺少固定测试牌局。')
+      return
+    }
+    const generation = ++this.generation
+    this.preserveNextShellHide = true
+    try { this.dependencies.previewFixture('match-opening', 'full') } finally { this.preserveNextShellHide = false }
+    this.dependencies.scheduleOnce(() => {
+      if (this.isCurrent(generation)) this.show(0)
+    }, 0)
+  }
+
+  public show (requestedPage = 0): void {
+    if (this.dependencies.isDisposed()) return
+    const fixtures = this.dependencies.listFixtures()
+    if (!fixtures.length) {
+      this.dependencies.showNotice('实验室不可用', '正式构建不包含开发实验室。')
+      return
+    }
+    const safeWidth = this.dependencies.screen.safeSize().x
+    const safeHeight = this.dependencies.screen.safeSize().y
+    const compact = safeHeight < 650
+    const pageSize = compact ? 3 : 4
+    const pageCount = Math.max(1, Math.ceil(fixtures.length / pageSize))
+    this.page = Math.max(0, Math.min(pageCount - 1, requestedPage))
+    const ui = this.dependencies.router.open('effect-lab')
+    const drawerWidth = Math.min(390, Math.max(340, safeWidth * (compact ? 0.46 : 0.36)))
+    const drawerX = this.dependencies.screen.safeRightX(drawerWidth / 2 + 8)
+    const drawerTop = this.dependencies.screen.safeTopY(8)
+    const drawerBottom = this.dependencies.screen.safeBottomY(8)
+    const drawer = ui.panel('EffectLabDrawer', drawerX, (drawerTop + drawerBottom) / 2, drawerWidth, Math.max(1, drawerTop - drawerBottom), {
+      fill: new Color(8, 29, 39, 247), stroke: new Color(215, 173, 70, 245), lineWidth: 2, radius: 8,
+    })
+    drawer.addComponent(BlockInputEvents)
+    const top = this.dependencies.screen.safeTopY(compact ? 30 : 48)
+    ui.outlinedLabel('牌桌特效测试', drawerX, top, 25, {
+      width: drawerWidth - 20, height: 36, color: new Color(255, 229, 139), outlineColor: new Color(45, 48, 35), outlineWidth: 3,
+    })
+    ui.outlinedLabel(`开发环境 · ${this.page + 1}/${pageCount}`, drawerX, top - 33, 16, {
+      width: drawerWidth - 20, height: 26, color: new Color(220, 235, 227), outlineColor: new Color(35, 57, 50), outlineWidth: 2,
+    })
+    const qualityWidth = (drawerWidth - 40) / 3
+    ;(['full', 'reduced', 'off'] as const).forEach((quality, index) => {
+      const labels: Record<EffectQuality, string> = { full: '完整', reduced: '精简', off: '关闭' }
+      this.sizedButton(
+        ui,
+        `${labels[quality]}${this.quality === quality ? ' 已选' : ''}`,
+        drawerX + (index - 1) * (qualityWidth + 8),
+        top - (compact ? 55 : 65),
+        qualityWidth,
+        compact ? 34 : 38,
+        18,
+        () => { this.quality = quality; this.show(this.page) },
+      )
+    })
+    const fixtureStartY = top - (compact ? 96 : 116)
+    const fixtureStep = compact ? 50 : 56
+    fixtures.slice(this.page * pageSize, (this.page + 1) * pageSize).forEach((fixture, index) => {
+      this.sizedButton(ui, `${fixture.label} · ${fixture.kind}\n${fixture.description}`, drawerX, fixtureStartY - index * fixtureStep, drawerWidth - 24, compact ? 46 : 50, 18, () => {
+        const generation = ++this.generation
+        this.dependencies.previewFixture(fixture.id, this.quality)
+        if (fixture.id === 'match-opening') this.dependencies.scheduleOnce(() => {
+          if (this.isCurrent(generation)) this.show(this.page)
+        }, 0)
+      })
+    })
+    const navigationY = this.dependencies.screen.safeBottomY(compact ? 72 : 78)
+    const navigationWidth = (drawerWidth - 54) / 2
+    if (this.page > 0) {
+      this.sizedButton(ui, '上一页', drawerX - (navigationWidth + 10) / 2, navigationY, navigationWidth, compact ? 36 : 40, 18, () => this.show(this.page - 1))
+    }
+    if (this.page + 1 < pageCount) {
+      this.sizedButton(ui, '下一页', drawerX + (navigationWidth + 10) / 2, navigationY, navigationWidth, compact ? 36 : 40, 18, () => this.show(this.page + 1))
+    }
+    this.sizedButton(ui, '结束测试', drawerX, this.dependencies.screen.safeBottomY(compact ? 28 : 30), Math.min(190, drawerWidth - 40), compact ? 38 : 42, 19, this.dependencies.showMenu)
+  }
+
+  public reflow (): void {
+    if (this.dependencies.router.current === 'effect-lab') this.show(this.page)
+  }
+
+  public cancelPending (): void { this.generation += 1 }
+
+  public handleShellHidden (): void {
+    if (this.preserveNextShellHide) {
+      this.preserveNextShellHide = false
+      return
+    }
+    this.cancelPending()
+  }
+
+  private isCurrent (generation: number): boolean {
+    return generation === this.generation && !this.dependencies.isDisposed()
+  }
+
+  private sizedButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, action: () => void): Node {
+    const node = ui.button('PageButton', text, x, width, height, fontSize)
+    node.setPosition(new Vec3(x, y, 0))
+    node.on(Node.EventType.TOUCH_END, action)
+    return node
+  }
+}

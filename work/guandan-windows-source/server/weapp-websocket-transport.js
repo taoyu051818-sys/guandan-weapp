@@ -2,6 +2,12 @@ import { createHash } from 'node:crypto'
 
 const websocketGuid = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 
+export const isProtocolUpgradeRequest = request => Boolean(
+  request?.url === '/weapp'
+  && request.headers?.upgrade?.toLowerCase() === 'websocket'
+  && request.headers?.['sec-websocket-key'],
+)
+
 export const frameTextMessage = text => {
   const data = Buffer.from(text)
   if (data.length >= 65536) throw new Error('WebSocket 消息过大')
@@ -94,11 +100,7 @@ export const upgradeToProtocolConnection = ({
   onInvalidMessage,
   onClose,
 }) => {
-  if (
-    request.url !== '/weapp'
-    || request.headers.upgrade?.toLowerCase() !== 'websocket'
-    || !request.headers['sec-websocket-key']
-  ) {
+  if (!isProtocolUpgradeRequest(request)) {
     socket.destroy()
     return null
   }

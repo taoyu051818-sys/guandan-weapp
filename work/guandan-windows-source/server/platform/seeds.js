@@ -20,12 +20,17 @@ export const SAMPLE_TOURNAMENTS = [
 
 export const SAMPLE_SEASONS = [
   { id: 'season-2026-lingshui', name: '陵水夏季赛季', status: 'active', startsAt: 1785513600000, endsAt: 1788191999000 },
+  // Development seed without a calendar expiry. Real deployments replace it with an operated season window.
+  { id: 'season-lingshui-integration', name: '陵水联调赛季', status: 'active' },
 ]
 
 export const SAMPLE_TASKS = [
   { id: 'daily-play-1', seasonId: 'season-2026-lingshui', name: '完成一局', metric: 'gamesPlayed', target: 1, rewardPoints: 80, cadence: 'daily' },
   { id: 'season-win-3', seasonId: 'season-2026-lingshui', name: '赢得三局', metric: 'wins', target: 3, rewardPoints: 300, cadence: 'season' },
   { id: 'season-bomb-5', seasonId: 'season-2026-lingshui', name: '打出五次炸弹', metric: 'bombsPlayed', target: 5, rewardPoints: 240, cadence: 'season' },
+  { id: 'integration-daily-play-1', seasonId: 'season-lingshui-integration', name: '完成一局', metric: 'gamesPlayed', target: 1, rewardPoints: 80, cadence: 'daily' },
+  { id: 'integration-season-win-3', seasonId: 'season-lingshui-integration', name: '赢得三局', metric: 'wins', target: 3, rewardPoints: 300, cadence: 'season' },
+  { id: 'integration-season-bomb-5', seasonId: 'season-lingshui-integration', name: '打出五次炸弹', metric: 'bombsPlayed', target: 5, rewardPoints: 240, cadence: 'season' },
 ]
 
 export const createSeededPlatformState = () => {

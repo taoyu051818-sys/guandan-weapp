@@ -1,14 +1,22 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractRuntimeConfig, injectWebRuntimeConfig, runtimeConfigFromEnv, verifyReleaseRuntimeConfig } from './runtime-client-config.mjs';
+import {
+  extractRuntimeConfig,
+  injectWebRuntimeConfig,
+  runtimeConfigFromEnv,
+  verifyBareIpTestRuntimeConfig,
+  verifyReleaseRuntimeConfig,
+} from './runtime-client-config.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const settingsPath = resolve(projectRoot, 'build/web-desktop/src/settings.json');
 const applicationPath = resolve(projectRoot, 'build/web-desktop/application.js');
 const indexPath = resolve(projectRoot, 'build/web-desktop/index.html');
+const stylePath = resolve(projectRoot, 'build/web-desktop/style.css');
 const checkOnly = process.argv.includes('--check');
 const release = process.argv.includes('--release');
+const bareIpTest = process.argv.includes('--bare-ip-test');
 const buildRoot = resolve(projectRoot, 'build/web-desktop');
 const forbiddenBundleMarkers = [
   '53e52062-b47e-43f8-b184-fb566cd720bd',
@@ -52,6 +60,7 @@ if (/showFPS\s*:\s*true/.test(applicationSource)) {
 }
 
 let indexSource = await readFile(indexPath, 'utf8');
+const styleSource = await readFile(stylePath, 'utf8');
 if (!/name="screen-orientation" content="landscape"/.test(indexSource)) {
   throw new Error('Web build must advertise landscape orientation.');
 }
@@ -59,13 +68,20 @@ if (!/id="GameDiv"[^>]*width: 1280px; height: 720px;/.test(indexSource)
   || !/id="GameCanvas" width="1280" height="720"/.test(indexSource)) {
   throw new Error('Web build shell must start at 1280x720.');
 }
-const requestedRuntimeConfig = runtimeConfigFromEnv(process.env, { release });
+if (!/id="MobileStage"/.test(indexSource)
+  || !/--simulated-mobile-width:\s*874px/.test(styleSource)
+  || !/--simulated-mobile-height:\s*402px/.test(styleSource)
+  || /width:\s*100vw\s*!important|height:\s*100vh\s*!important/.test(styleSource)) {
+  throw new Error('Web build must use the fixed 874x402 desktop mobile simulator shell.');
+}
+const requestedRuntimeConfig = runtimeConfigFromEnv(process.env, { release, bareIpTest });
 if (!checkOnly && requestedRuntimeConfig) {
   indexSource = injectWebRuntimeConfig(indexSource, requestedRuntimeConfig);
   await writeFile(indexPath, indexSource, 'utf8');
 }
 const embeddedRuntimeConfig = extractRuntimeConfig(indexSource);
 if (release) verifyReleaseRuntimeConfig(embeddedRuntimeConfig);
+if (bareIpTest) verifyBareIpTestRuntimeConfig(embeddedRuntimeConfig);
 if (requestedRuntimeConfig && JSON.stringify(embeddedRuntimeConfig) !== JSON.stringify(requestedRuntimeConfig)) {
   throw new Error('Web build runtime config does not match the requested environment.');
 }

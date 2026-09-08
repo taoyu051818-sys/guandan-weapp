@@ -1,4 +1,5 @@
 import { Color, Graphics, Label, Node, UITransform, Vec2, Vec3 } from 'cc'
+import type { PlayerId } from '../core/generated'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
 import { createDefaultTableHudSeats, type TableHudSeatState } from './TableHudSeatViewGroup'
 import type { TableHudSeatPlace, TableHudViewport } from './TableHudLayoutPolicy'
@@ -21,12 +22,17 @@ export type TableGameHudState = Readonly<{
   turnDurationSeconds: number
   turnPlace: TableGameHudSeatPlace
   counterExpanded: boolean
+  counterEnabled?: boolean
+  counterPossibleSuits?: readonly TableGameHudSuit[]
   cardCounts: Readonly<Partial<Record<TableGameHudCounterRank, number>>>
   seats: readonly TableGameHudSeatState[]
   availableSuits: readonly TableGameHudSuit[]
   selectedSuit: TableGameHudSuit | null
   lockAction: TableGameHudLockAction
   arrangeRestoreAvailable: boolean
+  handViewLabel?: string
+  handToolsVisible?: boolean
+  chatEnabled?: boolean
 }>
 
 export type TableGameHudActions = Readonly<{
@@ -36,6 +42,8 @@ export type TableGameHudActions = Readonly<{
   onHandLockAction?: () => void
   onArrange?: () => void
   onChat?: () => void
+  onOwnAvatar?: () => void
+  onSeatAvatar?: (playerId: PlayerId) => void
 }>
 
 export type ButtonView = {
@@ -59,11 +67,11 @@ export const BASE_COUNTER_OPEN_HEIGHT = 82
 export const BASE_COUNTER_CLOSED_HEIGHT = 42
 export const BASE_TOOLBAR_WIDTH = 420
 export const EXPANDED_BACK_SIZE = 60
-export const EXPANDED_ROUND_WIDTH = 272
+export const EXPANDED_ROUND_WIDTH = 240
 export const EXPANDED_ROUND_HEIGHT = 84
 export const EXPANDED_SUIT_BAR_WIDTH = 480
 export const EXPANDED_SUIT_BAR_HEIGHT = 68
-export const EXPANDED_TOOLBAR_WIDTH = 540
+export const EXPANDED_TOOLBAR_WIDTH = 480
 export const EXPANDED_TOOLBAR_HEIGHT = 70
 export const SUITS: readonly TableGameHudSuit[] = ['spade', 'heart', 'club', 'diamond']
 export type DraggableOverlay = 'counter' | 'operations'
@@ -77,8 +85,9 @@ export const freshTableGameHudState = (): TableGameHudState => ({
   turnSeconds: 15,
   turnDurationSeconds: 15,
   turnPlace: 'bottom',
-  counterExpanded: true,
+  counterExpanded: false,
   cardCounts: {},
+  counterPossibleSuits: [],
   seats: createDefaultTableHudSeats(),
   availableSuits: [],
   selectedSuit: null,

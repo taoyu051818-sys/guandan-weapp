@@ -1,4 +1,4 @@
-import type { PlayerId, Rank, Team, TributeState } from '../core/generated'
+import type { PlayerId, Rank, Team } from '../core/generated'
 
 export type TablePlayerTeams = Readonly<Record<PlayerId, Readonly<{ team: Team }>>>
 
@@ -11,6 +11,13 @@ export type TableViewerProjection = Readonly<{
   settlementWon: boolean | null
   settlementTitle: string | null
 }>
+
+/** Other seats disclose their remaining count only at ten cards or fewer. */
+export const projectTableSeatStatus = (count: number, isSelf: boolean, finishPlace = 0): string => {
+  if (finishPlace > 0) return ['头游', '二游', '三游', '末游'][finishPlace - 1] ?? ''
+  if (!Number.isInteger(count) || count < 0) return ''
+  return isSelf || (count > 0 && count <= 10) ? `剩${count}张` : ''
+}
 
 /** Keeps every team-relative table label anchored to the active viewer's seat. */
 export const projectTableViewer = (
@@ -31,16 +38,4 @@ export const projectTableViewer = (
     settlementWon,
     settlementTitle: settlementWon === null ? null : settlementWon ? '本局胜利' : '本局失利',
   }
-}
-
-/** Creates stable identities for tribute effects shared by recovery and live rendering. */
-export const projectTributeEffectTokens = (tribute: TributeState | null): Set<string> => {
-  const tokens = new Set<string>()
-  if (!tribute) return tokens
-  if (tribute.isAntiTribute) tokens.add('anti-tribute')
-  tribute.actions.forEach(action => {
-    if (action.card) tokens.add(`give:${action.from}:${action.to}:${action.card.id}`)
-    if (action.returnCard) tokens.add(`return:${action.to}:${action.from}:${action.returnCard.id}`)
-  })
-  return tokens
 }

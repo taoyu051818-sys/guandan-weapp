@@ -18,7 +18,20 @@ const errors = (result.diagnostics ?? []).filter(diagnostic => diagnostic.catego
 assert.deepEqual(errors, [], 'TableSnapshotPresenter must transpile')
 const moduleRecord = { exports: {} }
 new Function('exports', 'module', 'require', result.outputText)(moduleRecord.exports, moduleRecord, require)
-const { projectTableViewer, projectTributeEffectTokens } = moduleRecord.exports
+const { projectTableSeatStatus, projectTableViewer } = moduleRecord.exports
+
+for (const count of [27, 18, 11, 10, 9, 1, 0]) {
+  assert.equal(projectTableSeatStatus(count, false), count > 0 && count <= 10 ? `剩${count}张` : '')
+  assert.equal(projectTableSeatStatus(count, true), `剩${count}张`, 'the viewer retains their own count')
+}
+for (const isSelf of [false, true]) {
+  for (const [index, rank] of ['头游', '二游', '三游', '末游'].entries()) {
+    assert.equal(projectTableSeatStatus(0, isSelf, index + 1), rank, 'finish rank takes precedence over count')
+  }
+}
+assert.deepEqual([11, 10, 9, 1, 0, 27].map(count => projectTableSeatStatus(count, false)),
+  ['', '剩10张', '剩9张', '剩1张', '', ''], 'new-round and recovered snapshots must not retain the last count')
+assert.equal(projectTableSeatStatus(NaN, false), '')
 
 const players = {
   p1: { team: 'teamA' },
@@ -50,18 +63,13 @@ for (const viewerId of ['p2', 'p4']) {
 
 assert.equal(projectTableViewer(players, 'p2', levels).settlementTitle, null)
 
-const tributeCard = { id: 'tribute-ace' }
-const returnCard = { id: 'return-three' }
-assert.deepEqual(Array.from(projectTributeEffectTokens({
-  isAntiTribute: false,
-  actions: [{ from: 'p2', to: 'p1', card: tributeCard, returnCard }],
-})), ['give:p2:p1:tribute-ace', 'return:p1:p2:return-three'])
-assert.deepEqual(Array.from(projectTributeEffectTokens({ isAntiTribute: true, actions: [] })), ['anti-tribute'])
-assert.deepEqual(Array.from(projectTributeEffectTokens(null)), [])
-
 const coordinatorSource = fs.readFileSync(coordinatorPath, 'utf8')
+const hudPresenterSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableHudPresenter.ts'), 'utf8')
+assert.match(hudPresenterSource, /status: projectTableSeatStatus\(player\.hand\.length, id === humanId, finishPlace\)/,
+  'every viewer-relative HUD seat must use the same remaining-count policy')
 assert.match(coordinatorSource, /projectTableViewer\(snapshot\.state\.players, humanId, teamLevels/)
-assert.match(coordinatorSource, /projectTributeEffectTokens\(packet\.tribute\)/, 'recovery and live tribute effects must share the presenter token projection')
+assert.doesNotMatch(coordinatorSource, /renderTributeEffects|resetTribute/, 'retired flow bookkeeping is absent')
+const progressSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableProgressPresentation.ts'), 'utf8')
 assert.doesNotMatch(coordinatorSource, /collectTributeEffectTokens/, 'the match coordinator must not own tribute effect identity derivation')
 assert.doesNotMatch(coordinatorSource, /settlement\.winnerTeam === 'teamA' \? '本局胜利'/, 'settlement copy must never assume teamA is the viewer')
 assert.match(coordinatorSource, /seat\.render\([\s\S]*?snapshot\.state\.players\[humanId\]\.team,/, 'the live legacy seat layer must receive the viewer team')

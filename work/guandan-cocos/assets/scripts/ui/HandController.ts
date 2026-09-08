@@ -97,6 +97,7 @@ export class HandController extends Component {
     lockedCardIds?: readonly string[],
     lockDraftCardIds: readonly string[] = [],
     interactionMode: HandInteractionMode = 'play',
+    animateEntrance = true,
   ): number {
     const fallback = [...hand].sort((a, b) => sortOrder === 'desc' ? b.value - a.value : a.value - b.value)
     const byId = new Map(hand.map(card => [card.id, card]))
@@ -113,6 +114,7 @@ export class HandController extends Component {
     const availableWidth = Math.max(280, (this.getComponent(UITransform)?.contentSize.width ?? 1040) - 100)
     const layout = createHandStackLayout(displayHand.map(card => card.id), stackGroups, availableWidth)
     const slotByCard = new Map(layout.slots.map(slot => [slot.cardId, slot]))
+    const badgeByGroup = new Map(stackGroups.map(group => [group.id, group.badge]))
     const playSelectedIds = new Set(playSelectedCardIds)
     const lockDraftIds = new Set(lockDraftCardIds)
     const inferredLockedCardIds = stackGroups.flatMap(group => group.locked ? group.cardIds : [])
@@ -148,13 +150,14 @@ export class HandController extends Component {
         lockDraft: lockDraftIds.has(card.id),
         locked: lockedIds.has(card.id),
         interactive,
+        groupBadge: slot?.stackId && slot.stackIndex === slot.stackSize - 1 ? badgeByGroup.get(slot.stackId) : undefined,
       })
-      view?.configureFanHitArea(layout.laneSpacing || 78, (slot?.laneIndex ?? index) === layout.laneCount - 1)
+      view?.configureFanHitArea(slot?.nextLaneSpacing ?? 78, (slot?.laneIndex ?? index) === layout.laneCount - 1)
       view?.configureStackHitArea(slot?.stackStep ?? 0, slot?.stackIndex ?? 0, slot?.stackSize ?? 1)
       Tween.stopAllByTarget(node)
       if (isNew) node.setPosition(target)
       else if (!node.position.equals(target, 0.1)) tween(node).to(0.18, { position: target }, { easing: 'quadOut' }).start()
-      if (isNew) {
+      if (isNew && animateEntrance) {
         const completion = view?.playEntrance(index * 0.025)
         if (completion) entranceCompletions.push(completion)
       }

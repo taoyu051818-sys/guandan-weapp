@@ -13,8 +13,15 @@ import {
   pickLowestWinningPlayByResolution,
   type CachedPlayInfo,
 } from './scoring';
+import {
+  createResourceProtection,
+  getPlayResourceDamage,
+  removePlayedCards,
+} from './resourceProtection';
 import type { RuntimeIntelState } from './runtimeIntel';
 import type { AdvancedRole, Difficulty } from './types';
+
+export type { PlayResourceDamage } from './resourceProtection';
 
 export type TeamIntent = 'assist_teammate' | 'block_enemy' | 'tempo';
 
@@ -52,15 +59,23 @@ export const createDecisionSupport = ({
   const pickLowestWinningPlay = (plays: Card[][]): Card[] | null =>
     pickLowestWinningPlayByResolution(plays, getPlayInfo);
 
+  const { choosePressureLead, chooseUrgentBlock } = createResourceProtection({
+    getPlayInfo,
+    pickLowestWinningPlay,
+  });
+
   const getIntent = (
     lastPlay: PlayAction | null,
     teammateId: PlayerId,
     teammateCount: number,
     enemyMinCount: number,
   ): TeamIntent => {
-    if (teammateCount <= 4) return 'assist_teammate';
+    // A teammate with no cards has already finished. "Contact" gives us the
+    // lead, but there is nobody left to feed, so resume normal/enemy control.
+    if (teammateCount > 0 && teammateCount <= 4) return 'assist_teammate';
     if (enemyMinCount <= 5) return 'block_enemy';
-    if (lastPlay && lastPlay.type !== PlayType.Pass && lastPlay.playerId === teammateId) {
+    if (teammateCount > 0 && lastPlay && lastPlay.type !== PlayType.Pass
+      && lastPlay.playerId === teammateId) {
       return 'assist_teammate';
     }
     return 'tempo';
@@ -75,11 +90,6 @@ export const createDecisionSupport = ({
       .find(id => id !== myPlayerId && players[id].team === myTeam);
     if (!teammate) throw new Error(`AI player ${myPlayerId} has no teammate on ${myTeam}`);
     return teammate;
-  };
-
-  const removeCards = (hand: Card[], play: Card[]): Card[] => {
-    const used = new Set(play.map(card => card.id));
-    return hand.filter(card => !used.has(card.id));
   };
 
   const chooseByType = (
@@ -171,7 +181,7 @@ export const createDecisionSupport = ({
     for (const play of possiblePlays.slice(0, 10)) {
       const info = getPlayInfo(play);
       if (!info || isBombType(info.type)) continue;
-      const score = evaluateHandStructureScore(removeCards(hand, play));
+      const score = evaluateHandStructureScore(removePlayedCards(hand, play));
       if (score < bestScore) {
         bestScore = score;
         best = play;
@@ -196,7 +206,7 @@ export const createDecisionSupport = ({
     for (const play of possiblePlays.slice(0, 18)) {
       const info = getPlayInfo(play);
       if (!info || isBombType(info.type)) continue;
-      const remainScore = evaluateHandStructureScore(removeCards(hand, play));
+      const remainScore = evaluateHandStructureScore(removePlayedCards(hand, play));
       const shapeBonus = isComplexPlayType(info.type)
         ? -6
         : info.type === PlayType.Pair ? -1.5 : 0;
@@ -313,13 +323,15 @@ export const createDecisionSupport = ({
   const chooseFeedPlayByScore = (
     possiblePlays: Card[][],
     teammateType: PlayType | undefined,
+    hand: Card[],
   ): Card[] | null => {
     let best: Card[] | null = null;
     let bestScore = Number.POSITIVE_INFINITY;
     for (const play of possiblePlays) {
       const info = getPlayInfo(play);
       if (!info || isBombType(info.type)) continue;
-      let score = info.maxValue * 4 + play.length * 1.5;
+      const resourceDamage = getPlayResourceDamage(hand, play);
+      let score = info.maxValue * 4 + play.length * 1.5 + resourceDamage.score;
       if (teammateType && info.type === teammateType) score -= 16;
       if (isComplexPlayType(info.type)) score -= 4;
       if (info.type === PlayType.Single || info.type === PlayType.Pair) score += 4;
@@ -379,7 +391,7 @@ export const createDecisionSupport = ({
       if (pick) return pick;
     }
     if (!lastPlay || lastPlay.type === PlayType.Pass) {
-      if (teammate.hand.length <= 6) {
+      if (teammate.hand.length > 0 && teammate.hand.length <= 6) {
         const teammateType = runtimeIntel.lastTypeByPlayer.get(teammateId);
         if (teammateType && teammateType !== PlayType.Bomb
           && teammateType !== PlayType.StraightFlush && teammateType !== PlayType.Rocket) {
@@ -410,7 +422,7 @@ export const createDecisionSupport = ({
     const info = getPlayInfo(play);
     if (!info) return Number.NEGATIVE_INFINITY;
     const nextAction: PlayAction = { playerId: myPlayerId, cards: play, type: info.type };
-    const remaining = removeCards(hand, play);
+    const remaining = removePlayedCards(hand, play);
     const ruleProfile = getRuleProfile();
     const myLeadAfter = getPossiblePlays(remaining, null, difficulty, ruleProfile).length;
     const nextEnemyResponses = getPossiblePlays(
@@ -432,6 +444,7 @@ export const createDecisionSupport = ({
     chooseByType,
     chooseByTypeOrder,
     chooseFeedPlayByScore,
+    choosePressureLead,
     chooseLeadByStructure,
     chooseLowestComplexPlay,
     chooseOpeningDecomposeLead,
@@ -445,8 +458,10 @@ export const createDecisionSupport = ({
     getIntent,
     getMinEnemyHand,
     getSinglesPairsTailShape,
+    getPlayResourceDamage,
     getTeammateId,
     isComplexPlayType,
     pickLowestWinningPlay,
+    chooseUrgentBlock,
   };
 };

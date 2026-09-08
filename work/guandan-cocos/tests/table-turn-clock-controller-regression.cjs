@@ -102,48 +102,14 @@ const createHarness = ({ network = false, initialLobby = null, initialNow = 0 } 
   }
 }
 
-const local = createHarness()
-const localTurn = createSnapshot()
-local.controller.update({ snapshot: localTurn, humanId: 'p1', humanFinished: false, controlsY: 100 })
-assert.equal(local.label.node.active, true)
-assert.equal(local.label.string, '20s')
-assert.deepEqual(local.label.node.position, new Vec3(0, 147, 0), 'normal hands keep the clock above the action row')
-assert.deepEqual(local.controller.project(localTurn, 'p1'), {
-  turnVisible: true,
-  turnSeconds: 20,
-  turnDurationSeconds: 20,
-  turnPlace: 'bottom',
-})
-
-for (let index = 0; index < 15; index += 1) local.tick()
-assert.equal(local.label.string, '5s')
-assert.deepEqual(local.countdownSounds, [5], 'the warning sound starts exactly at five seconds')
-for (let index = 0; index < 5; index += 1) local.tick()
-assert.deepEqual(local.countdownSounds, [5, 4, 3, 2, 1])
-assert.equal(local.timeoutCount(), 1, 'only the local controller may invoke the local timeout action')
-local.tick()
-assert.equal(local.timeoutCount(), 1, 'zero must not submit timeout twice')
-
-local.controller.reset()
-assert.equal(local.label.node.active, false)
-local.controller.update({ snapshot: localTurn, humanId: 'p1', humanFinished: false, controlsY: 100 })
-assert.equal(local.label.string, '20s', 'reset must clear the local turn identity as well as its value')
-assert.deepEqual(local.label.node.position, new Vec3(0, 147, 0), 'the clock remains fixed above the action row regardless of hand height')
-
-const otherLocalTurn = createSnapshot({ currentTurn: 'p2' })
-local.controller.update({ snapshot: otherLocalTurn, humanId: 'p1', humanFinished: false, controlsY: 100 })
-assert.equal(local.label.node.active, false, 'the legacy text label is local-action only')
-assert.deepEqual(local.controller.project(otherLocalTurn, 'p1'), {
-  turnVisible: true,
-  turnSeconds: 20,
-  turnDurationSeconds: 20,
-  turnPlace: 'right',
-}, 'the HUD must retain the equal-size clock at a local opponent operation area')
-const pendingLocalTurn = createSnapshot({ actionPending: true })
-local.controller.update({ snapshot: pendingLocalTurn, humanId: 'p1', humanFinished: false, controlsY: 100 })
-assert.equal(local.controller.project(pendingLocalTurn, 'p1').turnVisible, false)
-local.controller.update({ snapshot: localTurn, humanId: 'p1', humanFinished: true, controlsY: 100 })
-assert.equal(local.label.node.active, false, 'finished local players must not retain an action deadline')
+const retired = createHarness()
+const retiredSnapshot = createSnapshot()
+retired.controller.update({ snapshot: retiredSnapshot, humanId: 'p1', humanFinished: false, controlsY: 100 })
+assert.equal(retired.label.node.active, false, 'no offline clock without server authority')
+for (let i = 0; i < 25; i++) retired.tick()
+assert.equal(retired.timeoutCount(), 0, 'offline state cannot synthesize actions')
+assert.equal(retired.controller.project(retiredSnapshot, 'p1').turnVisible, false)
+retired.controller.dispose()
 
 const networkLobby = {
   roomStatus: 'ready',

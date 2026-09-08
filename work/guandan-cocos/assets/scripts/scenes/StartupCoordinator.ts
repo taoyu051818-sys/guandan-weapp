@@ -1,7 +1,7 @@
 import { game, type Node, type Texture2D } from 'cc'
 import { ensureGameAssetBundle, type GameAssetBundleProgress } from '../services/GameAssetLoader'
 import { preloadAllClassicCardFrames } from '../ui/ClassicCardFrameStore'
-import { StartupLoadingOverlay } from '../ui/StartupLoadingOverlay'
+import { StartupLoadingOverlay, type StartupFailureCode } from '../ui/StartupLoadingOverlay'
 import type { TableViewport } from '../ui/ScreenAdapter'
 import type { SceneBackdropController } from './SceneBackdropController'
 
@@ -69,6 +69,7 @@ export class StartupCoordinator {
     if (!overlay || !this.isCurrent(attempt)) return
 
     overlay.setProgress(0.03, '正在连接资源服务...')
+    let failureCode: StartupFailureCode = 'GD-S01'
     try {
       await ensureGameAssetBundle((progress) => {
         if (!this.isCurrent(attempt) || !this.overlay) return
@@ -80,6 +81,7 @@ export class StartupCoordinator {
       })
       if (!this.isCurrent(attempt)) return
       overlay.setProgress(0.88, '正在准备牌面与大厅画面...')
+      failureCode = 'GD-S02'
 
       const [, cardSkinReady] = await Promise.all([
         this.dependencies.backdrop.preload('lobby'),
@@ -89,8 +91,8 @@ export class StartupCoordinator {
     } catch (error) {
       if (!this.isCurrent(attempt) || !this.overlay) return
       this.loading = false
-      console.error('Unable to prepare the game asset bundle.', error)
-      this.overlay.showError('资源下载失败，请检查网络后重试', () => this.begin())
+      console.error(`[GuandanStartup:${failureCode}] Unable to prepare the game asset bundle.`, error)
+      this.overlay.showError(failureCode === 'GD-S01' ? '请检查网络后重试' : '牌面或大厅画面准备失败，请重试', () => this.begin(), failureCode)
       return
     }
 
@@ -102,15 +104,8 @@ export class StartupCoordinator {
     } catch (error) {
       if (!this.isCurrent(attempt) || !this.overlay) return
       this.loading = false
-      console.error('Unable to initialize the game scene.', error)
-      this.overlay.showError('游戏初始化失败，请重新进入小游戏', () => {
-        void game.restart().catch((restartError) => {
-          console.error('Unable to restart the game scene.', restartError)
-          this.overlay?.showError('重新进入失败，请关闭后再次打开小游戏', () => {
-            void game.restart()
-          })
-        })
-      })
+      console.error('[GuandanStartup:GD-S03] Unable to initialize the game scene.', error)
+      this.overlay.showError('资源已就绪，请重新进入小游戏', () => this.restartApplication(), 'GD-S03')
       return
     }
 
@@ -128,6 +123,14 @@ export class StartupCoordinator {
     if (this.disposed || !this.initialized || !this.sceneStarted || this.readyPublished) return
     this.readyPublished = true
     this.dependencies.onReady()
+  }
+
+  private restartApplication (): void {
+    void game.restart().catch((error) => {
+      if (this.disposed) return
+      console.error('[GuandanStartup:GD-S04] Unable to restart the game scene.', error)
+      this.overlay?.showError('请关闭小游戏后再次打开', () => this.restartApplication(), 'GD-S04')
+    })
   }
 
   private isCurrent (attempt: number): boolean {

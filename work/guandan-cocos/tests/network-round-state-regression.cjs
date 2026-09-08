@@ -32,6 +32,7 @@ class FakeComponent {
   scheduleOnce () {}
 }
 class FakeSession {
+  setRoomView () {}
   joinRoom () {}
   enterLobby () {}
   leaveToMenu () {}
@@ -40,7 +41,7 @@ class FakeSocket {
   constructor () { this.listeners = new Map(); this.sent = []; this.sequence = 0 }
   on (type, listener) { this.listeners.set(type, [...(this.listeners.get(type) || []), listener]); return () => {} }
   emit (type, payload) { for (const listener of this.listeners.get(type) || []) listener(payload) }
-  send (type, payload) { const requestId = ++this.sequence; this.sent.push({ type, payload, requestId }); return requestId }
+  send (type, payload, retryRequestId) { const requestId = retryRequestId ?? ++this.sequence; this.sent.push({ type, payload, requestId }); return requestId }
   connect () { return Promise.resolve() }
   close () {}
 }
@@ -78,7 +79,9 @@ new Function('exports', 'module', 'require', lobbyEntryAttemptOutput)(lobbyEntry
 const lobbyCleanupTracker = loadPureTs(lobbyCleanupTrackerPath)
 const lobbyMatchedEntryCoordinator = loadPureTs(lobbyMatchedEntryCoordinatorPath)
 const lobbyResumeConnectionWatchdog = loadPureTs(lobbyResumeConnectionWatchdogPath)
-const lobbyResumeSession = loadPureTs(lobbyResumeSessionPath)
+const lobbyResumeSession = loadPureTs(lobbyResumeSessionPath, {
+  '../services/NetworkEndpoint': loadPureTs(path.join(root, 'assets/scripts/services/NetworkEndpoint.ts')),
+})
 
 const lobbyModelsOutput = ts.transpileModule(fs.readFileSync(lobbyModelsPath, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -101,6 +104,7 @@ const lobbyConnectionEventCoordinator = loadPureTs(lobbyConnectionEventCoordinat
 const lobbyMessageRouter = loadPureTs(lobbyMessageRouterPath, {
   './LobbyModels': lobbyModelsModule.exports,
   './LobbySyncTracker': lobbySyncTrackerModule.exports,
+  './FriendRoomViewReceiver': loadPureTs(path.join(root, 'assets/scripts/network/FriendRoomViewReceiver.ts')),
 })
 
 const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
@@ -117,6 +121,7 @@ runtime.require = request => {
   if (request === './CocosSocketClient') return { CocosSocketClient: FakeSocket }
   if (request === '../effects/NetworkEffectSyncPolicy') return policyModule.exports
   if (request === './LobbyEntryAttempt') return lobbyEntryAttemptModule.exports
+  if (request === './LobbyEntryRequest') return loadPureTs(path.join(root, 'assets/scripts/network/LobbyEntryRequest.ts'))
   if (request === './LobbyCleanupTracker') return lobbyCleanupTracker
   if (request === './LobbyCommandSender') return lobbyCommandSender
   if (request === './LobbyConnectionEventCoordinator') return lobbyConnectionEventCoordinator
@@ -231,9 +236,6 @@ assert.match(tableMatchCoordinatorSource, /deadlinePlayerId !== humanId/, 'only 
 assert.match(tableMatchCoordinatorSource, /deadlineAction === 'finishTribute'/, 'only the authoritative tribute leader may start play')
 assert.match(turnClockSource, /playerName} · \$\{ACTION_LABELS\[deadlineAction\]}/, 'tribute countdown must identify the authoritative player and action')
 const multiplayerTick = turnClockSource.slice(turnClockSource.indexOf('private readonly tick'), turnClockSource.indexOf('private playWarningTick'))
-assert.match(multiplayerTick, /if \(this\.dependencies\.isMultiplayer\(\)\)/, 'multiplayer countdown must have an explicit server-owned branch')
-assert.match(multiplayerTick, /this\.refreshLabel\(\)[\s\S]*return/, 'the server-owned branch must return without performing a local timeout action')
-assert.equal((multiplayerTick.match(/actOnLocalTimeout\(\)/g) ?? []).length, 1, 'only the local-game branch may invoke actOnLocalTimeout')
 assert.doesNotMatch(tableMatchCoordinatorSource, /humanId !== 'p1' && !gameWon/, 'all four seats must have a between-round ready control')
 assert.match(tableMatchCoordinatorSource, /roundReadyPlayerIds\?\.includes\(humanId\)/, 'the ready control must reflect this seat\'s authoritative vote')
 assert.match(tableMatchCoordinatorSource, /lobby\.cancelRoundReady\(\)/, 'a ready player must be able to cancel')
@@ -243,3 +245,6 @@ assert.match(tableOverlaySource, /this\.voteDissolve\(false\)/, 'the table overl
 assert.match(tableOverlaySource, /this\.voteDissolve\(true\)/, 'the table overlay must expose an agree vote')
 
 process.stdout.write('network round-state regression checks passed\n')
+
+assert.doesNotMatch(multiplayerTick, /actOnLocalTimeout|remainingSeconds -=/, 'clock must never simulate moves or elapsed local turns')
+assert.match(multiplayerTick, /deadline - this\.now\(\)/, 'deadline remains server-authoritative')

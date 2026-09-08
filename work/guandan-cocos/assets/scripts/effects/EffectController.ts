@@ -17,7 +17,6 @@ import { EffectProfileResolver } from './EffectProfileResolver'
 import { isBombEffectKey } from './EffectRecipes'
 import type { EffectRenderContext } from './EffectRenderContext'
 import { EffectRendererRegistry } from './EffectRendererRegistry'
-import type { FlowEffectKind, TributeFlowEvent } from './FlowEffectTypes'
 import { LegacyCoordinateAdapter } from './LegacyCoordinateAdapter'
 import { SixBombRenderer } from './SixBombRenderer'
 import { TransientEffectNodePool } from './TransientEffectNodePool'
@@ -26,26 +25,9 @@ import { preloadVfxCardFrames } from './VfxCardSnapshot'
 
 const { ccclass } = _decorator
 type SourceProvider = (playerId: PlayerId) => Vec3
-type TargetProvider = (playerId: PlayerId) => Vec3
+type TargetProvider = (playerId: PlayerId, action: PlayAction) => Vec3
 type CardBlastTargetProvider = () => readonly CardBlastReactionTarget[]
 const EAGER_EFFECT_ASSET_IDS = new Set(['common.impact-ring'])
-
-export type EffectRuntimeDiagnostics = Readonly<{
-  activeRendererHandles: number
-  activeFlightNodes: number
-  activeTransientNodes: number
-  pooledTransientNodes: number
-  activeMajorEffects: number
-  registeredRendererKeys: readonly string[]
-}>
-
-export type EffectAssetAudit = Readonly<{
-  bundled: number
-  loaded: number
-  missing: readonly string[]
-  migrationCandidates: number
-  rejected: number
-}>
 
 export type { PlayEffectPresentation } from './EffectActionPresentationCoordinator'
 
@@ -88,11 +70,7 @@ export class EffectController extends Component {
   private frames = new Map<string, SpriteFrame>()
   private frameRequests = new Map<string, Promise<SpriteFrame | null>>()
   private policy: EffectPolicy = DEFAULT_EFFECT_POLICY
-  private readonly transientNodes = new Set<Node>()
   private busy = false
-  private trusteeHandle: EffectHandle | null = null
-  private trusteeState: boolean | null = null
-  private trusteeTargetWorldPosition: Vec3 | null = null
   private cardBlastTargets: CardBlastTargetProvider | null = null
 
   public setup (tableRoot: Node, flightRoot: Node, topRoot: Node, soundPlayer: (event: AudioEvent) => void, actionVoicePlayer: (action: PlayAction) => void, busyListener: (busy: boolean) => void, cardBlastTargets?: CardBlastTargetProvider): void {
@@ -133,52 +111,6 @@ export class EffectController extends Component {
     return this.playback.waitForPresentation(completion, finish)
   }
 
-  /** Development-only style entry point: no action cursor or rule state is mutated. */
-  public previewAction (action: PlayAction, quality: EffectQuality, sourceWorldPosition = new Vec3(-160, -120, 0), targetWorldPosition = Vec3.ZERO): void {
-    const previous = this.quality
-    this.quality = quality
-    try {
-      this.play({
-        action,
-        actionIndex: 0,
-        humanId: action.playerId,
-        sourcePositions: action.cards.map(() => sourceWorldPosition),
-        targetWorldPosition,
-      })
-    } finally {
-      this.quality = previous
-    }
-  }
-
-  public previewFlow (kind: FlowEffectKind, text: string, targetNode?: Node, quality: EffectQuality = this.quality): EffectHandle {
-    return this.withQuality(quality, () => this.renderFlow(kind, text, targetNode ? { targetNode } : {}))
-  }
-
-  public diagnostics (): EffectRuntimeDiagnostics {
-    this.transientNodes.forEach(node => { if (!node.isValid) this.transientNodes.delete(node) })
-    return Object.freeze({
-      activeRendererHandles: this.renderers.activeCount,
-      activeFlightNodes: this.flight?.activeCount ?? 0,
-      activeTransientNodes: this.transientNodes.size + this.transientPool.activeCount,
-      pooledTransientNodes: this.transientPool.pooledCount(),
-      activeMajorEffects: this.majorHandle?.isActive ? 1 : 0,
-      registeredRendererKeys: Object.freeze(this.renderers.keys()),
-    })
-  }
-
-  public async auditRuntimeAssets (): Promise<EffectAssetAudit> {
-    const entries = this.assets.list()
-    const bundled = entries.filter(entry => entry.availability === 'bundled' && entry.decision === 'allow')
-    const results = await Promise.all(bundled.map(async entry => ({ id: entry.id, loaded: Boolean(await this.loadSpriteFrame(entry)) })))
-    return Object.freeze({
-      bundled: bundled.length,
-      loaded: results.filter(result => result.loaded).length,
-      missing: Object.freeze(results.filter(result => !result.loaded).map(result => result.id)),
-      migrationCandidates: entries.filter(entry => entry.availability === 'migration-candidate').length,
-      rejected: entries.filter(entry => entry.decision === 'deny').length,
-    })
-  }
-
   /** Only one newly appended action may play; baselines and sequence gaps land silently. */
   public syncActions (
     actions: PlayAction[],
@@ -196,56 +128,6 @@ export class EffectController extends Component {
       () => this.cancelAll('recovery'),
       request => this.play({ ...request, onCardArrive: card => request.onCardArrive?.(card.id) }),
     )
-  }
-
-  public playSettlement (won: boolean, levelUp: number, quality?: EffectQuality): void {
-    this.withQuality(quality, () => {
-      const profile: EffectProfile = { key: won ? 'victory' : 'defeat', level: 3, label: won ? `胜利  升 ${levelUp} 级` : '本局结束', durationMs: 1200, flightMs: 0, shake: 'none', sound: won ? 'victory' : 'defeat', haptic: won ? 'medium' : 'none', dimTable: false, color: won ? [255, 214, 92] : [164, 183, 184] }
-      if (!this.topRoot) return
-      const result = this.renderFlow(won ? 'victory' : 'defeat', profile.label, { levelUp })
-      if (won && levelUp > 0) {
-        void result.finished.then(reason => {
-          if (reason === 'completed' && this.node.isValid) this.withQuality(quality, () => this.renderFlow('upgrade', `升 ${levelUp} 级`, { levelUp }))
-        })
-      }
-    })
-  }
-
-  /** Migrated 27-step deal clip plus the old backOut/hold/backIn grade notice. */
-  public playRoundOpening (gradeText: string): void {
-    this.renderFlow('deal', '发牌')
-    this.renderFlow('grade', gradeText)
-  }
-
-  public playMatchSuccess (): void { this.renderFlow('match-success', '匹配成功') }
-
-  public playPlayerFinished (text: string): void { this.renderFlow('player-finished', text) }
-
-  public playTrusteeState (active: boolean, targetNode?: Node): void {
-    if (this.trusteeState === null && !active) { this.trusteeState = false; return }
-    const targetWorld = targetNode?.worldPosition.clone() ?? null
-    const targetMoved = Boolean(targetWorld && (!this.trusteeTargetWorldPosition || Vec3.distance(targetWorld, this.trusteeTargetWorldPosition) > 1))
-    if (this.trusteeState === active && !targetMoved && (active ? Boolean(this.trusteeHandle?.isActive) : true)) return
-    this.trusteeState = active
-    this.trusteeTargetWorldPosition = targetWorld
-    this.trusteeHandle?.cancel('replaced')
-    this.trusteeHandle = null
-    const handle = this.renderFlow(active ? 'trustee-on' : 'trustee-off', active ? '托管中' : '已取消托管', { targetNode })
-    if (active && handle.isActive) {
-      this.trusteeHandle = handle
-      handle.onFinish(() => { if (this.trusteeHandle === handle) this.trusteeHandle = null })
-    }
-  }
-
-  public playChatPulse (targetNode: Node, side: 'left' | 'right'): void {
-    this.renderFlow(side === 'left' ? 'chat-left' : 'chat-right', '', { targetNode })
-  }
-
-  public playTribute (event: TributeFlowEvent, sourceWorldPosition: Vec3, targetWorldPosition: Vec3, quality?: EffectQuality): void {
-    this.withQuality(quality, () => {
-      const kind: FlowEffectKind = event.phase === 'anti-tribute' ? 'anti-tribute' : event.phase === 'return' ? 'return-tribute' : 'tribute'
-      this.renderFlow(kind, kind === 'anti-tribute' ? '抗贡成立' : kind === 'return-tribute' ? '还贡' : '进贡', { card: event.card }, [sourceWorldPosition], targetWorldPosition)
-    })
   }
 
   public skipAll (reason: EffectCancelReason = 'skipped'): void { this.cancelAll(reason) }
@@ -269,13 +151,11 @@ export class EffectController extends Component {
     this.playback.play(event, this.quality, profile)
   }
 
-  private renderPlayImpact (profile: EffectProfile, event: PlayEffectEvent, wildcardUsed: boolean): EffectHandle {
+  private renderPlayImpact (profile: EffectProfile, event: PlayEffectEvent, _wildcardUsed: boolean): EffectHandle {
     if (isBombEffectKey(profile.key)) {
       return this.playRegisteredMajor(profile, event, {
         onImpact: () => {
           event.onFlightFinish?.()
-          if (!wildcardUsed) return
-          try { this.soundPlayer?.('wildcard') } catch (error) { console.warn('[effects] wildcard sound failed', error) }
         },
       })
     }
@@ -370,18 +250,6 @@ export class EffectController extends Component {
     return handle
   }
 
-  private renderFlow (
-    kind: FlowEffectKind,
-    _text: string,
-    _metadata: Readonly<Record<string, unknown>> = {},
-    _sourceWorldPositions?: readonly Vec3[],
-    _targetWorldPosition?: Vec3,
-  ): EffectHandle {
-    if (kind === 'victory') this.soundPlayer?.('victory')
-    else if (kind === 'defeat') this.soundPlayer?.('defeat')
-    return EffectHandle.completed('unavailable')
-  }
-
   private withQuality<T> (quality: EffectQuality | undefined, work: () => T): T {
     if (quality === undefined || quality === this.quality) return work()
     const previous = this.quality
@@ -457,29 +325,7 @@ export class EffectController extends Component {
     this.flight?.skipAll(reason)
     this.cardBlastReaction.cancel(reason)
     this.transientPool.releaseAll()
-    this.clearTransientNodes()
     this.actionPresentation.clearPendingOrigins()
-    this.trusteeHandle = null
-    this.trusteeState = null
-    this.trusteeTargetWorldPosition = null
-  }
-
-  private destroyTransient (node: Node): void {
-    this.transientNodes.delete(node)
-    if (!node.isValid) return
-    const stop = (target: Node): void => {
-      target.children.forEach(stop)
-      Tween.stopAllByTarget(target)
-      target.components.forEach(component => Tween.stopAllByTarget(component))
-    }
-    stop(node)
-    node.destroy()
-  }
-
-  private clearTransientNodes (): void {
-    const nodes = Array.from(this.transientNodes)
-    this.transientNodes.clear()
-    nodes.forEach(node => this.destroyTransient(node))
   }
 
   private vibrate (kind: EffectProfile['haptic']): void {

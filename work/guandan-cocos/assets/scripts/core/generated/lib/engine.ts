@@ -16,6 +16,7 @@ import {
   teammateOf,
 } from './turn'
 import { PlayType } from '../types/game'
+import type { MatchFormat } from './matchFormat'
 import type {
   Card,
   PlayAction,
@@ -27,6 +28,7 @@ import type {
 } from '../types/game'
 
 export interface EngineState {
+  matchFormat?: MatchFormat
   currentLevel: Rank
   ruleProfile: RuleProfile
   players: Record<PlayerId, Player>
@@ -62,6 +64,7 @@ export interface MatchState extends EngineState {
 }
 
 export interface CreateMatchStateInput {
+  matchFormat?: MatchFormat
   ruleProfile: RuleProfile
   currentLevel: Rank
   levelTeam: Team
@@ -97,6 +100,7 @@ export interface PassCommand extends VersionedCommand {
 export interface PrepareNextRoundCommand extends VersionedCommand {
   type: 'PREPARE_NEXT_ROUND'
   dealtHands: Record<PlayerId, Card[]>
+  nextLevel?: Rank
 }
 
 export interface SelectTributeCardCommand extends VersionedCommand {
@@ -187,6 +191,7 @@ export const createGame = (
 }
 
 export const createMatchState = (input: CreateMatchStateInput): MatchState => ({
+  ...(input.matchFormat ? { matchFormat: { ...input.matchFormat } } : {}),
   revision: input.revision ?? 0,
   roundId: input.roundId ?? 1,
   phase: 'playing',

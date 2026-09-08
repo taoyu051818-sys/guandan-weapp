@@ -36,8 +36,8 @@ const {
   SPECTATOR_POLL_INTERVAL_SECONDS,
   shouldStopSpectatorPolling,
   spectatorRetryDelaySeconds,
-} = compile(path.join(root, 'assets/scripts/replay/SpectatorPollingPolicy.ts'))
-const { DevelopmentSpectatorGateway } = compile(path.join(root, 'assets/scripts/services/DevelopmentApis.ts'))
+} = compile(path.join(root, 'migration/spectator/SpectatorPollingPolicy.ts'))
+const { DevelopmentSpectatorGateway } = compile(path.join(root, 'migration/platform/RetiredDevelopmentApis.ts'))
 
 assert.equal(SPECTATOR_POLL_INTERVAL_SECONDS, 3)
 assert.equal(SPECTATOR_MAX_RETRY_DELAY_SECONDS, 12)

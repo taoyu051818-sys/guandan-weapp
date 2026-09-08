@@ -72,6 +72,18 @@ export class HttpAuthGateway implements AuthGateway {
   }
 
   public signOut (): void { this.client.signOut() }
+
+  public async updateProfile (profile: Pick<UserProfile, 'displayName' | 'avatarUrl'>): Promise<UserProfile> {
+    // wx.request has no portable PATCH support; the server keeps PATCH for web clients too.
+    const payload = requireRecord(await this.client.request<unknown>('/api/v1/profile', 'POST', profile), '资料保存响应')
+    return normalizeUserProfile(payload.user, '用户信息')
+  }
+
+  public async getAvatarImage (expectedAvatar?: string): Promise<string | null> {
+    const payload = requireRecord(await this.client.request<unknown>('/api/v1/profile/avatar'), '头像响应')
+    if (expectedAvatar && payload.avatarUrl !== expectedAvatar) return null
+    return typeof payload.dataUri === 'string' && /^data:image\/(png|jpeg);base64,/.test(payload.dataUri) ? payload.dataUri : null
+  }
 }
 
 export class HttpPlayerCenterGateway implements PlayerCenterGateway {

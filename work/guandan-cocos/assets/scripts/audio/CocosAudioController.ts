@@ -2,8 +2,10 @@ import { _decorator, AudioClip, AudioSource, Component, Node } from 'cc'
 import type { PlayAction } from '../core/generated'
 import { GameSession } from '../session/GameSession'
 import { loadGameAsset } from '../services/GameAssetLoader'
-import { resolveAudioEvent, resolveAudioProfile, resolveCountdownProfile, type AudioEvent, type AudioProfile } from './AudioProfiles'
+import { RETIRED_AUDIO_ROUTES, resolveAudioEvent, resolveAudioProfile, resolveCountdownProfile, type AudioEvent, type AudioProfile } from './AudioProfiles'
 import { resolvePlayVoiceProfile } from './PlayVoiceProfiles'
+import { OptionalAudioAssetCache } from './OptionalAudioAssetCache'
+import { ActionVoiceGate } from './ActionVoiceGate'
 
 const { ccclass, property } = _decorator
 export type BgmMode = 'lobby' | 'battle'
@@ -22,9 +24,9 @@ export class CocosAudioController extends Component {
   public bgmSource: AudioSource | null = null
 
   private effectSource: AudioSource | null = null
-  private readonly clips = new Map<string, AudioClip>()
-  private readonly unavailableAssets = new Set<string>()
-  private readonly pendingLoads = new Map<string, Array<(clip: AudioClip | null) => void>>()
+  private readonly assets = new OptionalAudioAssetCache<AudioClip>((path, done) => loadGameAsset(path, AudioClip, done))
+  private readonly actionVoices = new ActionVoiceGate()
+  private disposed = false
   private readonly lastRequests = new Map<AudioEvent, number>()
   private readonly lastPlayedAssets = new Map<string, number>()
   private readonly variantCursors = new Map<AudioEvent, number>()
@@ -33,9 +35,7 @@ export class CocosAudioController extends Component {
   private lastQuickVoiceAt = -Infinity
   private soundEnabled = true
   private bgmMode: BgmMode = 'lobby'
-  private readonly bgmClips = new Map<string, AudioClip>()
   private readonly pendingBgmAssets = new Set<string>()
-  private readonly unavailableBgmAssets = new Set<string>()
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession)
@@ -46,19 +46,19 @@ export class CocosAudioController extends Component {
   }
 
   protected onDestroy (): void {
+    this.disposed = true
     this.cancelTransientPlayback()
     this.session?.events.off('guandan:session', this.applySettings, this)
     this.bgmSource?.stop()
-    this.pendingLoads.clear()
-    this.clips.clear()
-    this.bgmClips.clear()
+    if (this.bgmSource) this.bgmSource.clip = null
+    this.assets.dispose()
     this.pendingBgmAssets.clear()
-    this.unavailableBgmAssets.clear()
     this.effectSource = null
   }
 
   /** The scene owns the lobby/table boundary; this controller owns the audible transition. */
   public setBgmMode (mode: BgmMode): void {
+    if (this.disposed) return
     if (this.bgmMode !== mode) {
       this.bgmMode = mode
       const source = this.ensureBgmSource()
@@ -72,6 +72,7 @@ export class CocosAudioController extends Component {
 
   /** Invalidates delayed cues and in-flight optional loads at a table/session boundary. */
   public cancelTransientPlayback (): void {
+    this.actionVoices.invalidate()
     this.playbackEpoch += 1
     this.roundStartEpoch += 1
     this.effectSource?.stop()
@@ -97,6 +98,7 @@ export class CocosAudioController extends Component {
 
   /** Quick-chat clips are optional and intentionally do not fall back to game SFX. */
   public playVoice (key: string): void {
+    if (key in RETIRED_AUDIO_ROUTES) return
     const settings = this.session?.snapshot.settings
     if (settings && !settings.soundEnabled) return
     const now = Date.now()
@@ -107,10 +109,11 @@ export class CocosAudioController extends Component {
 
   /** Announces only the card groups for which the imported pack is unambiguous. */
   public playActionVoice (action: PlayAction): void {
+    const current = this.actionVoices.begin()
     const settings = this.session?.snapshot.settings
     if (settings && !settings.soundEnabled) return
     const profile = resolvePlayVoiceProfile(action)
-    if (profile) this.playFirstAvailable(this.selectHumanVoiceKeys(profile.assetKeys), profile.volumeScale)
+    if (profile) this.playFirstAvailable(this.selectHumanVoiceKeys(profile.assetKeys), profile.volumeScale, 0, this.playbackEpoch, current)
   }
 
   public playEvent (event: AudioEvent): void {
@@ -128,6 +131,7 @@ export class CocosAudioController extends Component {
   }
 
   private applySettings (): void {
+    if (this.disposed) return
     const settings = this.session?.snapshot.settings
     const nextSoundEnabled = settings?.soundEnabled ?? true
     if (this.soundEnabled && !nextSoundEnabled) {
@@ -143,7 +147,7 @@ export class CocosAudioController extends Component {
       return
     }
     const assetPath = BGM_ASSETS[this.bgmMode]
-    const clip = this.bgmClips.get(assetPath)
+    const clip = this.assets.peek(assetPath)
     if (!clip) {
       source.stop()
       source.clip = null
@@ -169,16 +173,11 @@ export class CocosAudioController extends Component {
 
   /** Each track is optional; late loads may only activate the mode that still requests them. */
   private ensureBgmLoaded (assetPath: string): void {
-    if (this.bgmClips.has(assetPath) || this.pendingBgmAssets.has(assetPath) || this.unavailableBgmAssets.has(assetPath)) return
+    if (this.disposed || this.pendingBgmAssets.has(assetPath)) return
     this.pendingBgmAssets.add(assetPath)
-    loadGameAsset(assetPath, AudioClip, (error, clip) => {
+    this.assets.get(assetPath, clip => {
       this.pendingBgmAssets.delete(assetPath)
-      if (error || !clip) {
-        this.unavailableBgmAssets.add(assetPath)
-        return
-      }
-      this.bgmClips.set(assetPath, clip)
-      if (this.node.isValid && BGM_ASSETS[this.bgmMode] === assetPath) this.applySettings()
+      if (!this.disposed && clip && this.node.isValid && BGM_ASSETS[this.bgmMode] === assetPath) this.applySettings()
     })
   }
 
@@ -191,18 +190,16 @@ export class CocosAudioController extends Component {
   }
 
   private playProfile (profile: AudioProfile): void {
+    const current = profile.event === 'pass' ? this.actionVoices.begin() : () => true
     if (!this.acceptCooldown(profile)) return
     const keys = this.selectAssetKeys(profile)
-    this.playFirstAvailable(profile.event === 'pass' ? this.selectHumanVoiceKeys(keys) : keys, profile.volumeScale)
+    this.playFirstAvailable(profile.event === 'pass' ? this.selectHumanVoiceKeys(keys) : keys, profile.volumeScale, 0, this.playbackEpoch, current)
   }
 
-  /** Human announcements stay inside one selected voice pack; generated neutral
-   * effects may remain as fallback, but another recorded voice never leaks in. */
+  /** Only curated Female announcements are allowed, including old cached sessions.
+   * Unclassified licensed speech must not reintroduce another voice as fallback. */
   private selectHumanVoiceKeys (assetKeys: readonly string[]): readonly string[] {
-    if (this.session?.snapshot.settings.voicePack !== 'male') return assetKeys
-    const male = assetKeys.filter(key => key.startsWith('niuma/')).map(key => key.replace(/^niuma\//, 'niuma-male/'))
-    const neutral = assetKeys.filter(key => !key.startsWith('niuma/') && !key.startsWith('licensed/'))
-    return male.concat(neutral)
+    return assetKeys.filter(key => key.startsWith('niuma/') || key === 'licensed/single_5_female' || key === 'tts/steel_plate')
   }
 
   /** Round-robin keeps all curated pass variants audible and deterministic. */
@@ -213,11 +210,13 @@ export class CocosAudioController extends Component {
     return profile.assetVariants[cursor % profile.assetVariants.length]
   }
 
-  private playFirstAvailable (assetKeys: readonly string[], volumeScale: number, index = 0, epoch = this.playbackEpoch): void {
-    if (index >= assetKeys.length || !this.effectSource?.node.isValid) return
-    this.loadOptionalClip(assetKeys[index], clip => {
+  private playFirstAvailable (assetKeys: readonly string[], volumeScale: number, index = 0,
+    epoch = this.playbackEpoch, current: () => boolean = () => true): void {
+    if (index >= assetKeys.length || !this.isPlaybackCurrent(epoch) || !current()) return
+    this.assets.get(`audio/voices/${assetKeys[index]}`, clip => {
       if (!this.isPlaybackCurrent(epoch)) return
-      if (!clip) return this.playFirstAvailable(assetKeys, volumeScale, index + 1, epoch)
+      if (!current()) return
+      if (!clip) return this.playFirstAvailable(assetKeys, volumeScale, index + 1, epoch, current)
       const assetKey = assetKeys[index]
       const now = Date.now()
       if (now - (this.lastPlayedAssets.get(assetKey) ?? -Infinity) < 60) return
@@ -229,25 +228,9 @@ export class CocosAudioController extends Component {
   }
 
   private isPlaybackCurrent (epoch: number): boolean {
-    if (epoch !== this.playbackEpoch || !this.effectSource?.node.isValid) return false
+    if (this.disposed || epoch !== this.playbackEpoch || !this.effectSource?.node.isValid) return false
     const settings = this.session?.snapshot.settings
     return !settings || settings.soundEnabled
   }
 
-  /** Missing/failed resources are cached as unavailable and degrade to the next candidate. */
-  private loadOptionalClip (assetKey: string, done: (clip: AudioClip | null) => void): void {
-    const cached = this.clips.get(assetKey)
-    if (cached) return done(cached)
-    if (this.unavailableAssets.has(assetKey)) return done(null)
-    const pending = this.pendingLoads.get(assetKey)
-    if (pending) { pending.push(done); return }
-    this.pendingLoads.set(assetKey, [done])
-    loadGameAsset(`audio/voices/${assetKey}`, AudioClip, (error, clip) => {
-      const listeners = this.pendingLoads.get(assetKey) ?? []
-      this.pendingLoads.delete(assetKey)
-      if (error || !clip) this.unavailableAssets.add(assetKey)
-      else this.clips.set(assetKey, clip)
-      listeners.forEach(listener => listener(error || !clip ? null : clip))
-    })
-  }
 }

@@ -1,6 +1,7 @@
-import { Node, Vec3 } from 'cc'
+import { Color, Node, Vec3 } from 'cc'
 import type { FrontPageGateways, PlayerDashboard, SeasonTaskList } from '../../services/FrontPageGatewayContracts'
-import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
+import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
+import { coastalText, coastalButton } from '../../ui/CoastalUi'
 import type { PageRouter } from '../PageRouter'
 import type { FrontPagePlayerState } from './FrontPagePlayerState'
 import type { FrontPageWalletState } from './FrontPageWalletState'
@@ -12,6 +13,7 @@ const settle = <T>(promise: Promise<T>): Promise<Settled<T>> => promise.then(
 )
 
 export type PlayerCenterPageDependencies = {
+  editProfile: () => void
   router: PageRouter
   gateways: FrontPageGateways
   player: FrontPagePlayerState
@@ -47,27 +49,32 @@ export class PlayerCenterPageDomain {
       this.render(null, this.errorDetail(dashboardResult.reason, '个人数据暂时无法获取'))
       return
     }
-    this.dependencies.player.dashboard = dashboardResult.value
+    this.dependencies.player.updateDashboard(dashboardResult.value)
     const walletStatus = walletResult.status === 'fulfilled' ? '' : ' · 积分暂时无法同步'
     this.render(dashboardResult.value, `${this.dependencies.gateways.configured ? '已同步平台数据' : '开发演示数据'}${walletStatus}`)
   }
 
   private render (dashboard: PlayerDashboard | null, status: string): void {
     this.dashboardView = { dashboard, status }
-    const ui = this.dependencies.router.open('player-center')
-    ui.menuLabel('个人中心', 0, 220, 42)
-    ui.menuLabel(status, 0, 174, 18)
+    const page = this.dependencies.router.open('player-center')
+    const panel = page.panel('PlayerCenterSurface', 0, 0, 760, 540, {
+      fill: new Color(17, 52, 72, 247), stroke: new Color(109, 160, 181), lineWidth: 1, radius: 26,
+    })
+    const ui = new RuntimeUiFactory(panel)
+    coastalText(ui, '个人中心', 0, 218, 650, 52, 36, { bold: true })
+    coastalText(ui, status, 0, 172, 680, 34, 21, { color: new Color(168, 204, 218) })
     if (dashboard) {
       const games = Math.max(0, dashboard.rating.games)
       const wins = Math.max(0, dashboard.rating.wins)
       const winRate = games ? Math.round(wins * 100 / games) : 0
       const season = dashboard.season ? `${dashboard.season.name}  ${dashboard.season.progress.score}分 · ${dashboard.season.progress.gamesPlayed}场` : '暂无赛季'
       const points = this.dependencies.wallet.fresh ? String(Math.max(0, Math.round(this.dependencies.wallet.value.points))) : '--'
-      ui.menuLabel(`${dashboard.user.displayName}    账号 ${dashboard.user.accountId}\n积分  ${points}    综合分  ${Math.round(dashboard.rating.comprehensiveScore)}\n总场数  ${games}    胜率  ${winRate}%    头游  ${dashboard.stats.firstPlaceFinishes}\n${season}`, 0, 86, 23)
+      coastalText(ui, `${dashboard.user.displayName}    账号 ${dashboard.user.accountId}\n积分  ${points}    综合分  ${Math.round(dashboard.rating.comprehensiveScore)}\n总场数  ${games}    胜率  ${winRate}%    头游  ${dashboard.stats.firstPlaceFinishes}\n${season}`, 0, 76, 680, 144, 24)
     }
-    this.sizedButton(ui, '赛季任务', -150, -70, 250, 48, 19, () => { void this.showSeasonTasks() })
-    this.sizedButton(ui, '我的牌谱', 150, -70, 250, 48, 19, this.dependencies.showReplayList)
-    this.pageButton(ui, '返回大厅', -145, this.dependencies.showMenu)
+    coastalButton(ui, '赛季任务', -150, -62, 270, 58, () => { void this.showSeasonTasks() })
+    coastalButton(ui, '我的对局', 150, -62, 270, 58, this.dependencies.showReplayList)
+    coastalButton(ui, '修改昵称和头像', 0, -132, 330, 58, this.dependencies.editProfile, true)
+    coastalButton(ui, '返回大厅', 0, -208, 230, 56, this.dependencies.showMenu)
   }
 
   private async showSeasonTasks (): Promise<void> {

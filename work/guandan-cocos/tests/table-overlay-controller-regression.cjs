@@ -271,7 +271,9 @@ controller.setTableVisible(true)
 bubbles.set('p1', { playerId: 'p1', message: '大家加油' })
 controller.renderOwnChat()
 assert.equal(ownBubble.getComponent(MockLabel).string, '大家加油')
-assert.equal(ownBubble.active, true)
+assert.equal(ownBubble.active, false, 'legacy own-chat node is only an effect anchor')
+assert.equal(findNode(root, 'SeatChat-p1').active, true)
+assert.equal(findNode(root, 'SeatChat-p1').getComponent(MockLabel).string, '大家加油')
 
 controller.resize({ ...viewport, width: 1000, halfWidth: 500, safeLeft: 20, safeBottom: 10 })
 assert.deepEqual(ownBubble.position, new MockVec3(-260, 125, 0), 'own bubble must retain the safe-area position formula')
@@ -283,13 +285,15 @@ scheduledOnce.at(-1).callback()
 assert.equal(finishToast.active, false)
 
 controller.toggleQuickChatPanel()
-let quickChatNodes = root.children.filter(node => node.name.startsWith('QuickChat-'))
+let quickChatNodes = descendants(root).filter(node => node.name.startsWith('QuickChat-'))
 assert.equal(quickChatNodes.length, phrases.length + 1)
-assert.equal(quickChatNodes[0].position.x, -260)
+assert.equal(quickChatNodes[0].position.x, 278)
+assert.equal(controller.blocksHandInput, true, 'open chat panel must exclude the underlying hand')
 quickChatNodes[0].emit(MockNode.EventType.TOUCH_END)
 assert.deepEqual(chatCalls.find(call => call[0] === 'send'), ['send', 'p1', 'hurry'])
 assert.deepEqual(voices.at(-1), 'chat_hurry')
-assert.deepEqual(pulses.at(-1), ['p1', 'OwnChatBubble'])
+assert.deepEqual(pulses, [], 'retired chat pulse is not dispatched; the real bubble remains')
+assert.equal(controller.blocksHandInput, false)
 assert.equal(root.children.filter(node => node.name.startsWith('QuickChat-')).length, 0)
 
 state.interactionDisabled = true
@@ -300,16 +304,16 @@ state.interactionDisabled = false
 
 state.multiplayer = true
 controller.toggleQuickChatPanel()
-quickChatNodes = root.children.filter(node => node.name.startsWith('QuickChat-'))
+quickChatNodes = descendants(root).filter(node => node.name.startsWith('QuickChat-'))
 quickChatNodes[1].emit(MockNode.EventType.TOUCH_END)
 assert.deepEqual(lobbyCalls.at(-1), ['chat', '你的牌打得太好啦'])
 const voiceCountBeforeEcho = voices.length
 lobbyEvents.emit('guandan:chat', { playerId: 'p2', text: '你的牌打得太好啦' })
 assert.equal(voices.length, voiceCountBeforeEcho + 1, 'authoritative echo must own multiplayer voice playback')
-assert.deepEqual(pulses.at(-1), ['p2', 'OwnChatBubble'])
+assert.deepEqual(pulses, [], 'remote chat uses its seat bubble without the retired pulse')
 
 controller.toggleQuickChatPanel()
-quickChatNodes = root.children.filter(node => node.name.startsWith('QuickChat-'))
+quickChatNodes = descendants(root).filter(node => node.name.startsWith('QuickChat-'))
 const muteButton = quickChatNodes.find(node => node.buttonText === '屏蔽其他玩家快捷语')
 assert.ok(muteButton)
 muteButton.emit(MockNode.EventType.TOUCH_END)
@@ -362,7 +366,7 @@ lobbyEvents.emit('guandan:dissolve-vote', { vote: null, outcome: 'expired' })
 assert.equal(finishToast.getComponent(MockLabel).string, '解散投票已超时，牌局继续')
 
 controller.toggleQuickChatPanel()
-const retainedQuickChatNode = root.children.find(node => node.name.startsWith('QuickChat-'))
+const retainedQuickChatNode = descendants(root).find(node => node.name.startsWith('QuickChat-'))
 const retainedHandler = retainedQuickChatNode.handlers.get(MockNode.EventType.TOUCH_END)[0]
 controller.requestLeave()
 const retainedLeaveNode = findNode(root, 'LeaveButton')

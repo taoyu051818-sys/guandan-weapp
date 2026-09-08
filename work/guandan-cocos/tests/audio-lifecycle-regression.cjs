@@ -7,6 +7,7 @@ const projectRoot = path.resolve(__dirname, '..')
 const sourcePath = path.join(projectRoot, 'assets/scripts/audio/CocosAudioController.ts')
 const scenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
 const ts = loadTypeScript()
+const { loadTs } = require('./support/load-typescript-module.cjs')
 const pendingLoads = []
 
 class Component {}
@@ -40,14 +41,16 @@ const localRequire = request => {
   }
   if (request === '../session/GameSession') return { GameSession: class GameSession {} }
   if (request === '../services/GameAssetLoader') return {
-    loadGameAsset: (assetPath, assetType, callback) => pendingLoads.push({ assetPath, assetType, callback }),
+    loadGameAsset: (assetPath, assetType, callback) => { pendingLoads.push({ assetPath, assetType, callback }); return () => {} },
   }
+  if (request === './OptionalAudioAssetCache' || request === './ActionVoiceGate') return loadTs(path.resolve(path.dirname(sourcePath), `${request}.ts`))
   if (request === './AudioProfiles') return {
+    RETIRED_AUDIO_ROUTES: { wildcard: { runtimeAllowed: false } },
     resolveAudioEvent: () => null,
     resolveAudioProfile: event => ({ event, assetKeys: [event], volumeScale: 1, cooldownMs: 0 }),
     resolveCountdownProfile: () => null,
   }
-  if (request === './PlayVoiceProfiles') return { resolvePlayVoiceProfile: () => null }
+  if (request === './PlayVoiceProfiles') return { resolvePlayVoiceProfile: action => action.type === 'Plate' ? { assetKeys: ['tts/steel_plate'], volumeScale: .92 } : null }
   throw new Error(`unexpected runtime dependency ${request}`)
 }
 new Function('exports', 'module', 'require', '__filename', '__dirname', result.outputText)(
@@ -82,6 +85,20 @@ const makeController = () => {
 }
 
 const rounds = makeController()
+const retired = makeController()
+const loadCount = pendingLoads.length
+retired.controller.playVoice('wildcard')
+retired.controller.playEffect('wildcard')
+assert.equal(pendingLoads.length, loadCount, 'neither direct voice nor legacy playback may load the retired level cue')
+const steel = makeController()
+steel.controller.playActionVoice({type:'Plate'})
+assert.equal(pendingLoads.at(-1).assetPath, 'audio/voices/tts/steel_plate')
+const steelClip = new AudioClip()
+pendingLoads.at(-1).callback(null, steelClip)
+assert.deepEqual(steel.played, [steelClip], 'steel-plate announcement must reach the dedicated audio source once')
+rounds.controller.session.snapshot.settings.voicePack = 'male'
+assert.deepEqual(rounds.controller.selectHumanVoiceKeys(['niuma-male/bomb', 'licensed/pass', 'niuma/bomb']), ['niuma/bomb'], 'stale Male settings and unclassified speech must not restore Male playback')
+assert.deepEqual(rounds.controller.selectHumanVoiceKeys(['niuma-male/pass_1']), [], 'removed Male voices must degrade to silence')
 rounds.controller.playRoundStart()
 const firstDeal = rounds.scheduled.at(-1)
 rounds.controller.playRoundStart()

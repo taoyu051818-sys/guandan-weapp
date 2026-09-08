@@ -15,7 +15,7 @@ const friendMatchEndReasons = new Set(['round-limit', 'time-limit'])
 const spectatorEventKeys = new Set([
   'eventId', 'matchId', 'roomId', 'sequence', 'at', 'type', 'roundSequence',
   'playerId', 'cards', 'playType', 'automatic', 'ranking', 'winnerTeam',
-  'isGameWon', 'reason', 'userId', 'scores', 'roundsPlayed', 'endedAt',
+  'isGameWon', 'reason', 'userId', 'scores', 'roundsPlayed', 'endedAt', 'friendRoster',
 ])
 const spectatorCardKeys = new Set(['rank', 'suit'])
 const friendMatchScoresKeys = new Set(['teamA', 'teamB'])
@@ -27,7 +27,7 @@ const spectatorPostStartTypes = new Set([
 ])
 const spectatorCommonKeys = ['eventId', 'matchId', 'roomId', 'sequence', 'at', 'type', 'roundSequence']
 const spectatorKeysByType = {
-  'game-start': new Set(spectatorCommonKeys),
+  'game-start': new Set([...spectatorCommonKeys, 'friendRoster']),
   'round-start': new Set(spectatorCommonKeys),
   'tribute-start': new Set(spectatorCommonKeys),
   tribute: new Set([...spectatorCommonKeys, 'playerId']),
@@ -111,6 +111,11 @@ export const normalizeSpectatorEvent = (eventId, rawEvent, now) => {
   const roundSequence = Number(rawEvent.roundSequence)
   if (!Number.isSafeInteger(roundSequence) || roundSequence < 1 || roundSequence > 1000) throw badRequest('INVALID_ROUND_SEQUENCE', '观战事件 roundSequence 无效')
   const event = { eventId, matchId, roomId: String(rawEvent.roomId), sequence, at, type: rawEvent.type, roundSequence }
+  if (rawEvent.friendRoster !== undefined) {
+    assertOnlyKeys(rawEvent.friendRoster, new Set(seats), 'INVALID_FRIEND_ROSTER', '开局席位表无效')
+    if (!seats.every(seat => typeof rawEvent.friendRoster[seat] === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(rawEvent.friendRoster[seat]))) throw badRequest('INVALID_FRIEND_ROSTER', '开局席位身份无效')
+    event.friendRoster = { ...rawEvent.friendRoster }
+  }
 
   if (rawEvent.type === 'tribute' || rawEvent.type === 'return-tribute') {
     if (!seats.includes(rawEvent.playerId)) throw badRequest('INVALID_SPECTATOR_PLAYER', '贡还动作席位无效')
@@ -140,7 +145,7 @@ export const normalizeSpectatorEvent = (eventId, rawEvent, now) => {
   }
   if (rawEvent.type === 'seat-left') {
     if (roundSequence !== 1) throw badRequest('INVALID_FRIEND_SEAT_ROUND', '好友房开局前离席事件 roundSequence 必须为 1')
-    if (!seats.slice(1).includes(rawEvent.playerId)) throw badRequest('INVALID_SPECTATOR_PLAYER', '好友房离席事件只接受 p2 到 p4')
+    if (![...seats, 'observer'].includes(rawEvent.playerId)) throw badRequest('INVALID_SPECTATOR_PLAYER', '好友房离席位置无效')
     if (!spectatorSeatLeaveReasons.has(rawEvent.reason)) throw badRequest('INVALID_FRIEND_SEAT_LEAVE_REASON', '好友房离席原因只支持 left 或 kicked')
     const userId = typeof rawEvent.userId === 'string' ? rawEvent.userId.trim() : ''
     if (!userId || userId.length > 128 || !/^[A-Za-z0-9:_-]+$/.test(userId)) throw badRequest('INVALID_FRIEND_SEAT_USER', '好友房离席用户无效')

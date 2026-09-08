@@ -4,12 +4,16 @@ on:
   pull_request:
     paths:
       - 'shared-core/**'
+      - '.gitignore'
+      - 'scripts/check-repository-boundaries.mjs'
       - 'work/guandan-cocos/**'
       - '.github/workflows/guandan-cocos.yml'
   push:
     branches: [main]
     paths:
       - 'shared-core/**'
+      - '.gitignore'
+      - 'scripts/check-repository-boundaries.mjs'
       - 'work/guandan-cocos/**'
       - '.github/workflows/guandan-cocos.yml'
 

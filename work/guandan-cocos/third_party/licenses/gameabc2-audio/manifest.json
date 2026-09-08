@@ -5,132 +5,6 @@
   "runtimeDirectory": "assets/game-assets/audio/voices/licensed",
   "assets": [
     {
-      "label": "顺子",
-      "key": "licensed/straight",
-      "file": "straight.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3a/3a415123-ce33-4221-9329-95e8d7004ef6.3830f.mp3",
-      "bytes": 12195,
-      "sha256": "abb9de2a4baf66b8a5717e3dde26453c90a6a6fb1e165377e35b8fc00e53e871",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对小王",
-      "key": "licensed/pair_small_joker",
-      "file": "pair_small_joker.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/bc/bcbfbc62-da5c-447f-a890-ee7685db6087.ae0fa.mp3",
-      "bytes": 16416,
-      "sha256": "7502480c5f9c0333cab0aaf1fa12a6eaf0179838af108586a426d46cebcab11b",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "大王",
-      "key": "licensed/single_big_joker",
-      "file": "single_big_joker.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/12/12d5cfec-fbf0-44ea-b3c8-40fc43f1c557.9f870.mp3",
-      "bytes": 16419,
-      "sha256": "b73106368d7d7f8b0c5ab6ee0b869cc4cd621266fba8f21563160dc93be50b55",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "小王",
-      "key": "licensed/single_small_joker",
-      "file": "single_small_joker.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3e/3eb574c7-3cd1-4217-afb9-b08bce88c607.12cfb.mp3",
-      "bytes": 34080,
-      "sha256": "504eba7be6572a75e54f76f0c726baad9d3d14657b9b7d3df908d30d022c58be",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "单张A",
-      "key": "licensed/single_a",
-      "file": "single_a.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/30/307fd8ce-5142-44a7-a830-6c16bedcce58.2e16c.mp3",
-      "bytes": 9507,
-      "sha256": "5ceea8e5393ef47d29868c710f9255131d5ada33b69b33da4386dad27869ecd4",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对老K",
-      "key": "licensed/pair_k",
-      "file": "pair_k.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/81/81e83a89-877a-44a7-b947-625dae7c1136.efc30.mp3",
-      "bytes": 18723,
-      "sha256": "ee6f703d1217be848f894b08ce2a5d289ee31bcffef74ea7c270903734d35c0f",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "单张K",
-      "key": "licensed/single_k",
-      "file": "single_k.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/27/27e45534-80a1-4e63-81ff-a7581dd6d2f8.c3798.mp3",
-      "bytes": 9891,
-      "sha256": "d6c35ea8e132607c17c72beaee64aeb5fbcbafe73d253e8b20eeede6a6129119",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对J",
-      "key": "licensed/pair_j",
-      "file": "pair_j.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/65/651c2017-2b54-4948-b1f6-c0b4b2ddeb36.64e14.mp3",
-      "bytes": 16803,
-      "sha256": "069d1c0f95ddde4f12a203f2a6047d1a007cc087c475b886b1ec85eb5865a73d",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "单张J",
-      "key": "licensed/single_j",
-      "file": "single_j.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/f2/f2ad59b5-0b1b-4f7b-9df9-015d8348faec.31af1.mp3",
-      "bytes": 21024,
-      "sha256": "286eaa8e687689ccc73f97779ec9b561bf7484459de52e3ec96c78c48b1964af",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对9",
-      "key": "licensed/pair_9",
-      "file": "pair_9.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/81/8185c95a-b9f8-4f39-93c6-e123eb936401.d65ca.mp3",
-      "bytes": 13347,
-      "sha256": "747c22f8e6f2a908fcc2a55c653356ff9fece16d60b2b4e32dc5fb8bea1142f1",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "单张9",
-      "key": "licensed/single_9",
-      "file": "single_9.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/d6/d62bd8c7-57f3-49c5-a624-88a2824e0368.5cb8c.mp3",
-      "bytes": 11040,
-      "sha256": "44889b39bcaddd546d091d60a18a088f7523528aefe9e28bbe1d64f2b1f20f94",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对7",
-      "key": "licensed/pair_7",
-      "file": "pair_7.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/5b/5b3df909-6016-40d2-9357-30abd56f0f3c.ea4fb.mp3",
-      "bytes": 13347,
-      "sha256": "cfb0d7d253238b153b9475854b383241859a7a3911053383ad616ffde3174b86",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "单张6",
-      "key": "licensed/single_6",
-      "file": "single_6.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/28/287aa164-9b33-4d09-8831-64e2d2715ddb.81a62.mp3",
-      "bytes": 12963,
-      "sha256": "cbf27166b59e14f46670f6b2513ac681bb7dbea7fa61ff93afc7e6aa2897f003",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对5",
-      "key": "licensed/pair_5",
-      "file": "pair_5.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/23/230f0085-f93f-4cd0-acfe-302e2796b17e.a3274.mp3",
-      "bytes": 13347,
-      "sha256": "9e12366bb834b1c2402b358a5fb3aec5eafd26dda318aa2b312e428991321a8e",
-      "contentType": "audio/mpeg"
-    },
-    {
       "label": "单张5（女声）",
       "key": "licensed/single_5_female",
       "file": "single_5_female.mp3",
@@ -140,66 +14,12 @@
       "contentType": "audio/mpeg"
     },
     {
-      "label": "单张5（男声）",
-      "key": "licensed/single_5_male",
-      "file": "single_5_male.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/09/0993b521-aa76-4df9-bdda-20b5ccc5836d.53530.mp3",
-      "bytes": 11427,
-      "sha256": "56d70bc69aa297777b5da5e456da7d66b870da5c0e69bc767bc19e6cd89f4226",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对4",
-      "key": "licensed/pair_4",
-      "file": "pair_4.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/a8/a84f5c76-8391-4928-9928-722e44c90d33.e7615.mp3",
-      "bytes": 11427,
-      "sha256": "c64c0478e52d2aaf52e7eeb0bd2a3d3d6a07b6827f36aa34137c2d7a19299bbb",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对3",
-      "key": "licensed/pair_3",
-      "file": "pair_3.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3d/3debd1a9-4705-40a9-a723-cb494f67d683.90ebf.mp3",
-      "bytes": 13731,
-      "sha256": "7bbc48937ffe6a5868dbd1a626fa5ca151a2fb4041d7e8c06083fb95b5bdb2be",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对2",
-      "key": "licensed/pair_2",
-      "file": "pair_2.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/d8/d80ead4f-3723-4847-aa77-c0292b63bafb.6f4cb.mp3",
-      "bytes": 13347,
-      "sha256": "fedab4ebb8b865e5811794032f7a92c4ba9f1ea185d13e8b01e0c211e6fc5fb8",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "单张2",
-      "key": "licensed/single_2",
-      "file": "single_2.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/af/af437165-6d5a-4b60-86ff-f00aa5537717.f815f.mp3",
-      "bytes": 9507,
-      "sha256": "4aa4ee542988412ff310d6dd2ae20cb68ad302db3d34f474b5f4d8cbf0ae072e",
-      "contentType": "audio/mpeg"
-    },
-    {
       "label": "炸弹音效",
       "key": "licensed/bomb",
       "file": "bomb.mp3",
       "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/b3/b376c1d2-c47c-4f1f-8307-e3c6624ff25b.e17ec.mp3",
       "bytes": 19107,
       "sha256": "4c4d4f2ce9288a7541e38e1ef4308dc3a8f07671ecce6bf812d6dee3057e5f02",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "过",
-      "key": "licensed/pass",
-      "file": "pass.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/f7/f7c52c5a-d385-4161-8733-257da36bd77d.e952a.mp3",
-      "bytes": 10566,
-      "sha256": "8c5f5aacc27734d5c2002829501637895af8150af74a92ec4d8a74c9b9891828",
       "contentType": "audio/mpeg"
     },
     {
@@ -218,15 +38,6 @@
       "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/c2/c2c4a06f-280c-4ec6-a4f3-38a7d06ba5a5.97b7a.mp3",
       "bytes": 84387,
       "sha256": "4f0d3616086cb966c229765a76f412f298c297ef166dae282e5bf8848091c96b",
-      "contentType": "audio/mpeg"
-    },
-    {
-      "label": "对6",
-      "key": "licensed/pair_6",
-      "file": "pair_6.mp3",
-      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/c2/c2d7d6ba-c33a-4ae3-97fb-b215dff3aebe.47c39.mp3",
-      "bytes": 10659,
-      "sha256": "acb0686d8a2928c104c8a64ac26682b257bba7d6d8eb4384fb3d7d46816f0a5c",
       "contentType": "audio/mpeg"
     }
   ],
@@ -251,6 +62,206 @@
       "bytes": 62112,
       "sha256": "5528b4e0415183fb2314a97e30ad0b220c991afd536df175d013cc2f767b0556",
       "contentType": "audio/mpeg"
+    },
+    {
+      "label": "顺子",
+      "key": "licensed/straight",
+      "file": "straight.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3a/3a415123-ce33-4221-9329-95e8d7004ef6.3830f.mp3",
+      "bytes": 12195,
+      "sha256": "abb9de2a4baf66b8a5717e3dde26453c90a6a6fb1e165377e35b8fc00e53e871",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对小王",
+      "key": "licensed/pair_small_joker",
+      "file": "pair_small_joker.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/bc/bcbfbc62-da5c-447f-a890-ee7685db6087.ae0fa.mp3",
+      "bytes": 16416,
+      "sha256": "7502480c5f9c0333cab0aaf1fa12a6eaf0179838af108586a426d46cebcab11b",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "大王",
+      "key": "licensed/single_big_joker",
+      "file": "single_big_joker.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/12/12d5cfec-fbf0-44ea-b3c8-40fc43f1c557.9f870.mp3",
+      "bytes": 16419,
+      "sha256": "b73106368d7d7f8b0c5ab6ee0b869cc4cd621266fba8f21563160dc93be50b55",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "小王",
+      "key": "licensed/single_small_joker",
+      "file": "single_small_joker.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3e/3eb574c7-3cd1-4217-afb9-b08bce88c607.12cfb.mp3",
+      "bytes": 34080,
+      "sha256": "504eba7be6572a75e54f76f0c726baad9d3d14657b9b7d3df908d30d022c58be",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "单张A",
+      "key": "licensed/single_a",
+      "file": "single_a.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/30/307fd8ce-5142-44a7-a830-6c16bedcce58.2e16c.mp3",
+      "bytes": 9507,
+      "sha256": "5ceea8e5393ef47d29868c710f9255131d5ada33b69b33da4386dad27869ecd4",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对老K",
+      "key": "licensed/pair_k",
+      "file": "pair_k.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/81/81e83a89-877a-44a7-b947-625dae7c1136.efc30.mp3",
+      "bytes": 18723,
+      "sha256": "ee6f703d1217be848f894b08ce2a5d289ee31bcffef74ea7c270903734d35c0f",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "单张K",
+      "key": "licensed/single_k",
+      "file": "single_k.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/27/27e45534-80a1-4e63-81ff-a7581dd6d2f8.c3798.mp3",
+      "bytes": 9891,
+      "sha256": "d6c35ea8e132607c17c72beaee64aeb5fbcbafe73d253e8b20eeede6a6129119",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对J",
+      "key": "licensed/pair_j",
+      "file": "pair_j.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/65/651c2017-2b54-4948-b1f6-c0b4b2ddeb36.64e14.mp3",
+      "bytes": 16803,
+      "sha256": "069d1c0f95ddde4f12a203f2a6047d1a007cc087c475b886b1ec85eb5865a73d",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "单张J",
+      "key": "licensed/single_j",
+      "file": "single_j.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/f2/f2ad59b5-0b1b-4f7b-9df9-015d8348faec.31af1.mp3",
+      "bytes": 21024,
+      "sha256": "286eaa8e687689ccc73f97779ec9b561bf7484459de52e3ec96c78c48b1964af",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对9",
+      "key": "licensed/pair_9",
+      "file": "pair_9.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/81/8185c95a-b9f8-4f39-93c6-e123eb936401.d65ca.mp3",
+      "bytes": 13347,
+      "sha256": "747c22f8e6f2a908fcc2a55c653356ff9fece16d60b2b4e32dc5fb8bea1142f1",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "单张9",
+      "key": "licensed/single_9",
+      "file": "single_9.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/d6/d62bd8c7-57f3-49c5-a624-88a2824e0368.5cb8c.mp3",
+      "bytes": 11040,
+      "sha256": "44889b39bcaddd546d091d60a18a088f7523528aefe9e28bbe1d64f2b1f20f94",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对7",
+      "key": "licensed/pair_7",
+      "file": "pair_7.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/5b/5b3df909-6016-40d2-9357-30abd56f0f3c.ea4fb.mp3",
+      "bytes": 13347,
+      "sha256": "cfb0d7d253238b153b9475854b383241859a7a3911053383ad616ffde3174b86",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "单张6",
+      "key": "licensed/single_6",
+      "file": "single_6.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/28/287aa164-9b33-4d09-8831-64e2d2715ddb.81a62.mp3",
+      "bytes": 12963,
+      "sha256": "cbf27166b59e14f46670f6b2513ac681bb7dbea7fa61ff93afc7e6aa2897f003",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对5",
+      "key": "licensed/pair_5",
+      "file": "pair_5.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/23/230f0085-f93f-4cd0-acfe-302e2796b17e.a3274.mp3",
+      "bytes": 13347,
+      "sha256": "9e12366bb834b1c2402b358a5fb3aec5eafd26dda318aa2b312e428991321a8e",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对4",
+      "key": "licensed/pair_4",
+      "file": "pair_4.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/a8/a84f5c76-8391-4928-9928-722e44c90d33.e7615.mp3",
+      "bytes": 11427,
+      "sha256": "c64c0478e52d2aaf52e7eeb0bd2a3d3d6a07b6827f36aa34137c2d7a19299bbb",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对3",
+      "key": "licensed/pair_3",
+      "file": "pair_3.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/3d/3debd1a9-4705-40a9-a723-cb494f67d683.90ebf.mp3",
+      "bytes": 13731,
+      "sha256": "7bbc48937ffe6a5868dbd1a626fa5ca151a2fb4041d7e8c06083fb95b5bdb2be",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对2",
+      "key": "licensed/pair_2",
+      "file": "pair_2.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/d8/d80ead4f-3723-4847-aa77-c0292b63bafb.6f4cb.mp3",
+      "bytes": 13347,
+      "sha256": "fedab4ebb8b865e5811794032f7a92c4ba9f1ea185d13e8b01e0c211e6fc5fb8",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "单张2",
+      "key": "licensed/single_2",
+      "file": "single_2.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/af/af437165-6d5a-4b60-86ff-f00aa5537717.f815f.mp3",
+      "bytes": 9507,
+      "sha256": "4aa4ee542988412ff310d6dd2ae20cb68ad302db3d34f474b5f4d8cbf0ae072e",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "过",
+      "key": "licensed/pass",
+      "file": "pass.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/f7/f7c52c5a-d385-4161-8733-257da36bd77d.e952a.mp3",
+      "bytes": 10566,
+      "sha256": "8c5f5aacc27734d5c2002829501637895af8150af74a92ec4d8a74c9b9891828",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
+    },
+    {
+      "label": "对6",
+      "key": "licensed/pair_6",
+      "file": "pair_6.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/c2/c2d7d6ba-c33a-4ae3-97fb-b215dff3aebe.47c39.mp3",
+      "bytes": 10659,
+      "sha256": "acb0686d8a2928c104c8a64ac26682b257bba7d6d8eb4384fb3d7d46816f0a5c",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-08: unreachable or blocked by the female-only voice policy; source archive only."
     }
   ],
   "excluded": [
@@ -258,6 +269,18 @@
       "label": "炸弹特效图汇总",
       "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/8b/8b6df27d-a934-42cf-9c2e-d30c1b2c7c1f.76410.png",
       "reason": "Rejected during visual curation; never downloaded or included in the runtime."
+    }
+  ],
+  "retired": [
+    {
+      "label": "单张5（男声）",
+      "key": "licensed/single_5_male",
+      "file": "single_5_male.mp3",
+      "url": "https://wxstatic.gameabc2.com/100002/wechat/remote/guandan/native/09/0993b521-aa76-4df9-bdda-20b5ccc5836d.53530.mp3",
+      "bytes": 11427,
+      "sha256": "56d70bc69aa297777b5da5e456da7d66b870da5c0e69bc767bc19e6cd89f4226",
+      "contentType": "audio/mpeg",
+      "reason": "2026-09-07: female-only voice policy; removed from runtime."
     }
   ]
 }

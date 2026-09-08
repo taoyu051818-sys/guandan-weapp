@@ -1,3 +1,5 @@
+import { isIP } from 'node:net'
+
 const START_MARKER = '/* guandan-runtime-config:start */'
 const END_MARKER = '/* guandan-runtime-config:end */'
 const GLOBAL_KEY = '__GUANDAN_RUNTIME_CONFIG__'
@@ -7,6 +9,46 @@ const parseBoolean = (value, name) => {
   if (value === 'true') return true
   if (value === 'false') return false
   throw new Error(`${name} must be exactly true or false`)
+}
+
+const parsePort = (value, name, fallback) => {
+  const parsed = Number(value === undefined || value === '' ? fallback : value)
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 65535) throw new Error(`${name} must be an integer from 1 to 65535`)
+  return parsed
+}
+
+const requireBareIpv4 = value => {
+  const ip = String(value ?? '').trim()
+  if (isIP(ip) !== 4 || ip === '0.0.0.0') throw new Error('GUANDAN_TEST_SERVER_IP must be a connectable bare IPv4 address')
+  return ip
+}
+
+export const bareIpTestRuntimeConfigFromEnv = env => {
+  const ip = requireBareIpv4(env.GUANDAN_TEST_SERVER_IP)
+  const platformPort = parsePort(env.GUANDAN_TEST_PLATFORM_PORT, 'GUANDAN_TEST_PLATFORM_PORT', 3003)
+  const gamePort = parsePort(env.GUANDAN_TEST_GAME_PORT, 'GUANDAN_TEST_GAME_PORT', 3002)
+  return {
+    version: 1,
+    lobbyEndpoint: `ws://${ip}:${gamePort}/weapp`,
+    platformEndpoint: `http://${ip}:${platformPort}`,
+    platformAllowDevelopmentLogin: true,
+    platformAllowInsecureEndpoint: true,
+    platformAllowInsecureGameEndpoint: true,
+  }
+}
+
+export const verifyBareIpTestRuntimeConfig = config => {
+  if (!config || config.version !== 1) throw new Error('Bare-IP test build is missing versioned runtime client config.')
+  let platform
+  let game
+  try { platform = new URL(config.platformEndpoint); game = new URL(config.lobbyEndpoint) } catch { throw new Error('Bare-IP test endpoints are invalid.') }
+  if (platform.protocol !== 'http:' || game.protocol !== 'ws:' || isIP(platform.hostname) !== 4 || platform.hostname !== game.hostname) {
+    throw new Error('Bare-IP test endpoints must use the same IPv4 host over HTTP and WS.')
+  }
+  if (!config.platformAllowDevelopmentLogin || !config.platformAllowInsecureEndpoint || !config.platformAllowInsecureGameEndpoint) {
+    throw new Error('Bare-IP test runtime config requires all three isolated development switches.')
+  }
+  return config
 }
 
 export const verifyReleaseRuntimeConfig = config => {
@@ -20,7 +62,26 @@ export const verifyReleaseRuntimeConfig = config => {
   return config
 }
 
-export const runtimeConfigFromEnv = (env, { release = false } = {}) => {
+/** Narrower than generic Web release config: this AppID has one approved business domain. */
+export const verifyWechatRuntimeConfig = config => {
+  verifyReleaseRuntimeConfig(config)
+  for (const [field, protocol] of [['platformEndpoint', 'https:'], ['lobbyEndpoint', 'wss:']]) {
+    const value = config[field]
+    let endpoint
+    try { endpoint = new URL(value) } catch { throw new Error(`WeChat ${field} is missing or invalid.`) }
+    const prefix = `${protocol}//api.yutechhn.cn/guandan`
+    if (typeof value !== 'string' || endpoint.protocol !== protocol || endpoint.hostname !== 'api.yutechhn.cn' ||
+        endpoint.username || endpoint.password || endpoint.port || endpoint.hash ||
+        !value.startsWith(prefix) || !['', '/', '?'].includes(value.slice(prefix.length, prefix.length + 1))) {
+      throw new Error(`WeChat ${field} must use ${prefix}; local/IP/unapproved endpoints are forbidden.`)
+    }
+  }
+  return config
+}
+
+export const runtimeConfigFromEnv = (env, { release = false, bareIpTest = false } = {}) => {
+  if (release && bareIpTest) throw new Error('Bare-IP test config cannot be used for a release build.')
+  if (bareIpTest) return verifyBareIpTestRuntimeConfig(bareIpTestRuntimeConfigFromEnv(env))
   const platformEndpoint = String(env.GUANDAN_PLATFORM_ENDPOINT ?? '').trim()
   if (!platformEndpoint) {
     if (release) throw new Error('Release build requires GUANDAN_PLATFORM_ENDPOINT.')
@@ -28,6 +89,7 @@ export const runtimeConfigFromEnv = (env, { release = false } = {}) => {
   }
   const config = {
     version: 1,
+    lobbyEndpoint: String(env.GUANDAN_LOBBY_ENDPOINT ?? '').trim(),
     platformEndpoint,
     platformAllowDevelopmentLogin: parseBoolean(env.GUANDAN_PLATFORM_ALLOW_DEVELOPMENT_LOGIN, 'GUANDAN_PLATFORM_ALLOW_DEVELOPMENT_LOGIN'),
     platformAllowInsecureEndpoint: parseBoolean(env.GUANDAN_PLATFORM_ALLOW_INSECURE_ENDPOINT, 'GUANDAN_PLATFORM_ALLOW_INSECURE_ENDPOINT'),

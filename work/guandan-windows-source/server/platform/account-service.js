@@ -13,6 +13,11 @@ const normalizeText = (value, fallback, maxLength) => {
   return (text || fallback).slice(0, maxLength)
 }
 
+// Nickname limits count Unicode code points, matching validateProfilePatch; IDs/URLs are unchanged.
+const normalizeNickname = (value, fallback) => Array.from(
+  (typeof value === 'string' ? value.trim() : '') || fallback,
+).slice(0, 24).join('')
+
 const emptyStats = (userId) => ({
   userId,
   gamesPlayed: 0,
@@ -123,7 +128,7 @@ export class AccountService {
   async loginExternal ({ externalId, displayName, avatarUrl }) {
     const safeExternalId = normalizeText(externalId, '', 180)
     if (!safeExternalId) throw badRequest('EXTERNAL_ID_REQUIRED', '外部用户标识不能为空')
-    const safeName = normalizeText(displayName, '陵水牌友', 24)
+    const safeName = normalizeNickname(displayName, '陵水牌友')
     const now = this.now()
     const result = await this.store.transaction(state => {
       ensureAccountCollections(state)
@@ -131,8 +136,11 @@ export class AccountService {
       if (existingId) {
         const existing = state.users[existingId]
         this.ensureUserAccountId(state, existing)
-        existing.displayName = safeName
-        if (typeof avatarUrl === 'string') existing.avatarUrl = avatarUrl.trim().slice(0, 500)
+        // Login refresh authenticates identity; it must not overwrite a saved profile.
+        if (!existing.profileCustomizedAt) {
+          existing.displayName = safeName
+          if (typeof avatarUrl === 'string') existing.avatarUrl = avatarUrl.trim().slice(0, 500)
+        }
         existing.updatedAt = now
         state.userStats[existingId] ||= emptyStats(existingId)
         state.matchHistoryByUser[existingId] ||= []
@@ -205,8 +213,9 @@ export class AccountService {
       ensureAccountCollections(state)
       const user = state.users[userId]
       if (!user) throw notFound('USER_NOT_FOUND', '用户不存在')
-      if (displayName !== undefined) user.displayName = normalizeText(displayName, user.displayName, 24)
+      if (displayName !== undefined) user.displayName = normalizeNickname(displayName, user.displayName)
       if (avatarUrl !== undefined) user.avatarUrl = normalizeText(avatarUrl, '', 500)
+      if (displayName !== undefined || avatarUrl !== undefined) user.profileCustomizedAt = now || 1
       user.updatedAt = now
       return this.publicUser(user, this.ensurePlayerRating(state, userId))
     })

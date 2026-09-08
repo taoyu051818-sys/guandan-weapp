@@ -74,7 +74,6 @@ export class EffectPlaybackCoordinator {
       try {
         this.dependencies.withQuality(effectQuality, () => {
           if (!rendererOwnsBombFlight && profile.sound) this.dependencies.playSound(profile.sound)
-          if (wildcardUsed) this.dependencies.playSound('wildcard')
           if (!rendererOwnsBombFlight) this.dependencies.vibrate(profile.haptic)
           impactHandle = this.dependencies.renderPlayImpact(profile, playEvent, wildcardUsed)
         })
@@ -93,7 +92,6 @@ export class EffectPlaybackCoordinator {
         try { this.dependencies.playActionVoice(event.action) } catch (error) { this.dependencies.reportError('[effects] action voice failed', error) }
         try {
           if (profile.sound) this.dependencies.playSound(profile.sound)
-          if (wildcardUsed) this.dependencies.playSound('wildcard')
         } catch (error) { this.dependencies.reportError('[effects] semantic audio failed', error) }
         handle.complete()
         return
@@ -115,7 +113,6 @@ export class EffectPlaybackCoordinator {
         if (!cardFramesReady || !flight) {
           try {
             if (profile.sound) this.dependencies.playSound(profile.sound)
-            if (wildcardUsed) this.dependencies.playSound('wildcard')
           } catch (error) { this.dependencies.reportError('[effects] fallback semantic audio failed', error) }
           handle.complete()
           return

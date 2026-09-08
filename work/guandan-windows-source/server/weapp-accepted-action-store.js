@@ -11,7 +11,7 @@ export const createAcceptedActionStore = ({ maxEntries }) => {
     return true
   }
   const release = key => { if (key) reservations.delete(key) }
-  const remember = (key, fingerprint, response, messageType = 'actionAccepted') => {
+  const remember = (key, fingerprint, response, messageType = 'actionAccepted', completion = null) => {
     if (!key) return true
     if (!entries.has(key) && !reservations.has(key) && !reserve(key)) return false
     while (!entries.has(key) && entries.size >= maxEntries) {
@@ -20,7 +20,7 @@ export const createAcceptedActionStore = ({ maxEntries }) => {
       entries.delete(oldestDurable)
     }
     reservations.delete(key)
-    entries.set(key, { fingerprint, messageType, response, pendingDurability: true })
+    entries.set(key, { fingerprint, messageType, response: structuredClone(response), completion: structuredClone(completion), pendingDurability: true })
     return true
   }
   const rotateToken = (previousToken, nextToken, room = null) => {
@@ -34,9 +34,9 @@ export const createAcceptedActionStore = ({ maxEntries }) => {
       room.pendingGameStartRequest.cacheKey = `${nextToken}:${room.pendingGameStartRequest.cacheKey.slice(prefix.length)}`
     }
   }
-  const deleteToken = token => {
+  const deleteToken = (token, exceptKey = null) => {
     const prefix = `${token}:`
-    for (const key of [...entries.keys()]) if (key.startsWith(prefix)) entries.delete(key)
+    for (const key of [...entries.keys()]) if (key !== exceptKey && key.startsWith(prefix)) entries.delete(key)
     for (const key of [...reservations]) if (key.startsWith(prefix)) reservations.delete(key)
   }
   return { entries, reserve, release, remember, rotateToken, deleteToken }

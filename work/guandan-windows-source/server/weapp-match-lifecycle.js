@@ -3,9 +3,12 @@ import { createGameStatsBySeat } from './game-stats.js'
 import { adjustDoubleDownSettlement, hasReachedRoundLimit, normalizeFriendRoomSettings } from './friend-room-settings.js'
 import { MASTER_BOT_DIFFICULTY } from './master-bot-policy.js'
 import { dispatchMatchIntent, matchFailureMessage, replaceSettlement } from './game-session.js'
+import { isSingleRoundMatch } from './match-format-policy.js'
+import { prepareBotPlay } from './bot-turn-pacing.js'
+import { createTurnClock } from './weapp-turn-clock.js'
 
 const require = createRequire(import.meta.url)
-const { createDeck, dealCards, shuffleDeck, highestCard, automaticReturnCard } = require('../../../shared-core/dist')
+const { createDeck, dealCards, shuffleDeck, highestCard, automaticReturnCard, chooseMatchLevel } = require('../../../shared-core/dist')
 
 /** Owns authoritative turn, match-duration, and round-finalization lifecycles. */
 export const createWeAppMatchLifecycle = ({
@@ -132,7 +135,7 @@ export const createWeAppMatchLifecycle = ({
     }
     const winnerTeam = reason === 'round-limit'
       ? (scores.teamA === scores.teamB ? null : scores.teamA > scores.teamB ? 'teamA' : 'teamB')
-      : reason === 'passed-a' ? settlementWinnerTeam : null
+      : reason === 'passed-a' || reason === 'single-round' ? settlementWinnerTeam : null
     if (reason === 'passed-a' && !['teamA', 'teamB'].includes(winnerTeam)) {
       throw new Error('过 A 终局缺少权威结算胜方')
     }
@@ -140,7 +143,7 @@ export const createWeAppMatchLifecycle = ({
       reason,
       endedAt,
       roundsPlayed: Math.max(0, Number(room.roundSequence) || 0),
-      configuredRounds: normalizeFriendRoomSettings(room.roomSettings).rounds,
+      configuredRounds: isSingleRoundMatch(room) ? 1 : normalizeFriendRoomSettings(room.roomSettings).rounds,
       scores,
       winnerTeam,
     }
@@ -217,7 +220,8 @@ export const createWeAppMatchLifecycle = ({
     room.deadlineAction = null
     const roomSettings = normalizeFriendRoomSettings(room.roomSettings)
     room.roundSequence += 1
-    if (result.isGameWon) markMatchEnded(room, 'passed-a', { winnerTeam: result.winnerTeam })
+    if (isSingleRoundMatch(room)) markMatchEnded(room, 'single-round', { winnerTeam: result.winnerTeam })
+    else if (result.isGameWon) markMatchEnded(room, 'passed-a', { winnerTeam: result.winnerTeam })
     else if (isFriendRoom(room) && hasReachedRoundLimit(room.roundSequence, roomSettings)) markMatchEnded(room, 'round-limit')
     else if (isFriendRoom(room) && Number.isFinite(room.totalDeadlineAt) && now() >= room.totalDeadlineAt) markMatchEnded(room, 'time-limit', { endedAt: room.totalDeadlineAt })
     room.roundReady = room.matchEnded
@@ -324,8 +328,15 @@ export const createWeAppMatchLifecycle = ({
         if (autoTrusteeEnabled && room.consecutiveTimeouts[expectedPlayerId] >= timeoutsBeforeTrustee) room.trustees[expectedPlayerId] = { reason: 'timeout', since: now() }
       }
       if (expectedAction === 'play') {
+        const plan = isBot ? prepareBotPlay(room, expectedPlayerId, botPolicyForRoom(room), { now, baseMs: botActionDelayMs }) : null
+        if (plan) snapshot = structuredClone(room) // retries reuse this decision and do not reroll it
+        if (plan?.waitMs > 0) {
+          await commitRuntimeState()
+          scheduleTurnRetry(room, () => automatedDeadline(room, expectedPlayerId, expectedAction, expectedDeadline), `planned play ${room.roomId}`, plan.waitMs)
+          return
+        }
         const cards = isBot
-          ? botPolicyForRoom(room).chooseCards({ state: room.state, teamLevels: room.teamLevels, playerId: expectedPlayerId })
+          ? plan.cards
           : (room.state.lastValidPlay ? [] : [room.state.players[expectedPlayerId].hand.at(-1)])
         const isPass = !cards || cards.length === 0
         const previousState = room.state
@@ -402,56 +413,18 @@ export const createWeAppMatchLifecycle = ({
     if (expectedAction === 'play' || expectedAction === 'finishTribute') publishState(room)
     else publishTribute(room)
   }
-  const armTurnDeadline = (room, { publish = true } = {}) => {
-    clearTurnTimer(room.roomId)
-    ensureLiveMetadata(room)
-    const step = deadlineStepFor(room)
-    if (!step) {
-      room.turnDeadlineAt = null
-      room.deadlinePlayerId = null
-      room.deadlineAction = null
-      return
-    }
-    const roomSettings = normalizeFriendRoomSettings(room.roomSettings)
-    const delay = isBotPlayer(room, step.playerId)
-      ? Math.min(botActionDelayMs, roomSettings.turnSeconds * friendSecondMs)
-      : isMatchRoom(room)
-        ? (room.trustees[step.playerId] ? trusteeActionDelayMs : turnTimeoutMs)
-        : (room.trustees[step.playerId] && roomSettings.trusteeSeconds > 0
-            ? roomSettings.trusteeSeconds * friendSecondMs
-            : roomSettings.turnSeconds * friendSecondMs)
-    const deadline = now() + delay
-    room.turnDeadlineAt = deadline
-    room.deadlinePlayerId = step.playerId
-    room.deadlineAction = step.action
-    turnTimers.set(room.roomId, scheduleTimeout(() => {
-      void enqueueServerOperation(() => automatedDeadline(room, step.playerId, step.action, deadline), `automated turn ${room.roomId}`, room.roomId)
-    }, delay))
-    if (publish) publishTurnStatus(room)
-  }
-
-  const restoreTurnDeadline = room => {
-    clearTurnTimer(room.roomId)
-    const step = deadlineStepFor(room)
-    if (!step) {
-      room.turnDeadlineAt = null
-      room.deadlinePlayerId = null
-      room.deadlineAction = null
-      return
-    }
-    const deadline = Number(room.turnDeadlineAt)
-    const matchesStoredStep = Number.isFinite(deadline) && room.deadlinePlayerId === step.playerId && room.deadlineAction === step.action
-    if (!matchesStoredStep) { armTurnDeadline(room); return }
-    turnTimers.set(room.roomId, scheduleTimeout(() => {
-      void enqueueServerOperation(() => automatedDeadline(room, step.playerId, step.action, deadline), `restored turn ${room.roomId}`, room.roomId)
-    }, Math.max(0, deadline - now())))
-  }
+  const { armTurnDeadline, restoreTurnDeadline } = createTurnClock({
+    clearTurnTimer, turnTimers, ensureLiveMetadata, deadlineStepFor, isBotPlayer, isMatchRoom,
+    botActionDelayMs, friendSecondMs, trusteeActionDelayMs, turnTimeoutMs,
+    now, scheduleTimeout, enqueueServerOperation, automatedDeadline, publishTurnStatus,
+  })
 
   const prepareNextRound = (room, incrementVersion = true) => {
     const result = room.roundResult
-    const dealt = dealCards(shuffleDeck(createDeck(result.currentLevel), shuffleRandom))
+    const nextLevel = room.state.matchFormat?.kind === 'independent' ? chooseMatchLevel(room.state.matchFormat, shuffleRandom) : result.currentLevel
+    const dealt = dealCards(shuffleDeck(createDeck(nextLevel), shuffleRandom))
     const dealtHands = Object.fromEntries(playerIds.map(id => [id, [...dealt[id]].sort((a, b) => b.value - a.value)]))
-    const transitionResult = dispatchMatchIntent(room.state, { type: 'PREPARE_NEXT_ROUND', dealtHands })
+    const transitionResult = dispatchMatchIntent(room.state, { type: 'PREPARE_NEXT_ROUND', dealtHands, nextLevel })
     if (!transitionResult.ok) throw new Error(matchFailureMessage(transitionResult.reason))
     room.state = transitionResult.state
     syncRoomFromMatchState(room)
@@ -465,7 +438,7 @@ export const createWeAppMatchLifecycle = ({
     room.roundStatsBySeat = createGameStatsBySeat()
     if (incrementVersion) room.version += 1
     reportSpectatorEvent(room, { type: 'round-start', roundSequence: room.roundSequence + 1 })
-    reportSpectatorEvent(room, {
+    if (room.state.tribute) reportSpectatorEvent(room, {
       type: room.state.tribute?.status === 'resisted' ? 'anti-tribute' : 'tribute-start',
       roundSequence: room.roundSequence + 1,
     })

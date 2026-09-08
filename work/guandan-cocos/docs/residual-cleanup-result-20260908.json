@@ -1,0 +1,22 @@
+{
+  "builtAt": "2026-09-08T15:07:51.856Z",
+  "mainBytes": 3070654,
+  "subpackageBytes": 13433169,
+  "totalBytes": 16503823,
+  "fileCount": 284,
+  "mainScriptBytes": 745333,
+  "mainScriptSha256": "58cd08e7965772faa0218a68b1170f17407d2f113046522c37924f9dd30df4d6",
+  "comparison": "previous local build recorded in retirement-package-result-20260908.json; not an isolated A/B rebuild",
+  "baseline": {
+    "mainBytes": 3105949,
+    "subpackageBytes": 13433169,
+    "totalBytes": 16539118,
+    "mainScriptBytes": 780628
+  },
+  "savedBytesAgainstPreviousBuild": 35295,
+  "removedRuntimeModuleCount": 17,
+  "removedRuntimeModuleCountThisPass": 7,
+  "addedRuntimeModuleCountThisPass": 1,
+  "regressionScriptCount": 76,
+  "scope": "local build only; no upload or deployment"
+}

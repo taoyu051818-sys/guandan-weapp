@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import './weapp-command-recovery.test.mjs'
 import { createCommandGateway } from './weapp-command-gateway.js'
 
 const replies = []

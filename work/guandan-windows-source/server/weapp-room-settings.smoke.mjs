@@ -91,6 +91,8 @@ const fullSettings = {
   disableInteraction: true,
   sortOrder: 'asc',
   authoritativeValidation: true,
+  counterEnabled: false,
+  disableVoice: true,
 }
 
 try {
@@ -99,7 +101,7 @@ try {
 
   const illegalSettings = [
     { ...fullSettings, rounds: 6 },
-    { ...fullSettings, turnSeconds: 30 },
+    { ...fullSettings, turnSeconds: 25 },
     { ...fullSettings, trusteeSeconds: 10 },
     { ...fullSettings, totalTimeMinutes: 5 },
     { ...fullSettings, spectator: 'everyone' },
@@ -173,7 +175,7 @@ try {
   const matchEndedPromise = waitFor(timedHost, 'matchEnded', packet => packet.matchEnded?.reason === 'time-limit')
   send(timedHost, 'startGame', { roomId: timedRoomId }, startId)
   const started = await startedPromise
-  assert.ok(started.turnDeadlineAt - Date.now() > 19000, '首出 20 秒必须进入权威回合截止时间')
+  assert.equal(started.turnDeadlineAt, null, '无托管的真人回合不应建立自动代打截止时间')
   assert.ok(started.totalDeadlineAt - started.matchStartedAt === 2000, '自定义总时长必须进入独立权威截止时间')
   assert.deepEqual(started.spectatorPolicy, { mode: 'live', allowed: true, delayRounds: 0 })
 

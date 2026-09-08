@@ -2,18 +2,26 @@ import {
   DEFAULT_FRIEND_ROOM_SETTINGS,
   type FriendRoomSettings,
 } from '../../network/LobbyModels'
+import { MATCH_LEVELS } from '../../core/generated/lib/matchFormat'
 
 export type FriendRoomSettingsTab = 'rules' | 'experience'
 export type FriendRoomChoiceId =
+  | 'rounds-preset'
+  | 'level-mode'
+  | 'tribute'
   | 'scoring'
   | 'score-visibility'
   | 'turn-seconds'
   | 'trustee-seconds'
   | 'total-time'
   | 'spectator'
+  | 'spectator-delay'
   | 'auto-sort'
   | 'interaction'
   | 'sort-order'
+  | 'upgrade-target'
+  | 'counter'
+  | 'voice'
 
 export type FriendRoomChoiceRow = Readonly<{
   id: FriendRoomChoiceId
@@ -32,10 +40,8 @@ type FriendRoomChoiceSchema = Readonly<{
 }>
 
 export const FRIEND_ROOM_MODES = [
-  { id: 'classic', label: '经典掼蛋', available: true },
-  { id: 'egg-turn', label: '转蛋', available: false },
-  { id: 'landlord', label: '斗地主', available: false },
-  { id: 'duplicate', label: '掼蛋复式', available: false },
+  { id: 'rounds', label: '定局玩法', available: true },
+  { id: 'upgrade', label: '传统升级', available: true },
 ] as const
 
 export const FRIEND_ROOM_SETTINGS_TABS: ReadonlyArray<Readonly<{ id: FriendRoomSettingsTab, label: string }>> = [
@@ -46,26 +52,46 @@ export const FRIEND_ROOM_SETTINGS_TABS: ReadonlyArray<Readonly<{ id: FriendRoomS
 export const FRIEND_ROOM_ROUNDS = Object.freeze({
   label: '局数',
   suffix: '局',
-  minimum: 4,
+  minimum: 1,
   maximum: 32,
-  step: 4,
+  step: 1,
 })
 
 const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
+  {
+    id: 'upgrade-target', tab: 'rules', label: '目标', options: ['过6', '过10', '过A', '过A翻山'],
+    selected: settings => settings.upgradeTarget === 6 ? '过6' : settings.upgradeTarget === 10 ? '过10' : settings.upgradeTarget === 'A-reset' ? '过A翻山' : '过A',
+    update: (settings, selected) => ({ ...settings, upgradeTarget: selected === '过6' ? 6 : selected === '过10' ? 10 : selected === '过A翻山' ? 'A-reset' : 'A' }),
+  },
+  {
+    id: 'rounds-preset', tab: 'rules', label: '常用局数', options: ['1局', '4局', '8局', '12局'],
+    selected: settings => `${settings.rounds}局`,
+    update: (settings, selected) => ({ ...settings, rounds: Number(selected.replace('局', '')) }),
+  },
+  {
+    id: 'level-mode', tab: 'rules', label: '级牌', options: ['每局随机', '固定级牌'],
+    selected: settings => settings.levelMode === 'fixed' ? '固定级牌' : '每局随机',
+    update: (settings, selected) => ({ ...settings, levelMode: selected === '固定级牌' ? 'fixed' : 'random' }),
+  },
+  {
+    id: 'tribute', tab: 'rules', label: '贡还', options: ['进贡', '不进贡'],
+    selected: settings => settings.tributeEnabled ? '进贡' : '不进贡',
+    update: (settings, selected) => ({ ...settings, tributeEnabled: selected === '进贡' }),
+  },
   {
     id: 'scoring', tab: 'rules', label: '计分', options: ['双下3分', '双下4分'],
     selected: settings => settings.scoring === 'double-4' ? '双下4分' : '双下3分',
     update: (settings, selected) => ({ ...settings, scoring: selected === '双下4分' ? 'double-4' : 'double-3' }),
   },
   {
-    id: 'score-visibility', tab: 'rules', label: '比分', options: ['实时显示', '结算显示'],
+    id: 'score-visibility', tab: 'experience', label: '比分', options: ['实时显示', '结算显示'],
     selected: settings => settings.scoreVisibility === 'live' ? '实时显示' : '结算显示',
     update: (settings, selected) => ({ ...settings, scoreVisibility: selected === '实时显示' ? 'live' : 'hidden' }),
   },
   {
-    id: 'turn-seconds', tab: 'rules', label: '首出', options: ['20秒', '40秒', '60秒'],
+    id: 'turn-seconds', tab: 'rules', label: '出牌时间', options: ['15秒', '20秒', '30秒', '60秒'],
     selected: settings => `${settings.turnSeconds}秒`,
-    update: (settings, selected) => ({ ...settings, turnSeconds: Number(selected.replace('秒', '')) as 20 | 40 | 60 }),
+    update: (settings, selected) => ({ ...settings, turnSeconds: Number(selected.replace('秒', '')) as FriendRoomSettings['turnSeconds'] }),
   },
   {
     id: 'trustee-seconds', tab: 'rules', label: '托管', options: ['无托管', '15秒', '30秒', '60秒'],
@@ -78,9 +104,14 @@ const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
     update: (settings, selected) => ({ ...settings, totalTimeMinutes: selected === '不限制' ? 0 : Number(selected.replace('分钟', '')) as 20 | 30 | 60 }),
   },
   {
-    id: 'spectator', tab: 'experience', label: '观战', options: ['禁止观战', '实时观战', '延迟1局'],
-    selected: settings => settings.spectator === 'live' ? '实时观战' : settings.spectator === 'delayed-round' ? '延迟1局' : '禁止观战',
-    update: (settings, selected) => ({ ...settings, spectator: selected === '实时观战' ? 'live' : selected === '延迟1局' ? 'delayed-round' : 'off' }),
+    id: 'spectator', tab: 'experience', label: '允许观战', options: ['禁止观战', '实时观战', '延迟观战'],
+    selected: settings => settings.spectator === 'off' ? '禁止观战' : settings.spectator === 'live' ? '实时观战' : '延迟观战',
+    update: (settings, selected) => ({ ...settings, spectator: selected === '实时观战' ? 'live' : selected === '延迟观战' ? 'delay-30' : 'off' }),
+  },
+  {
+    id: 'spectator-delay', tab: 'experience', label: '观战延迟', options: ['15秒', '30秒', '60秒', '1局'],
+    selected: settings => settings.spectator === 'delayed-round' ? '1局' : `${settings.spectator.replace('delay-', '')}秒`,
+    update: (settings, selected) => ({ ...settings, spectator: selected === '1局' ? 'delayed-round' : `delay-${selected.replace('秒', '')}` as FriendRoomSettings['spectator'] }),
   },
   {
     id: 'auto-sort', tab: 'experience', label: '一键理牌', options: ['开启', '关闭'],
@@ -88,9 +119,19 @@ const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
     update: (settings, selected) => ({ ...settings, autoSort: selected === '开启' }),
   },
   {
-    id: 'interaction', tab: 'experience', label: '互动', options: ['禁止互动', '允许互动'],
-    selected: settings => settings.disableInteraction ? '禁止互动' : '允许互动',
-    update: (settings, selected) => ({ ...settings, disableInteraction: selected === '禁止互动' }),
+    id: 'interaction', tab: 'experience', label: '聊天', options: ['禁止聊天', '允许聊天'],
+    selected: settings => settings.disableInteraction ? '禁止聊天' : '允许聊天',
+    update: (settings, selected) => ({ ...settings, disableInteraction: selected === '禁止聊天' }),
+  },
+  {
+    id: 'voice', tab: 'experience', label: '聊天语音', options: ['允许语音', '禁止语音'],
+    selected: settings => settings.disableVoice ? '禁止语音' : '允许语音',
+    update: (settings, selected) => ({ ...settings, disableVoice: selected === '禁止语音' }),
+  },
+  {
+    id: 'counter', tab: 'experience', label: '记牌器', options: ['开启', '关闭'],
+    selected: settings => settings.counterEnabled === false ? '关闭' : '开启',
+    update: (settings, selected) => ({ ...settings, counterEnabled: selected === '开启' }),
   },
   {
     id: 'sort-order', tab: 'experience', label: '牌序', options: ['大牌在左', '小牌在左'],
@@ -99,18 +140,32 @@ const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
   },
 ]
 
-export const createDefaultFriendRoomSettings = (): FriendRoomSettings => ({ ...DEFAULT_FRIEND_ROOM_SETTINGS })
+export const createDefaultFriendRoomSettings = (): FriendRoomSettings => ({
+  ...DEFAULT_FRIEND_ROOM_SETTINGS, format: 'rounds', levelMode: 'random', levelRank: 2, tributeEnabled: false,
+})
+
+export const changeFriendRoomFormat = (settings: FriendRoomSettings, format: 'rounds' | 'upgrade'): FriendRoomSettings => ({
+  ...settings, format, levelMode: format === 'upgrade' ? 'fixed' : 'random', levelRank: 2, tributeEnabled: format === 'upgrade',
+  upgradeTarget: format === 'upgrade' ? 'A' : undefined,
+})
+
+export const updateFriendRoomLevel = (settings: FriendRoomSettings, index: number): FriendRoomSettings =>
+  settings.format === 'rounds' && settings.levelMode === 'fixed' && Number.isInteger(index) && MATCH_LEVELS[index] !== undefined
+    ? { ...settings, levelRank: MATCH_LEVELS[index] } : settings
 
 export const friendRoomChoiceRows = (
   settings: FriendRoomSettings,
   tab: FriendRoomSettingsTab,
 ): readonly FriendRoomChoiceRow[] => CHOICE_SCHEMAS
   .filter(schema => schema.tab === tab)
+  .filter(schema => schema.id !== 'spectator-delay' || !['off', 'live'].includes(settings.spectator))
+  .filter(schema => ['tribute', 'upgrade-target'].includes(schema.id) ? settings.format === 'upgrade'
+    : ['rounds-preset', 'level-mode'].includes(schema.id) ? settings.format === 'rounds' : true)
   .map(schema => ({
     id: schema.id,
-    label: schema.label,
-    options: schema.options,
-    selected: schema.selected(settings),
+    label: schema.id === 'scoring' && settings.format === 'upgrade' ? '升级' : schema.label,
+    options: schema.id === 'scoring' && settings.format === 'upgrade' ? ['双上升3级', '双上升4级'] : schema.options,
+    selected: schema.id === 'scoring' && settings.format === 'upgrade' ? `双上升${settings.scoring === 'double-4' ? 4 : 3}级` : schema.selected(settings),
   }))
 
 export const updateFriendRoomChoice = (
@@ -118,6 +173,8 @@ export const updateFriendRoomChoice = (
   choiceId: FriendRoomChoiceId,
   selected: string,
 ): FriendRoomSettings => {
+  if (choiceId === 'scoring' && settings.format === 'upgrade') selected = selected.replace('双上升', '双下').replace('级', '分')
+  if (!friendRoomChoiceRows(settings, 'rules').concat(friendRoomChoiceRows(settings, 'experience')).some(row => row.id === choiceId)) return settings
   const schema = CHOICE_SCHEMAS.find(candidate => candidate.id === choiceId)
   if (!schema || !schema.options.includes(selected)) return settings
   return schema.update(settings, selected)
@@ -133,6 +190,18 @@ export const updateFriendRoomRounds = (
   return normalized === settings.rounds ? settings : { ...settings, rounds: normalized }
 }
 
-export const describeFriendRoomRules = (settings: FriendRoomSettings): string => (
-  `${settings.rounds}局 · ${settings.scoring === 'double-4' ? '双下4分' : '双下3分'} · ${settings.scoreVisibility === 'live' ? '实时比分' : '结算比分'} · 首出${settings.turnSeconds}秒 · ${settings.trusteeSeconds ? `托管${settings.trusteeSeconds}秒` : '无托管'}`
-)
+export const describeFriendRoomRules = (settings: FriendRoomSettings): string => {
+  const format = settings.format === 'rounds'
+    ? `${settings.rounds}局 · ${settings.levelMode === 'fixed' ? `固定打${settings.levelRank}` : '每局随机2–A'} · 不进贡`
+    : settings.format === 'upgrade' ? `从2过${settings.upgradeTarget === 'A-reset' ? 'A翻山' : settings.upgradeTarget ?? 'A'} · ${settings.tributeEnabled ? '进贡' : '不进贡'}` : `${settings.rounds}局 · 经典升级`
+  const scoring = settings.format === 'upgrade' ? `双上升${settings.scoring === 'double-4' ? 4 : 3}级` : `双下${settings.scoring === 'double-4' ? 4 : 3}分`
+  return `${format} · ${scoring} · ${settings.trusteeSeconds === 0 ? '无托管' : `${settings.turnSeconds}秒`}`
+}
+
+export const friendRoomRuleHelp = (settings: FriendRoomSettings, tab: FriendRoomSettingsTab): string => tab === 'experience'
+  ? '观战可点头像切换手牌；仅开局前可站起、坐下。延迟由服务器控制。'
+  : settings.trusteeSeconds === 0 ? '无托管：不倒计时、不自动代打；房间总时长限制仍有效。'
+    : settings.format === 'upgrade'
+      ? settings.upgradeTarget === 'A-reset' ? 'A必打；头游且搭档非末游过关。己方三次冲A未过回2。'
+        : '目标级必打，不能跳过；打目标级时头游且搭档非末游过关。'
+      : '定局独立计分，不进贡；固定或每局随机级牌。不等同于复式。'

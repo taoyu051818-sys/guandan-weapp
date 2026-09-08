@@ -1,18 +1,22 @@
-import type { EngineState, PlayerId, Rank, SettlementResult, TributeState } from '../core/generated'
+import type { EngineState, PlayerId, Rank, RoomFormatSettings, SettlementResult, TributeState } from '../core/generated'
 import type { NetworkEffectSync } from '../effects/NetworkEffectSyncPolicy'
 import type { NetworkRequestResult } from './LobbySocketClient'
 
-export type FriendRoomSettings = {
+export const protocolVersion = (value: unknown): number | null => Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null
+
+export type FriendRoomSettings = Partial<RoomFormatSettings> & {
   mode: 'classic'
   rounds: number
   scoring: 'double-3' | 'double-4'
   scoreVisibility: 'live' | 'hidden'
-  turnSeconds: 20 | 40 | 60
+  turnSeconds: 15 | 20 | 30 | 40 | 60
   trusteeSeconds: 0 | 15 | 30 | 60
   totalTimeMinutes: 0 | 20 | 30 | 60
-  spectator: 'off' | 'live' | 'delayed-round'
+  spectator: 'off' | 'live' | 'delayed-round' | 'delay-15' | 'delay-30' | 'delay-60'
   autoSort: boolean
   disableInteraction: boolean
+  counterEnabled?: boolean
+  disableVoice?: boolean
   sortOrder: 'desc' | 'asc'
   authoritativeValidation: true
 }
@@ -22,7 +26,7 @@ export const DEFAULT_FRIEND_ROOM_SETTINGS: FriendRoomSettings = {
   rounds: 4,
   scoring: 'double-3',
   scoreVisibility: 'live',
-  turnSeconds: 40,
+  turnSeconds: 20,
   trusteeSeconds: 15,
   totalTimeMinutes: 0,
   spectator: 'off',
@@ -54,7 +58,7 @@ export type LobbyCapabilities = {
   canKickMembers: boolean
   requiresLobbyReady: boolean
 }
-export type MatchEndedReason = 'passed-a' | 'round-limit' | 'time-limit'
+export type MatchEndedReason = 'passed-a' | 'round-limit' | 'time-limit' | 'single-round'
 export type NetworkMatchEnded = Readonly<{
   reason: MatchEndedReason
   endedAt: number
@@ -63,7 +67,7 @@ export type NetworkMatchEnded = Readonly<{
   scores: Readonly<Record<'teamA' | 'teamB', number>>
   winnerTeam: 'teamA' | 'teamB' | null
 }>
-export type LobbySnapshot = {
+export type LobbySnapshot = RoomViewMetadata & {
   connected: boolean
   rooms: NetworkRoom[]
   roomId: string | null
@@ -111,7 +115,8 @@ export type MatchedRoomEntry = {
   roomId: string
   gameEndpoint: string
   gameTicket: string
-  seat: PlayerId
+  seat: PlayerId | 'observer'
+  isRoomHost?: boolean
   expiresAt?: number
   displayName?: string
 }
@@ -137,12 +142,23 @@ export type LobbyLiveMetadata = {
 }
 
 export type LobbyWire<T> = { type: string, requestId?: number } & T
-export type RoomSnapshotWire = LobbyWire<LobbyLiveMetadata & {
+export type RoomViewMetadata = {
+  roomRole?: 'player' | 'observer'
+  seatedPlayerId?: PlayerId | null
+  viewPlayerId?: PlayerId
+  isRoomHost?: boolean
+  hostPlayerId?: PlayerId | null
+  observers?: { name: string, isHost: boolean }[]
+  observerWaiting?: boolean
+  observerClockAt?: number
+  viewRevision?: number
+}
+export type RoomSnapshotWire = LobbyWire<LobbyLiveMetadata & RoomViewMetadata & {
   roomId: string
   myPlayerId: PlayerId
   resumeToken?: string
   state?: EngineState | null
-  phase?: 'lobby' | 'playing' | 'tribute' | 'settlement'
+  phase?: 'lobby' | 'observing' | 'playing' | 'tribute' | 'settlement'
   tribute?: TributeState | null
   roundResult?: SettlementResult | null
   viewerRoundStats?: NetworkViewerRoundStats
@@ -175,6 +191,8 @@ export const createEmptyTrustees = (): Record<PlayerId, NetworkTrustee | null> =
 export const createEmptyTimeouts = (): Record<PlayerId, number> => ({ p1: 0, p2: 0, p3: 0, p4: 0 })
 
 export const createRoomMetadataDefaults = (): Partial<LobbySnapshot> => ({
+  roomRole: 'player', seatedPlayerId: null, viewPlayerId: undefined, isRoomHost: undefined,
+  hostPlayerId: undefined, observers: [], observerWaiting: false, observerClockAt: undefined, viewRevision: undefined,
   gameVersion: 0,
   turnDeadlineAt: null,
   deadlinePlayerId: null,
@@ -259,7 +277,7 @@ export const normalizeNetworkMatchEnded = (value: unknown): NetworkMatchEnded | 
   const candidate = value as Record<string, unknown>
   const scores = candidate.scores as Record<string, unknown> | null
   if (
-    (candidate.reason !== 'passed-a' && candidate.reason !== 'round-limit' && candidate.reason !== 'time-limit') ||
+    (candidate.reason !== 'passed-a' && candidate.reason !== 'round-limit' && candidate.reason !== 'time-limit' && candidate.reason !== 'single-round') ||
     !finiteInteger(candidate.endedAt) || Number(candidate.endedAt) < 0 ||
     !finiteInteger(candidate.roundsPlayed) || Number(candidate.roundsPlayed) < 0 ||
     !finiteInteger(candidate.configuredRounds) || Number(candidate.configuredRounds) < 1 ||

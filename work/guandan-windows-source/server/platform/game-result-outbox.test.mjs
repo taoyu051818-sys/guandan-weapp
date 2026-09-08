@@ -19,11 +19,11 @@ const event = {
   finishedAt: 1785907200000,
 }
 
-const acceptedResponse = (duplicate = false) => ({
+const acceptedResponse = (duplicate = false, eventId = event.eventId) => ({
   ok: true,
   status: 200,
   async json () {
-    return { ok: true, data: { result: { accepted: true, duplicate } } }
+    return { ok: true, data: { result: { eventId, accepted: true, duplicate } } }
   },
 })
 
@@ -125,7 +125,7 @@ try {
     retryMaxMs: 1,
     fetchImpl: async (_url, options) => {
       timeoutCalls += 1
-      if (timeoutCalls > 1) return acceptedResponse()
+      if (timeoutCalls > 1) return acceptedResponse(false, JSON.parse(options.body).eventId)
       timedOutSignal = options.signal
       return new Promise((resolve, reject) => {
         options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true })

@@ -5,7 +5,7 @@ const Module = require('node:module')
 const fs = require('node:fs')
 
 const projectRoot = path.resolve(__dirname, '..')
-const platformSource = path.join(projectRoot, 'assets/scripts/services/PlatformApi.ts')
+const platformSource = path.join(projectRoot, 'migration/platform/RetiredPlatformApi.ts')
 const serverEntry = path.resolve(projectRoot, '../guandan-windows-source/server/platform-server.js')
 const { loadTypeScript } = require('./support/typescript.cjs')
 const ts = loadTypeScript()

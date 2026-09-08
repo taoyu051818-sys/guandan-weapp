@@ -4,7 +4,17 @@ const clone = (value) => JSON.parse(JSON.stringify(value))
 
 export const stateForViewer = (state, viewerId) => {
   const projected = clone(state)
-  playerIds.filter(id => id !== viewerId).forEach(id => {
+  const viewer = state.players[viewerId]
+  const teammates = playerIds.filter(id => id !== viewerId && viewer &&
+    ['teamA', 'teamB'].includes(viewer.team) && state.players[id].team === viewer.team)
+  const teammateId = teammates.length === 1 ? teammates[0] : null
+  // Finished players may follow their own living teammate, never an opponent.
+  // Derived from authoritative state, not a client-selected viewpoint or request flag.
+  const watchedId = state.phase === 'playing' && viewer?.hand.length === 0 &&
+    state.finishedPlayers?.includes(viewerId) && teammateId &&
+    !state.finishedPlayers.includes(teammateId) && state.players[teammateId].hand.length > 0
+    ? teammateId : null
+  playerIds.filter(id => id !== viewerId && id !== watchedId).forEach(id => {
     projected.players[id].hand = projected.players[id].hand.map((_, index) => ({ id: `hidden-${id}-${index}` }))
   })
   if (projected.tribute?.exchanges) {

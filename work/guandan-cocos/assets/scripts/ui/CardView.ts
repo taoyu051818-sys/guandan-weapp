@@ -1,11 +1,13 @@
-import { _decorator, Color, Component, EventTouch, Graphics, Node, Sprite, SpriteFrame, Tween, UIOpacity, UITransform, Vec2, Vec3, tween } from 'cc'
+import { _decorator, Color, Component, EventTouch, Graphics, Label, Node, Sprite, SpriteFrame, Tween, UIOpacity, UITransform, Vec2, Vec3, tween } from 'cc'
 import { getCachedClassicCardFrames, requestClassicCardFrames } from './ClassicCardFrameStore'
 import { CLASSIC_CARD_JOKER_GEOMETRY, CLASSIC_CARD_LAYER_GEOMETRY } from './ClassicCardGeometry'
 import type { ClassicCardLayer } from './ClassicCardGeometry'
 import { resolveClassicCardPlan } from './CardSkinResolver'
 import type { ClassicCardPlan, ClassicCardSuit } from './CardSkinResolver'
+import type { HandGroupBadge } from '../game/HandStackLayout'
+import { HandGroupBadgeView } from './HandGroupBadgeView'
 
-export type CardPresentation = { id: string, rank: string, suit: ClassicCardSuit, red: boolean, levelCard: boolean, selected: boolean, lockDraft?: boolean, locked?: boolean, interactive?: boolean }
+export type CardPresentation = { id: string, rank: string, suit: ClassicCardSuit, red: boolean, levelCard: boolean, selected: boolean, lockDraft?: boolean, locked?: boolean, interactive?: boolean, groupBadge?: HandGroupBadge }
 
 export const HAND_CARD_TOUCH_START = 'guandan:hand-card-touch-start'
 export const HAND_CARD_TOUCH_MOVE = 'guandan:hand-card-touch-move'
@@ -15,6 +17,7 @@ export const HAND_CARD_TOUCH_CANCEL = 'guandan:hand-card-touch-cancel'
 export type HandCardTouch = Readonly<{
   cardId: string
   pointerId: number
+  /** Cocos screen coordinates; consumed by UITransform.hitTest, not node/UI space. */
   screenPoint: Vec2
 }>
 
@@ -31,7 +34,8 @@ export class CardView extends Component {
   private selectionOverlay: Graphics | null = null
   private lockDraftOverlay: Graphics | null = null
   private lockOverlay: Graphics | null = null
-  private levelFilter: Graphics | null = null
+  private levelBadge: Node | null = null
+  private groupBadge: HandGroupBadgeView | null = null
   private opacity: UIOpacity | null = null
   private bombReactionRoot: Node | null = null
   private visualRoot: Node | null = null
@@ -75,18 +79,19 @@ export class CardView extends Component {
     this.opacity = this.getComponent(UIOpacity) ?? this.addComponent(UIOpacity)
     this.redrawSurface()
     this.createClassicVisuals(visualRoot)
-    this.createLevelFilter(visualRoot)
+    this.createLevelBadge(visualRoot)
     this.createSelectionOverlay(visualRoot)
     this.createLockDraftOverlay(visualRoot)
     this.createLockOverlay(visualRoot)
     if (this.card) {
       this.applyCard(++this.artworkRequestId)
-      this.redrawLevelFilter(this.card.levelCard)
+      this.setLevelBadge(this.card.levelCard)
       this.applySelectionVisual(this.card.selected)
       this.applyLockDraftVisual(Boolean(this.card.lockDraft))
       this.applyLockVisual(Boolean(this.card.locked))
     }
     this.syncInputBinding()
+    this.updateGroupBadge()
   }
 
   protected onEnable (): void { this.syncInputBinding() }
@@ -107,11 +112,17 @@ export class CardView extends Component {
     const requestId = ++this.artworkRequestId
     this.card = card
     this.applyCard(requestId)
-    this.redrawLevelFilter(card.levelCard)
+    this.setLevelBadge(card.levelCard)
     this.applySelectionVisual(card.selected)
     this.applyLockDraftVisual(Boolean(card.lockDraft))
     this.applyLockVisual(Boolean(card.locked))
     this.syncInputBinding()
+    this.updateGroupBadge()
+  }
+
+  private updateGroupBadge (): void {
+    if (this.card?.groupBadge && this.visualRoot && !this.groupBadge) this.groupBadge = new HandGroupBadgeView(this.visualRoot)
+    this.groupBadge?.render(this.card?.groupBadge)
   }
 
   /**
@@ -223,13 +234,32 @@ export class CardView extends Component {
     this.redrawLockDraftOverlay(false)
   }
 
-  private createLevelFilter (parent: Node): void {
-    const node = new Node('CardLevelYellowFilter')
+  private createLevelBadge (parent: Node): void {
+    const node = new Node('CardLevelBadge')
     node.parent = parent
     node.setPosition(new Vec3(0, 0, 7))
     node.addComponent(UITransform).setContentSize(80, 116)
-    this.levelFilter = node.addComponent(Graphics)
-    this.redrawLevelFilter(false)
+    const graphics = node.addComponent(Graphics)
+    graphics.fillColor = new Color(28, 119, 96, 255)
+    graphics.moveTo(5, 56)
+    graphics.lineTo(32, 56)
+    graphics.quadraticCurveTo(38, 56, 38, 50)
+    graphics.lineTo(38, 23)
+    graphics.close()
+    graphics.fill()
+    const text = new Node('LevelBadgeText')
+    text.parent = node
+    text.setPosition(new Vec3(28, 46, 1))
+    text.addComponent(UITransform).setContentSize(18, 20)
+    const label = text.addComponent(Label)
+    label.string = '级'
+    label.fontSize = 15
+    label.lineHeight = 18
+    label.horizontalAlign = Label.HorizontalAlign.CENTER
+    label.verticalAlign = Label.VerticalAlign.CENTER
+    label.color = new Color(255, 255, 255, 255)
+    this.levelBadge = node
+    this.setLevelBadge(false)
   }
 
   private createClassicSprite (parent: Node, name: string, width: number, height: number, x: number, y: number, z: number): Sprite {
@@ -346,8 +376,7 @@ export class CardView extends Component {
     if (!this.selectionOverlay) return
     this.selectionOverlay.clear()
     if (!selected) return
-    // A neutral dark wash preserves every classic PNG detail while the warm,
-    // heavy outline remains legible on both red and black suits.
+    // Selection uses the existing hand lift plus a neutral wash, never a gold outline.
     this.selectionOverlay.fillColor = new Color(8, 18, 24, 82)
     if (this.stackCovered) {
       const height = Math.max(6, Math.min(112, this.hitAreaHeight))
@@ -355,19 +384,10 @@ export class CardView extends Component {
       const radius = Math.min(8, height / 2)
       this.selectionOverlay.roundRect(-38, y, 76, height, radius)
       this.selectionOverlay.fill()
-      this.selectionOverlay.strokeColor = new Color(255, 205, 64, 255)
-      this.selectionOverlay.lineWidth = 4
-      const strokeHeight = Math.max(1, height - 2)
-      this.selectionOverlay.roundRect(-39, y + 1, 78, strokeHeight, Math.min(radius, strokeHeight / 2))
-      this.selectionOverlay.stroke()
       return
     }
     this.selectionOverlay.roundRect(-38, -56, 76, 112, 8)
     this.selectionOverlay.fill()
-    this.selectionOverlay.strokeColor = new Color(255, 205, 64, 255)
-    this.selectionOverlay.lineWidth = 4
-    this.selectionOverlay.roundRect(-40, -58, 80, 116, 9)
-    this.selectionOverlay.stroke()
   }
 
   private redrawLockOverlay (locked: boolean): void {
@@ -386,7 +406,7 @@ export class CardView extends Component {
     }
     this.lockOverlay.roundRect(-35, -53, 70, 106, 7)
     this.lockOverlay.stroke()
-    // The small cool-colour clasp stays distinct from the gold selection state.
+    // The cool-colour clasp identifies locked groups, independently of selection.
     this.lockOverlay.fillColor = new Color(48, 205, 226, 230)
     this.lockOverlay.roundRect(24, 42, 12, 10, 2)
     this.lockOverlay.fill()
@@ -415,17 +435,8 @@ export class CardView extends Component {
     this.lockDraftOverlay.stroke()
   }
 
-  private redrawLevelFilter (isLevelCard: boolean): void {
-    if (!this.levelFilter) return
-    this.levelFilter.clear()
-    if (!isLevelCard) return
-    this.levelFilter.fillColor = new Color(255, 190, 28, 54)
-    this.levelFilter.roundRect(-38, -56, 76, 112, 8)
-    this.levelFilter.fill()
-    this.levelFilter.strokeColor = new Color(255, 205, 67, 210)
-    this.levelFilter.lineWidth = 2
-    this.levelFilter.roundRect(-38, -56, 76, 112, 8)
-    this.levelFilter.stroke()
+  private setLevelBadge (isLevelCard: boolean): void {
+    if (this.levelBadge) this.levelBadge.active = isLevelCard
   }
 
   private applySelectionVisual (selected: boolean): void {
@@ -493,7 +504,9 @@ export class CardView extends Component {
     return {
       cardId: this.card.id,
       pointerId: event.getID() ?? 0,
-      screenPoint: event.getUILocation().clone(),
+      // hitTest applies camera/viewport conversion itself. UI coordinates would
+      // be converted a second time, shifting the sweep away from the finger.
+      screenPoint: event.getLocation().clone(),
     }
   }
 

@@ -39,10 +39,12 @@ class MockSprite {
 }
 class MockSpriteFrame {}
 class MockNode {
+  static EventType = { TOUCH_END: 'touch-end' }
   constructor (name) {
     this.name = name
     this.children = []
     this.components = new Map()
+    this.handlers = new Map()
     this.active = true
     this.isValid = true
     this.position = new MockVec3()
@@ -61,6 +63,8 @@ class MockNode {
     return component
   }
   getComponent (ComponentType) { return this.components.get(ComponentType) ?? null }
+  on (event, callback) { this.handlers.set(event, callback) }
+  emit (event) { this.handlers.get(event)?.() }
   setPosition (position) { this.position = position }
   setScale (scale) { this.scale = scale }
   destroy () {
@@ -100,7 +104,8 @@ const localRequire = request => {
   throw new Error(`unexpected dependency ${request}`)
 }
 new Function('exports', 'module', 'require', '__filename', '__dirname', result.outputText)(moduleRecord.exports, moduleRecord, localRequire, sourcePath, path.dirname(sourcePath))
-const { TableHudSeatViewGroup } = moduleRecord.exports
+const { TableHudSeatViewGroup, createDefaultTableHudSeats } = moduleRecord.exports
+assert.ok(createDefaultTableHudSeats().every(seat => seat.status === ''), 'initial placeholders must not flash a made-up count')
 
 const descendants = root => root.children.flatMap(child => [child, ...descendants(child)])
 const findNode = (root, name) => descendants(root).find(node => node.name === name)
@@ -111,9 +116,19 @@ const avatarFrame = new MockSpriteFrame()
 group.setDefaultAvatarFrame(avatarFrame)
 group.render([
   { place: 'bottom', name: '超长玩家名称甲乙', status: '已离线', offline: true },
-  { place: 'top', name: '队友', status: '剩18张', active: true },
+  { place: 'top', name: '队友', status: '剩10张', active: true },
 ])
 group.mount(parentA)
+for (const place of ['left', 'right']) {
+  const seat = findNode(parentA, `Seat-${place}`)
+  const avatar = findNode(seat, 'DefaultAvatar')
+  const name = findNode(seat, 'PlayerName')
+  const rank = findNode(seat, 'PlayerRank')
+  assert.equal(name.position.x, avatar.position.x, 'side names must be centered under their avatar')
+  assert.ok(name.position.y < avatar.position.y - 36, 'name must clear the lower edge of the avatar')
+  assert.ok(rank.position.y < name.position.y, 'remaining-card status belongs below the name')
+  assert.equal(name.getComponent(MockLabel).fontSize, 22, 'seat names use the smaller reviewed font')
+}
 
 assert.deepEqual(parentA.children.map(node => node.name), ['Seat-bottom', 'Seat-right', 'Seat-top', 'Seat-left'])
 assert.deepEqual(group.getContentSize(), { width: 280, height: 100 })
@@ -122,12 +137,32 @@ const right = parentA.children[1]
 const top = parentA.children[2]
 assert.equal(findNode(bottom, 'PlayerName').getComponent(MockLabel).string, '超长玩家名…', 'long player names must preserve the existing six-character presentation limit')
 assert.equal(findNode(right, 'PlayerName').getComponent(MockLabel).string, '下家', 'missing seat snapshots must use their viewer-relative fallback')
-assert.equal(findNode(top, 'PlayerRank').getComponent(MockLabel).string, '剩18张')
+assert.equal(findNode(top, 'PlayerRank').getComponent(MockLabel).string, '剩10张')
+assert.equal(findNode(right, 'PlayerRank').active, false, 'an empty status must hide its label')
+assert.equal(right.getComponent(MockGraphics).commands.filter(command => command[0] === 'roundRect').length, 1,
+  'an empty status must not leave an empty pill behind the name')
 assert.equal(findNode(bottom, 'DefaultAvatar').getComponent(MockSprite).spriteFrame, avatarFrame)
 assert.equal(findNode(bottom, 'DefaultAvatar').active, true)
 assert.deepEqual(findNode(bottom, 'DefaultAvatar').getComponent(MockSprite).color, new MockColor(150, 156, 154), 'offline avatar tint must remain local to the seat view')
 assert.equal(bottom.getComponent(MockGraphics).lineWidth, 1.5)
 assert.equal(top.getComponent(MockGraphics).lineWidth, 2.5, 'the active seat must retain the emphasized outline')
+
+const topNamePosition = findNode(top, 'PlayerName').position
+const watched = []
+group.onSeatAvatar = playerId => watched.push(playerId)
+group.render([{ place: 'top', playerId: 'p3', name: '队友', status: '' }])
+findNode(top, 'DefaultAvatar').emit(MockNode.EventType.TOUCH_END)
+group.render([{ place: 'top', playerId: 'p2', name: '上家', status: '' }])
+findNode(top, 'DefaultAvatar').emit(MockNode.EventType.TOUCH_END)
+assert.deepEqual(watched, ['p3', 'p2'], 'avatar taps must use the current viewpoint mapping, not the mount-time seat')
+for (const status of ['', '剩10张', '剩9张', '剩1张', '头游', '']) {
+  group.render([{ place: 'top', name: '队友', status }])
+  const label = findNode(top, 'PlayerRank')
+  assert.equal(label.getComponent(MockLabel).string, status)
+  assert.equal(label.active, Boolean(status), 'status visibility must reset on every snapshot')
+  assert.equal(top.getComponent(MockGraphics).commands.filter(command => command[0] === 'roundRect').length, status ? 2 : 1)
+  assert.deepEqual(findNode(top, 'PlayerName').position, topNamePosition, 'count visibility must not move the name or avatar')
+}
 
 const placements = {
   bottom: { x: -430, y: -250, scale: 0.9, visible: true },

@@ -46,6 +46,7 @@ class FakeVec3 {
 }
 
 const loaded = { exports: {} }
+let projectedPlayKeys = ['hint', 'play']
 new Function('exports', 'module', 'require', result.outputText)(loaded.exports, loaded, request => {
   if (request === 'cc') return {
     Label: class Label {},
@@ -54,8 +55,22 @@ new Function('exports', 'module', 'require', result.outputText)(loaded.exports, 
     tween: () => ({ stop () { return this }, to () { return this }, start () {} }),
   }
   if (request === '../ui/TablePromptPolicy') return { tableHintToast: () => null }
+  if (request === '../game/TeammateHandProjector') return { TeammateHandProjector: class { project () { return null } reset () {} } }
+  if (request === '../ui/TablePlayActionPolicy') return { TablePlayActionPolicy: class { resolve () { return projectedPlayKeys } } }
+  if (request === '../ui/TableSettlementView') return { TableSettlementView: class { clear () {} render () {} } }
+  if (request === './SettlementPresentation') return { projectSettlementContent: () => ({}) }
   if (request === './MatchEndedPresentation') return { projectMatchEndedPresentation: () => ({ title: '', detail: '' }) }
   if (request === './TableNetworkEventBridge') return { TableNetworkEventBridge: FakeTableNetworkEventBridge }
+  if (request === './TableProgressPresentation') {
+    const compiled = ts.transpileModule(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableProgressPresentation.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } })
+    const scope = { exports: {} }
+    new Function('exports', 'require', compiled.outputText)(scope.exports, name => {
+      if (name === 'cc') return { Vec3: FakeVec3 }
+      if (name === './TableSnapshotPresenter') return { projectTributeEffectTokens: () => new Set() }
+      throw new Error(name)
+    })
+    return scope.exports
+  }
   if (request === './TableSnapshotPresenter') return {
     projectTableViewer: () => ({ levelLabel: '', settlementTitle: null, settlementWon: null }),
     projectTributeEffectTokens: () => new Set(),
@@ -68,11 +83,13 @@ const managerNode = new ListenerOwner()
 const nextRound = new ListenerOwner()
 const trustee = new ListenerOwner()
 const calls = { handoff: 0, hide: 0, visible: [], reset: [], invalidate: 0, apply: [] }
+const closedCalls = []
 const dependencies = {
   session: { snapshot: { myPlayerId: 'p1', isMultiplayer: true, status: 'playing' } },
   manager: {
     node: managerNode,
     applyServerState: (state, hint) => calls.apply.push({ state, hint }),
+    abortRound: () => closedCalls.push('abort'),
   },
   lobby: { events: {}, snapshot: { roomId: 'room-1' } },
   audio: {},
@@ -83,9 +100,11 @@ const dependencies = {
   frontPages: {
     handoffFriendRoomReservation: () => { calls.handoff += 1 },
     hideAll: () => { calls.hide += 1 },
+    showMenu: () => closedCalls.push('main-hall'),
+    showRecoveryMenu: () => closedCalls.push('preserved-recovery-hall'),
   },
-  overlays: {},
-  turnClock: {},
+  overlays: { clearDialogs: () => closedCalls.push('clear-dialogs'), showToast: message => closedCalls.push(message) },
+  turnClock: { reset: () => closedCalls.push('reset-clock') },
   handInteraction: { invalidateAuthoritativeHand: () => { calls.invalidate += 1 } },
   hud: {},
   controls: {
@@ -127,6 +146,28 @@ assert.equal(calls.apply.length, 2, 'a recovery packet must still reach the snap
 assert.deepEqual(calls.reset, [2], 'recovery must establish the server action count as the visual baseline')
 assert.equal(calls.invalidate, 1, 'recovery must invalidate the cached authoritative hand')
 assert.deepEqual(calls.visible, [true, true], 'accepted packets must reveal the table')
+
+networkBridge.handlers.onRoomClosed('全员同意，房间已解散', { compensateReservation: true })
+assert.deepEqual(closedCalls, ['clear-dialogs', 'abort', 'reset-clock', 'main-hall', '全员同意，房间已解散'], 'a closed match must return to the main hall, never unrelated friend-room entry')
+closedCalls.length = 0
+networkBridge.handlers.onRoomClosed('恢复本地状态', { compensateReservation: false })
+assert.deepEqual(closedCalls, ['clear-dialogs', 'abort', 'reset-clock', 'preserved-recovery-hall', '恢复本地状态'], 'local recovery reset must not cancel a valid remote reservation')
+closedCalls.length = 0
+networkBridge.handlers.onRoomClosed()
+assert.equal(closedCalls.at(-1), '房间已关闭', 'older close messages without a reason still have readable feedback')
+
+dependencies.turnClock.update = () => {}
+dependencies.hud.mounted = true
+for (const key of ['hint', 'pass', 'play']) dependencies.controls[key] = { active: false }
+const playing = { state, phase: 'playing', actionPending: false }
+projectedPlayKeys = ['pass']
+coordinator.layoutActionControls(playing, 'p1', false, 'play')
+assert.deepEqual(['hint', 'pass', 'play'].map(key => dependencies.controls[key].active), [false, true, false], 'the live coordinator must apply the rule-derived pass-only policy')
+projectedPlayKeys = ['hint', 'play']
+coordinator.layoutActionControls(playing, 'p1', false, 'play')
+assert.deepEqual(['hint', 'pass', 'play'].map(key => dependencies.controls[key].active), [true, false, true], 'lead controls must exclude pass')
+coordinator.layoutActionControls({ ...playing, actionPending: true }, 'p1', false, 'play')
+assert.ok(['hint', 'pass', 'play'].every(key => !dependencies.controls[key].active), 'an in-flight network command still suppresses all play actions')
 
 coordinator.dispose()
 coordinator.dispose()

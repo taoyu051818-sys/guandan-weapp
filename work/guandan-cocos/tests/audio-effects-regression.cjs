@@ -17,7 +17,6 @@ const gameManagerPath = path.join(projectRoot, 'assets/scripts/game/GameManager.
 const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
 const tableMatchCoordinatorPath = path.join(projectRoot, 'assets/scripts/scenes/TableMatchCoordinator.ts')
 const tableTurnClockPath = path.join(projectRoot, 'assets/scripts/scenes/TableTurnClockController.ts')
-const settingsRulesPagePath = path.join(projectRoot, 'assets/scripts/scenes/front-pages/SettingsRulesPageDomain.ts')
 const gameSessionPath = path.join(projectRoot, 'assets/scripts/session/GameSession.ts')
 const gameSessionModelPath = path.join(projectRoot, 'assets/scripts/session/GameSessionModel.ts')
 const licensedCatalogPath = path.join(projectRoot, 'third_party/licenses/gameabc2-audio/catalog.json')
@@ -55,7 +54,7 @@ for (const sourcePath of [audioProfilesPath, playVoiceProfilesPath, effectPolicy
 }
 
 const audio = loadPureTs(audioProfilesPath)
-const expectedEvents = ['game-start', 'deal', 'play', 'pass', 'countdown', 'bomb', 'king-bomb', 'wildcard', 'victory', 'defeat']
+const expectedEvents = ['game-start', 'deal', 'play', 'pass', 'countdown', 'bomb', 'king-bomb', 'victory', 'defeat']
 assert.deepEqual(audio.AUDIO_EVENTS, expectedEvents, 'the complete semantic audio surface must remain explicit')
 
 const expectedPrimaryAssets = {
@@ -66,7 +65,6 @@ const expectedPrimaryAssets = {
   countdown: 'niuma/countdown_5',
   bomb: 'licensed/bomb',
   'king-bomb': 'king_bomb',
-  wildcard: 'wildcard',
   victory: 'niuma/victory',
   defeat: 'licensed/defeat',
 }
@@ -108,12 +106,18 @@ assert.equal(audio.resolveAudioProfile('straight-flush'), null, 'straight-flush 
 assert.equal(audio.resolveAudioProfile('straight_flush'), null, 'legacy straight-flush lookups must also remain silent')
 assert.equal(audio.RETIRED_AUDIO_ROUTES['straight-flush'].runtimeAllowed, false)
 assert.equal(audio.RETIRED_AUDIO_ROUTES.straight_flush.runtimeAllowed, false)
+assert.equal(audio.resolveAudioEvent('wildcard'), null)
+assert.equal(audio.resolveAudioProfile('wildcard'), null, 'level cards must not request an additional cue')
+assert.equal(audio.RETIRED_AUDIO_ROUTES.wildcard.runtimeAllowed, false)
+for (const file of ['assets/scripts/effects/EffectController.ts', 'assets/scripts/effects/EffectPlaybackCoordinator.ts']) {
+  assert.doesNotMatch(read(path.join(projectRoot, file)), /(?:playSound|soundPlayer)[^\n]*'wildcard'/, 'all arrival/fallback/off/bomb paths must omit the retired level sound')
+}
 assert.equal(audio.resolveAudioEvent('unregistered-clip'), null, 'unknown asset names must stay optional')
 
 const catalog = JSON.parse(read(licensedCatalogPath))
 const manifest = JSON.parse(read(licensedManifestPath))
-assert.equal(catalog.assets.length, 25, 'only the 25 reachable authorized clips may enter the runtime bundle')
-assert.equal(catalog.archived.length, 2, 'two authorized but unreachable clips must remain outside assets')
+assert.equal(catalog.assets.length, 4, 'the retired male clip must not enter the runtime bundle')
+assert.equal(catalog.archived.length, 22, 'retired licensed clips must remain outside assets')
 assert.equal(catalog.excluded.length, 1, 'the rejected visual must remain explicitly excluded')
 assert.match(catalog.excluded[0].url, /\.png$/)
 assert.equal(manifest.assets.length, catalog.assets.length)
@@ -179,9 +183,9 @@ const pairRankAssets = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8',
 for (const [rank, key] of Object.entries(pairRankAssets)) {
   assert.equal(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Pair, rank)).assetKeys[0], `niuma/pair_${key}`, `pair ${rank} must use the complete Female matrix`)
 }
-assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Pair, 'Small')).assetKeys, ['licensed/pair_small_joker', 'niuma/pair_joker_generic'])
+assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Pair, 'Small')).assetKeys, ['niuma/pair_joker_generic'])
 assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Pair, 'Big')).assetKeys, ['niuma/pair_joker_generic'])
-assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Straight, 3)).assetKeys, ['niuma/straight', 'licensed/straight'])
+assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Straight, 3)).assetKeys, ['niuma/straight'])
 assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Triple, 3)).assetKeys, ['niuma/triple'])
 assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.TripleWithPair, 3)).assetKeys, ['niuma/triple_with_pair'])
 assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Tube, 3)).assetKeys, ['niuma/tube'])
@@ -189,7 +193,7 @@ assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.StraightFlu
 assert.equal((read(playVoiceProfilesPath).match(/PlayType\.StraightFlush/g) || []).length, 1, 'PlayVoiceProfiles must retain one straight-flush dispatch site')
 assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Bomb, 3)).assetKeys, ['niuma/bomb'])
 assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Rocket, 3)).assetKeys, ['niuma/king_bomb'])
-assert.equal(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Plate, 3)), null, 'the mismatched “飞机” source must not announce a steel plate')
+assert.deepEqual(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Plate, 3)).assetKeys, ['tts/steel_plate'], 'steel plate must use its own Female TTS, never the mismatched 飞机 source')
 assert.equal(voices.resolvePlayVoiceProfile(voiceAction(PlayType.Single, 'A', [{ cardId: 'c-A-1', representedValue: 12 }])), null, 'wildcard-resolved singles must not announce the physical rank')
 
 const niumaAudioManifest = JSON.parse(read(niumaAudioManifestPath))
@@ -245,36 +249,27 @@ const niumaRuntimeFiles = fs.readdirSync(path.join(projectRoot, niumaAudioManife
 assert.deepEqual(niumaRuntimeFiles, niumaAudioManifest.assets.map(asset => asset.file).sort(), 'runtime NiuMa audio files must exactly match the curated manifest')
 
 const niumaMaleManifest = JSON.parse(read(niumaMaleAudioManifestPath))
-assert.equal(niumaMaleManifest.schemaVersion, 1)
-assert.equal(niumaMaleManifest.sourceRevision, niumaAudioManifest.sourceRevision)
-assert.equal(niumaMaleManifest.assets.length, 40, 'the optional Male pack must contain 39 play/pass clips and one exact-copy quick-chat clip')
-assert.equal(niumaMaleManifest.excluded.length, 10)
-assert.equal(niumaMaleManifest.excluded.some(asset => /Male\/feiji\.mp3$/.test(asset.sourcePath)), true)
-assert.equal(niumaMaleManifest.excluded.some(asset => /Male\/yapai\.mp3$/.test(asset.sourcePath)), true)
-assert.deepEqual(niumaMaleManifest.assets.filter(asset => asset.runtimePhraseId).map(asset => ({
-  sourcePhraseIndex: asset.sourcePhraseIndex,
-  sourceText: asset.sourceText,
-  runtimeText: asset.runtimeText,
-  key: asset.key,
-})), [{ sourcePhraseIndex: 2, sourceText: '你的牌打得太好啦', runtimeText: '你的牌打得太好啦', key: 'niuma-male/chat_nice_play' }])
-assert.equal(new Set(niumaMaleManifest.assets.map(asset => asset.sha256)).size, niumaMaleManifest.assets.length)
-for (const asset of niumaMaleManifest.assets) {
-  assert.match(asset.key, /^niuma-male\//)
-  const runtimePath = path.join(projectRoot, niumaMaleManifest.runtimeDirectory, asset.file)
-  const buffer = fs.readFileSync(runtimePath)
+assert.equal(niumaMaleManifest.runtimeAllowed, false)
+assert.equal(niumaMaleManifest.assets.length, 40, 'preserve source hashes as historical provenance')
+assert.equal(fs.existsSync(path.join(projectRoot, niumaMaleManifest.runtimeDirectory)), false, 'retired Male pack must stay outside assets')
+assert.equal(fs.existsSync(path.join(projectRoot, 'assets/game-assets/audio/voices/licensed/single_5_male.mp3')), false)
+assert.equal(fs.existsSync(path.join(projectRoot, 'scripts/import-niuma-male-audio.mjs')), false)
+
+const ttsManifest = JSON.parse(read(path.join(projectRoot, 'third_party/licenses/tts-steel-plate.json')))
+assert.equal(ttsManifest.gender, 'female')
+assert.equal(ttsManifest.synthesized, true)
+assert.equal(ttsManifest.text, '钢板！')
+for (const asset of ttsManifest.assets) {
+  const file = path.join(projectRoot, ttsManifest.runtimeDirectory, asset.file)
+  const buffer = fs.readFileSync(file)
   assert.equal(buffer.length, asset.bytes)
   assert.equal(crypto.createHash('sha256').update(buffer).digest('hex'), asset.sha256)
-  assert.equal(fs.existsSync(`${runtimePath}.meta`), true)
-  if (requireBuild) {
-    const meta = JSON.parse(read(`${runtimePath}.meta`))
-    const builtPath = path.join(projectRoot, 'build/web-desktop/assets/game-assets/native', meta.uuid.slice(0, 2), `${meta.uuid}${path.extname(asset.file)}`)
-    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(builtPath)).digest('hex'), asset.sha256)
-  }
+  assert.equal(buffer.toString('ascii', 0, 4), 'RIFF')
+  assert.equal(buffer.toString('ascii', 8, 12), 'WAVE')
+  assert.equal(buffer.readUInt16LE(22), 1)
+  assert.equal(buffer.readUInt32LE(24), 24000)
+  assert.equal(fs.existsSync(`${file}.meta`), true)
 }
-assert.deepEqual(
-  fs.readdirSync(path.join(projectRoot, niumaMaleManifest.runtimeDirectory)).filter(file => /\.(mp3|ogg)$/.test(file)).sort(),
-  niumaMaleManifest.assets.map(asset => asset.file).sort(),
-)
 
 const niumaBgmManifest = JSON.parse(read(niumaBgmManifestPath))
 assert.equal(niumaBgmManifest.schemaVersion, 1)
@@ -337,11 +332,10 @@ const gameManager = read(gameManagerPath)
 const gameScene = read(gameScenePath)
 const tableMatchCoordinator = read(tableMatchCoordinatorPath)
 const tableTurnClock = read(tableTurnClockPath)
-const settingsRulesPage = read(settingsRulesPagePath)
 const gameSession = read(gameSessionPath)
 const gameSessionModel = read(gameSessionModelPath)
-assert.match(audioController, /if \(!clip\) return this\.playFirstAvailable\(assetKeys, volumeScale, index \+ 1, epoch\)/, 'a missing clip must try the next configured candidate')
-assert.match(audioController, /this\.unavailableAssets\.add\(assetKey\)/, 'failed resources must be cached instead of loaded forever')
+assert.match(audioController, /if \(!clip\) return this\.playFirstAvailable\(assetKeys, volumeScale, index \+ 1, epoch, current\)/, 'fallback candidates must retain the same announcement identity')
+assert.match(audioController, /new OptionalAudioAssetCache<AudioClip>/, 'optional resources use the lifecycle-owned, bounded-retry cache; behavior is covered by audio-recovery-regression')
 assert.match(audioController, /if \(settings && !settings\.soundEnabled\) return/, 'the independent sound switch must be authoritative')
 assert.match(audioController, /if \(!this\.isPlaybackCurrent\(epoch\)\) return/, 'a late async load must re-check playback state before sounding')
 assert.match(audioController, /settings\?\.volume \?\? 0\.5\) \* volumeScale/, 'loaded clips must use the current volume rather than the request-time volume')
@@ -359,12 +353,11 @@ assert.match(audioController, /source\.loop = true/, 'the selected background tr
 assert.match(audioController, /if \(!settings\.bgmEnabled\)[\s\S]*source\.stop\(\)/, 'the independent music switch must stop BGM')
 assert.match(audioController, /if \(!source\.playing\) source\.play\(\)/, 'enabling music must start an already loaded track')
 assert.doesNotMatch(audioController, /soundEnabled[\s\S]{0,80}bgmSource\.stop/, 'the sound-effect switch must not silently control the independent music channel')
-assert.match(audioController, /settings\.voicePack !== 'male'/, 'the selected voice pack must drive human announcements')
-assert.match(audioController, /replace\(\/\^niuma\\\/\/, 'niuma-male\/'\)/, 'Male selection must stay in its isolated runtime namespace')
-assert.match(audioController, /!key\.startsWith\('licensed\/'\)/, 'Male selection must not fall through into another recorded human voice')
-assert.match(gameSessionModel, /voicePack: 'female'/, 'Female must remain the backward-compatible default pack')
-assert.match(gameSessionModel, /voicePack: oneOf\(settings\.voicePack, \['female', 'male'\], base\.settings\.voicePack\)/, 'restored voice-pack values must be normalized by the session schema owner')
-assert.match(settingsRulesPage, /切换报牌声线/, 'settings must expose the optional Male/Female voice pack')
+assert.doesNotMatch(audioController, /niuma-male/)
+assert.match(audioController, /key\.startsWith\('niuma\/'\)/, 'human voices must use the curated female namespace')
+assert.match(audioController, /profile\.event === 'pass' \? this\.selectHumanVoiceKeys\(keys\) : keys/)
+assert.match(gameSessionModel, /voicePack: 'female'/)
+assert.doesNotMatch(gameSessionModel, /\['female', 'male'\]/, 'old male settings must normalize to female')
 assert.doesNotMatch(`${effectController}\n${effectPlayback}`, /enqueueSemanticAudio/, 'pass audio must not restore the retired side queue')
 const playMethodSource = effectPlayback.slice(effectPlayback.indexOf('  public play (event: PlayEffectEvent'), effectPlayback.indexOf('  public renderPreparedContext'))
 const playStartIndex = playMethodSource.indexOf('const start = async (): Promise<void> =>')
@@ -377,11 +370,8 @@ assert.match(playMethodSource, /const start = async \(\): Promise<void> =>[\s\S]
 assert.match(playMethodSource, /const renderImpact = \(\): void => \{[\s\S]*?this\.dependencies\.withQuality\(effectQuality, \(\) => \{[\s\S]*?if \(!rendererOwnsBombFlight\) this\.dependencies\.vibrate\(profile\.haptic\)[\s\S]*?impactHandle = this\.dependencies\.renderPlayImpact\(profile, playEvent, wildcardUsed\)/, 'enabled visuals must trigger haptics from the arrival-synchronised impact callback')
 assert.match(effectController, /this\.policy\.maxMajorEffectCount === 0/, 'the major-effect budget must be enforced')
 assert.match(effectController, /profile\.level > this\.majorLevel && !this\.policy\.replaceLowerLevelEffect/, 'major-effect replacement policy must be enforced')
-assert.match(effectController, /private renderFlow \([\s\S]*if \(kind === 'victory'\) this\.soundPlayer\?\.\('victory'\)[\s\S]*else if \(kind === 'defeat'\) this\.soundPlayer\?\.\('defeat'\)[\s\S]*return EffectHandle\.completed\('unavailable'\)/, 'EffectController must dispatch settlement audio directly after the retired flow renderer is removed')
-assert.match(effectController, /this\.renderFlow\(won \? 'victory' : 'defeat'/, 'settlement must use the shared direct dispatch path in both full and reduced modes')
 assert.doesNotMatch(effectController, /showTag\(profile\.label/, 'reduced settlement must not fall back to a system-font tag')
 assert.doesNotMatch(effectController, /pauseSystemEvents|resumeSystemEvents|enabled\s*=\s*false/, 'effect playback must not disable gameplay input')
-assert.match(gameManager, /this\.audio\?\.playRoundStart\(\)/, 'local round creation must dispatch the layered semantic start/deal cue')
 assert.match(tableTurnClock, /this\.remainingSeconds > 0 && this\.remainingSeconds <= 5[\s\S]*this\.dependencies\.playCountdown\(this\.remainingSeconds\)/, 'the last five countdown seconds must select their dedicated semantic ticks')
 assert.match(tableMatchCoordinator, /isLiveNextRound[\s\S]*audio\.playRoundStart\(\)/, 'live network next-round preparation must dispatch the layered start/deal cue')
 assert.match(gameScene, /action => this\.audio\?\.playActionVoice\(action\)/, 'the scene must bind action semantics to the audio controller')
@@ -393,3 +383,6 @@ assert.match(read(path.join(projectRoot, 'THIRD_PARTY.md')), /Creative Commons Z
 assert.match(read(path.join(projectRoot, 'THIRD_PARTY.md')), /Project-authorized Guandan audio collection/)
 
 process.stdout.write(`audio and effect regression checks passed (web build ${requireBuild ? 'checked' : 'not requested'})\n`)
+
+assert.doesNotMatch(effectController, /renderFlow|playSettlement|playRoundOpening/, 'retired flow APIs must not remain as audio shims')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableMatchCoordinator.ts'), 'utf8'), /audio\.playEvent\(viewer\.settlementWon \? 'victory' : 'defeat'\)/, 'settlement audio belongs to the live transition, independently of retired visuals')

@@ -27,7 +27,9 @@ export const createInitialMatchState = ({
   scores = { teamA: 0, teamB: 0 },
   revision = 1,
   roundId = 1,
+  matchFormat,
 }) => createMatchState({
+  matchFormat,
   ruleProfile,
   currentLevel,
   levelTeam: teamFor(dealerId),
@@ -171,7 +173,7 @@ export const replaceSettlement = (previous, state, settlement) => ({
   lastRoundRank: [...settlement.fullRank],
   scores: {
     ...previous.scores,
-    [settlement.winnerTeam]: previous.scores[settlement.winnerTeam] + Math.max(0, settlement.levelUp),
+    [settlement.winnerTeam]: previous.scores[settlement.winnerTeam] + Math.max(0, settlement.pointsEarned ?? settlement.levelUp),
   },
   settlement,
 })

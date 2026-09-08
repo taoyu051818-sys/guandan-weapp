@@ -60,6 +60,7 @@ npm run test:server
 | `GAME_RESULT_OUTBOX_FILE` | 空（关闭） | 牌局服单实例结算 outbox，例如 `./var/result-outbox.json` |
 | `GAME_SPECTATOR_OUTBOX_FILE` | 空（关闭） | 牌局服单实例观战事件 outbox，例如 `./var/spectator-outbox.json` |
 | `WEAPP_ROOM_STATE_FILE` | 空（关闭） | 牌局服单实例房间快照，例如 `./var/weapp-rooms.json` |
+| `WEAPP_HOST` | `127.0.0.1` | 牌局服监听地址；香港裸 IP 联调显式使用 `0.0.0.0` |
 | `WEAPP_ALLOWED_ORIGINS` | 空（开发环境不校验） | 逗号分隔的 WebSocket Origin 白名单 |
 | `WEAPP_MAX_PENDING_COMMANDS` | `32` | 单连接等待执行命令上限，范围 `1..1024` |
 | `WX_APPID` / `WX_SECRET` | 空 | 微信小程序 `code2Session` 配置；生产环境两者必填 |
@@ -130,6 +131,8 @@ npm run test:server
 ### `GET /api/v1/profile` / `PATCH /api/v1/profile`
 
 返回 `data.user`。其中 `accountId` 是服务端分配、全平台不重复的八位数字字符串，`comprehensiveScore` 是只用于实力展示和匹配的综合分；PATCH 只能提交 `displayName`、`avatarUrl`，不能修改账号或综合分。
+
+昵称限制为 1—24 个 Unicode 码点，校验与保存口径一致，包含表情时不截断 UTF-16 代理对；登录时需要裁剪的昵称也按完整码点处理。账号 ID 和头像 URL 的长度规则不变。
 
 ## 个人中心、钱包、商城与赛季
 
@@ -211,6 +214,8 @@ npm run test:server
 ```
 
 返回 `data.order`，状态当前为 `paid`。库存扣减、积分扣减、订单和流水在同一个存储事务中提交。`expectedPointsPrice` 与服务端现价不一致时返回 `409 PRODUCT_PRICE_CHANGED`，客户端必须刷新并让用户重新确认，不会按未展示的新价自动扣分。请求结果不确定时，重试必须复用原 `Idempotency-Key`。
+
+商品必须是目录中自身持有、ID 一致的有效记录，不接受对象继承属性。价格、库存、余额和兑换总额必须为非负安全整数；异常时拒绝兑换，不扣款、不减库存、不新增订单或流水。异常商品配置、余额、总额分别返回 `409 INVALID_PRODUCT_STATE`、`INVALID_WALLET_STATE`、`INVALID_ORDER_TOTAL`，不会擅自修复历史余额。
 
 ### `GET /api/v1/tournaments`
 
@@ -307,7 +312,7 @@ X-Game-Signature: hex(HMAC-SHA256(GAME_RESULT_SECRET, timestamp + "." + rawBody)
 
 - `POST /api/v1/merchants/apply`：幂等创建 `pending` 商户申请；不会自动变为可发分账户。
 - `GET /api/v1/merchants/me`：返回商户、角色、门店、员工和最近发分记录。
-- `POST /api/v1/merchants/stores`：负责人/管理员创建门店，必须使用 `Idempotency-Key`。
+- `POST /api/v1/merchants/stores`：负责人/管理员创建门店，必须使用 `Idempotency-Key`；相同标识仅允许重放相同规范化名称和地址，内容不同返回 `409 IDEMPOTENCY_CONFLICT`。兼容原有字符串回执，不需要数据迁移。
 - `POST /api/v1/merchants/employees`：仅负责人可添加 `manager` 或 `cashier`。
 - `POST /api/v1/merchants/points/grant`：向已存在用户发放 1–1000 积分，必须使用 `Idempotency-Key`；受商户日限额、门店归属和操作员角色检查保护。
 
@@ -475,7 +480,7 @@ Content-Type: application/json
 
 支持普通快速匹配 `quick`、经典底分场 `classic_50` / `classic_300` / `classic_2000` / `classic_10000`，以及赛事队列 `rookie_cup` / `weekend_cup` / `master_cup` / `lingshui_16_cup`。等待中响应 `data.match`：
 
-`quick` 和四个经典底分场可直接进入匹配，服务端按 `mode` 使用互相独立的等待池，不会跨底分场拼桌。同一等待池允许并行维护多张未满桌，优先选择综合分跨度最小的桌；初始允许跨度 5000 分，最老等待者每等待 15 秒放宽 5000 分。赛事队列必须先报名对应赛事；未报名返回 `403`，已完成全部轮次返回 `409 TOURNAMENT_ROUNDS_COMPLETE`。`lingshui_16_cup` 不能按普通队列随机凑桌，必须提交服务端当前状态返回的 `{ "mode": "lingshui_16_cup", "tournamentId": "lingshui-16-cup", "assignmentId": "tpa_..." }`；缺失 assignment 返回 `409 TOURNAMENT_ASSIGNMENT_REQUIRED`。
+`quick` 和四个经典底分场可直接进入匹配，服务端按 `mode` 使用互相独立的等待池，不会跨底分场拼桌。同一等待池允许并行维护多张未满桌，优先选择综合分跨度最小的桌。最早真人等待达到 7000ms 后，下一次 `join / status / cancel` 会在同一个平台事务中先为缺少的 p2—p4 席位生成系统机器人并原子成桌；客户端每秒轮询，因此正常在线等待会自动补位。超过期限后才到达的真人进入另一张桌，不能挤占已签名席位；期限前取消则不会补位。所有赛事队列都禁止机器人补位：未报名返回 `403`，已完成全部轮次返回 `409 TOURNAMENT_ROUNDS_COMPLETE`。`lingshui_16_cup` 不能按普通队列随机凑桌，必须提交服务端当前状态返回的 `{ "mode": "lingshui_16_cup", "tournamentId": "lingshui-16-cup", "assignmentId": "tpa_..." }`；缺失 assignment 返回 `409 TOURNAMENT_ASSIGNMENT_REQUIRED`。
 
 经典场底分分别为 50、300、2000、10000。入队后会为这场匹配预留一份底分；商城兑换和赛事报名只能使用“钱包余额 - 已预留底分”的可用积分，不能花掉正在匹配或已经匹配牌局的底分。余额不足时返回 `409 INSUFFICIENT_CLASSIC_STAKE`。结算为队伍间零和转账：每个败方席位必须向对应胜方席位完整转移一份底分，不允许按剩余余额折扣扣款。匹配取消、异常终止或牌局完成后释放预留资格；`quick` 和赛事沿用非底分奖励规则。
 
@@ -489,7 +494,10 @@ Content-Type: application/json
   "mode": "quick",
   "status": "matching",
   "joinedAt": 1785753600000,
-  "entryAttemptId": "6nLw3vYms-kH8iWQ2zMt1A"
+  "entryAttemptId": "6nLw3vYms-kH8iWQ2zMt1A",
+  "humanPlayerCount": 1,
+  "botCount": 0,
+  "botFillAt": 1785753607000
 }
 ```
 
@@ -508,11 +516,13 @@ Content-Type: application/json
   "gameEndpoint": "wss://game.example/weapp",
   "gameTicket": "signed.compact.token",
   "joinToken": "signed.compact.token",
-  "expiresAt": 1785753690000
+  "expiresAt": 1785753690000,
+  "humanPlayerCount": 1,
+  "botCount": 3
 }
 ```
 
-普通与固定赛事匹配的 `entryAttemptId` 由平台生成并持久绑定 participant，重试和固定 assignment 换签都保持不变；签名票据必须携带相同值。`joinToken` 是当前 Cocos 契约的兼容别名，值与 `gameTicket` 相同。
+普通与固定赛事匹配的 `entryAttemptId` 由平台生成并持久绑定 participant，重试和固定 assignment 换签都保持不变；签名票据必须携带相同值。机器人补位桌会把完整 `botUserIdsBySeat` 写入每张真人 HMAC 票据，牌局服要求同房票据绑定完全一致；机器人没有 Socket、入桌票或恢复令牌，客户端也不能把普通空席伪造成机器人。普通匹配恢复票据会保留同一组绑定。`joinToken` 是当前 Cocos 契约的兼容别名，值与 `gameTicket` 相同。
 
 ### `GET /api/v1/match/status?matchId=mat_...`
 
@@ -533,7 +543,7 @@ Content-Type: application/json
 - `seat === "p1"`：发送 `createRoom`，payload 包含 `roomId`、`hostName`、`gameTicket`、`entryAttemptId`。
 - 其他席位：发送 `joinRoom`，payload 包含 `roomId`、`gameTicket`、`entryAttemptId`。
 
-服务端校验签名、过期时间、`roomId`、固定 `seat`、`matchId` 和一次性 `jti`。非 p1 先到时会由有效票据预建不公开的等待房间；p1 随后 `createRoom` 接管。票据房四席到齐后由服务端自动发牌并向四端广播 `gameState`，无需 p1 再发 `startGame`；普通好友房仍由房主手动开始。客户端正常收到入桌响应后，后续重连应使用服务器签发的 `resumeToken`。
+服务端校验签名、过期时间、`roomId`、固定 `seat`、`matchId`、机器人席位绑定和一次性 `jti`。非 p1 真人先到时会由有效票据预建不公开的等待房间；p1 随后 `createRoom` 接管。真人连接与签名机器人合计占满四席后，服务端自动发牌并向所有真人端广播 `gameState`，无需 p1 再发 `startGame`；普通好友房仍由房主手动开始。客户端正常收到入桌响应后，后续重连应使用服务器签发的 `resumeToken`。
 
 为处理 `roomCreated` / `roomJoined` 成功响应在网络中丢失的情况，票据房会把原始 `jti` 固定绑定到对应席位：同一张尚未过期的票据，在该席位为空或仍是同一连接时可以幂等重发。服务端返回原 `resumeToken`、当前阶段以及该席位视角的脱敏牌局状态；若席位正被另一个活动连接占用则拒绝。不同 `jti`、错误 `matchId`、错误 `roomId` 或错误 `seat` 都不能走恢复分支。底层 `GameTicketVerifier.verifyAndConsume()` 对重复消费仍然报错，恢复只在房间确认原 `jti` 绑定后显式执行。
 

@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-08",
+  "reason": "Remove unreachable runtime pages/services and rejected speech without deleting server capabilities or saves.",
+  "removedRuntimeSources": [
+    "assets/scripts/scenes/front-pages/CompetitionPageDomain.ts",
+    "assets/scripts/scenes/front-pages/SettingsRulesPageDomain.ts",
+    "assets/scripts/ui/RuleHelpProjection.ts",
+    "assets/scripts/services/platform/merchantGateway.ts",
+    "assets/scripts/development/EffectLab.ts",
+    "assets/scripts/development/EffectLabSceneHost.ts",
+    "assets/scripts/development/EffectLabPreviewRunner.ts",
+    "assets/scripts/scenes/front-pages/EffectLabPageDomain.ts",
+    "assets/scripts/development/FixedMatchFixtures.ts",
+    "assets/scripts/development/TableLayoutFixtures.ts",
+    "assets/scripts/game/LocalMatchController.ts",
+    "assets/scripts/game/LocalAITurnController.ts",
+    "assets/scripts/game/LocalMatchEventController.ts",
+    "assets/scripts/game/LocalTurnScheduler.ts",
+    "assets/scripts/game/SynchronousLocalAIEngine.ts",
+    "assets/scripts/effects/FlowEffectTypes.ts",
+    "assets/scripts/core/generated/lib/ai.ts"
+  ],
+  "retiredAudio": [
+    {
+      "key": "licensed/single_2",
+      "path": "assets/game-assets/audio/voices/licensed/single_2.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_2.mp3",
+      "uuid": "1fd490ae-0dda-47ed-b99b-ad5d4c8c624a",
+      "bytes": 9507,
+      "sha256": "4aa4ee542988412ff310d6dd2ae20cb68ad302db3d34f474b5f4d8cbf0ae072e"
+    },
+    {
+      "key": "licensed/single_6",
+      "path": "assets/game-assets/audio/voices/licensed/single_6.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_6.mp3",
+      "uuid": "77d6b056-3059-4658-b326-1c30847cad4b",
+      "bytes": 12963,
+      "sha256": "cbf27166b59e14f46670f6b2513ac681bb7dbea7fa61ff93afc7e6aa2897f003"
+    },
+    {
+      "key": "licensed/single_9",
+      "path": "assets/game-assets/audio/voices/licensed/single_9.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_9.mp3",
+      "uuid": "43d1bff2-44da-48db-a7ee-4e91f219d235",
+      "bytes": 11040,
+      "sha256": "44889b39bcaddd546d091d60a18a088f7523528aefe9e28bbe1d64f2b1f20f94"
+    },
+    {
+      "key": "licensed/single_j",
+      "path": "assets/game-assets/audio/voices/licensed/single_j.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_j.mp3",
+      "uuid": "6d8dbbf3-010d-4d29-bccf-b725af13f9b3",
+      "bytes": 21024,
+      "sha256": "286eaa8e687689ccc73f97779ec9b561bf7484459de52e3ec96c78c48b1964af"
+    },
+    {
+      "key": "licensed/single_k",
+      "path": "assets/game-assets/audio/voices/licensed/single_k.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_k.mp3",
+      "uuid": "17f234be-e100-44dd-9569-c67d9522dbf3",
+      "bytes": 9891,
+      "sha256": "d6c35ea8e132607c17c72beaee64aeb5fbcbafe73d253e8b20eeede6a6129119"
+    },
+    {
+      "key": "licensed/single_a",
+      "path": "assets/game-assets/audio/voices/licensed/single_a.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_a.mp3",
+      "uuid": "d221285c-8e1e-4f41-91b4-c9663c4ed9b7",
+      "bytes": 9507,
+      "sha256": "5ceea8e5393ef47d29868c710f9255131d5ada33b69b33da4386dad27869ecd4"
+    },
+    {
+      "key": "licensed/single_small_joker",
+      "path": "assets/game-assets/audio/voices/licensed/single_small_joker.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_small_joker.mp3",
+      "uuid": "f639482f-264b-4300-af31-74fee6f1cba6",
+      "bytes": 34080,
+      "sha256": "504eba7be6572a75e54f76f0c726baad9d3d14657b9b7d3df908d30d022c58be"
+    },
+    {
+      "key": "licensed/single_big_joker",
+      "path": "assets/game-assets/audio/voices/licensed/single_big_joker.mp3",
+      "archivePath": "art-source/audio/licensed-archive/single_big_joker.mp3",
+      "uuid": "6c2cd634-eeac-4fd5-9f1d-5a2739604166",
+      "bytes": 16419,
+      "sha256": "b73106368d7d7f8b0c5ab6ee0b869cc4cd621266fba8f21563160dc93be50b55"
+    },
+    {
+      "key": "licensed/pair_2",
+      "path": "assets/game-assets/audio/voices/licensed/pair_2.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_2.mp3",
+      "uuid": "8f968bad-a0a3-448c-b9de-63943ac071d8",
+      "bytes": 13347,
+      "sha256": "fedab4ebb8b865e5811794032f7a92c4ba9f1ea185d13e8b01e0c211e6fc5fb8"
+    },
+    {
+      "key": "licensed/pair_3",
+      "path": "assets/game-assets/audio/voices/licensed/pair_3.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_3.mp3",
+      "uuid": "49fbe508-c3e5-4ee8-8a49-ced2cba430fd",
+      "bytes": 13731,
+      "sha256": "7bbc48937ffe6a5868dbd1a626fa5ca151a2fb4041d7e8c06083fb95b5bdb2be"
+    },
+    {
+      "key": "licensed/pair_4",
+      "path": "assets/game-assets/audio/voices/licensed/pair_4.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_4.mp3",
+      "uuid": "69028fc0-76a8-43b7-90b4-71412d297ce2",
+      "bytes": 11427,
+      "sha256": "c64c0478e52d2aaf52e7eeb0bd2a3d3d6a07b6827f36aa34137c2d7a19299bbb"
+    },
+    {
+      "key": "licensed/pair_5",
+      "path": "assets/game-assets/audio/voices/licensed/pair_5.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_5.mp3",
+      "uuid": "26888c66-7a35-4557-bfdc-32abcf6c59c5",
+      "bytes": 13347,
+      "sha256": "9e12366bb834b1c2402b358a5fb3aec5eafd26dda318aa2b312e428991321a8e"
+    },
+    {
+      "key": "licensed/pair_6",
+      "path": "assets/game-assets/audio/voices/licensed/pair_6.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_6.mp3",
+      "uuid": "efe71dc7-fa41-49f1-8dea-9ef67e543df0",
+      "bytes": 10659,
+      "sha256": "acb0686d8a2928c104c8a64ac26682b257bba7d6d8eb4384fb3d7d46816f0a5c"
+    },
+    {
+      "key": "licensed/pair_7",
+      "path": "assets/game-assets/audio/voices/licensed/pair_7.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_7.mp3",
+      "uuid": "3dfbad98-b319-4547-a372-8eb6015bfcb4",
+      "bytes": 13347,
+      "sha256": "cfb0d7d253238b153b9475854b383241859a7a3911053383ad616ffde3174b86"
+    },
+    {
+      "key": "licensed/pair_9",
+      "path": "assets/game-assets/audio/voices/licensed/pair_9.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_9.mp3",
+      "uuid": "fe34fd7d-cfc4-494d-9fb2-186205c00431",
+      "bytes": 13347,
+      "sha256": "747c22f8e6f2a908fcc2a55c653356ff9fece16d60b2b4e32dc5fb8bea1142f1"
+    },
+    {
+      "key": "licensed/pair_j",
+      "path": "assets/game-assets/audio/voices/licensed/pair_j.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_j.mp3",
+      "uuid": "f4c6a227-9073-445b-afe6-cbba6b49fc9d",
+      "bytes": 16803,
+      "sha256": "069d1c0f95ddde4f12a203f2a6047d1a007cc087c475b886b1ec85eb5865a73d"
+    },
+    {
+      "key": "licensed/pair_k",
+      "path": "assets/game-assets/audio/voices/licensed/pair_k.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_k.mp3",
+      "uuid": "029972d1-b179-4d7d-b63c-4637b81bb5f2",
+      "bytes": 18723,
+      "sha256": "ee6f703d1217be848f894b08ce2a5d289ee31bcffef74ea7c270903734d35c0f"
+    },
+    {
+      "key": "licensed/straight",
+      "path": "assets/game-assets/audio/voices/licensed/straight.mp3",
+      "archivePath": "art-source/audio/licensed-archive/straight.mp3",
+      "uuid": "83f1e9c0-0601-4685-b6c6-95a616898a47",
+      "bytes": 12195,
+      "sha256": "abb9de2a4baf66b8a5717e3dde26453c90a6a6fb1e165377e35b8fc00e53e871"
+    },
+    {
+      "key": "licensed/pass",
+      "path": "assets/game-assets/audio/voices/licensed/pass.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pass.mp3",
+      "uuid": "8f95c31e-8ae7-4bb3-8d2d-7cafde7d5f3a",
+      "bytes": 10566,
+      "sha256": "8c5f5aacc27734d5c2002829501637895af8150af74a92ec4d8a74c9b9891828"
+    },
+    {
+      "key": "licensed/pair_small_joker",
+      "path": "assets/game-assets/audio/voices/licensed/pair_small_joker.mp3",
+      "archivePath": "art-source/audio/licensed-archive/pair_small_joker.mp3",
+      "uuid": "0827ed05-4f3e-4690-bf3e-406fff246ff4",
+      "bytes": 16416,
+      "sha256": "7502480c5f9c0333cab0aaf1fa12a6eaf0179838af108586a426d46cebcab11b"
+    }
+  ],
+  "laboratoryRetirement": {
+    "reason": "User explicitly requested full laboratory removal, including debug access and production fixture injection.",
+    "archivedSources": [
+      {
+        "path": "assets/scripts/development/EffectLab.ts",
+        "archivePath": "asset-library/retired-runtime-20260908/EffectLab.ts.snapshot",
+        "metadataArchivePath": "asset-library/retired-runtime-20260908/EffectLab.ts.meta.snapshot"
+      },
+      {
+        "path": "assets/scripts/development/EffectLabSceneHost.ts",
+        "archivePath": "asset-library/retired-runtime-20260908/EffectLabSceneHost.ts.snapshot",
+        "metadataArchivePath": "asset-library/retired-runtime-20260908/EffectLabSceneHost.ts.meta.snapshot"
+      },
+      {
+        "path": "assets/scripts/development/EffectLabPreviewRunner.ts",
+        "archivePath": "asset-library/retired-runtime-20260908/EffectLabPreviewRunner.ts.snapshot",
+        "metadataArchivePath": "asset-library/retired-runtime-20260908/EffectLabPreviewRunner.ts.meta.snapshot"
+      },
+      {
+        "path": "assets/scripts/scenes/front-pages/EffectLabPageDomain.ts",
+        "archivePath": "asset-library/retired-runtime-20260908/EffectLabPageDomain.ts.snapshot",
+        "metadataArchivePath": "asset-library/retired-runtime-20260908/EffectLabPageDomain.ts.meta.snapshot"
+      },
+      {
+        "path": "assets/scripts/development/FixedMatchFixtures.ts",
+        "archivePath": "asset-library/retired-runtime-20260908/FixedMatchFixtures.ts.snapshot",
+        "metadataArchivePath": "asset-library/retired-runtime-20260908/FixedMatchFixtures.ts.meta.snapshot"
+      },
+      {
+        "path": "assets/scripts/development/TableLayoutFixtures.ts",
+        "archivePath": "asset-library/retired-runtime-20260908/TableLayoutFixtures.ts.snapshot",
+        "metadataArchivePath": "asset-library/retired-runtime-20260908/TableLayoutFixtures.ts.meta.snapshot"
+      }
+    ],
+    "testOnlyFixtures": [
+      "tests/fixtures/FixedMatchFixtures.ts",
+      "tests/fixtures/TableLayoutFixtures.ts"
+    ],
+    "sharedLiveEffectAssets": "Retained; lab used production bomb/card assets, no dedicated bitmap or audio payload identified."
+  }
+}

@@ -1,15 +1,15 @@
-import { Color, Graphics, Label, Node, UITransform, Vec3, tween } from 'cc'
+import type { Label } from 'cc'
 import type { FrontPageGateways, MatchQueueId, MatchTicket } from '../../services/FrontPageGatewayContracts'
-import { PlatformApiError } from '../../services/PlatformApi'
+import { matchErrorDetail } from '../../services/MatchmakingErrorPresentation'
 import { matchWaitingText, type MatchWaitingStage } from '../../services/MatchWaitingPresentation'
-import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import type { PageRouter } from '../PageRouter'
+import { renderMatchmakingPage } from './MatchmakingPageView'
 
-export type MatchReturnPage = 'menu' | 'online' | 'competition' | 'classic-rooms'
+export type MatchReturnPage = 'menu' | 'online' | 'classic-rooms'
 export type MatchAssignment = { tournamentId: string, assignmentId: string }
 const MAX_TRACKED_MATCH_IDS = 32
-
 export type MatchmakingPageDependencies = {
+  animationsEnabled: () => boolean
   router: PageRouter
   gateways: FrontPageGateways
   isDisposed: () => boolean
@@ -18,7 +18,6 @@ export type MatchmakingPageDependencies = {
   enterMatchedGame: (ticket: MatchTicket) => void
   showMenu: () => void
   showOnlinePlay: () => void
-  showCompetition: () => void
   showClassicRooms: () => void
 }
 
@@ -29,13 +28,16 @@ export class MatchmakingPageDomain {
   private matchingStatusLabel: Label | null = null
   private matchingStartedAt = 0
   private matchingQueueName = ''
+  private matchingBotFillEnabled = false
   private matchingStage: MatchWaitingStage = 'requesting'
   private matchingReturnPage: MatchReturnPage = 'menu'
+  private pendingRequest: Promise<void> | null = null
+  private matchingError: string | null = null
+  private retryRequest: (() => void) | null = null
   private readonly reconciledMatchIds = new Set<string>()
   private readonly uncertainMatchIds = new Set<string>()
   private readonly reconciliationTasks = new Map<string, Promise<boolean>>()
   private destroyed = false
-
   public constructor (private readonly dependencies: MatchmakingPageDependencies) {}
 
   public begin (
@@ -44,21 +46,30 @@ export class MatchmakingPageDomain {
     returnPage: MatchReturnPage,
     assignment?: MatchAssignment,
   ): void {
-    if (this.isDisposed()) return
+    if (this.isDisposed() || (this.dependencies.router.current === 'matching' && this.matchingStartedAt && this.matchingStage !== 'failed')) return
     this.invalidate()
     const token = this.matchAttemptToken
     this.matchingStartedAt = Date.now()
     this.matchingQueueName = queueName
+    this.matchingBotFillEnabled = queueId === 'quick' || queueId.startsWith('classic_')
     this.matchingStage = 'requesting'
     this.matchingReturnPage = returnPage
+    this.retryRequest = () => this.begin(queueId, queueName, returnPage, assignment)
     this.renderMatching()
     this.scheduleMatchingWaitTick(token)
-    this.dependencies.scheduleOnce(() => { void this.requestMatch(queueId, token, returnPage, assignment) }, 0.65)
+    this.dependencies.scheduleOnce(() => {
+      if (!this.isCurrentAttempt(token) || this.isCancelling()) return
+      const pending = this.requestMatch(queueId, token, returnPage, assignment).finally(() => {
+        if (this.pendingRequest === pending) this.pendingRequest = null
+      })
+      this.pendingRequest = pending
+    }, 0)
   }
 
   public reflow (): void {
     if (!this.isDisposed() && this.dependencies.router.current === 'matching') this.renderMatching()
   }
+  public get entering (): boolean { return this.matchingStage === 'entering' && this.dependencies.router.current === 'matching' }
 
   /** Invalidates delayed callbacks and reconciles any queue ticket still owned by this page. */
   public invalidate (): void {
@@ -68,52 +79,63 @@ export class MatchmakingPageDomain {
     this.matchingStatusLabel = null
     this.matchingStartedAt = 0
     this.matchingQueueName = ''
+    this.matchingBotFillEnabled = false
     this.matchingStage = 'requesting'
+    this.matchingError = null
     if (ticketId) void this.cancelOrRecoverAssignedMatch(ticketId)
   }
 
-  /** Stops the reusable domain without permanently disabling future matching. */
-  public stop (): void {
-    this.invalidate()
-  }
-
+  public stop (): void { this.invalidate() }
   public destroy (): void {
     if (this.destroyed) return
-    this.stop()
+    this.invalidate()
     this.destroyed = true
   }
 
   private renderMatching (): void {
     const ui = this.dependencies.router.open('matching')
-    ui.menuLabel('正在匹配', 0, 185, 44)
-    this.matchingStatusLabel = ui.menuLabel('', 0, -5, 22)
+    this.matchingStatusLabel = renderMatchmakingPage(ui, this.matchingStage, this.matchingError,
+      () => { void this.cancelMatch() }, () => this.retryRequest?.(), () => this.deferUncertainMatch(), this.dependencies.animationsEnabled())
     this.refreshMatchingWaitLabel()
-    this.createMatchingShuffle(ui)
-    this.pageButton(ui, '取消匹配', -105, () => this.showReturnPage(this.matchingReturnPage))
   }
 
-  private createMatchingShuffle (ui: RuntimeUiFactory): void {
-    ;[-1, 0, 1].forEach((slot, index) => {
-      const node = new Node(`MatchingCard-${index}`)
-      node.parent = ui.parent
-      node.setPosition(new Vec3(slot * 42, 90 + Math.abs(slot) * 4, index))
-      node.addComponent(UITransform).setContentSize(58, 82)
-      const graphics = node.addComponent(Graphics)
-      graphics.fillColor = new Color(17, 82, 61, 255)
-      graphics.strokeColor = new Color(239, 201, 90, 255)
-      graphics.lineWidth = 3
-      graphics.roundRect(-29, -41, 58, 82, 8)
-      graphics.fill()
-      graphics.stroke()
-      graphics.strokeColor = new Color(108, 225, 204, 190)
-      graphics.lineWidth = 2
-      graphics.roundRect(-19, -31, 38, 62, 6)
-      graphics.stroke()
-      tween(node).delay(index * 0.12).repeatForever(
-        tween().to(0.46, { position: new Vec3(-slot * 48, 103 + index * 3, index), angle: slot * 7 }, { easing: 'sineInOut' })
-          .to(0.46, { position: new Vec3(slot * 42, 90 + Math.abs(slot) * 4, index), angle: -slot * 5 }, { easing: 'sineInOut' }),
-      ).start()
-    })
+  private async cancelMatch (): Promise<void> {
+    if (this.isDisposed() || this.matchingStage === 'cancelling' || this.matchingStage === 'entering') return
+    const token = this.matchAttemptToken
+    this.matchingStage = 'cancelling'
+    this.matchingError = null
+    this.renderMatching()
+    // Keep this page visible until both the in-flight join and cancel have an outcome.
+    await this.pendingRequest
+    if (!this.isCurrentAttempt(token)) return
+    const ticketId = this.activeMatchTicketId
+    if (ticketId && await this.cancelOrRecoverAssignedMatch(ticketId)) return
+    if (!this.isCurrentAttempt(token)) return
+    if (ticketId && this.uncertainMatchIds.has(ticketId)) {
+      this.matchingStage = 'cancel-uncertain'
+      this.renderMatching()
+    } else this.showReturnPage(this.matchingReturnPage)
+  }
+
+  private enterTicket (ticket: MatchTicket): void {
+    this.activeMatchTicketId = null
+    this.matchingStage = 'entering'
+    if (this.dependencies.router.current === 'matching') this.renderMatching()
+    this.dependencies.enterMatchedGame(ticket)
+  }
+
+  private deferUncertainMatch (): void {
+    if (this.matchingStage !== 'cancel-uncertain') return
+    // Keep the uncertain credential for the next preflight, without a background
+    // cancel that could navigate away from the lobby after the player leaves.
+    this.activeMatchTicketId = null
+    this.showReturnPage(this.matchingReturnPage)
+  }
+
+  private failMatch (detail: string): void {
+    this.matchingStage = 'failed'
+    this.matchingError = detail
+    this.renderMatching()
   }
 
   private async requestMatch (
@@ -122,10 +144,10 @@ export class MatchmakingPageDomain {
     returnPage: MatchReturnPage,
     assignment?: MatchAssignment,
   ): Promise<void> {
-    if (!this.isCurrentAttempt(token)) return
+    if (!this.isCurrentAttempt(token) || this.isCancelling()) return
     try {
       const enteredPriorMatch = await this.reconcileUncertainMatches()
-      if (!this.isCurrentAttempt(token) || enteredPriorMatch) return
+      if (!this.isCurrentAttempt(token) || enteredPriorMatch || this.isCancelling()) return
       if (this.uncertainMatchIds.size > 0) {
         this.showReturnPage(returnPage)
         this.dependencies.showNotice('正在确认上次匹配', '上次匹配状态尚未确认，已保留凭证并将在下次重试')
@@ -137,13 +159,13 @@ export class MatchmakingPageDomain {
         return
       }
       this.activeMatchTicketId = ticket.ticketId
+      if (this.isCancelling()) return
       this.matchingStage = 'queued'
       this.refreshMatchingWaitLabel()
       this.acceptMatchTicket(ticket, token, returnPage)
     } catch (error) {
       if (this.isDisposed() || token !== this.matchAttemptToken) return
-      this.showReturnPage(returnPage)
-      this.dependencies.showNotice('比赛匹配失败', this.matchErrorDetail(error))
+      if (!this.isCancelling()) this.failMatch(matchErrorDetail(error))
     }
   }
 
@@ -151,15 +173,12 @@ export class MatchmakingPageDomain {
     if (!this.isCurrentAttempt(token)) return
     if (ticket.status === 'matched') {
       const usable = this.isUsableMatchTicket(ticket)
-      this.activeMatchTicketId = null
       if (usable) {
         this.markReconciled(ticket.ticketId)
-        this.dependencies.enterMatchedGame(ticket)
+        this.enterTicket(ticket)
         return
       }
-      void this.cancelOrRecoverAssignedMatch(ticket.ticketId)
-      this.showReturnPage(returnPage)
-      this.dependencies.showNotice('比赛匹配失败', '匹配服务返回的房间凭证不完整或已过期')
+      this.failMatch('匹配服务返回的房间凭证不完整或已过期，请重新匹配')
       return
     }
     if (ticket.status === 'cancelled') {
@@ -184,35 +203,34 @@ export class MatchmakingPageDomain {
   }
 
   private async pollMatch (ticketId: string, token: number, returnPage: MatchReturnPage): Promise<void> {
-    if (!this.isCurrentAttempt(token, ticketId)) return
+    if (!this.isCurrentAttempt(token, ticketId) || this.matchingStage !== 'queued') return
     try {
       const ticket = await this.getTicketStatus(ticketId)
       if (!this.isCurrentAttempt(token, ticketId)) {
         void this.reconcileStaleMatch(ticket)
         return
       }
-      this.acceptMatchTicket(ticket, token, returnPage)
+      if (this.matchingStage === 'queued') this.acceptMatchTicket(ticket, token, returnPage)
     } catch (error) {
       if (this.isDisposed() || token !== this.matchAttemptToken) return
-      this.showReturnPage(returnPage)
-      this.dependencies.showNotice('比赛匹配失败', this.matchErrorDetail(error))
+      if (this.matchingStage === 'queued') this.failMatch(matchErrorDetail(error))
     }
   }
 
   private showReturnPage (returnPage: MatchReturnPage): void {
     this.invalidate()
     if (returnPage === 'menu') this.dependencies.showMenu()
-    else if (returnPage === 'competition') this.dependencies.showCompetition()
     else if (returnPage === 'classic-rooms') this.dependencies.showClassicRooms()
     else this.dependencies.showOnlinePlay()
   }
 
   private refreshMatchingWaitLabel (): void {
-    if (!this.matchingStatusLabel || !this.matchingStartedAt) return
+    if (!this.matchingStatusLabel || !this.matchingStartedAt || this.matchingError) return
     this.matchingStatusLabel.string = matchWaitingText(
       this.matchingQueueName,
       this.matchingStage,
       Date.now() - this.matchingStartedAt,
+      this.matchingBotFillEnabled,
     )
   }
 
@@ -226,11 +244,12 @@ export class MatchmakingPageDomain {
 
   private async reconcileStaleMatch (ticket: MatchTicket): Promise<void> {
     if (!ticket.ticketId || this.reconciledMatchIds.has(ticket.ticketId)) return
+    if (this.uncertainMatchIds.has(ticket.ticketId) && this.dependencies.router.current !== 'matching') return
     if (ticket.status === 'matched') {
       if (this.isUsableMatchTicket(ticket) && !this.isDisposed()) {
         this.markReconciled(ticket.ticketId)
         this.dependencies.showNotice('匹配已完成', '取消请求到达时牌桌已分配，正在进入对局')
-        this.dependencies.enterMatchedGame(ticket)
+        this.enterTicket(ticket)
       } else await this.cancelOrRecoverAssignedMatch(ticket.ticketId)
       return
     }
@@ -301,7 +320,7 @@ export class MatchmakingPageDomain {
     if (ticket.status === 'matched' && this.isUsableMatchTicket(ticket) && !this.isDisposed()) {
       this.markReconciled(ticketId)
       this.dependencies.showNotice('匹配已完成', '取消请求到达时牌桌已分配，正在进入对局')
-      this.dependencies.enterMatchedGame(ticket)
+      this.enterTicket(ticket)
       return true
     }
     if (ticket.status === 'cancelled' || ticket.status === 'playing' || ticket.status === 'completed' || ticket.status === 'aborted') {
@@ -357,32 +376,6 @@ export class MatchmakingPageDomain {
     return Boolean(ticket.ticketId && ticket.entryAttemptId && ticket.status === 'matched' && ticket.roomId && ticket.gameEndpoint && ticket.joinToken && ticket.seat && (!ticket.expiresAt || ticket.expiresAt > Date.now()))
   }
 
-  private pageButton (ui: RuntimeUiFactory, text: string, y: number, action: () => void): Node {
-    const node = ui.button('MenuButton', text, 0)
-    node.setPosition(new Vec3(0, y, 0))
-    node.on(Node.EventType.TOUCH_END, action)
-    return node
-  }
-
-  private matchErrorDetail (error: unknown): string {
-    if (error instanceof PlatformApiError) {
-      if (error.status === 401 || error.status === 403) return '登录状态已失效，请重新进入游戏'
-      if (error.status === 429) return '当前匹配请求较多，请稍后重试'
-      if (error.retryable) return '匹配服务暂时不可用，请稍后重试'
-      if (error.code === 'MATCH_TICKET_EXPIRED') return '本次匹配凭证已过期，请重新匹配'
-      if (error.code === 'INSUFFICIENT_CLASSIC_STAKE') {
-        const details = error.details && typeof error.details === 'object' ? error.details as Record<string, unknown> : null
-        const required = details && typeof details.required === 'number' && Number.isFinite(details.required)
-          ? Math.max(0, Math.round(details.required))
-          : null
-        return required === null ? '积分不足，无法进入该场' : `积分不足：进入该场至少需要 ${required} 积分`
-      }
-    }
-    if (error instanceof Error && error.message.includes('功能正在开发中')) return '比赛匹配服务暂未开放'
-    return '请稍后重试'
-  }
-
-  private isDisposed (): boolean {
-    return this.destroyed || this.dependencies.isDisposed()
-  }
+  private isCancelling (): boolean { return this.matchingStage === 'cancelling' }
+  private isDisposed (): boolean { return this.destroyed || this.dependencies.isDisposed() }
 }

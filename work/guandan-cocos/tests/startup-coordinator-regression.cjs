@@ -37,7 +37,7 @@ class MockStartupLoadingOverlay {
 
   resize (viewport) { this.resizes.push(viewport) }
   setProgress (progress, status) { this.progress.push({ progress, status }) }
-  showError (message, retry) { this.errors.push({ message, retry }) }
+  showError (message, retry, code) { this.errors.push({ message, retry, code }) }
   bringToFront () { this.bringCount += 1 }
   fadeOut () { this.fadeCount += 1; return Promise.resolve() }
   dispose () { this.disposeCount += 1 }
@@ -60,11 +60,12 @@ const preloadAllClassicCardFrames = () => {
 }
 
 let restartCount = 0
+let restartFailure = false
 const cc = {
   game: {
     restart: () => {
       restartCount += 1
-      return Promise.resolve()
+      return restartFailure ? Promise.reject(new Error('restart failed')) : Promise.resolve()
     },
   },
 }
@@ -181,7 +182,8 @@ const createHarness = initializeApplication => {
     retry.coordinator.begin()
     failedBundle.reject(new Error('offline'))
     await settle()
-    assert.equal(retry.overlay.errors.at(-1).message, '资源下载失败，请检查网络后重试')
+    assert.equal(retry.overlay.errors.at(-1).message, '请检查网络后重试')
+    assert.equal(retry.overlay.errors.at(-1).code, 'GD-S01')
     retry.overlay.errors.at(-1).retry()
     assert.equal(bundleRequests.length, 3, 'resource errors must start a fresh retry attempt')
     retryBundle.resolve({})
@@ -209,13 +211,40 @@ const createHarness = initializeApplication => {
     initializationFailure.coordinator.markSceneStarted()
     initializationFailure.coordinator.begin()
     await settle()
-    assert.equal(initializationFailure.overlay.errors.at(-1).message, '游戏初始化失败，请重新进入小游戏')
+    assert.equal(initializationFailure.overlay.errors.at(-1).message, '资源已就绪，请重新进入小游戏')
+    assert.equal(initializationFailure.overlay.errors.at(-1).code, 'GD-S03')
+    assert.equal(initializationFailure.overlay.progress.at(-1).progress, 0.96)
     const requestsBeforeRejectedBegin = bundleRequests.length
     initializationFailure.coordinator.begin()
     assert.equal(bundleRequests.length, requestsBeforeRejectedBegin, 'partial initialization must never be retried in place')
     initializationFailure.overlay.errors.at(-1).retry()
     await settle()
     assert.equal(restartCount, 1, 'partial initialization recovery must restart the application')
+
+    restartFailure = true
+    initializationFailure.overlay.errors.at(-1).retry()
+    await settle()
+    assert.equal(initializationFailure.overlay.errors.at(-1).code, 'GD-S04')
+    initializationFailure.overlay.errors.at(-1).retry()
+    await settle()
+    assert.equal(restartCount, 3, 'repeated restart rejections must stay handled and retryable')
+    restartFailure = false
+    initializationFailure.overlay.errors.at(-1).retry()
+    await settle()
+    assert.equal(restartCount, 4)
+
+    queuedBundles.push({ promise: Promise.resolve({}) }, { promise: Promise.resolve({}) })
+    queuedCardSkins.push(false, true)
+    let artworkInitializeCount = 0
+    const artworkFailure = createHarness(() => { artworkInitializeCount += 1 })
+    artworkFailure.coordinator.begin()
+    await settle()
+    assert.equal(artworkFailure.overlay.errors.at(-1).code, 'GD-S02')
+    assert.equal(artworkFailure.overlay.progress.at(-1).progress, 0.88)
+    assert.equal(artworkInitializeCount, 0)
+    artworkFailure.overlay.errors.at(-1).retry()
+    await settle()
+    assert.equal(artworkInitializeCount, 1)
 
     console.log('startup coordinator regression checks passed')
   } finally {

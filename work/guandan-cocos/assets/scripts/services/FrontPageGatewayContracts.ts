@@ -17,6 +17,9 @@ export type MatchTicket = {
   joinToken?: string
   seat?: 'p1' | 'p2' | 'p3' | 'p4'
   expiresAt?: number
+  botFillAt?: number
+  humanPlayerCount?: number
+  botCount?: number
 }
 
 export interface MatchmakingGateway {
@@ -29,7 +32,8 @@ export type FriendRoomEntry = {
   entryAttemptId: string
   matchId: string
   roomId: string
-  seat: 'p1' | 'p2' | 'p3' | 'p4'
+  seat: 'p1' | 'p2' | 'p3' | 'p4' | 'observer'
+  isRoomHost?: boolean
   gameEndpoint: string
   gameTicket: string
   joinToken: string
@@ -58,7 +62,7 @@ type MatchRecoveryBase = {
   recoveryAttemptId: string
   matchId: string
   roomId: string
-  seat: 'p1' | 'p2' | 'p3' | 'p4'
+  seat: 'p1' | 'p2' | 'p3' | 'p4' | 'observer'
   ticketPurpose: 'entry' | 'rejoin'
   gameEndpoint: string
   gameTicket: string
@@ -73,6 +77,7 @@ type FriendRecoveryInvitation =
 export type MatchRecoveryEntry =
   | Readonly<MatchRecoveryBase & {
     roomKind: 'match'
+    seat: 'p1' | 'p2' | 'p3' | 'p4'
     roomExpiresAt?: never
     roomSettings?: never
     inviteCode?: never
@@ -101,19 +106,6 @@ export type ShopProduct = {
   imageUrl?: string
 }
 
-export type ShopOrder = {
-  orderId: string
-  productId: string
-  quantity: number
-  totalPoints: number
-  status: 'created' | 'paid' | 'cancelled' | 'fulfilled'
-}
-
-export interface ShopGateway {
-  listProducts(): Promise<ShopProduct[]>
-  createOrder(productId: string, quantity: number, expectedPointsPrice?: number): Promise<ShopOrder>
-}
-
 export type WalletSnapshot = { points: number, diamonds: number }
 
 export interface WalletGateway {
@@ -124,6 +116,8 @@ export type UserProfile = { id: string, accountId: string, displayName: string, 
 
 export interface AuthGateway {
   getProfile(): Promise<UserProfile>
+  updateProfile(profile: Pick<UserProfile, 'displayName' | 'avatarUrl'>): Promise<UserProfile>
+  getAvatarImage(expectedAvatar?: string): Promise<string | null>
   signOut(): void
 }
 
@@ -361,12 +355,8 @@ export type FrontPageGateways = {
   matchmaking: MatchmakingGateway
   friendRooms: FriendRoomGateway
   matchRecovery: MatchRecoveryGateway
-  shop: ShopGateway
   wallet: WalletGateway
-  tournaments: TournamentGateway
   playerCenter: PlayerCenterGateway
   seasons: SeasonGateway
   replays: ReplayGateway
-  spectator: SpectatorGateway
-  merchant: MerchantGateway
 }

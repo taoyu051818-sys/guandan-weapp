@@ -75,7 +75,7 @@ try {
       return {
         ok: true,
         status: 200,
-        async json () { return { ok: true, data: { event: { sequence: event.sequence } } } },
+        async json () { return { ok: true, data: { event: { eventId: event.eventId, matchId: event.matchId, sequence: event.sequence, accepted: true } } } },
       }
     },
   })

@@ -1,4 +1,5 @@
 import { _decorator, Component, EventTarget, Size, UITransform, Vec2, Vec3, sys, view } from 'cc'
+import { readWechatCapsule, type SceneExclusionRect, type WechatWindowApi } from './WechatCapsuleLayout'
 
 export type TableViewport = {
   width: number
@@ -9,6 +10,7 @@ export type TableViewport = {
   safeRight: number
   safeTop: number
   safeBottom: number
+  nativeCapsule?: SceneExclusionRect
 }
 
 const { ccclass } = _decorator
@@ -39,7 +41,8 @@ export class ScreenAdapter extends Component {
     const safeBottom = Math.max(0, safe.y)
     const safeRight = Math.max(0, width - safe.x - safe.width)
     const safeTop = Math.max(0, height - safe.y - safe.height)
-    this.viewport = { width, height, halfWidth: width / 2, halfHeight: height / 2, safeLeft, safeRight, safeTop, safeBottom }
+    const nativeCapsule = readWechatCapsule(width, height, (globalThis as unknown as { wx?: WechatWindowApi }).wx)
+    this.viewport = { width, height, halfWidth: width / 2, halfHeight: height / 2, safeLeft, safeRight, safeTop, safeBottom, nativeCapsule }
     const transform = this.getComponent(UITransform) ?? this.addComponent(UITransform)
     transform!.setContentSize(new Size(width, height))
     this.node.setPosition(Vec3.ZERO)

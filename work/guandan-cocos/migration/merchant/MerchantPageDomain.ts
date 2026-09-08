@@ -1,17 +1,16 @@
 import { EditBox, Node, Vec3 } from 'cc'
-import type { FrontPageGateways, MerchantConsole, MerchantRole } from '../../assets/scripts/services/FrontPageGatewayContracts'
+import type { MerchantGateway, MerchantConsole, MerchantRole } from '../../assets/scripts/services/FrontPageGatewayContracts'
 import { PlatformApiError } from '../../assets/scripts/services/PlatformApi'
 import type { ScreenAdapter } from '../../assets/scripts/ui/ScreenAdapter'
 import type { RuntimeUiFactory } from '../../assets/scripts/ui/RuntimeUiFactory'
-import type { FrontPageId, PageRouter } from '../../assets/scripts/scenes/PageRouter'
 
 type MerchantAction = 'apply' | 'store' | 'employee' | 'grant'
-type MerchantPageId = Extract<FrontPageId, 'merchant-console' | 'merchant-apply' | 'merchant-store' | 'merchant-employee' | 'merchant-grant'>
+type MerchantPageId = 'merchant-console' | 'merchant-apply' | 'merchant-store' | 'merchant-employee' | 'merchant-grant'
 
 export type MerchantPageDependencies = {
-  router: PageRouter
+  router: { readonly current: MerchantPageId | null, open: (page: MerchantPageId) => RuntimeUiFactory }
   screen: ScreenAdapter
-  gateways: FrontPageGateways
+  gateways: { configured: boolean, merchant: MerchantGateway }
   isDisposed: () => boolean
   issuePageRequest: () => number
   currentPageRequest: () => number

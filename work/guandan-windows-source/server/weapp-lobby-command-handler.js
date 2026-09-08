@@ -1,3 +1,4 @@
+import { memberIsHost, roomMember } from './friend-room-members.js'
 export const LOBBY_COMMAND_TYPES = [
   'startGame', 'setLobbyReady', 'cancelLobbyReady', 'kickMember', 'addBot', 'removeBot',
 ]
@@ -15,7 +16,7 @@ export const createLobbyCommandHandler = dependencies => async context => {
 
   if (type === 'startGame') {
     const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    if (!room || playerIn(room, connection.id) !== 'p1') return reply('error', { message: '只有房主可以开始游戏' })
+    if (!room || !memberIsHost(room, connection.id)) return reply('error', { message: '只有房主可以开始游戏' })
     if (isMatchRoom(room)) return reply('error', { message: '匹配房必须等待平台确认后由服务器自动开局' })
     if (room.state) return reply('error', { message: '对局已经开始' })
     if (ids.some(id => !seatIsOccupied(room, id))) return reply('error', { message: '需要四个已占用席位才能开始' })
@@ -93,11 +94,11 @@ export const createLobbyCommandHandler = dependencies => async context => {
   }
   if (type === 'kickMember') {
     const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-    if (!room || playerIn(room, connection.id) !== 'p1') return reply('error', { message: '只有房主可以移出成员' })
+    if (!room || !memberIsHost(room, connection.id)) return reply('error', { message: '只有房主可以移出成员' })
     if (isMatchRoom(room)) return reply('error', { message: '匹配房不允许房主移出成员' })
     if (room.state) return reply('error', { message: '对局开始后不能移出成员' })
     const targetPlayerId = String(payload.playerId || '')
-    if (!ids.includes(targetPlayerId) || targetPlayerId === 'p1') return reply('error', { message: '只能移出其他有效席位' })
+    if (!ids.includes(targetPlayerId) || memberIsHost(room, room.seats[targetPlayerId])) return reply('error', { message: '只能移出其他有效席位' })
     const targetConnectionId = room.seats[targetPlayerId]
     const targetConnection = connections.get(targetConnectionId)
     if (!targetConnectionId || !targetConnection) return reply('error', { message: '该成员当前不在房间中' })
@@ -106,6 +107,8 @@ export const createLobbyCommandHandler = dependencies => async context => {
     const targetUserId = room.userIdsBySeat?.[targetPlayerId]
     const targetTicketJti = room.ticketJtisBySeat?.[targetPlayerId]
     const targetTicketExp = room.ticketExpiresAtBySeat?.[targetPlayerId]
+    const targetMember = roomMember(room, targetConnectionId)
+    if (targetMember) room.friendMembers = room.friendMembers.filter(member => member !== targetMember)
     room.seats[targetPlayerId] = null
     deleteAcceptedActionIdentity(room.resumeTokens[targetPlayerId])
     room.resumeTokens[targetPlayerId] = null
@@ -127,15 +130,15 @@ export const createLobbyCommandHandler = dependencies => async context => {
     return
   }
   const room = rooms.get(String(payload.roomId || connection.roomId || ''))
-  if (!room || playerIn(room, connection.id) !== 'p1') return reply('error', { message: '只有房主可以设置机器人' })
+  if (!room || !memberIsHost(room, connection.id)) return reply('error', { message: '只有房主可以设置机器人' })
   if (room.ticketBound) return reply('error', { message: '平台票据房不允许设置机器人' })
   if (room.state) return reply('error', { message: '对局开始后不能设置机器人' })
   const targetPlayerId = String(payload.playerId || '')
-  if (!ids.slice(1).includes(targetPlayerId)) return reply('error', { message: '只能设置空闲的其他席位' })
+  if (!ids.includes(targetPlayerId) || memberIsHost(room, room.seats[targetPlayerId])) return reply('error', { message: '只能设置空闲的其他席位' })
   ensureLobbyMetadata(room)
   const botIndex = room.botPlayerIds.indexOf(targetPlayerId)
   if (type === 'addBot') {
-    if (room.seats[targetPlayerId]) return reply('error', { message: '该席位已有玩家' })
+    if (room.seats[targetPlayerId] || room.friendMembers?.some(member => member.seat === targetPlayerId)) return reply('error', { message: '该席位已有玩家' })
     if (botIndex >= 0) return reply('error', { message: '该席位已经是机器人' })
     room.botPlayerIds.push(targetPlayerId)
     room.botPlayerIds.sort((left, right) => ids.indexOf(left) - ids.indexOf(right))

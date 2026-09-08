@@ -2,6 +2,8 @@
 
 这是微信小游戏主客户端。它不复用 React / Electron UI；只复用根目录 `shared-core` 的规则、结算、进贡和 AI。
 
+广州腾讯云服务器已部署到 <https://api.yutechhn.cn/guandan/>，微信 AppID 为 `wxa79bf8bc567765a1`。配置、构建复现、密钥边界、部署检查与尚待完成的微信真机验收见 [`docs/guangzhou-wechat-deployment.md`](docs/guangzhou-wechat-deployment.md)；下一轮大厅/牌桌流程收束见 [`docs/ui-product-polish-plan.md`](docs/ui-product-polish-plan.md)。网页只是外观预览，不代替真实微信登录。
+
 ## 打开方式
 
 1. 使用 Cocos Creator 3.8.8 导入本目录。
@@ -11,7 +13,7 @@
 
 ## 架构基线
 
-当前 P0-P6 交付状态、分层、状态所有权、依赖方向、生命周期约束、可注入边界和验收门禁统一记录在 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。新增模块前先按该文档判断归属，并运行 `pnpm test:ci`；文档同时列出了不阻断发布、但仍应继续拆分的展示层热点。
+当前分层与状态所有权见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)；2026-09-08 的代码清理、开发入口和风险结论见 [`docs/CODE_HEALTH.md`](docs/CODE_HEALTH.md)，逐文件清单见 [`docs/CODE_FILE_INVENTORY.md`](docs/CODE_FILE_INVENTORY.md)。专项退役与真实包体对比见 [`docs/RETIREMENT_PACKAGE_AUDIT_20260908.md`](docs/RETIREMENT_PACKAGE_AUDIT_20260908.md)。新增模块先运行 `npm run verify:architecture`、`npm run verify:health` 和 `npm run verify:retirement`；共享规则只改 `shared-core/src`，再同步到客户端。
 
 ## 微信资源分包与加载页
 
@@ -29,9 +31,9 @@ node scripts/verify-wechat-build.mjs
 npm run verify:wechat-build
 ```
 
-脚本会检查子包声明与输出路径、加载图主包依赖、原生首屏接管顺序、未使用引擎产物和包体限制。最近一次 Creator 3.8.8 发行构建的首包为 `2.84 MiB`，`game-assets` 子包为 `6.69 MiB`，总计 `9.53 MiB`。
+脚本会检查 AppID、小游戏类型、合法域名校验开关、子包声明与输出路径、加载图主包依赖、原生首屏接管顺序、未使用引擎产物、包体限制、正式运行地址和退役代码／资源防回流。2026-09-08 退役及残留清理后的 Creator 3.8.8 发行构建首包为 `2.93 MiB`，`game-assets` 子包为 `12.81 MiB`，总计 `15.74 MiB`；残留清理比上一轮再减少 `35,295 bytes`。最新对照及验收边界见 [`docs/RESIDUAL_CLEANUP_20260908.md`](docs/RESIDUAL_CLEANUP_20260908.md)，上一轮记录保留在 [`docs/RETIREMENT_PACKAGE_AUDIT_20260908.md`](docs/RETIREMENT_PACKAGE_AUDIT_20260908.md)。只检查包结构可运行 `pnpm verify:wechat-package`，但它不能替代完整发布检查。
 
-运行时采用分层职责：`FrontPageController + PageRouter` 管理大厅、比赛、商城、规则弹窗、设置与多人房间页面，`RuntimeUiFactory` 统一代码生成 UI；休眠的商户技术预览源码位于包外 `migration/merchant`。`GameScene` 负责组合与牌桌展示桥接，短期交互、回合钟、弹层和快照投影由独立控制器持有。`GameManager`、`LocalMatchController`、`HandController`、`PlayerSeatController`、`PlayAreaController` 与 `LobbyController` 提供牌局能力：
+运行时由 `FrontPageController + PageRouter` 管理页面，`RuntimeUiFactory` 构建 UI。页面模块存在不代表普通玩家入口已开放：迁移功能在 `migration` 中独立检查；实验室页面、控制台桥接和固定牌局注入已删除。`GameScene` 负责组合，交互、计时、弹层和快照投影由独立控制器持有；联机状态以服务端为准。
 
 - 两副牌完整开局、AI 回合和合法出牌；
 - 选牌上移、手牌响应式排布；
@@ -39,24 +41,26 @@ npm run verify:wechat-build
 - `assets/game-assets/backgrounds/lobby-lingshui-coast-v1.jpg` 是菜单和大厅的海滨背景，`assets/game-assets/backgrounds/table-perspective-blue-v2.jpg` 是对局牌桌背景；两者会按页面状态淡入切换，并由 `ScreenAdapter` 以等比 cover 方式适配横屏尺寸和安全区；
 - `CardSkinResolver` 用 36 张项目授权牌面组件和 1 张 NiuMa MIT 牌底组合 54 种单副牌面；手牌、桌面牌和飞牌特效只使用这一条经典 PNG 渲染链路，共用同一帧缓存。全部牌面在大厅初始化前预加载，缺图时停留在资源重试页，不再切换为文字牌面；
 - 统一 `EffectController`：规则语义解析、L0-L3 强度、四方飞牌、对象池、牌型标签、逢人配、炸弹/同花顺/天王炸、胜负升级和跳过动画；
-- `AudioProfiles` 统一局开始、发牌、出牌、三种不要、0–5 倒计时、关键牌型与胜负的语义音频映射；完整女声与可选男声报牌包互不混播，资源缺失会安全回退或静默；
+- `AudioProfiles` 统一局开始、发牌、出牌、三种不要、0–5 倒计时、关键牌型与胜负的语义音频映射；报牌仅使用女声（NiuMa、授权单张 5 女声和钢板 TTS），资源缺失会安全回退或静默；
 - 手牌已加入错峰发牌、固定尺寸的选中/锁定反馈和重排过渡；选中、锁定与堆叠均不改变卡牌缩放或层级；正式桌面牌先显示，装饰特效不阻塞输入、AI 或网络消息；震屏仅作用于 `GameTableShakeRoot`，HUD 和返回按钮保持稳定；
-- 设置页提供「完整 / 精简 / 关闭」特效质量与震动开关；断线重连和跨局恢复只显示最终状态，不重放历史大特效；联机倒计时严格读取服务端 `turnDeadlineAt`，连续超时、主动托管和断线托管都由服务端权威驱动；
+- 特效控制器保留「完整 / 精简 / 关闭」质量配置和震动策略，但没有玩家设置页或实验室入口；断线重连和跨局恢复只显示最终状态，不重放历史大特效；联机倒计时严格读取服务端 `turnDeadlineAt`，连续超时、主动托管和断线托管都由服务端权威驱动；
 - 局间由四个座位分别准备/取消准备；返回入口区分安全退出和全员解散投票，投票拒绝、超时与断线恢复都有明确状态；
-- 普通手牌使用 `point-stacked`：实体点数决定归列，同点牌固定每张露出 40px，普通牌与大小王使用相同像素步长，牌数增加时不压缩；未锁牌即使四张以上也不会按牌型跳到左侧。点击「一键理牌」才进入 `smart-arranged`，把天王炸、炸弹和组合牌型移到左边，单张/对子/三张仍按有效点数交错；级牌固定在大小王与 A 之间（A 为级牌时在大小王与 K 之间）。显式手动锁组会作为完整单元进入左侧锁定区，区内按当前 `RuleProfile` 的共享规则强度稳定排序，但不会让其他牌隐式进入智能理牌；解锁后牌张回到当前布局规则。复原理牌不会回滚当前锁，权威手牌变化导致锁组失效时立即释放，新局/离桌必定清空。操作按钮和倒计时处于牌面上层并保持固定位置。这些都只调整展示 cardId，不修改规则手牌；
+- 手牌排列、锁组与一键理牌分别由 `HandWorkspace`、`HandDisplayOrdering`、`HandGrouping` 和展示层负责；排序仅改变显示 cardId，不修改权威手牌。高牌组可以进入中间，不强制左右分区；重叠以报告告警处理，不自动把元素挤开。
 - 「提示」先由 shared-core 生成合法候选，再按当前锁组和理牌组评估拆牌损伤：只要存在替代选择就不部分拆锁组，并依次保护天王炸、炸弹、组合牌、三张和对子；同等候选优先保留红桃级牌。提示只替换本地选中 cardId，实际出牌仍由同一规则内核及联机服务端复核；
 - 开发构建的「固定牌局 · 音效/动效实验室」提供固定开局、逢人配/炸弹手牌、炸弹压制，以及所有牌型、贡还、结算和倒计时 fixture；固定牌局结算不会写入战绩；
-- 大厅头像/资料栏进入个人中心，统一展示八位账号、积分和服务端综合分；赛季任务与我的牌谱从个人中心进入并返回。未配置平台时，牌谱和任务明确标为开发模拟/演示，且不会展示可领取的假按钮；
-- 「我的牌谱」和「延迟观战（实验）」使用同一套公开状态播放器：按服务端 sequence 排序去重，复原四座位最后动作、桌面已出牌与公开阶段，支持播放/暂停、前后步进和比例跳转；“更多”内可一键进入固定 30 秒公开事件示例，真实观战页每 3 秒增量追帧，处于末尾时自动跟随，回看历史时保留光标并提示“回到最新”，前后台/离页会停止无效轮询；客户端不会保存或推断隐藏手牌；
-- 商户客户端页面和接口暂留为迁移边界，但普通玩家入口已隐藏；服务端商户数据与能力不在本次收束范围内；
-- 匹配页使用轻量三牌洗牌循环，明确显示“请求服务/已进入队列”、本地可核对的等待时长和取消入口；服务端未提供排队人数或 ETA 时不伪造这些数据；Web Desktop 自定义模板使用全视口，`1280×720` 不再裁掉手牌和操作区；
-- 「更多」保留游戏设置、延迟观战示例和“快速开始·人机测试”；测试局直接进入本地牌桌，三名机器人统一使用最高难度并按权威队伍关系识别队友。存在固定 fixture 的开发构建才额外显示牌桌特效测试；旧双明牌教学、摸牌定庄和本机数据入口已退役；
+- 大厅头像/资料栏进入个人中心，显示真实账号、积分和平台数据；当前文案为“我的对局”。微信头像昵称通过平台允许的用户交互流程设置，不使用假同步状态。
+- 对局记录与公开事件播放器保留独立实现，按服务端 sequence 去重排序；只能读取授权的公开事件，不推断未公开手牌。开发示例不作为玩家大厅入口。
+- 商户、赛事管理和旧 HTTP 观战接口已移入 `migration/platform`，不再注册到玩家网关、不进入 Cocos 包；服务端商户数据与能力不在本次收束范围内；
+- 匹配等待进入牌桌背景，使用轻量三牌洗牌循环和取消入口。补位时限由服务端配置，机器人使用固定网名库；所有赛事队列仍按实际服务端策略处理，不伪造在线人数或 ETA。Web Desktop 用 `874×402` 设备框模拟移动横屏；底层设计坐标和安全区由 Cocos 适配。
+- 玩家大厅已移除测试用途的“更多”、玩法说明和设置页；旧赛事页面只保留“筹备中”提示。实验室连同开发开关后的入口也已删除，固定手牌仅在 `tests/fixtures` 中用于回归。
 - `CocosSocketClient` 断线重连、四席轮转与服务端权威的出牌/不要/贡还/下一局协议；
-- Cocos 原生音频控制层；授权音频、固定 MIT 提交的 NiuMa 男女独立报牌包和循环背景音乐已接入，rFXGen 轻量音效保留为失败兜底。
+- Cocos 原生音频控制层统一管理语音与播放生命周期；当前报牌只使用女声。已停用的级牌专属提示音、出牌电子音和旧视觉效果不得通过兜底逻辑重新启用。
 
-特效架构、四阶段交付清单和人工测试矩阵见 [`docs/EFFECTS_AND_TESTING.md`](docs/EFFECTS_AND_TESTING.md)，开源素材版本与许可证见 [`THIRD_PARTY.md`](THIRD_PARTY.md)。
+特效架构、四阶段交付清单和人工测试矩阵见 [`docs/EFFECTS_AND_TESTING.md`](docs/EFFECTS_AND_TESTING.md)，开源素材版本与许可证见 [`THIRD_PARTY.md`](THIRD_PARTY.md)。本地参考工程中的商业 UI、MIT 候选、授权阻塞项和明确拒绝项统一记录在 [`docs/commercial-ui-asset-inventory.md`](docs/commercial-ui-asset-inventory.md)。
 
 ## 联机地址
+
+当前阶段的香港裸 IPv4 联调、固定桌面移动端画布、服务器测试档和验收清单见 [`docs/hong-kong-bare-ip-test.md`](docs/hong-kong-bare-ip-test.md)。裸 IP 档只允许用于 HTTP/WS 测试，不能进入正式发布。
 
 `GameRoot` 的 `GameScene.lobbyEndpoint` 默认为空，防止真机错误连接到手机自己的 `127.0.0.1`。
 
@@ -78,7 +82,7 @@ Web Desktop 从 `localhost` 或 `127.0.0.1` 打开时会只在运行时采用 `w
 | `platformAllowInsecureEndpoint` | 仅本机/局域网 HTTP 联调临时打开 | 必须关闭，Bearer Token 只允许发送到 HTTPS |
 | `platformAllowInsecureGameEndpoint` | 本机默认可接受 `ws://127.0.0.1`；局域网真机联调需要临时打开 | 必须关闭，匹配返回的 `GAME_ENDPOINT` 必须是 `wss://` |
 
-除本机 Web 预览回退外，`platformEndpoint` 留空时，商城和比赛页只使用本地演示数据，商户页也只显示明确标注的只读合成示例，不会发生真实扣分、报名、匹配、入驻或发积分；填入地址后才启用平台登录、钱包、商城、赛事、商户技术预览和四人匹配接口。赛事当前额外提供一条固定16人、4桌、3轮且不重复同桌的可验证流程，包含检录、服务端分桌、轮次屏障和 Top 8 资格；它不代表已经支持任意人数、迟到弃权、自动补赛或晋级后新阶段。商户写操作都要求显式按钮提交并携带幂等键，但审核/申诉、撤销、核销、对账和独立运营后台仍未实现，不能作为正式商户后台上线。`lobbyEndpoint` 仍用于好友房直连，平台匹配则以签名票据内返回的 `gameEndpoint` 为准。
+除本机 Web 预览回退外，`platformEndpoint` 留空时只提供明确的本地只读预览，不进行真实兑换或匹配；配置地址后启用账号、钱包、玩家资料、我的对局、匹配和好友房接口。商城仅展示商品预览，不提供兑换下单接口。赛事按钮目前只提示“筹备中”，不会启动旧赛事页或报名请求。商城下单、商户、固定 16 人赛事及旧 HTTP 观战的契约实现和测试保留在 `migration/platform`，不是当前玩家客户端功能；服务端数据和未来业务能力没有删除。好友房实时／延迟观战继续通过正式好友房协议运行，与退役的旧观战页面无关。`lobbyEndpoint` 用于好友房直连，平台匹配以签名票据返回的 `gameEndpoint` 为准。
 
 局域网真机联调示例（把 `192.168.1.10` 换成开发电脑地址；两个服务共享票据、结算和观战事件密钥，其中结算密钥与观战密钥必须不同）：
 
@@ -120,17 +124,16 @@ node scripts/sync-core.mjs
 node scripts/import-licensed-audio.mjs
 ```
 
-脚本下载 `third_party/licenses/gameabc2-audio/catalog.json` 中的 27 个 MP3：25 个可达语音进入 Cocos 运行时，2 个仅审计用音频进入 `art-source/audio/licensed-archive`，并生成带 SHA-256 的来源清单；被视觉筛选淘汰的 PNG 永远不会下载。运行环境没有全局 Node 时，可改用 Codex 随附的 Node 执行同一个脚本。
+脚本按 `third_party/licenses/gameabc2-audio/catalog.json` 的分流清单处理 26 个 MP3：仅 4 个进入 Cocos 运行时，22 个进入 `art-source/audio/licensed-archive`，并生成带 SHA-256 的来源清单；被视觉筛选淘汰的 PNG 永远不会下载。运行环境没有全局 Node 时，可改用 Codex 随附的 Node 执行同一个脚本。
 
 重新审计或恢复固定 MIT 来源的 NiuMa 音频时运行：
 
 ```sh
 NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-audio.mjs
-NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-male-audio.mjs
 NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-bgm.mjs
 ```
 
-三条脚本校验上游 MIT 全文、固定 revision、旧文案数组和音频索引路由：默认女声包含 48 个白名单 MP3 与 1 个逐字一致的 OGG，可选男声包含 39 个出牌/不要 MP3 与同一句 OGG，背景音乐独立导入；全部生成 Cocos `.meta` 和 SHA-256 清单。其余快捷语以及 `feiji.mp3`、`yapai.mp3`、旧 `dealcard.ogg` 均明确排除。完整说明见 `docs/niuma-audio-import.md`。
+两条脚本校验上游 MIT 全文、固定 revision、旧文案数组和音频索引路由：女声及流程音效包含 48 个白名单 MP3 与 1 个逐字一致的 OGG，背景音乐独立导入；生成 Cocos `.meta` 和 SHA-256 清单。男声导入脚本已经退役，不能恢复到运行资源。其余快捷语以及 `feiji.mp3`、`yapai.mp3`、旧 `dealcard.ogg` 均明确排除。完整说明见 `docs/niuma-audio-import.md`。
 
 ## 自动验收
 
@@ -148,7 +151,9 @@ node tests/network-round-state-regression.cjs
 node tests/architecture-regression.cjs
 node tests/selection-regression.cjs
 node tests/hand-grouping-regression.cjs
-node tests/effect-lab-quick-chat-regression.cjs
+node tests/quick-chat-regression.cjs
+node tests/retirement-boundary-regression.cjs
+node tests/fixed-match-fixtures-regression.cjs
 node tests/card-skin-regression.cjs
 node tests/platform-api-regression.cjs
 node tests/merchant-console-regression.cjs

@@ -1,4 +1,4 @@
-import { _decorator, Component, Graphics, Label, Node, sys, Texture2D, UITransform, Vec3 } from 'cc'
+import { _decorator, Component, Label, Node, sys, Texture2D, UITransform } from 'cc'
 import { GameManager, playValidationHint } from '../game/GameManager'
 import { HandController } from '../ui/HandController'
 import { GameSession } from '../session/GameSession'
@@ -18,15 +18,21 @@ import { createHttpGateways, type PlatformLoginCredential } from '../services/Pl
 import { requestWechatLoginCredential, type WechatLoginApi } from '../services/WechatLoginProvider'
 import { resolveClientNetworkConfig } from '../services/RuntimeClientConfig'
 import { FrontPageController } from './FrontPageController'
-import { EffectLabSceneHost } from '../development/EffectLabSceneHost'
+import { createFrontPagePreviewData } from '../development/FrontPagePreviewData'
 import { SceneBackdropController } from './SceneBackdropController'
 import { StartupCoordinator } from './StartupCoordinator'
 import { TableOverlayController } from './TableOverlayController'
+import { TABLE_HUD_TURN_OPERATION_ANCHORS } from '../ui/TableHudLayoutPolicy'
 import { TableTurnClockController } from './TableTurnClockController'
 import { TableHandInteractionController } from './TableHandInteractionController'
 import { TableHudPresenter } from './TableHudPresenter'
 import { PlatformMatchRecoveryCoordinator } from './PlatformMatchRecoveryCoordinator'
 import { TableMatchCoordinator } from './TableMatchCoordinator'
+import { TableLayoutAuditBridge } from './TableLayoutAuditBridge'
+import { orderTableLayers } from '../ui/TableLayerOrder'
+
+import { buildTableSceneNodes, type TableSceneNodes } from './TableSceneNodes'
+import { layoutTableNodes, layoutTableSeats } from './TableSceneLayout'
 
 const { ccclass, property } = _decorator
 
@@ -121,11 +127,11 @@ export class GameScene extends Component {
   private effects: EffectController | null = null
   private skipEffectButton: Node | null = null
   private tableHandInteraction: TableHandInteractionController | null = null
-  private effectLabHost: EffectLabSceneHost | null = null
   private friendRoomWaitingVisible = false
   private startupCoordinator: StartupCoordinator | null = null
   private matchRecovery: PlatformMatchRecoveryCoordinator | null = null
   private tableMatch: TableMatchCoordinator | null = null
+  private tableLayoutAuditBridge: TableLayoutAuditBridge | null = null
 
   protected onLoad (): void {
     const screen = (this.getComponent(ScreenAdapter) ?? this.addComponent(ScreenAdapter)) as ScreenAdapter
@@ -166,7 +172,6 @@ export class GameScene extends Component {
     const lobby = this.lobby!
     const audio = this.audio!
     manager.session = this.session
-    manager.audio = audio
     manager.lobby = lobby
     lobby.session = this.session
     audio.session = this.session
@@ -187,8 +192,7 @@ export class GameScene extends Component {
       },
       playerName: playerId => this.tableMatch?.snapshot?.state.players[playerId].name ?? playerId,
       leaveTable: () => this.tableMatch?.leaveTableToMenu(),
-      playVoice: voice => this.audio?.playVoice(voice),
-      playChatPulse: (playerId, ownBubbleNode) => this.playChatPulseFor(playerId, ownBubbleNode),
+      playVoice: voice => { if (!this.activeFriendRoomSettings()?.disableVoice) this.audio?.playVoice(voice) },
       refreshPresentation: () => this.tableMatch?.refresh(),
       schedule: (callback, intervalSeconds) => this.schedule(callback, intervalSeconds),
       scheduleOnce: (callback, delaySeconds) => this.scheduleOnce(callback, delaySeconds),
@@ -206,7 +210,7 @@ export class GameScene extends Component {
           autoSort: !friendRoomSettings || friendRoomSettings.autoSort,
           ruleProfile: this.tableMatch?.snapshot?.state.ruleProfile ?? this.session?.ruleProfile ?? getRuleProfile('classic'),
           multiplayer,
-          trustee: multiplayer && Boolean(this.lobby?.snapshot.trustees?.[humanId] || this.lobby?.snapshot.matchEnded),
+          trustee: multiplayer && Boolean(this.session?.snapshot.isObserver || this.lobby?.snapshot.trustees?.[humanId] || this.lobby?.snapshot.matchEnded),
           deadlinePlayerId: this.lobby?.snapshot.deadlinePlayerId ?? null,
         }
       },
@@ -229,33 +233,15 @@ export class GameScene extends Component {
       isMultiplayer: () => Boolean(this.session?.snapshot.isMultiplayer),
       lobbySnapshot: () => this.lobby?.snapshot ?? null,
       playCountdown: seconds => this.audio?.playCountdown(seconds),
-      actOnLocalTimeout: () => this.gameManager?.actOnTimeout(),
       schedule: (callback, intervalSeconds) => this.schedule(callback, intervalSeconds),
       unschedule: callback => this.unschedule(callback),
-    })
-    this.effectLabHost = new EffectLabSceneHost({
-      effects: this.effects,
-      audio: this.audio,
-      flightRoot: this.flightRoot,
-      topEffectRoot: this.topEffectRoot,
-      getEffectQuality: () => this.session?.snapshot.settings.effectQuality ?? 'full',
-      hasLiveTableSnapshot: () => Boolean(this.tableMatch?.hasSnapshot),
-      openEffectLabTable: () => this.frontPages?.openEffectLabTable(),
-      scheduleOnce: (callback, delaySeconds) => this.scheduleOnce(callback, delaySeconds),
-      showNotice: (title, detail) => this.tableOverlays?.showNotice(title, detail),
-      startFixedMatch: (state, fixture) => {
-        this.frontPages?.hideAll()
-        this.setTableVisible(true)
-        this.effects?.resetForRecovery(state.playArea.length)
-        manager.applyDevelopmentFixtureState(state, fixture.label)
-        this.audio?.playRoundStart()
-      },
     })
     const frontPageGateways = this.createFrontPageGateways()
     this.matchRecovery = new PlatformMatchRecoveryCoordinator({
       configured: frontPageGateways.configured, gateway: frontPageGateways.matchRecovery, lobby,
       enterLobby: () => this.session?.enterLobby(),
       restoreFriendRoom: entry => this.frontPages?.restoreFriendRoomReservation(entry),
+      onPendingChanged: pending => this.frontPages?.setRecoveryPending(pending),
       showRecoveryAvailable: message => {
         lobby.offerActiveMatchRecovery(message)
         this.frontPages?.showRecoveryMenu()
@@ -264,6 +250,8 @@ export class GameScene extends Component {
       isDisposed: () => !this.node.isValid,
     })
     this.frontPages = new FrontPageController(this.node, this.session!, lobby, screen, {
+      showToast: message => this.tableOverlays?.showToast(message),
+      refreshProfile: () => this.tableMatch?.refresh(),
       setTableVisible: visible => this.setTableVisible(visible),
       setFriendRoomWaitingVisible: visible => this.setFriendRoomWaitingVisible(visible),
       closeModal: () => this.tableOverlays?.clearModal(),
@@ -271,11 +259,7 @@ export class GameScene extends Component {
       scheduleOnce: (callback, delaySeconds) => this.scheduleOnce(callback, delaySeconds),
       getLobbyEndpoint: () => this.resolvedLobbyEndpoint(),
       enterMatchedGame: ticket => this.enterMatchedGame(ticket),
-      startMasterBotTest: () => this.tableMatch?.startMasterBotTest(),
-      listEffectLabFixtures: () => this.effectLabHost?.list() ?? [],
-      previewEffectLabFixture: (id, quality) => { this.effectLabHost?.trigger(id, quality) },
-    }, frontPageGateways)
-    this.effectLabHost.installDebugBridge()
+    }, frontPageGateways, createFrontPagePreviewData())
     this.applyResponsiveLayout(screen.viewport)
     this.hand?.node.on('guandan:card-toggle', this.tableHandInteraction.handleCardToggle, this.tableHandInteraction)
     this.playButton?.on(Node.EventType.TOUCH_END, this.tableHandInteraction.playSelected, this.tableHandInteraction)
@@ -358,7 +342,6 @@ export class GameScene extends Component {
       return
     }
     if (this.topEffectRoot) this.topEffectRoot.active = true
-    this.effects?.playMatchSuccess()
     this.session?.enterLobby()
     this.lobby?.enterMatchedRoom({
       entryAttemptId: ticket.entryAttemptId,
@@ -373,6 +356,8 @@ export class GameScene extends Component {
   }
 
   protected onDestroy (): void {
+    this.tableLayoutAuditBridge?.dispose()
+    this.tableLayoutAuditBridge = null
     this.matchRecovery?.dispose()
     this.matchRecovery = null
     this.startupCoordinator?.dispose()
@@ -394,8 +379,6 @@ export class GameScene extends Component {
     this.session?.events.off('guandan:session', this.refreshBackdropTheme, this)
     this.backdropController?.dispose()
     this.backdropController = null
-    this.effectLabHost?.dispose()
-    this.effectLabHost = null
     this.frontPages?.destroy()
     this.frontPages = null
     this.hand?.setTouchExclusionPredicate(null)
@@ -409,59 +392,42 @@ export class GameScene extends Component {
     return lobby.roomSettings ?? null
   }
 
-  private playChatPulseFor (playerId: PlayerId, ownBubbleNode: Node): void {
-    const humanId = this.session?.snapshot.myPlayerId ?? 'p1'
-    const target = playerId === humanId ? ownBubbleNode : this.playerSeats.get(playerId)?.node
-    if (!target) return
-    this.effects?.playChatPulse(target, target.worldPosition.x < 0 ? 'left' : 'right')
+  /** Lets the first playable scene run before the art prefabs are bound in Creator. */
+  private tableNodeBindings (): TableSceneNodes {
+    return {
+      hand: this.hand,
+      playArea: this.playArea,
+      hintLabel: this.hintLabel,
+      phaseLabel: this.phaseLabel,
+      overlayLabel: this.overlayLabel,
+      levelLabel: this.levelLabel,
+      countdownLabel: this.countdownLabel,
+      playButton: this.playButton,
+      passButton: this.passButton,
+      hintButton: this.hintButton,
+      confirmTributeButton: this.confirmTributeButton,
+      finishTributeButton: this.finishTributeButton,
+      nextRoundButton: this.nextRoundButton,
+      trusteeButton: this.trusteeButton,
+      skipEffectButton: this.skipEffectButton,
+      playerSeats: this.playerSeats,
+    }
   }
 
-  /** Lets the first playable scene run before the art prefabs are bound in Creator. */
   private ensureFallbackUi (): void {
+    if (!this.ui) throw new Error('Runtime UI factory is not initialized')
     this.backdropController?.mount()
-    if (!this.hand) {
-      const handNode = new Node('HumanHand')
-      handNode.parent = this.node
-      handNode.setPosition(new Vec3(0, -265, 0))
-      handNode.addComponent(UITransform).setContentSize(1040, 150)
-      this.hand = handNode.addComponent(HandController)
-    }
-    if (!this.playArea) {
-      const playNode = new Node('PlayArea')
-      playNode.parent = this.node
-      playNode.addComponent(UITransform).setContentSize(900, 420)
-      this.playArea = playNode.addComponent(PlayAreaController)
-    }
-    ;(['p1', 'p2', 'p3', 'p4'] as const).forEach(id => {
-      if (this.playerSeats.has(id)) return
-      const seat = new Node(`Seat-${id}`)
-      seat.parent = this.node
-      seat.setPosition(new Vec3(0, 0, 0))
-      this.playerSeats.set(id, seat.addComponent(PlayerSeatController))
-    })
-    this.hintLabel ??= this.makeLabel('Hint', 410, -123, 24)
-    this.hintLabel.node.getComponent(UITransform)?.setContentSize(420, 38)
-    this.hintLabel.overflow = Label.Overflow.SHRINK
-    this.hintLabel.verticalAlign = Label.VerticalAlign.CENTER
-    this.phaseLabel ??= this.makeLabel('Phase', 0, 282, 30)
-    this.levelLabel ??= this.makeLabel('Level', -475, 268, 18)
-    this.levelLabel.node.getComponent(UITransform)?.setContentSize(300, 38)
-    this.levelLabel.horizontalAlign = Label.HorizontalAlign.LEFT
-    this.countdownLabel ??= this.makeLabel('ActionCountdown', 0, -126, 22)
-    this.countdownLabel.node.getComponent(UITransform)?.setContentSize(100, 38)
-    this.countdownLabel.node.active = false
-    this.overlayLabel ??= this.makeLabel('Overlay', 0, 42, 30)
-    this.passButton ??= this.makeButton('PassButton', '不要', -185, 112, 54, 28)
-    this.hintButton ??= this.makeButton('HintButton', '提示', -62, 112, 54, 28)
-    this.playButton ??= this.makeButton('PlayButton', '出牌', 70, 128, 58, 28)
-    this.confirmTributeButton ??= this.makeButton('ConfirmTributeButton', '确认贡牌', 0)
-    this.finishTributeButton ??= this.makeButton('FinishTributeButton', '开始本局', 0)
-    this.nextRoundButton ??= this.makeButton('NextRoundButton', '下一局', 0)
-    this.trusteeButton ??= this.makeButton('TrusteeButton', '托管', 535, 112, 44, 18)
-    this.trusteeButton.active = false
-    this.skipEffectButton ??= this.makeButton('SkipEffectButton', '跳过动画', 0, 132, 42, 18)
-    this.skipEffectButton.active = false
-    this.skipEffectButton.on(Node.EventType.TOUCH_END, () => this.effects?.skipAll(), this)
+    const nodes = buildTableSceneNodes(this.node, this.ui, this.tableNodeBindings())
+    ;({
+      hand: this.hand, playArea: this.playArea,
+      hintLabel: this.hintLabel, phaseLabel: this.phaseLabel, overlayLabel: this.overlayLabel,
+      levelLabel: this.levelLabel, countdownLabel: this.countdownLabel,
+      playButton: this.playButton, passButton: this.passButton, hintButton: this.hintButton,
+      confirmTributeButton: this.confirmTributeButton, finishTributeButton: this.finishTributeButton,
+      nextRoundButton: this.nextRoundButton, trusteeButton: this.trusteeButton,
+      skipEffectButton: this.skipEffectButton, playerSeats: this.playerSeats,
+    } = nodes)
+    this.skipEffectButton?.on(Node.EventType.TOUCH_END, () => this.effects?.skipAll(), this)
   }
 
   /** Mounts the table chrome above flights and below major effects. */
@@ -475,10 +441,14 @@ export class GameScene extends Component {
         onHandLockAction: () => this.tableHandInteraction?.handleLockAction(),
         onArrange: () => this.tableHandInteraction?.handleArrangeIntent(),
         onChat: () => this.tableOverlays?.toggleQuickChatPanel(),
+        onOwnAvatar: () => { if (!this.session?.snapshot.isObserver) this.frontPages?.showProfileEditor() },
+        onSeatAvatar: playerId => { if (this.session?.snapshot.isObserver) this.lobby?.watchPlayer(playerId) },
       },
       lobbySnapshot: () => this.lobby?.snapshot ?? null,
       isMultiplayer: () => Boolean(this.session?.snapshot.isMultiplayer),
       turnClock: (snapshot, humanId) => this.tableTurnClock?.project(snapshot, humanId) ?? null,
+      ownProfile: () => this.frontPages?.ownProfile ?? null,
+      ownAvatarFrame: () => this.frontPages?.ownAvatarFrame() ?? Promise.resolve(null),
     })
     this.tableHudPresenter = presenter
     const hudNode = presenter.mount({
@@ -487,14 +457,26 @@ export class GameScene extends Component {
       legacySeatNodes: Array.from(this.playerSeats.values(), seat => seat.node),
     })
     this.hand?.setTouchExclusionPredicate(screenPoint => {
-      return presenter.hitTestInteractiveScreenPoint(screenPoint) || hitTestVisibleNodes(
+      return Boolean(this.tableOverlays?.blocksHandInput || this.frontPages?.profileEditorOpen) || presenter.hitTestInteractiveScreenPoint(screenPoint) || hitTestVisibleNodes(
         [this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, this.trusteeButton], screenPoint,
       )
     })
-    this.flightRoot?.setSiblingIndex(this.node.children.length - 1)
-    hudNode.setSiblingIndex(this.node.children.length - 1)
-    this.topEffectRoot?.setSiblingIndex(this.node.children.length - 1)
-    this.skipEffectButton?.setSiblingIndex(this.node.children.length - 1)
+    this.tableLayoutAuditBridge = new TableLayoutAuditBridge({
+      viewport: () => this.screen?.viewport ?? null,
+      handNode: () => this.hand?.node ?? null,
+      playArea: () => this.playArea,
+      humanId: () => this.session?.snapshot.myPlayerId ?? 'p1',
+      hudRoot: () => presenter.node,
+      auxiliaryNodes: () => [
+        { id: 'tribute-confirm', label: '确认贡牌', role: 'control', interactive: true, node: this.confirmTributeButton },
+        { id: 'tribute-finish', label: '开始本局', role: 'control', interactive: true, node: this.finishTributeButton },
+        { id: 'next-round', label: '下一局操作', role: 'control', interactive: true, node: this.nextRoundButton },
+        { id: 'trustee', label: '托管操作', role: 'control', interactive: true, node: this.trusteeButton },
+      ],
+    })
+    this.tableLayoutAuditBridge.install()
+    orderTableLayers(this.node, [this.hand?.node, this.flightRoot, this.topEffectRoot, hudNode,
+      this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, this.skipEffectButton])
   }
 
   /** Separates shakeable table content, card flights, HUD and top-level effects. */
@@ -525,9 +507,7 @@ export class GameScene extends Component {
     )
     const settings = this.session?.snapshot.settings
     if (settings) effects.configure(settings.effectQuality, settings.hapticEnabled)
-    this.flightRoot.setSiblingIndex(this.node.children.length - 1)
-    this.topEffectRoot.setSiblingIndex(this.node.children.length - 1)
-    this.skipEffectButton?.setSiblingIndex(this.node.children.length - 1)
+    orderTableLayers(this.node, [this.hand?.node, this.flightRoot, this.topEffectRoot, this.skipEffectButton])
   }
 
   private setTableVisible (visible: boolean): void {
@@ -568,66 +548,22 @@ export class GameScene extends Component {
     if (!this.tableHudPresenter?.visible) this.backdropController?.setMode('lobby')
   }
 
-  private layoutSeats (humanId: 'p1' | 'p2' | 'p3' | 'p4'): void {
-    const order: Array<'p1' | 'p2' | 'p3' | 'p4'> = ['p1', 'p2', 'p3', 'p4']
-    const humanIndex = order.indexOf(humanId)
-    const screen = this.screen
-    const positions = screen
-      ? [new Vec3(0, screen.safeBottomY(90), 0), new Vec3(screen.safeRightX(105), 22, 0), new Vec3(-220, 218, 0), new Vec3(screen.safeLeftX(105), 22, 0)]
-      : [new Vec3(0, -260, 0), new Vec3(510, 35, 0), new Vec3(-220, 218, 0), new Vec3(-510, 35, 0)]
-    order.forEach((id, index) => {
-      const slot = (index - humanIndex + 4) % 4
-      const seat = this.playerSeats.get(id)
-      seat?.node.setPosition(positions[slot])
-      seat?.setChatBubbleAbove(slot !== 2)
-    })
+  private layoutSeats (humanId: PlayerId): void {
+    layoutTableSeats(humanId, this.screen, this.playerSeats)
   }
 
   private tableControlsY (): number {
-    return this.screen?.safeBottomY(200) ?? -160
+    return TABLE_HUD_TURN_OPERATION_ANCHORS.bottom.y
   }
 
-  /** Repositions every table control when the device rotates, resizes or exposes a notch inset. */
   private applyResponsiveLayout (viewport: TableViewport): void {
     this.frontPages?.resize(viewport.width, viewport.height)
-    const safeWidth = viewport.width - viewport.safeLeft - viewport.safeRight
-    const controlsY = this.tableControlsY()
-    this.hand?.node.setPosition(new Vec3(0, this.screen?.safeBottomY(112) ?? -248, 0))
-    this.hand?.node.getComponent(UITransform)?.setContentSize(Math.max(300, safeWidth - 380), 150)
-    this.playArea?.node.getComponent(UITransform)?.setContentSize(Math.max(300, safeWidth - 360), Math.max(300, viewport.height - 270))
-    ;[this.tableShakeRoot, this.flightRoot, this.topEffectRoot].forEach(root => root?.getComponent(UITransform)?.setContentSize(viewport.width, viewport.height))
-    this.overlayLabel?.node.setPosition(Vec3.ZERO)
-    this.overlayLabel?.node.getComponent(UITransform)?.setContentSize(
-      Math.max(280, Math.min(860, safeWidth - 64)),
-      Math.max(140, Math.min(300, viewport.height - viewport.safeTop - viewport.safeBottom - 180)),
-    )
-    if (this.overlayLabel) {
-      this.overlayLabel.overflow = Label.Overflow.SHRINK
-      this.overlayLabel.enableWrapText = true
-      this.overlayLabel.verticalAlign = Label.VerticalAlign.CENTER
-    }
-    if (!this.tableHudPresenter?.mounted) {
-      this.hintButton?.setPosition(new Vec3(-126, controlsY, 0))
-      this.passButton?.setPosition(new Vec3(0, controlsY, 0))
-      this.playButton?.setPosition(new Vec3(126, controlsY, 0))
-    }
-    this.confirmTributeButton?.setPosition(new Vec3(0, controlsY, 0))
-    this.finishTributeButton?.setPosition(new Vec3(0, controlsY, 0))
-    this.nextRoundButton?.setPosition(new Vec3(0, controlsY, 0))
-    this.levelLabel?.node.setPosition(new Vec3(this.screen?.safeLeftX(165) ?? -475, this.screen?.safeTopY(92) ?? 268, 0))
-    this.levelLabel?.node.getComponent(UITransform)?.setContentSize(300, 38)
-    if (this.levelLabel) this.levelLabel.horizontalAlign = Label.HorizontalAlign.LEFT
-    this.trusteeButton?.setPosition(new Vec3(this.screen?.safeRightX(70) ?? 570, controlsY + 54, 0))
-    this.skipEffectButton?.setPosition(new Vec3(this.screen?.safeRightX(90) ?? 550, this.screen?.safeTopY(40) ?? 320, 0))
+    layoutTableNodes(viewport, this.screen, this.tableNodeBindings(),
+      [this.tableShakeRoot, this.flightRoot, this.topEffectRoot], Boolean(this.tableHudPresenter?.mounted))
     this.tableOverlays?.resize(viewport)
     this.backdropController?.resize(viewport)
     this.tableHudPresenter?.layout(viewport)
     this.tableMatch?.refresh()
-  }
-
-  private makeLabel (name: string, x: number, y: number, fontSize: number): Label {
-    if (!this.ui) throw new Error('Runtime UI factory is not initialized')
-    return this.ui.label(name, x, y, fontSize)
   }
 
   private refreshBackdropTheme (): void {
@@ -636,9 +572,5 @@ export class GameScene extends Component {
     if (settings) this.effects?.configure(settings.effectQuality, settings.hapticEnabled)
   }
 
-  private makeButton (name: string, text: string, x: number, width = 244, height = 56, fontSize = 25): Node {
-    if (!this.ui) throw new Error('Runtime UI factory is not initialized')
-    return this.ui.button(name, text, x, width, height, fontSize)
-  }
 
 }

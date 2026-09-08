@@ -23,7 +23,11 @@ const playTypeTier = (type: PlayType | null, ruleProfile: RuleProfile): number =
   if (type === PlayType.Single || type === PlayType.Pair || type === PlayType.Triple) return 5
   return 6
 }
-
+/** Relative order for explicit sorting and projection, not fixed screen zones. */
+export const handDisplayZone = (type: PlayType | null, ruleProfile: RuleProfile): 0 | 1 | 2 => {
+  const tier = playTypeTier(type, ruleProfile)
+  return tier === 0 ? 0 : tier === 5 ? 1 : 2
+}
 const unitCardSignature = (cards: readonly Card[]): string => cards
   .map(card => card.id)
   .slice()
@@ -62,11 +66,14 @@ interface ResolvedDisplayUnit {
   multiplicity: number
   arrangementAnchor: Card | null
   signature: string
+  zone: number
 }
 
 /**
  * Total order for horizontal lanes. Point-stacked mode never inspects a lane's
- * play type; smart-arranged mode promotes structured combinations to the left.
+ * play type. Smart arrangement keeps bomb-class groups left, low ordinary
+ * lanes between them and other tall combinations right within one centred pack.
+ * This is only called for explicit arrangement, never from frame rendering.
  */
 export const sortHandDisplayUnits = (
   hand: readonly Card[],
@@ -99,10 +106,19 @@ export const sortHandDisplayUnits = (
       multiplicity: cards.length,
       arrangementAnchor: cards.slice().sort((left, right) => compareCardsForArrangement(left, right, options))[0] ?? null,
       signature: unitCardSignature(cards),
+      zone: layoutMode === 'smart-arranged' ? handDisplayZone(resolution?.type ?? null, ruleProfile) : 0,
     }
   })
 
   resolved.sort((left, right) => {
+    const zoneDifference = left.zone - right.zone
+    if (zoneDifference !== 0) return zoneDifference
+    // The right zone grows in height towards its outer edge; no
+    // group membership, card IDs, lock flags or rule-hand order are changed.
+    if (layoutMode === 'smart-arranged' && left.zone === 2) {
+      const heightDifference = left.multiplicity - right.multiplicity
+      if (heightDifference !== 0) return heightDifference
+    }
     if (left.unit.locked !== right.unit.locked) return left.unit.locked ? -1 : 1
     if (!left.unit.locked && layoutMode === 'point-stacked' && left.arrangementAnchor && right.arrangementAnchor) {
       const pointDifference = compareCardsForArrangement(left.arrangementAnchor, right.arrangementAnchor, options)

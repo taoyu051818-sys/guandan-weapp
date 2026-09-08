@@ -13,7 +13,8 @@ export const tableHintToast = (rawHint: string, phase: 'playing' | 'tribute' | '
     /正在思考/,
     /^等待其他玩家/,
     /^请等待其他玩家/,
-    /^正在等待服务器确认$/,
+    /^(?:正在)?等待(?:服务器|服务端)确认/,
+    /^平台确认中/,
     /^请选择手牌$/,
     /^可出(?:\s*·|$)/,
     /^提示：/,
@@ -25,7 +26,6 @@ export const tableHintToast = (rawHint: string, phase: 'playing' | 'tribute' | '
     /^压不过/,
     /^炸弹不够大$/,
     /^天王炸无法压过$/,
-    /^固定测试牌局：/,
   ]
   return silentPatterns.some(pattern => pattern.test(hint)) ? null : hint
 }

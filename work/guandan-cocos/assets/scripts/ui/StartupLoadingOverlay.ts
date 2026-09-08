@@ -2,6 +2,8 @@ import { BlockInputEvents, Color, Graphics, Label, Node, Sprite, SpriteFrame, Te
 import type { TableViewport } from './ScreenAdapter'
 import { applyForegroundTextStyle, RUNTIME_MIN_TEXT_SIZE } from './RuntimeUiFactory'
 
+export type StartupFailureCode = 'GD-S01' | 'GD-S02' | 'GD-S03' | 'GD-S04'
+
 const FALLBACK_VIEWPORT: TableViewport = {
   width: 1280,
   height: 720,
@@ -134,10 +136,12 @@ export class StartupLoadingOverlay {
     this.redrawProgress()
   }
 
-  public showError (message: string, retry: () => void): void {
+  public showError (message: string, retry: () => void, code: StartupFailureCode): void {
     if (this.disposed) return
-    this.titleLabel.string = '资源加载失败'
+    const title = { 'GD-S01': '资源下载失败', 'GD-S02': '画面准备失败', 'GD-S03': '游戏初始化失败', 'GD-S04': '重新进入失败' }[code]
+    this.titleLabel.string = `${title}（${code}）`
     this.statusLabel.string = message
+    this.retryLabel.string = code === 'GD-S01' || code === 'GD-S02' ? '重试加载' : '重新进入'
     this.retryCallback = retry
     this.retryNode.active = true
     this.bringToFront()

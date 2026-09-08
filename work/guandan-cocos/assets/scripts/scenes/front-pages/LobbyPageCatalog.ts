@@ -18,7 +18,7 @@ export const LOBBY_ART = Object.freeze({
 })
 
 export const CLASSIC_ROOM_MODES: ReadonlyArray<{ id: ClassicRoomMode, label: string, available: boolean }> = [
-  { id: 'classic', label: '经典玩法', available: true },
+  { id: 'classic', label: '随机级牌', available: true },
   { id: 'consecutive', label: '连打过A', available: false },
   { id: 'no-shuffle', label: '不洗牌', available: false },
   { id: 'team-turn', label: '团团转', available: false },

@@ -1,5 +1,6 @@
 import { gameResultSignature } from './crypto.js'
 import { JsonGameResultOutboxStore } from './game-result-outbox-store.js'
+import { snapshotReportEvent, requireResultAcknowledgement } from './report-event-contract.js'
 
 export class GameResultReporter {
   constructor ({
@@ -49,6 +50,7 @@ export class GameResultReporter {
   stage (event) {
     if (!this.configured) return Promise.resolve({ skipped: true })
     if (!this.durable) throw new Error('结算 enqueue 必须配置持久 outbox')
+    event = snapshotReportEvent(event)
     this.outbox.add(event)
     if (this.stopped) throw this.stopped
     const eventId = String(event.eventId)
@@ -64,6 +66,7 @@ export class GameResultReporter {
   }
 
   schedule (event) {
+    event = snapshotReportEvent(event)
     const eventId = String(event.eventId)
     const existing = this.operations.get(eventId)
     if (existing) return existing
@@ -99,6 +102,7 @@ export class GameResultReporter {
       if (this.stopped) throw this.stopped
       try {
         const accepted = await this.report(event)
+        if (this.stopped) throw this.stopped
         this.outbox.remove(event.eventId)
         return accepted
       } catch (error) {
@@ -113,6 +117,7 @@ export class GameResultReporter {
   /** Keeps the original bounded, immediate reporting API for callers and tests. */
   async report (event) {
     if (!this.configured) return { skipped: true }
+    event = snapshotReportEvent(event)
     const rawBody = JSON.stringify(event)
     let lastError
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
@@ -140,6 +145,7 @@ export class GameResultReporter {
       controller.signal.addEventListener('abort', () => reject(controller.signal.reason || timeoutError), { once: true })
     })
     const requested = Promise.resolve().then(async () => {
+      if (this.stopped) throw this.stopped
       const response = await this.fetchImpl(this.endpoint, {
         method: 'POST',
         headers: {
@@ -153,8 +159,7 @@ export class GameResultReporter {
       })
       const payload = await response.json().catch(() => null)
       if (!response.ok || !payload?.ok) throw new Error(payload?.error?.message || `结算回调失败：HTTP ${response.status}`)
-      if (!payload.data?.result || typeof payload.data.result !== 'object') throw new Error('结算回调缺少确认结果')
-      return payload.data.result
+      return requireResultAcknowledgement(payload.data?.result, event)
     })
     try {
       return await Promise.race([requested, aborted])

@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["tests/support/refactor-type-contracts.ts", "tests/support/local-match/*.ts"],
+  "exclude": []
+}

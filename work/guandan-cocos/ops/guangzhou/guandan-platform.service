@@ -1,0 +1,24 @@
+[Unit]
+Description=Lingshui Guandan platform API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=guandan
+Group=guandan
+WorkingDirectory=/srv/guandan/current/work/guandan-windows-source
+EnvironmentFile=/srv/guandan/shared/production.env
+EnvironmentFile=/srv/guandan/shared/wechat.env
+ExecStart=/opt/node-v24.19.0/bin/node server/platform-server.js
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/guandan/shared/data
+
+[Install]
+WantedBy=multi-user.target

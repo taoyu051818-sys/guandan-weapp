@@ -11,6 +11,9 @@ const ts = loadTypeScript()
 
 assert.equal(fs.existsSync(sourcePath), true)
 assert.equal(fs.existsSync(`${sourcePath}.meta`), true)
+const engineConfig = JSON.parse(fs.readFileSync(path.join(projectRoot, 'settings/v2/packages/engine.json'), 'utf8')).modules.configs.defaultConfig
+assert.equal(engineConfig.cache.mask._value, true, 'runtime scrolling needs the non-cropped Cocos Mask feature')
+assert.ok(engineConfig.includeModules.includes('mask'))
 
 class MockColor {
   constructor (r = 0, g = 0, b = 0, a = 255) { this.r = r; this.g = g; this.b = b; this.a = a }
@@ -19,6 +22,7 @@ class MockVec3 {
   constructor (x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z }
 }
 class MockUITransform {
+  setAnchorPoint (x, y) { this.anchorPoint = { x, y } }
   setContentSize (width, height) { this.contentSize = typeof width === 'object' ? width : { width, height } }
 }
 class MockNode {
@@ -62,6 +66,9 @@ class MockNode {
 
 const stoppedTweens = []
 const cc = {
+  Mask: class {},
+  ScrollView: class { isValid = true; offset = { y: 0 }; scrollToOffset (v) { this.offset = v }; scrollToTop () { this.offset = { y: 0 } }; getScrollOffset () { return this.offset } },
+  Vec2: MockVec3,
   Color: MockColor,
   Node: MockNode,
   Tween: { stopAllByTarget: target => stoppedTweens.push(target) },
@@ -103,6 +110,7 @@ const compile = (filePath, runtimeDependencies) => {
 
 const policy = compile(policyPath, {
   '../../network/LobbyModels': { DEFAULT_FRIEND_ROOM_SETTINGS: defaultSettings },
+  '../../core/generated/lib/matchFormat': compile(path.join(projectRoot, 'assets/scripts/core/generated/lib/matchFormat.ts'), {}),
 })
 
 const uiInstances = []
@@ -156,6 +164,8 @@ class MockRuntimeUiFactory {
 
 const { FriendRoomSettingsPresenter } = compile(sourcePath, {
   cc,
+  '../../core/generated/lib/matchFormat': compile(path.join(projectRoot, 'assets/scripts/core/generated/lib/matchFormat.ts'), {}),
+  './FriendRoomFormUi': compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomFormUi.ts'), { cc, '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory } }),
   '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory },
   './FriendRoomSettingsPolicy': policy,
 })
@@ -196,7 +206,10 @@ const presenter = new FriendRoomSettingsPresenter({
   goBack: () => { backCount += 1 },
 })
 
-const currentUi = () => uiInstances.at(-1)
+const currentUi = () => {
+  const live = uiInstances.filter(ui => ui.parent.isValid)
+  return { buttons: live.flatMap(ui => ui.buttons), images: live.flatMap(ui => ui.images), labels: live.flatMap(ui => ui.labels) }
+}
 const button = text => {
   const node = currentUi().buttons.find(candidate => candidate.text === text)
   assert.ok(node, `expected button ${text}`)
@@ -214,13 +227,13 @@ assert.deepEqual(router.currentRoot.children[0].components.get(MockUITransform).
 const backdrop = currentUi().images.find(node => node.name === 'FriendRoomBackdrop')
 const coverScale = Math.max(viewport.width / 1672, viewport.height / 941)
 assert.deepEqual(backdrop.size, { width: 1672 * coverScale, height: 941 * coverScale }, 'the extracted page must preserve cover scaling')
-assert.equal(currentUi().buttons.filter(node => node.name === 'FriendModeTab').length, 4)
+assert.equal(currentUi().buttons.filter(node => node.name === 'FriendModeTab').length, 2)
 assert.equal(button('基础规则').fontSize, 22)
 assert.equal(button('重置').size.height, 42)
 
 const firstView = router.currentRoot.children[0]
 button('+').emit(MockNode.EventType.TOUCH_END)
-assert.equal(presenter.settings.rounds, 8, 'round changes must continue through the pure normalization policy')
+assert.equal(presenter.settings.rounds, 5, 'custom rounds advance one at a time')
 assert.equal(firstView.isValid, false, 'rerendering must release the previous owned view tree')
 
 button('体验设置').emit(MockNode.EventType.TOUCH_END)
@@ -232,7 +245,7 @@ assert.deepEqual(sessionUpdates, [{ sortOrder: 'asc' }], 'only the sort-order pr
 
 button('创建房间').emit(MockNode.EventType.TOUCH_END)
 assert.equal(createdSettings.length, 1)
-assert.equal(createdSettings[0].rounds, 8)
+assert.equal(createdSettings[0].rounds, 5)
 assert.equal(createdSettings[0].sortOrder, 'asc')
 button('加入房间').emit(MockNode.EventType.TOUCH_END)
 button('返回').emit(MockNode.EventType.TOUCH_END)
@@ -253,13 +266,18 @@ assert.equal(joinCount, 1, 'hidden-page join callbacks must be invalidated')
 assert.equal(backCount, 1, 'hidden-page navigation callbacks must be invalidated')
 
 presenter.show()
-assert.equal(presenter.settings.rounds, 8, 'navigation must retain the settings draft')
+assert.equal(presenter.settings.rounds, 5, 'navigation must retain the settings draft')
 const routeStaleCreate = button('创建房间')
 router.current = 'menu'
 routeStaleCreate.emit(MockNode.EventType.TOUCH_END)
 assert.equal(createdSettings.length, 1, 'callbacks retained by another route must remain inert')
 presenter.show()
 const finalCreate = button('创建房间')
+button('传统升级').emit(MockNode.EventType.TOUCH_END)
+assert.equal(presenter.settings.format, 'upgrade')
+assert.equal(currentUi().labels.some(node => node.text === '上下滑动查看更多设置'), false, 'short forms must not suggest nonexistent scrolling')
+assert.equal(currentUi().buttons.some(node => node.text === '每局随机'), false)
+assert.ok(button('不进贡'))
 const pageCountBeforeDispose = pages.length
 presenter.dispose()
 presenter.dispose()
@@ -309,6 +327,13 @@ const lobbyCc = {
 
 const { LobbyPageDomain } = compile(lobbyPagePath, {
   cc: lobbyCc,
+  '../../ui/LobbyLayoutPolicy': compile(path.join(projectRoot, 'assets/scripts/ui/LobbyLayoutPolicy.ts'), {}),
+  '../../ui/LobbyAmbientMotion': { attachLobbyAmbientMotion() {} },
+  '../../ui/LobbyMenuView': { // Rendering is covered by lobby-artwork/refinement suites.
+    renderLobbyEntries() {}, renderLobbyShop() {},
+    lobbyLabel: () => ({ node: { getComponent: () => null } }),
+  },
+  '../../ui/CoastalUi': { coastalText: () => ({}), coastalIcon: () => ({}), coastalButton: () => new MockNode('CoastalButton') },
   '../../network/LobbyController': {},
   '../../session/GameSession': {},
   '../../ui/ScreenAdapter': {},
@@ -329,7 +354,7 @@ const { LobbyPageDomain } = compile(lobbyPagePath, {
   './FriendRoomPlatformFlow': { FriendRoomPlatformFlow: class {} },
   './FriendRoomPlatformPresenter': { FriendRoomPlatformPresenter: class { resetInput () {}; renderEntry () {}; renderInviteShare () {} } },
   './FriendRoomWaitingPresenter': { FriendRoomWaitingPresenter: class { render () {} } },
-  '../../services/ClipboardService': { writeClipboardText: async () => {} },
+  '../../services/WechatFriendInvite': { WechatFriendInvite: class { activate () {}; dispose () {} } },
   './FriendRoomSettingsPolicy': { describeFriendRoomRules: () => '好友房规则' },
   './FrontPagePlayerState': {},
   './FrontPageWalletState': {},
@@ -370,7 +395,7 @@ const lobbyController = {
   refreshRooms () {}, leaveRoom () {}, joinRoom () {}, addBot () {}, removeBot () {}, kickMember () {}, setLobbyReady () {}, cancelLobbyReady () {}, startGame () {},
 }
 const lobbySession = {
-  snapshot: { status: 'menu', playerStats: { elo: 1000, gamesPlayed: 0, wins: 0 } },
+  snapshot: { status: 'menu', settings: { effectQuality: 'full' }, playerStats: { elo: 1000, gamesPlayed: 0, wins: 0 } },
   updateSettings () {},
   enterLobby () { this.snapshot.status = 'lobby' },
   leaveToMenu () { this.snapshot.status = 'menu' },
@@ -398,7 +423,7 @@ const domain = new LobbyPageDomain({
   invalidateMatchAttempt () {}, closeModal () {}, setTableVisible () {}, setFriendRoomWaitingVisible () {},
   scheduleOnce: callback => scheduled.push(callback),
   getLobbyEndpoint: () => 'ws://127.0.0.1:3002/weapp',
-  showNotice () {}, dismissRulesState () {}, rulesVisible: () => false, showRules () {}, showMoreMenu () {}, showCompetition () {}, showPlayerCenter () {}, showShop () {}, beginMatch () {},
+  showNotice () {}, showCompetition () {}, showPlayerCenter () {}, showShop () {}, beginMatch () {},
 })
 const domainPresenter = lobbyPresenterInstances.at(-1)
 const forwardedSettings = { ...defaultSettings, rounds: 20, scoring: 'double-4', sortOrder: 'asc' }
@@ -426,5 +451,67 @@ scheduled.shift()()
 assert.equal(roomCreations.length, 1, 'destroying the domain must invalidate a queued room creation without relying on its parent flag')
 assert.equal(domainPresenter.disposed, 1, 'the friend-room presenter must be disposed exactly once')
 domainDisposed = true
+
+const { FriendRoomWaitingPresenter } = compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomWaitingPresenter.ts'), {
+  cc, './FriendRoomSettingsPolicy': policy,
+  '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory },
+})
+const waitingCalls = []
+for (const height of [402, 589, 720]) {
+  for (const myPlayerId of ['p1', 'p2', 'p3', 'p4']) {
+    for (const ready of [false, true]) {
+      const waitingScreen = {
+        safeSize: () => ({ x: 1280, y: height }), safeLeftX: margin => -640 + margin,
+        safeRightX: margin => 640 - margin, safeTopY: margin => height / 2 - margin,
+        safeBottomY: margin => -height / 2 + margin,
+      }
+      const waiting = new FriendRoomWaitingPresenter(waitingScreen, {
+        setLobbyReady: () => waitingCalls.push('ready'), cancelLobbyReady: () => waitingCalls.push('cancel'),
+      }, 'original-avatar', () => {})
+      const ui = new MockRuntimeUiFactory(new MockNode('WaitingTest'))
+      waiting.render(ui, {
+        roomId: '123456', myPlayerId, members: ['p1', 'p2', 'p3', 'p4'], botPlayerIds: [],
+        lobbyReadyPlayerIds: ready ? [myPlayerId] : [], roomSettings: defaultSettings,
+        capabilities: { canUseBots: false, canKickMembers: false },
+      }, true)
+      const button = ui.buttons.find(item => item.text === (ready ? '取消准备' : '准备'))
+      const status = ui.labels.find(item => /^等待其他玩家准备|^等待房主开始/.test(item.text))
+      assert.ok(button && status)
+      assert.equal(button.position.x, 0, 'a lone ready action stays centered')
+      assert.ok(status.position.y + status.style.height / 2 <= button.position.y - button.size.height / 2 - 12,
+        `waiting copy must stay below, never overpaint ${myPlayerId}'s ready button`)
+      button.emit(MockNode.EventType.TOUCH_END)
+      assert.equal(waitingCalls.at(-1), ready ? 'cancel' : 'ready')
+    }
+  }
+}
+
+for (const width of [874, 1280]) {
+  for (const fullReady of [false, true]) {
+    const actions = []
+    const screen = { safeSize: () => ({ x: width, y: 589 }), safeLeftX: m => -width / 2 + m,
+      safeRightX: m => width / 2 - m, safeTopY: m => 294.5 - m, safeBottomY: m => -294.5 + m }
+    const ui = new MockRuntimeUiFactory(new MockNode('NativeInvitationWaiting'))
+    new FriendRoomWaitingPresenter(screen, {
+      setLobbyReady: () => actions.push('ready'), cancelLobbyReady: () => actions.push('cancel'), startGame: () => actions.push('start'),
+    }, 'original-avatar', () => {}).render(ui, {
+      roomId: '123456', myPlayerId: 'p1', members: ['p1', 'p2', 'p3', 'p4'], botPlayerIds: [],
+      lobbyReadyPlayerIds: fullReady ? ['p1', 'p2', 'p3', 'p4'] : [],
+      capabilities: { canUseBots: false, canKickMembers: false },
+    }, true, () => actions.push('invite'))
+    const row = ui.buttons.filter(b => ['邀请好友', '准备', '取消准备', '开始游戏'].includes(b.text))
+    assert.equal(row.length, fullReady ? 3 : 2)
+    assert.equal(row.reduce((sum, b) => sum + b.position.x, 0), 0, 'the action row is centered')
+    assert.equal(row[0].style.fill.g > row[0].style.fill.r, true, 'invitation uses green')
+    for (let i = 1; i < row.length; i++) {
+      assert.equal(row[i].position.y, row[0].position.y)
+      assert.ok(row[i].position.x - row[i].size.width / 2 - row[i - 1].position.x - row[i - 1].size.width / 2 >= 15.99)
+    }
+    if (!fullReady) assert.ok(row[1].style.fill.r > row[1].style.fill.g && row[1].style.fill.g > row[1].style.fill.b, 'ready uses yellow')
+    row[0].emit(MockNode.EventType.TOUCH_END)
+    assert.deepEqual(actions, ['invite'])
+    assert.equal(ui.buttons.some(b => /复制.*口令/.test(b.text)), false)
+  }
+}
 
 process.stdout.write('friend-room settings presenter lifecycle regression checks passed\n')

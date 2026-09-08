@@ -24,6 +24,7 @@ const resultSecret = 'friend-lifecycle-smoke-secret-at-least-thirty-two-characte
 const roomExpiresAt = Date.now() + 120_000
 const closedRoomExpiresAt = roomExpiresAt + 1
 const roomSettings = normalizeFriendRoomSettings({
+  format: 'rounds', levelMode: 'fixed', levelRank: 'A', tributeEnabled: false,
   rounds: 8,
   scoring: 'double-4',
   scoreVisibility: 'hidden',
@@ -52,6 +53,8 @@ let firstSeatLeftHandled = false
 let nextSeatReleaseRevocations = []
 const firstSeatLeftSeen = new Promise(resolve => { firstSeatLeftSeenResolve = resolve })
 const firstSeatLeftRelease = new Promise(resolve => { firstSeatLeftReleaseResolve = resolve })
+let kickedSeatReleaseResolve
+const kickedSeatRelease = new Promise(resolve => { kickedSeatReleaseResolve = resolve })
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const lifecycleTypes = new Set(['game-start', 'match-ended', 'seat-left', 'room-closed'])
@@ -88,6 +91,7 @@ const collector = createServer((request, response) => {
         await startClaimRelease
       }
       let seatRelease = null
+      if (event.type === 'seat-left' && event.reason === 'kicked') await kickedSeatRelease
       if (event.type === 'seat-left' && event.matchId === matchId && !firstSeatLeftHandled) {
         firstSeatLeftHandled = true
         firstSeatLeftSeenResolve(event)
@@ -117,11 +121,13 @@ const collector = createServer((request, response) => {
           event: event.type === 'game-start'
             ? {
                 eventId,
+                matchId: event.matchId,
+                sequence: event.sequence,
                 accepted: true,
                 duplicate,
                 lifecycleClaim: { accepted: true, status: 'playing', startedAt: Date.now() },
               }
-            : { eventId, accepted: true, duplicate, ...(seatRelease ? { seatRelease } : {}) },
+            : { eventId, matchId: event.matchId, sequence: event.sequence, accepted: true, duplicate, ...(seatRelease ? { seatRelease } : {}) },
         },
         error: null,
       }))
@@ -156,7 +162,7 @@ const launchServer = () => {
   child = spawn(process.execPath, ['server/weapp-ws.js'], {
     cwd: process.cwd(),
     env: serverEnvironment,
-    stdio: 'ignore',
+    stdio: process.env.WEAPP_SMOKE_VERBOSE === '1' ? 'inherit' : 'ignore',
   })
   return child
 }
@@ -205,12 +211,19 @@ const connect = async () => {
 }
 
 const waitMessage = (socket, type, requestId, timeoutMs = 4000) => new Promise((resolve, reject) => {
+  const timeoutError = new Error(`等待 ${type}/${requestId ?? '*'} 超时`)
   const timer = setTimeout(() => {
     socket.removeEventListener('message', handler)
-    reject(new Error(`等待 ${type}/${requestId ?? '*'} 超时`))
+    reject(timeoutError)
   }, timeoutMs)
   const handler = ({ data }) => {
     const packet = JSON.parse(data)
+    if (requestId !== undefined && packet.requestId === requestId && packet.type === 'error' && type !== 'error') {
+      clearTimeout(timer)
+      socket.removeEventListener('message', handler)
+      reject(new Error(`等待 ${type}/${requestId} 时收到 ${packet.code || 'error'}: ${packet.message}`))
+      return
+    }
     if (packet.type !== type || (requestId !== undefined && packet.requestId !== requestId)) return
     clearTimeout(timer)
     socket.removeEventListener('message', handler)
@@ -404,6 +417,15 @@ try {
   assert.equal(kickedNewTicket.code, 'FRIEND_ROOM_PARTICIPANT_REVOKED')
 
   const replacementTicket = issueFriendTicket(longTickets, { userId: 'usr-friend-3-replacement', seat: 'p3' })
+  const replacementPending = await expectError(thirdSeat, 'joinRoom', {
+    roomId,
+    ...ticketPayload(replacementTicket),
+  })
+  assert.equal(replacementPending.code, 'FRIEND_SEAT_RELEASE_PENDING', '踢人回执前替补入座必须被封锁，且不得消耗票据')
+  kickedSeatReleaseResolve()
+  await waitForPersistedRoom(roomId, room => (
+    !room.pendingSpectatorEvents.some(event => event.type === 'seat-left' && event.playerId === 'p3')
+  ))
   const replacementJoined = await sendAndWait(thirdSeat, 'joinRoom', {
     roomId,
     ...ticketPayload(replacementTicket),
@@ -519,6 +541,9 @@ try {
     purpose: 'rejoin',
   })
   const pendingRecoverySocket = await connect()
+  // Register before joining: the retry may publish gameState immediately after
+  // roomRejoined, before the idempotent replay below has finished awaiting.
+  gameStates.push(waitMessage(pendingRecoverySocket, 'gameState', undefined, 7000))
   const pendingRecoveryRequestId = requestId++
   const pendingRecoveryPayload = { roomId, ...ticketPayload(pendingRecoveryTicket) }
   const pendingRecoveryResponse = waitMessage(pendingRecoverySocket, 'roomRejoined', pendingRecoveryRequestId, 7000)
@@ -535,10 +560,10 @@ try {
   assert.deepEqual(await replayedPendingRecovery, pendingRecovered, 'pending 恢复必须按同一 requestId 稳定重放原等待快照')
   pendingRestartConnections.p2 = pendingRecoverySocket
   pendingRestartPackets.p2 = pendingRecovered
-  gameStates.push(waitMessage(pendingRecoverySocket, 'gameState', undefined, 7000))
   const startAcceptedResult = await startAccepted
   if (startAcceptedResult.error) throw startAcceptedResult.error
   const startedStates = await Promise.all(gameStates)
+  assert.ok(startedStates.every(packet => packet.state.currentLevel === 'A' && packet.state.matchFormat.kind === 'independent'), '好友房签名规则在开局、服务端恢复后仍固定打A')
   assert.ok(startedStates.every(packet => packet.phase === 'playing' && packet.roomId === roomId))
   ;[host, guest, thirdSeat, fourthSeat].forEach(socket => socket.removeEventListener('message', claimBarrierHandler))
 
@@ -683,6 +708,7 @@ try {
   assert.equal(collectorError, null)
   console.log('weapp signed friend-ticket integration passed')
 } finally {
+  kickedSeatReleaseResolve()
   startClaimReleaseResolve()
   firstSeatLeftReleaseResolve({ jti: 'cleanup', exp: Math.floor(Date.now() / 1000) + 60 })
   sockets.forEach(socket => socket.close())

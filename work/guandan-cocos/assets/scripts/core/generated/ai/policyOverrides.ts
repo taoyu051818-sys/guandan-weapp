@@ -114,6 +114,7 @@ export const createPolicyOverrides = ({
       getMinEnemyHand: support.getMinEnemyHand,
       getEnemyPressureModel: support.getEnemyPressureModel,
       getRankCounts,
+      getPlayResourceDamage: support.getPlayResourceDamage,
       memoGetPlayInfo: getPlayInfo,
       isBombType,
       chooseLowestComplexPlay: support.chooseLowestComplexPlay,
@@ -180,7 +181,6 @@ export const createPolicyOverrides = ({
   ) => chooseMediumOverrideImpl(
     { hand, possiblePlays, lastPlay, players, myTeam, aiContext },
     {
-      getMinEnemyHand: support.getMinEnemyHand,
       memoGetPlayInfo: getPlayInfo,
       isBombType,
       pickLowestWinningPlay: support.pickLowestWinningPlay,

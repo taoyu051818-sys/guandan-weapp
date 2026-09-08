@@ -1,5 +1,0 @@
-.table { min-height: 100vh; padding: 32px 20px; box-sizing: border-box; background: radial-gradient(circle, #1a4d3d, #0b0c10 74%); }
-.header, .opponents, .actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.title { font-size: 42px; font-weight: 700; color: #f3e5ab; }.level { color: #f3e5ab; }
-.opponents { margin: 60px 8px; color: #d7e4dd; font-size: 24px; }.play-area { height: 170px; display: flex; align-items: center; justify-content: center; color: #f3e5ab; }
-.hand { display: flex; flex-wrap: wrap; justify-content: center; padding: 10px 0 24px; }.card { width: 62px; height: 88px; margin-left: -12px; padding: 7px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; background: #fffff0; border: 1px solid #d4af37; border-radius: 8px; color: #141414; font-weight: 700; }.card.red { color: #b91c1c; }.card.selected { transform: translateY(-18px); box-shadow: 0 8px 12px rgba(0,0,0,.45); }.actions { margin-top: 12px; }

@@ -1,17 +1,21 @@
+import { createRequire } from 'node:module'
+const { normalizeRoomFormat } = createRequire(import.meta.url)('../../../shared-core/dist')
 const ROUND_COUNT_MIN = 4
 const ROUND_COUNT_MAX = 32
-const TURN_SECONDS = new Set([20, 40, 60])
+const TURN_SECONDS = new Set([15, 20, 30, 40, 60])
 const TRUSTEE_SECONDS = new Set([0, 15, 30, 60])
 const TOTAL_TIME_MINUTES = new Set([0, 20, 30, 60])
 const SCORING_MODES = new Set(['double-3', 'double-4'])
 const SCORE_VISIBILITY = new Set(['live', 'hidden'])
-const SPECTATOR_MODES = new Set(['off', 'live', 'delayed-round'])
+const SPECTATOR_MODES = new Set(['off', 'live', 'delayed-round', 'delay-15', 'delay-30', 'delay-60'])
 const SORT_ORDERS = new Set(['desc', 'asc'])
 const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A']
 
 // Fields after the first comma on each line are accepted only for older clients.
 const acceptedFields = new Set([
   'mode',
+  'format', 'levelMode', 'levelRank', 'tributeEnabled', 'upgradeTarget',
+  'counterEnabled', 'disableVoice',
   'rounds', 'roundCount', 'gameCount', 'customRoundCount',
   'scoring', 'doubleDownScore', 'doubleDownPoints',
   'scoreVisibility', 'scoreDisplay', 'scoreVisible',
@@ -30,7 +34,7 @@ export const DEFAULT_FRIEND_ROOM_SETTINGS = Object.freeze({
   rounds: 4,
   scoring: 'double-3',
   scoreVisibility: 'live',
-  turnSeconds: 40,
+  turnSeconds: 20,
   trusteeSeconds: 15,
   totalTimeMinutes: 0,
   spectator: 'off',
@@ -66,16 +70,18 @@ export const normalizeFriendRoomSettings = (value, { strict = false } = {}) => {
 
   const modeRaw = own(source, 'mode') ? source.mode : DEFAULT_FRIEND_ROOM_SETTINGS.mode
   const mode = normalizedOrDefault(modeRaw === 'classic', modeRaw, DEFAULT_FRIEND_ROOM_SETTINGS.mode, strict, 'mode 仅支持 classic')
+  let formatSettings
+  try { formatSettings = normalizeRoomFormat(source) } catch (error) { if (strict) invalid(error.message) }
 
   let roundsRaw = firstOwn(source, ['rounds', 'roundCount', 'gameCount'])
   if (roundsRaw === 'custom') roundsRaw = source.customRoundCount
   if (roundsRaw === undefined) roundsRaw = DEFAULT_FRIEND_ROOM_SETTINGS.rounds
   const rounds = normalizedOrDefault(
-    validRoundCount(roundsRaw),
+    formatSettings ? Number.isInteger(roundsRaw) && roundsRaw >= 1 && roundsRaw <= ROUND_COUNT_MAX : validRoundCount(roundsRaw),
     roundsRaw,
     DEFAULT_FRIEND_ROOM_SETTINGS.rounds,
     strict,
-    `rounds 必须是 ${ROUND_COUNT_MIN}-${ROUND_COUNT_MAX} 且为 4 的倍数`,
+    formatSettings ? 'rounds 必须为 1-32 的整数' : `rounds 必须是 ${ROUND_COUNT_MIN}-${ROUND_COUNT_MAX} 且为 4 的倍数`,
   )
 
   const scoringRaw = firstOwn(source, ['scoring', 'doubleDownScore', 'doubleDownPoints'])
@@ -110,7 +116,7 @@ export const normalizeFriendRoomSettings = (value, { strict = false } = {}) => {
     turnRaw,
     DEFAULT_FRIEND_ROOM_SETTINGS.turnSeconds,
     strict,
-    'turnSeconds 仅支持 20、40 或 60',
+    'turnSeconds 仅支持 15、20、30、40 或 60',
   )
 
   const trusteeRaw = own(source, 'trusteeSeconds') ? source.trusteeSeconds : DEFAULT_FRIEND_ROOM_SETTINGS.trusteeSeconds
@@ -144,7 +150,7 @@ export const normalizeFriendRoomSettings = (value, { strict = false } = {}) => {
     mappedSpectator,
     DEFAULT_FRIEND_ROOM_SETTINGS.spectator,
     strict,
-    'spectator 仅支持 off、live 或 delayed-round',
+    'spectator 仅支持禁止、实时、延迟15/30/60秒或延迟1局',
   )
 
   const autoSortRaw = firstOwn(source, ['autoSort', 'oneClickSort'])
@@ -178,9 +184,14 @@ export const normalizeFriendRoomSettings = (value, { strict = false } = {}) => {
 
   const validationRaw = own(source, 'authoritativeValidation') ? source.authoritativeValidation : true
   if (strict && validationRaw !== true) invalid('authoritativeValidation 不能关闭')
+  const experience = {}
+  for (const key of ['counterEnabled', 'disableVoice']) {
+    if (own(source, key)) experience[key] = normalizedOrDefault(typeof source[key] === 'boolean', source[key], key === 'counterEnabled', strict, `${key} 必须是布尔值`)
+  }
 
   return {
     mode,
+    ...formatSettings,
     rounds,
     scoring,
     scoreVisibility,
@@ -192,11 +203,12 @@ export const normalizeFriendRoomSettings = (value, { strict = false } = {}) => {
     disableInteraction,
     sortOrder,
     authoritativeValidation: true,
+    ...experience,
   }
 }
 
 export const adjustDoubleDownSettlement = ({ result, state, previousTeamLevels, roomSettings }) => {
-  if (!result || roomSettings.scoring !== 'double-4' || result.isGameWon) return result
+  if (!result || state.matchFormat || roomSettings.scoring !== 'double-4' || result.isGameWon) return result
   const [first, second] = result.fullRank || []
   if (!first || !second || state.players[first].team !== state.players[second].team) return result
   const winnerTeam = state.players[first].team
@@ -217,7 +229,7 @@ export const adjustDoubleDownSettlement = ({ result, state, previousTeamLevels, 
 }
 
 export const hasReachedRoundLimit = (roundSequence, roomSettings) => (
-  Number.isInteger(roundSequence) && roundSequence >= roomSettings.rounds
+  roomSettings.format !== 'upgrade' && Number.isInteger(roundSequence) && roundSequence >= roomSettings.rounds
 )
 
 export const spectatorPolicyFor = (roomSettings) => ({

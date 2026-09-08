@@ -1,0 +1,14 @@
+{
+  "builtAt": "2026-09-08T14:17:30.706Z",
+  "mainBytes": 3105949,
+  "subpackageBytes": 13433169,
+  "totalBytes": 16539118,
+  "fileCount": 284,
+  "mainScriptBytes": 780628,
+  "mainScriptSha256": "eec6ed1cf930efd1d8b11544200501186618d21b2d7ea67a6886b8990c254f66",
+  "comparison": "previous local build, not isolated A/B",
+  "savedBytesAgainstPreviousBuild": 373294,
+  "retiredAudioBytes": 288339,
+  "removedRuntimeModuleCount": 10,
+  "regressionScriptCount": 75
+}

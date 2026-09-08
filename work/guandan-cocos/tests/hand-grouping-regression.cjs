@@ -40,6 +40,9 @@ const { HandGrouping } = require(groupingPath)
 const { HandGroupingHistory } = require(groupingHistoryPath)
 const { HandWorkspace } = require(workspacePath)
 const { createHandStackLayout, handStackRise, STACK_EXPOSURE_HEIGHT } = require(stackLayoutPath)
+const { handDisplayZone } = require(displayOrderingPath)
+const { projectHandRenderModel } = require(path.join(projectRoot, 'assets/scripts/game/HandRenderProjector.ts'))
+const { PlayType } = require(path.join(projectRoot, 'assets/scripts/core/generated/index.ts'))
 const classicRuleProfile = Object.freeze({
   allowA2345Straight: true,
   straightFlushAsBomb: true,
@@ -221,8 +224,8 @@ function verifyUnifiedDisplayOrdering () {
   ]
   assert.deepEqual(
     sortHandDisplayUnits(structuredHand, structuredUnits, classicRuleProfile, 'smart-arranged', { direction: 'desc', levelRank: 7 }).map(unit => unit.key),
-    ['rocket', 'bomb-6', 'straight-flush', 'bomb-5', 'bomb-4', 'plate', 'ordinary'],
-    'large combinations must stay left and bombs must use the same strength order as the shared rules',
+    ['rocket', 'bomb-6', 'straight-flush', 'bomb-5', 'bomb-4', 'ordinary', 'plate'],
+    'smart layout keeps bomb strength order left, ordinary low lanes central and structured groups right',
   )
   const lockedStructuredUnits = structuredUnits.map(unit => ({ ...unit, locked: unit.groupId !== null }))
   assert.deepEqual(
@@ -235,6 +238,38 @@ function verifyUnifiedDisplayOrdering () {
     ['rocket', 'bomb-6', 'bomb-5', 'bomb-4', 'plate', 'straight-flush', 'ordinary'],
     'a tournament straight flush must stay in the structured locked tier instead of masquerading as a bomb',
   )
+
+  // A real-sized 27-card hand creates the intended low central silhouette.
+  const zonedHand = Object.freeze([
+    ...['spade', 'heart', 'club', 'diamond'].map((suit, i) => card(`z-bomb-${i}`, 9, suit)),
+    ...[3, 4, 5, 6, 7].map(rank => card(`z-flush-${rank}`, rank, 'spade')),
+    ...[3, 4, 5, 6, 7].map((rank, i) => card(`z-straight-${rank}`, rank, i % 2 ? 'heart' : 'club')),
+    ...[10, 'J'].flatMap(rank => ['spade', 'heart', 'club'].map((suit, i) => card(`z-plate-${rank}-${i}`, rank, suit))),
+    card('z-big', 'Big', 'joker'), card('z-small', 'Small', 'joker'),
+    card('z-A-1', 'A', 'club'), card('z-A-2', 'A', 'diamond'),
+    card('z-K-1', 'K', 'club'), card('z-K-2', 'K', 'diamond'), card('z-Q', 'Q', 'club'),
+  ])
+  assert.equal(zonedHand.length, 27)
+  const zoneUnit = (key, prefix, locked = false) => ({ key, groupId: key, origin: 'auto', locked, cardIds: zonedHand.filter(item => item.id.startsWith(prefix)).map(item => item.id) })
+  const zonedUnits = [
+    zoneUnit('bomb', 'z-bomb'), zoneUnit('flush', 'z-flush'), zoneUnit('straight', 'z-straight'), zoneUnit('plate', 'z-plate'),
+    zoneUnit('ace', 'z-A', true), zoneUnit('king', 'z-K'), zoneUnit('queen', 'z-Q'), zoneUnit('big', 'z-big'), zoneUnit('small', 'z-small'),
+  ]
+  const before = JSON.stringify({ zonedHand, zonedUnits })
+  const zonedOrder = sortHandDisplayUnits(zonedHand, zonedUnits.slice().reverse(), classicRuleProfile, 'smart-arranged', { levelRank: 2 })
+  assert.deepEqual(zonedOrder.slice(0, 2).map(unit => unit.key), ['flush', 'bomb'])
+  assert.deepEqual(zonedOrder.slice(-2).map(unit => unit.key), ['straight', 'plate'], 'tallest ordinary combination sits at the outer right edge')
+  assert.ok(zonedOrder.slice(2, -2).every(unit => unit.cardIds.length <= 2), 'central lanes remain low even when a pair is explicitly locked')
+  assert.equal(JSON.stringify({ zonedHand, zonedUnits }), before, 'zoning never mutates rule cards or lock membership')
+  assert.deepEqual(sortHandDisplayUnits(zonedHand, zonedOrder, classicRuleProfile, 'smart-arranged', { levelRank: 2 }), zonedOrder, 'repeated arrangement is deterministic')
+  const stack = createHandStackLayout(zonedOrder.flatMap(unit => unit.cardIds), zonedOrder.filter(unit => unit.cardIds.length > 1).map(unit => ({ id: unit.key, cardIds: unit.cardIds })), 900)
+  const middleIds = new Set(zonedOrder.slice(2, -2).flatMap(unit => unit.cardIds))
+  assert.ok(stack.slots.filter(slot => middleIds.has(slot.cardId)).every(slot => slot.y <= STACK_EXPOSURE_HEIGHT))
+  const zonedGrouping = new HandGrouping(zonedHand, { ruleProfile: classicRuleProfile, arrangement: { levelRank: 2 } })
+  zonedGrouping.autoGroup()
+  const arranged = zonedGrouping.getSnapshot()
+  zonedGrouping.syncAuthoritativeHand(zonedHand.slice().reverse(), { levelRank: 2 })
+  assert.deepEqual(zonedGrouping.getSnapshot().displayCardIds, arranged.displayCardIds, 'server transport order cannot reshuffle zoned hand after other players act')
 
   const regressionHand = [
     card('regression-A', 'A', 'spade'),
@@ -923,6 +958,123 @@ function verifyDownwardStackLayout () {
   assert.deepEqual(mixedFaces.slots.map(slot => slot.stackStep), [40, 40, 40], 'normal cards and both jokers share the same stack geometry')
 }
 
+function verifyCompactGroupGeometry () {
+  const make = (left, centre, right, width = 940) => {
+    const groups = []
+    const display = []
+    for (const [zone, count] of [[0, left], [1, centre], [2, right]]) {
+      for (let index = 0; index < count; index += 1) {
+        const ids = Array.from({ length: zone === 0 ? 4 : zone === 2 ? 5 : 1 }, (_, cardIndex) => `${zone}-${index}-${cardIndex}`)
+        display.push(...ids)
+        if (ids.length > 1) groups.push({ id: `${zone}-${index}`, zone, cardIds: ids })
+      }
+    }
+    return { groups, display, layout: createHandStackLayout(display, groups, width) }
+  }
+  for (const width of [280, 640, 940]) {
+    for (const [left, centre, right] of [[1, 0, 0], [0, 0, 1], [3, 0, 3], [6, 3, 0], [0, 2, 5], [1, 18, 1], [0, 27, 0], [0, 1, 0], [0, 0, 0]]) {
+      const { display, layout } = make(left, centre, right, width)
+      assert.deepEqual(layout.slots.map(slot => slot.cardId), display, 'compact geometry never reorders or loses physical cards')
+      const lanes = layout.slots.filter(slot => slot.stackIndex === 0)
+      const expectedSpacing = lanes.length <= 1 ? 0 : Math.min(68, width / (lanes.length - 1))
+      lanes.forEach((lane, index) => {
+        assert.ok(Math.abs(lane.x - (index - (lanes.length - 1) / 2) * expectedSpacing) < 1e-8, 'all categories share one content-sized centred pack')
+        assert.ok(Number.isFinite(lane.x) && Math.abs(lane.x) <= width / 2 + 1e-8, 'each centre stays inside the hand width')
+        if (index < lanes.length - 1) {
+          assert.ok(lane.x < lanes[index + 1].x, 'manual/display order and hit order remain monotonic')
+          assert.equal(lane.nextLaneSpacing, lanes[index + 1].x - lane.x, 'hit projection uses the actual neighbouring slot')
+        }
+      })
+      layout.slots.filter(slot => slot.stackSize > 1).forEach(slot => assert.equal(slot.stackStep, 40))
+    }
+  }
+  const split = make(1, 0, 1)
+  assert.equal(split.layout.slots[0].nextLaneSpacing, 68, 'bomb and combination are neighbours without a forced central gap')
+  assert.deepEqual(split.layout.slots.filter(slot => slot.stackIndex === 0).map(slot => slot.x), [-34, 34])
+  for (const remaining of split.groups) {
+    const afterPlay = createHandStackLayout(remaining.cardIds, split.groups, 940)
+    assert.ok(afterPlay.slots.every(slot => slot.x === 0), 'after either side is played, the remaining tall group moves to the centre')
+    const partial = createHandStackLayout(remaining.cardIds.slice(1), split.groups, 940)
+    assert.ok(partial.slots.every(slot => slot.x === 0), 'partial group removal stays centred and preserves downward stacking')
+    const last = createHandStackLayout(remaining.cardIds.slice(-1), split.groups, 940)
+    assert.equal(last.slots[0].x, 0, 'a stale group reduced to one card does not reserve a side zone')
+  }
+  const packWithSingle = make(1, 1, 1)
+  const withoutSingle = createHandStackLayout(packWithSingle.groups.flatMap(group => group.cardIds), packWithSingle.groups, 940)
+  assert.deepEqual(packWithSingle.layout.slots.filter(slot => slot.stackIndex === 0).map(slot => slot.x), [-68, 0, 68])
+  assert.deepEqual(withoutSingle.slots.filter(slot => slot.stackIndex === 0).map(slot => slot.x), [-34, 34], 'removing the middle single closes its lane instead of retaining an empty bay')
+  const withoutCategories = createHandStackLayout(split.display, split.groups.map(({ zone, ...group }) => group), 940)
+  assert.deepEqual(withoutCategories, split.layout, 'semantic categories cannot change coordinates or hit areas')
+  assert.deepEqual(createHandStackLayout([], split.groups, 940).slots, [], 'no occupied lanes remain after the hand is empty')
+  const manualDisplay = [...split.groups[1].cardIds, ...split.groups[0].cardIds]
+  const manual = createHandStackLayout(manualDisplay, split.groups, 940)
+  assert.deepEqual(manual.slots.map(slot => slot.cardId), manualDisplay, 'a manual cross-zone move is never silently reversed')
+  assert.deepEqual(manual.slots.filter(slot => slot.stackIndex === 0).map(slot => slot.x), [-34, 34], 'noncanonical manual order keeps compact ordered layout')
+  assert.deepEqual(createHandStackLayout(['last'], [], 940).slots.map(slot => slot.x), [0], 'last ordinary card stays central')
+  assert.equal(handDisplayZone(PlayType.StraightFlush, classicRuleProfile), 0)
+  assert.equal(handDisplayZone(PlayType.StraightFlush, tournamentRuleProfile), 2, 'semantic zones respect the live room rule profile')
+
+  const hand = [card('l1', 8), card('l2', 8, 'heart'), card('l3', 8, 'club'), card('l4', 8, 'diamond'), card('c', 'K')]
+  const grouping = new HandGrouping(hand, { ruleProfile: classicRuleProfile })
+  grouping.autoGroup()
+  const snapshot = grouping.getSnapshot()
+  const before = JSON.stringify(snapshot)
+  const input = {
+    hand, grouping: snapshot, mode: 'play', playSelectedCardIds: ['l1'], lockDraftCardIds: [],
+    sortOrder: 'desc', interactive: true, lockedCardIds: [], availableSuits: [], selectedSuit: null,
+    lockAction: 'lock', arrangeRestoreAvailable: true,
+  }
+  const projected = projectHandRenderModel(input)
+  assert.equal(projected.groups.find(group => group.cardIds.includes('l1')).zone, 0, 'live renderer receives semantic zones, not just sorted ids')
+  assert.equal(JSON.stringify(snapshot), before, 'projection leaves the undo/sync snapshot untouched')
+  assert.deepEqual(projectHandRenderModel(input), projected, 'selection refreshes cannot jitter lane classification')
+  const unselected = projectHandRenderModel({ ...input, playSelectedCardIds: [] })
+  assert.deepEqual(createHandStackLayout(unselected.displayCardIds, unselected.groups, 940), createHandStackLayout(projected.displayCardIds, projected.groups, 940), 'selecting or deselecting never changes horizontal geometry')
+  assert.equal(projectHandRenderModel({ ...input, grouping: { ...snapshot, layoutMode: 'point-stacked' } }).groups, snapshot.groups, 'point arrangement preserves the original projection')
+
+  const { TABLE_LAYOUT_FIXTURES } = require(path.join(projectRoot, 'tests/fixtures/TableLayoutFixtures.ts'))
+  for (const fixture of TABLE_LAYOUT_FIXTURES) {
+    const state = fixture.createState()
+    const fixedGrouping = new HandGrouping(state.players.p1.hand, { ruleProfile: state.ruleProfile })
+    fixedGrouping.autoGroup()
+    fixedGrouping.stackMatchingRanks()
+    const fixedProjection = projectHandRenderModel({ ...input, hand: state.players.p1.hand, grouping: fixedGrouping.getSnapshot() })
+    const fixedLayout = createHandStackLayout(fixedProjection.displayCardIds, fixedProjection.groups, 940)
+    const lanes = fixedLayout.slots.filter(slot => slot.stackIndex === 0)
+    if (state.players.p1.hand.length === 0) {
+      assert.equal(lanes.length, 0, 'finished own hand has no stale selectable lanes')
+      continue
+    }
+    assert.ok(Math.abs(lanes[0].x + lanes[lanes.length - 1].x) < 1e-8, 'live fixture hand is centred regardless of its group categories')
+    assert.ok(lanes.some(slot => Math.abs(slot.x) <= 34), 'high-only fixtures may occupy the middle')
+    if (fixture.id === 'match-layout-all-bombs') assert.ok(fixedProjection.groups.every(group => group.zone === 0))
+    if (fixture.id === 'match-layout-combinations') assert.deepEqual(fixedProjection.groups.map(group => group.zone), [2, 2])
+  }
+}
+
+function verifyAvailablePlayButtons () {
+  const { TablePlayActionPolicy } = require(path.join(projectRoot, 'assets/scripts/ui/TablePlayActionPolicy.ts'))
+  const policy = new TablePlayActionPolicy()
+  const pair = { playerId: 'p4', type: PlayType.Pair, cards: [card('t1', 5), card('t2', 5, 'heart')] }
+  const state = { ruleProfile: classicRuleProfile, players: { p1: { hand: [card('a', 'A')] } }, lastValidPlay: pair }
+  assert.deepEqual(policy.resolve(state, 'p1'), ['pass'], 'a single A cannot answer a pair; selection/hint controls must be hidden')
+  state.players.p1.hand = [card('h1', 6), card('h2', 6, 'heart')]
+  assert.deepEqual(policy.resolve(state, 'p1'), ['hint', 'pass', 'play'], 'an empty selection must not hide valid response controls')
+  state.players.p1.hand = ['spade', 'heart', 'club', 'diamond'].map((suit, index) => card(`bomb-${index}`, 3, suit))
+  assert.deepEqual(policy.resolve(state, 'p1'), ['hint', 'pass', 'play'], 'a lower-rank bomb still answers an ordinary pair')
+  state.lastValidPlay = { playerId: 'p4', type: PlayType.Rocket, cards: [card('s1', 'Small', 'joker'), card('s2', 'Small', 'joker'), card('b1', 'Big', 'joker'), card('b2', 'Big', 'joker')] }
+  assert.deepEqual(policy.resolve(state, 'p1'), ['pass'], 'no response exists against four jokers')
+  state.lastValidPlay = pair
+  state.players.p1.hand = [card('six', 6), card('wild', 2, 'heart', { value: 15, isLevelCard: true, isRedJoker: true })]
+  assert.deepEqual(policy.resolve(state, 'p1'), ['hint', 'pass', 'play'], 'wildcard responses must be decided by the rule engine')
+  state.players.p1.hand = [card('six', 6), card('wild', 2, 'heart')]
+  assert.deepEqual(policy.resolve(state, 'p1'), ['pass'], 'changed wildcard semantics invalidate the cache despite identical card IDs')
+  state.lastValidPlay = null
+  assert.deepEqual(policy.resolve(state, 'p1'), ['hint', 'play'], 'a fresh lead must not offer an illegal pass')
+  state.players.p1.hand = []
+  assert.deepEqual(policy.resolve(state, 'p1'), [], 'a finished empty hand has no play controls')
+}
+
 function verifyArchitectureBoundary () {
   const arrangementSource = fs.readFileSync(arrangementPath, 'utf8')
   const arrangementModelSource = fs.readFileSync(arrangementModelPath, 'utf8')
@@ -988,13 +1140,34 @@ function verifyRuntimeIntegration () {
   assert.match(handSource, /configureStackHitArea/, 'covered cards must only receive input on their exposed rank/suit strip')
   assert.match(handSource, /left\.slot\.stackIndex\s*-\s*right\.slot\.stackIndex/, 'later downward cards must render above the preceding card body')
   const cardViewSource = fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/CardView.ts'), 'utf8')
-  assert.doesNotMatch(cardViewSource, /\bLabel\b|`\$\{this\.card\.rank\}\$\{this\.card\.suit\}`/, 'covered cards must not reintroduce the retired text renderer')
+  assert.doesNotMatch(cardViewSource, /`\$\{this\.card\.rank\}\$\{this\.card\.suit\}`/, 'covered cards must not reintroduce the retired rank/suit text renderer')
+  assert.equal((cardViewSource.match(/addComponent\(Label\)/g) || []).length, 1, 'only the level corner marker uses a text label')
   assert.doesNotMatch(cardViewSource, /StackRankSuit|StackCornerRank|StackCornerSuit|contentHeight|rankWidth|suitWidth/, 'stack hit geometry must never replace or resize the natural classic artwork')
   assert.match(cardViewSource, /CLASSIC_CARD_LAYER_GEOMETRY\[layer\][\s\S]*geometry\.width[\s\S]*geometry\.height/, 'every stacked card must keep the shared natural card geometry')
   assert.match(cardViewSource, /configureStackHitArea[\s\S]*applyHitAreaGeometry\(\)[\s\S]*refreshStateVisuals\(\)/, 'stack exposure must affect only input and exposed state overlays')
   assert.match(handSource, /lockedCardIds\?: readonly string\[\]/, 'the hand renderer must accept an explicit persistent lock projection')
   assert.match(handSource, /group\.locked \? group\.cardIds : \[\]/, 'live grouping projections must infer explicit locks when the optional id list is omitted')
   assert.match(handSource, /locked: lockedIds\.has\(card\.id\)/, 'each card view must receive its persistent lock state')
+}
+
+// Lock creation plus canonical positioning is one undoable action, in both entry routes.
+for (const mode of ['manual', 'suggestion']) {
+  const grouping = new HandGrouping([card('a', 3), card('b', 3, 'heart'), card('c', 8), card('d', 10)])
+  const before = grouping.getSnapshot()
+  const lock = () => mode === 'manual'
+    ? grouping.createLockedGroup(['a', 'b'], classicRuleProfile)
+    : grouping.applySuggestion({ cardIds: ['a', 'b'], kind: 'pair' })
+  lock()
+  const after = grouping.getSnapshot()
+  assert.equal(after.revision - before.revision, 1, mode + ': creation must record only one transaction')
+  assert.equal(after.groups.filter(group => group.locked).length, 1)
+  assert.equal(grouping.undo(), true)
+  assert.deepEqual(grouping.getSnapshot().displayCardIds, before.displayCardIds)
+  assert.deepEqual(grouping.getSnapshot().groups, before.groups, 'one undo must remove the new lock')
+  assert.equal(grouping.undo(), false, 'no hidden second history record')
+  assert.equal(grouping.redo(), true)
+  assert.deepEqual(grouping.getSnapshot().groups, after.groups)
+  assert.deepEqual(grouping.getSnapshot().displayCardIds, after.displayCardIds)
 }
 
 verifyArchitectureBoundary()
@@ -1015,4 +1188,28 @@ verifyBoundedGroupingHistory()
 verifyAutoGrouping()
 verifyLockedGroupsSurviveArrangement()
 verifyDownwardStackLayout()
+verifyCompactGroupGeometry()
+verifyAvailablePlayButtons()
+// IDs intentionally put the large pair first lexically: attachment rank must win.
+const attachmentHand = [card('t1', 7), card('t2', 7, 'heart'), card('t3', 7, 'club'),
+  card('z-small1', 3), card('z-small2', 3, 'heart'), card('a-large1', 'A'), card('a-large2', 'A', 'heart')]
+const attachment = selectNonOverlappingSuggestions(suggestHandGroups(attachmentHand)).find(item => item.kind === 'triple-with-pair')
+assert.ok(attachment)
+assert.equal(attachment.pairValue, 3)
+assert.ok(attachment.cardIds.includes('z-small1'))
+const tubeFirstHand = attachmentHand.filter(item => !item.id.startsWith('a-large')).concat(
+  [4, 5, 9].flatMap(rank => [card(`pair-${rank}-1`, rank), card(`pair-${rank}-2`, rank, 'heart')]))
+const tubeFirst = selectNonOverlappingSuggestions(suggestHandGroups(tubeFirstHand))
+assert.equal(tubeFirst[0].kind, 'tube', 'three consecutive pairs stay ahead of triple attachments')
+assert.equal(tubeFirst.find(item => item.kind === 'triple-with-pair').pairValue, 9, 'do not dismantle the protected three-pair run')
+for (const rank of [10, 'J', 'Q', 'K', 'A', 'Small', 'Big']) {
+  const highPair = [card('high-a', rank, rank === 'Small' || rank === 'Big' ? 'joker' : 'spade'),
+    card('high-b', rank, rank === 'Small' || rank === 'Big' ? 'joker' : 'heart')]
+  const hand = attachmentHand.slice(0, 3).concat(highPair)
+  assert.equal(selectNonOverlappingSuggestions(suggestHandGroups(hand)).some(group => group.kind === 'triple-with-pair'), false,
+    `auto-arrange must preserve the ${rank} pair`)
+  assert.equal(recognizeHandGroup(hand, hand.map(item => item.id))?.kind, 'triple-with-pair', 'manual grouping remains legal')
+}
+const highTube = [10, 'J', 'Q'].flatMap(rank => [card(`run-${rank}-a`, rank), card(`run-${rank}-b`, rank, 'heart')])
+assert.equal(selectNonOverlappingSuggestions(suggestHandGroups(highTube))[0]?.kind, 'tube', 'high three-pair runs remain eligible')
 process.stdout.write('hand arrangement/grouping regression checks passed\n')

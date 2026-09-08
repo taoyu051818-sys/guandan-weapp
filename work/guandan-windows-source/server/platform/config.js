@@ -147,6 +147,7 @@ export const loadGameSecurityConfig = (env = process.env) => {
     throw new Error('生产环境禁止修改 WEAPP_FRIEND_SECOND_MS 或 WEAPP_TOTAL_MINUTE_MS 故障注入时钟')
   }
   return {
+    host: String(env.WEAPP_HOST || '127.0.0.1').trim() || '127.0.0.1',
     ticketRequired,
     gameTicketSecret,
     gameResultSecret,

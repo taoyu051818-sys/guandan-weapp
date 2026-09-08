@@ -1,11 +1,13 @@
 import type { HttpMethod, HttpRequest, HttpResponse, HttpTransport, PlatformApiConfig } from './contracts'
 import { PlatformApiError } from './contracts'
 import { malformedResponse, normalizeBaseUrl, requireRecord, unwrap } from './validation'
+import { assertWechatTransportEndpoint } from '../WechatNetworkPolicy'
 
 /** XMLHttpRequest is available in Cocos Web, native and WeChat adapters. */
 export class XhrTransport implements HttpTransport {
   public request (input: HttpRequest): Promise<HttpResponse> {
     return new Promise((resolve, reject) => {
+      assertWechatTransportEndpoint(input.url, 'https:')
       const xhr = new XMLHttpRequest()
       xhr.open(input.method, input.url, true)
       xhr.timeout = input.timeoutMs ?? 8000
@@ -42,14 +44,20 @@ export class PlatformApiClient {
   }
 
   public async request<T> (path: string, method: HttpMethod = 'GET', body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+    const generation = this.authGeneration
     const token = await this.ensureAccessToken()
+    this.assertCurrentLogin(generation)
     const response = await this.send(path, method, body, {
       Authorization: `Bearer ${token}`,
       ...headers,
     })
+    this.assertCurrentLogin(generation)
     if (response.status !== 401) return unwrap<T>(response)
     const refreshedToken = await this.refreshAfterUnauthorized(token)
-    return unwrap<T>(await this.send(path, method, body, { Authorization: `Bearer ${refreshedToken}`, ...headers }))
+    this.assertCurrentLogin(generation)
+    const retried = await this.send(path, method, body, { Authorization: `Bearer ${refreshedToken}`, ...headers })
+    this.assertCurrentLogin(generation)
+    return unwrap<T>(retried)
   }
 
   public signOut (): void {

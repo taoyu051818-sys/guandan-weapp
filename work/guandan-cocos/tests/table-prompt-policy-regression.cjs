@@ -23,6 +23,9 @@ for (const hint of [
   '玩家二 正在思考…',
   '请等待其他玩家出牌',
   '正在等待服务器确认',
+  '正在等待服务器确认出牌…',
+  '正在等待服务器确认不要…',
+  '等待服务端确认还贡…',
   '请选择手牌',
   '牌型不合法',
   '可出 · 对子',
@@ -33,7 +36,7 @@ for (const hint of [
 
 assert.equal(tableHintToast('手牌已更新，请重新选择', 'playing'), '手牌已更新，请重新选择')
 assert.equal(tableHintToast('没有可用提示，请选择不要', 'playing'), '没有可用提示，请选择不要')
-assert.equal(tableHintToast('当前不能不要', 'playing'), '当前不能不要', 'an always-visible pass action needs concise rejection feedback')
+assert.equal(tableHintToast('当前不能不要', 'playing'), '当前不能不要', 'a stale pass request still needs concise rejection feedback')
 assert.equal(tableHintToast('网络未连接，请稍后重试', 'playing'), '网络未连接，请稍后重试')
 assert.equal(tableHintToast('进贡或还贡只能选择一张牌', 'tribute'), null, 'blocking phases own their central copy')
 assert.equal(tableHintToast('本局结束', 'settlement'), null, 'settlement copy belongs to the settlement layer')

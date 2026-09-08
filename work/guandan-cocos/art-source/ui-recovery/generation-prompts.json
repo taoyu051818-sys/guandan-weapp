@@ -1,0 +1,20 @@
+{
+  "tool": "built-in image_gen",
+  "reference": "assets/game-assets/ui/lobby/entry-classic.jpg",
+  "prompts": [
+    [
+      "classic",
+      "Use case: stylized-concept. Project asset: an isolated horizontal game-entry illustration, genuinely transparent background. Cute polished 3D yellow chick wearing a straw sunhat and blue coastal shirt, holding a small fan of playing cards, joyful confident expression, full subject with wings visible. Match the provided reference chick identity, soft high-quality commercial casual card game render, warm sunlit yellow and turquoise palette. Composition horizontal 3:2, generous transparent padding, subject centered, no scenery, no frame, no button, no typography, no words, no logo, no watermark. This will be placed at the left of a wide UI button, so strong readable silhouette at small size."
+    ],
+    [
+      "friend",
+      "Use case: stylized-concept. Project asset: an isolated horizontal game-entry illustration, genuinely transparent background. Two cute polished 3D yellow chicks as friends sharing a small fan of playing cards, one in a turquoise coastal shirt and the other in a cream shirt. Match provided reference chick's yellow round face style, soft commercial casual card-game render. Friendly and inviting, blue turquoise warm yellow palette. Horizontal 3:2, entire subjects visible with transparent padding, centered compact silhouette readable at small size. No scenery, no frame, no button, no typography, no words, no logo, no watermark."
+    ],
+    [
+      "tournament",
+      "Use case: stylized-concept. Project asset: an isolated horizontal game-entry illustration, genuinely transparent background. A handsome small gold trophy with turquoise enamel base, two cream playing cards tucked behind, restrained festive ribbon. Polished soft 3D commercial casual card game render matching warmth and style of provided reference, not photoreal, not RPG. Horizontal 3:2, entire subject visible with transparent padding, centered readable silhouette. No chick needed. No scenery, no frame, no button, no typography, no words, no logo, no watermark."
+    ]
+  ],
+  "notes": "Classic and friend have real alpha. Both checkerboard trophy attempts rejected. Accepted trophy uses solid slate-blue background, not alpha.",
+  "finalTrophyPrompt": "Use case stylized-concept. A clean 3D gold tournament trophy with turquoise base and two cream playing cards, no writing. Horizontal 3:2 image, entire trophy centered with wide padding. Background is absolutely flat solid dark slate blue RGB(43,64,79), hex #2B404F, no texture, no gradient, NO CHECKERBOARD, no transparency requested. No glow, no halo, no shadows outside the object. Soft polished casual card-game style. Simple readable compact silhouette, not an RPG. No ribbons stretching out, no scenery, no frame, no logo."
+}

@@ -1,3 +1,6 @@
+import { assertWechatBusinessEndpoint, isWechatRuntime, type WechatRuntimeHost } from './WechatNetworkPolicy'
+import { parseNetworkEndpoint } from './NetworkEndpoint'
+
 export const RUNTIME_CLIENT_CONFIG_KEY = '__GUANDAN_RUNTIME_CONFIG__' as const
 
 export type SerializedClientNetworkConfig = Readonly<{
@@ -12,7 +15,7 @@ export type ResolvedClientNetworkConfig = SerializedClientNetworkConfig & Readon
   usingLocalBrowserDefaults: boolean
 }>
 
-type RuntimeConfigHost = Readonly<{
+type RuntimeConfigHost = WechatRuntimeHost & Readonly<{
   location?: Readonly<{ hostname?: string }>
   __GUANDAN_RUNTIME_CONFIG__?: unknown
 }>
@@ -30,12 +33,12 @@ const requireEndpoint = (value: unknown, field: string): string => {
 const assertEndpointPolicy = (config: SerializedClientNetworkConfig): void => {
   if (config.platformEndpoint) {
     let protocol = ''
-    try { protocol = new URL(config.platformEndpoint).protocol } catch { throw new Error('运行时平台地址格式无效') }
+    try { protocol = parseNetworkEndpoint(config.platformEndpoint).protocol } catch { throw new Error('运行时平台地址格式无效') }
     if (protocol !== 'https:' && !config.platformAllowInsecureEndpoint) throw new Error('正式运行时平台地址必须使用 HTTPS')
   }
   if (config.lobbyEndpoint) {
     let protocol = ''
-    try { protocol = new URL(config.lobbyEndpoint).protocol } catch { throw new Error('运行时牌局地址格式无效') }
+    try { protocol = parseNetworkEndpoint(config.lobbyEndpoint).protocol } catch { throw new Error('运行时牌局地址格式无效') }
     if (protocol !== 'wss:' && !config.platformAllowInsecureGameEndpoint) throw new Error('正式运行时牌局地址必须使用 WSS')
   }
 }
@@ -63,6 +66,15 @@ export const resolveClientNetworkConfig = (
   host: RuntimeConfigHost = globalThis as RuntimeConfigHost,
 ): ResolvedClientNetworkConfig => {
   const injected = injectedConfig(host)
+  if (isWechatRuntime(host)) {
+    if (!injected) throw new Error('微信包缺少正式网络配置，请重新构建；禁止回退本地测试服务')
+    if (injected.platformAllowDevelopmentLogin || injected.platformAllowInsecureEndpoint || injected.platformAllowInsecureGameEndpoint) {
+      throw new Error('微信包禁止开发登录及不安全连接开关')
+    }
+    assertWechatBusinessEndpoint(injected.platformEndpoint, 'https:')
+    assertWechatBusinessEndpoint(injected.lobbyEndpoint, 'wss:')
+    return { ...injected, usingLocalBrowserDefaults: false }
+  }
   if (injected) return { ...injected, usingLocalBrowserDefaults: false }
   const hostname = host.location?.hostname?.trim().toLowerCase()
   const localhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]'

@@ -7,6 +7,8 @@ const shift = (rank: Rank, delta: number): Rank =>
   ranks[Math.max(0, Math.min(ranks.length - 1, ranks.indexOf(rank) + delta))]
 
 export interface SettlementResult {
+  format?: 'independent' | 'upgrade'
+  pointsEarned?: number
   winnerTeam: Team
   levelUp: number
   currentLevel: Rank
@@ -32,11 +34,9 @@ export const settle = (
 ): SettlementResult | null => {
   const first = state.finishedPlayers[0]
   if (!first) return null
-  const mate = state.players[first].team === 'teamA'
-    ? first === 'p1' ? 'p3' : 'p1'
-    : first === 'p2' ? 'p4' : 'p2'
+  const mate = state.turnOrder.find(id => id !== first && state.players[id].team === state.players[first].team)
   const levelUp = state.finishedPlayers[1] === mate
-    ? 3
+    ? state.matchFormat?.doubleDown ?? 3
     : state.finishedPlayers[2] === mate
       ? 2
       : state.finishedPlayers.length >= 3
@@ -103,9 +103,57 @@ export interface MatchSettlementOperation {
   settlement: SettlementResult
 }
 
+/** New friend rooms: the target must actually be played; ordinary failures stay at the gate. */
+const settleConfiguredUpgrade = (
+  state: MatchState, teamLevels: Record<Team, Rank>, aFailStreaks: Record<Team, number>,
+): SettlementResult | null => {
+  const [first, second, third] = state.finishedPlayers
+  if (!first) return null
+  const winnerTeam = state.players[first].team
+  const sameTeam = (id: PlayerId | undefined): boolean => Boolean(id && state.players[id].team === winnerTeam)
+  const award = sameTeam(second) ? state.matchFormat!.doubleDown : sameTeam(third) ? 2 : third ? 1 : 0
+  if (!award) return null
+  const targetOption = state.matchFormat!.upgradeTarget!
+  const target: Rank = targetOption === 'A-reset' ? 'A' : targetOption
+  const targetIndex = ranks.indexOf(target)
+  const levels = { ...teamLevels }
+  const fails = { ...aFailStreaks }
+  // levelTeam identifies whose gate is being attempted, not merely who wins this hand.
+  const attackingTeam = state.levelTeam
+  const gateAttempt = state.currentLevel === target && teamLevels[attackingTeam] === target
+  const isGameWon = gateAttempt && winnerTeam === attackingTeam && award >= 2
+  let message = ''
+  if (gateAttempt && !isGameWon && targetOption === 'A-reset') {
+    fails[attackingTeam] += 1
+    if (fails[attackingTeam] >= 3) {
+      levels[attackingTeam] = 2
+      fails[attackingTeam] = 0
+      message = '三次冲A未过，退回2级。'
+    } else message = `冲A未过，累计 ${fails[attackingTeam]} 次。`
+  }
+  const before = levels[winnerTeam]
+  if (isGameWon) {
+    fails[winnerTeam] = 0
+    message = `成功打过 ${target}！`
+  } else if (!(gateAttempt && winnerTeam === attackingTeam)) {
+    levels[winnerTeam] = ranks[Math.min(targetIndex, ranks.indexOf(before) + award)]
+  }
+  const levelUp = Math.max(0, ranks.indexOf(levels[winnerTeam]) - ranks.indexOf(teamLevels[winnerTeam]))
+  return {
+    format: 'upgrade', winnerTeam, levelUp, currentLevel: levels[winnerTeam],
+    teamLevels: levels, aFailStreaks: fails, isGameWon,
+    fullRank: [...state.finishedPlayers, ...state.turnOrder.filter(id => !state.finishedPlayers.includes(id))],
+    message: message || (gateAttempt && winnerTeam === attackingTeam ? `头游搭档为末游，继续打 ${target}。` : `本局升级 ${levelUp} 级，${target} 必打。`),
+  }
+}
+
 /** Applies ranking, level progression, A-gate state and score projection as one pure operation. */
 export const settleMatchState = (state: MatchState): MatchSettlementOperation | null => {
-  const result = settle(state, state.teamLevels, state.aFailStreaks)
+  const result = state.matchFormat?.kind === 'independent'
+    ? settleIndependentRound(state)
+    : state.matchFormat?.kind === 'upgrade' && state.matchFormat.upgradeTarget !== undefined
+    ? settleConfiguredUpgrade(state, state.teamLevels, state.aFailStreaks)
+    : settle(state, state.teamLevels, state.aFailStreaks)
   if (!result) return null
   const settlement = cloneSettlementResult(result)
   return {
@@ -120,9 +168,26 @@ export const settleMatchState = (state: MatchState): MatchSettlementOperation | 
       lastRoundRank: [...result.fullRank],
       scores: {
         ...state.scores,
-        [result.winnerTeam]: state.scores[result.winnerTeam] + Math.max(0, result.levelUp),
+        [result.winnerTeam]: state.scores[result.winnerTeam] + Math.max(0, result.pointsEarned ?? result.levelUp),
       },
       settlement: cloneSettlementResult(result),
     },
+  }
+}
+
+/** Single-hand results never pass through the K/A progression gates. */
+const settleIndependentRound = (state: MatchState): SettlementResult | null => {
+  const [first, second, third] = state.finishedPlayers
+  if (!first) return null
+  const winnerTeam = state.players[first].team
+  const sameTeam = (id: PlayerId | undefined): boolean => Boolean(id && state.players[id].team === winnerTeam)
+  const pointsEarned = sameTeam(second) ? state.matchFormat!.doubleDown : sameTeam(third) ? 2 : third ? 1 : 0
+  if (!pointsEarned) return null
+  return {
+    format: 'independent', pointsEarned, winnerTeam, levelUp: 0,
+    currentLevel: state.currentLevel, teamLevels: { ...state.teamLevels },
+    aFailStreaks: { teamA: 0, teamB: 0 }, isGameWon: false,
+    fullRank: [...state.finishedPlayers, ...state.turnOrder.filter(id => !state.finishedPlayers.includes(id))],
+    message: `本局结束，胜方得 ${pointsEarned} 分。`,
   }
 }

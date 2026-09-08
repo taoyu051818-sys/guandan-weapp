@@ -20,7 +20,7 @@ assert.equal(fs.existsSync(gatewayContractsPath), true, 'stable front-page gatew
 assert.equal(fs.existsSync(`${gatewayContractsPath}.meta`), true, 'stable front-page gateway contracts need Cocos metadata')
 const gatewayContracts = fs.readFileSync(gatewayContractsPath, 'utf8')
 assert.doesNotMatch(gatewayContracts, /SAMPLE_|Development[A-Z]|from ['"]cc['"]/, 'gateway contracts must remain transport and runtime independent')
-for (const moduleName of ['client', 'contracts', 'validation', 'profileGateways', 'replayGateways', 'merchantGateway', 'commerceGateways', 'competitionDecoders', 'competitionGateways', 'friendRoomGateway', 'MatchRecoveryAttempt', 'matchRecoveryGateway', 'factory']) {
+for (const moduleName of ['client', 'contracts', 'validation', 'profileGateways', 'replayGateways', 'commerceGateways', 'competitionDecoders', 'competitionGateways', 'friendRoomGateway', 'MatchRecoveryAttempt', 'matchRecoveryGateway', 'factory']) {
   const modulePath = path.join(platformModuleDir, `${moduleName}.ts`)
   assert.equal(fs.existsSync(modulePath), true, `platform module ${moduleName} is missing`)
   assert.equal(fs.existsSync(path.join(platformModuleDir, `${moduleName}.ts.meta`)), true, `platform module ${moduleName} is missing Cocos metadata`)
@@ -34,6 +34,8 @@ const runtimeModule = new Module(sourcePath, module)
 runtimeModule.filename = sourcePath
 runtimeModule.paths = Module._nodeModulePaths(path.dirname(sourcePath))
 const previousTypeScriptLoader = Module._extensions['.ts']
+let FriendRoomPlatformFlow
+let retiredPlatform
 Module._extensions['.ts'] = (targetModule, filename) => {
   const dependency = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
@@ -43,12 +45,14 @@ Module._extensions['.ts'] = (targetModule, filename) => {
 }
 try {
   runtimeModule._compile(compiled, sourcePath)
+  retiredPlatform = require(path.join(projectRoot, 'migration/platform/RetiredPlatformApi.ts'))
+  ;({ FriendRoomPlatformFlow } = require(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomPlatformFlow.ts')))
 } finally {
   if (previousTypeScriptLoader) Module._extensions['.ts'] = previousTypeScriptLoader
   else delete Module._extensions['.ts']
 }
 
-const developmentSourcePath = path.join(projectRoot, 'assets/scripts/services/DevelopmentApis.ts')
+const developmentSourcePath = path.join(projectRoot, 'migration/platform/RetiredDevelopmentApis.ts')
 const developmentCompiled = ts.transpileModule(fs.readFileSync(developmentSourcePath, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   fileName: developmentSourcePath,
@@ -70,7 +74,9 @@ try {
   else delete Module._extensions['.ts']
 }
 
-const { createHttpGateways, PlatformApiClient, PlatformApiError } = runtimeModule.exports
+const { PlatformApiClient, PlatformApiError } = runtimeModule.exports
+const { createHttpGateways } = retiredPlatform
+assert.deepEqual(Object.keys(runtimeModule.exports.createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'retirement' })).sort(), ['configured', 'auth', 'matchmaking', 'friendRooms', 'matchRecovery', 'wallet', 'playerCenter', 'seasons', 'replays'].sort(), 'the shipped factory must only expose active player services')
 const { DevelopmentTournamentGateway } = developmentModule.exports
 const ok = data => ({ status: 200, body: { ok: true, data, error: null } })
 const errorResponse = (status, code, message, details, retryable) => ({
@@ -479,6 +485,107 @@ const testLoginLifecycle = async () => {
   )
 }
 
+const testRequestGenerationAfterSignOut = async () => {
+  for (const status of [200, 401]) {
+    let release
+    let markStarted
+    const started = new Promise(resolve => { markStarted = resolve })
+    const delayed = new Promise(resolve => { release = resolve })
+    let stored = 'old-token'
+    const calls = []
+    const client = new PlatformApiClient({ request: async input => {
+      calls.push(input)
+      if (input.url.endsWith('/api/v1/auth/dev-login')) return ok({ accessToken: 'new-token' })
+      if (input.headers.Authorization === 'Bearer old-token') { markStarted(); return delayed }
+      return ok({ current: true })
+    } }, {
+      baseUrl: 'https://platform.example', deviceId: 'generation-test', allowDevelopmentLogin: true,
+      credentialStore: {
+        getAccessToken: () => stored, setAccessToken: token => { stored = token }, clearAccessToken: () => { stored = null },
+      },
+    })
+    const stale = client.request('/api/v1/action', 'POST', { marker: 'old-action' })
+    await started
+    client.signOut()
+    release(status === 200 ? ok({ stale: true }) : errorResponse(401, 'EXPIRED', 'expired'))
+    await assert.rejects(stale, error => error.code === 'AUTH_CANCELLED')
+    assert.equal(stored, null, 'a late response must not restore credentials')
+    assert.equal(calls.length, 1, 'old POST must neither log in nor replay after signOut')
+    assert.deepEqual(await client.request('/api/v1/current'), { current: true }, 'explicit new request can log in normally')
+    assert.equal(stored, 'new-token')
+  }
+
+  const beforeSend = new PlatformApiClient({ request: async () => assert.fail('cancelled before token await must not send') }, {
+    baseUrl: 'https://platform.example', deviceId: 'before-send', accessToken: 'token',
+  })
+  const cancelled = beforeSend.request('/api/v1/action', 'POST')
+  beforeSend.signOut()
+  await assert.rejects(cancelled, error => error.code === 'AUTH_CANCELLED')
+
+  // Logout can also happen after refresh, while the second HTTP request is in flight.
+  let finishRetry
+  let markRetry
+  const retryStarted = new Promise(resolve => { markRetry = resolve })
+  const retried = new Promise(resolve => { finishRetry = resolve })
+  const retryClient = new PlatformApiClient({ request: async input => {
+    if (input.url.endsWith('/api/v1/auth/dev-login')) return ok({ accessToken: 'fresh' })
+    if (input.headers.Authorization === 'Bearer old') return errorResponse(401, 'EXPIRED', 'expired')
+    markRetry()
+    return retried
+  } }, { baseUrl: 'https://platform.example', deviceId: 'retry', accessToken: 'old', allowDevelopmentLogin: true })
+  const pending = retryClient.request('/api/v1/action')
+  await retryStarted
+  retryClient.signOut()
+  finishRetry(ok({ stale: true }))
+  await assert.rejects(pending, error => error.code === 'AUTH_CANCELLED')
+}
+
+const testFriendRoomIdempotentResponseOwnership = async () => {
+  const deferred = () => {
+    let resolve
+    const promise = new Promise(done => { resolve = done })
+    return { promise, resolve }
+  }
+  for (const firstResponse of [0, 1]) {
+    const started = [deferred(), deferred()]
+    const responses = [deferred(), deferred()]
+    const requests = []
+    const cancellations = []
+    const entered = []
+    const gateways = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'ownership', accessToken: 'token', gameEndpointPolicy: 'secure-only' }, {
+      request: async input => {
+        if (input.url.endsWith('/api/v1/match/cancel')) { cancellations.push(input.body.matchId); return ok({ cancelled: true }) }
+        assert.equal(input.url.endsWith('/api/v1/friend-rooms/create'), true)
+        const index = requests.push(input) - 1
+        started[index].resolve()
+        return responses[index].promise
+      },
+    })
+    const flow = new FriendRoomPlatformFlow({
+      gateway: gateways.friendRooms, isDisposed: () => false, onChanged: () => {},
+      enterMatchedRoom: value => entered.push(value), showNotice: title => assert.fail(title),
+    })
+    const oldTask = flow.create(friendRoomSettings)
+    await started[0].promise
+    flow.leave()
+    const newTask = flow.create(friendRoomSettings)
+    await started[1].promise
+    assert.equal(requests[0].body.entryAttemptId, requests[1].body.entryAttemptId, 'real gateway reuses the unresolved idempotency attempt')
+    const receipt = ok({ entry: validFriendEntry(requests[0].body.entryAttemptId) })
+    const tasks = [oldTask, newTask]
+    responses[firstResponse].resolve(receipt)
+    await tasks[firstResponse]
+    assert.deepEqual(cancellations, [])
+    if (firstResponse === 1) { flow.handoffReservation(); flow.leave() }
+    responses[1 - firstResponse].resolve(receipt)
+    await tasks[1 - firstResponse]
+    flow.handoffReservation()
+    flow.destroy()
+    assert.deepEqual(entered.map(value => value.matchId), ['mat_friend_1'])
+    assert.deepEqual(cancellations, [])
+  }
+}
+
 const testErrorMetadata = async () => {
   const client = new PlatformApiClient({ request: async () => errorResponse(409, 'PRICE_CHANGED', '价格已变更', { currentPointsPrice: 3300 }, false) }, {
     baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token',
@@ -658,6 +765,94 @@ const testMatchRecoveryGateway = async () => {
   await assert.rejects(retryGateway.matchRecovery.recover(), /temporary timeout/)
   assert.equal(await retryGateway.matchRecovery.recover(), null)
   assert.equal(retryAttemptIds[1], retryAttemptIds[0], 'an HTTP retry after transport uncertainty must reuse the same recovery attempt id')
+}
+
+const testWechatRecoveryRandomness = async () => {
+  const descriptors = Object.fromEntries(['crypto', 'wx'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  const requests = []
+  const callbacks = []
+  const native = { getRandomValues (options) {
+    assert.equal(this, native, 'native random provider must retain its receiver')
+    assert.equal(options.length, 16)
+    callbacks.push(options)
+  } }
+  const gateways = createHttpGateways({
+    baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
+  }, { request: async input => {
+    requests.push(input.body.recoveryAttemptId)
+    const id = input.body.recoveryAttemptId
+    return ok({ entry: { entryAttemptId: id, recoveryAttemptId: id, matchId: 'wechat-recovery', roomId: '787878', seat: 'p3',
+      roomKind: 'match', ticketPurpose: 'rejoin', gameEndpoint: 'wss://game.example/weapp',
+      gameTicket: 'wechat-ticket', joinToken: 'wechat-ticket', expiresAt: Date.now() + 60_000 } })
+  } })
+  const flush = () => new Promise(resolve => setImmediate(resolve))
+  try {
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: undefined })
+    Object.defineProperty(globalThis, 'wx', { configurable: true, value: { getUserCryptoManager: () => native } })
+    const first = gateways.matchRecovery.recover()
+    const duplicate = gateways.matchRecovery.recover()
+    const results = Promise.all([first, duplicate])
+    // Attach immediately so a synchronous platform mismatch is an assertion failure, not an unhandled rejection.
+    results.catch(() => undefined)
+    await flush()
+    assert.equal(callbacks.length, 1, 'phone recovery must request native secure bytes once, even during concurrent retry')
+    assert.equal(requests.length, 0, 'HTTP must wait for native secure randomness')
+    callbacks.shift().success({ randomValues: Uint8Array.from({ length: 16 }, (_, i) => i).buffer })
+    const [a, b] = await results
+    assert.equal(a.recoveryAttemptId, 'AAECAwQFBgcICQoLDA0ODw')
+    assert.equal(b.recoveryAttemptId, a.recoveryAttemptId)
+    assert.deepEqual(requests, [a.recoveryAttemptId, a.recoveryAttemptId])
+    gateways.matchRecovery.confirm('not-a-current-attempt')
+    await gateways.matchRecovery.recover()
+    assert.equal(callbacks.length, 0, 'unrelated acknowledgements must not rotate a pending recovery identity')
+    gateways.matchRecovery.confirm(a.recoveryAttemptId)
+    const failing = assert.rejects(gateways.matchRecovery.recover(), /安全随机数.*失败/)
+    await flush()
+    callbacks.shift().fail({ errMsg: 'private-native-detail' })
+    await failing
+    const malformed = assert.rejects(gateways.matchRecovery.recover(), /安全随机数.*无效/)
+    await flush()
+    callbacks.shift().success({ randomValues: new ArrayBuffer(8) })
+    await malformed
+    const retry = gateways.matchRecovery.recover()
+    await flush()
+    callbacks.shift().success({ randomValues: new Uint8Array(16).fill(42).buffer })
+    const recovered = await retry
+    assert.notEqual(recovered.recoveryAttemptId, a.recoveryAttemptId)
+    gateways.matchRecovery.abandon(recovered.recoveryAttemptId)
+    const originalTimer = globalThis.setTimeout
+    try {
+      // Fast-forward only the native API's timeout, without a real five-second sleep.
+      globalThis.setTimeout = (callback, delay, ...args) => {
+        assert.equal(delay, 5000)
+        return originalTimer(callback, 0, ...args)
+      }
+      await assert.rejects(gateways.matchRecovery.recover(), /安全随机数.*超时/)
+    } finally { globalThis.setTimeout = originalTimer }
+    const late = callbacks.shift()
+    const afterTimeout = gateways.matchRecovery.recover()
+    await flush()
+    late.success({ randomValues: new Uint8Array(16).fill(99).buffer })
+    callbacks.shift().success({ randomValues: new Uint8Array(16).fill(43).buffer })
+    const fresh = await afterTimeout
+    assert.equal(fresh.recoveryAttemptId, Buffer.alloc(16, 43).toString('base64url'), 'a late native callback must not overwrite the new recovery identity')
+    gateways.matchRecovery.abandon(fresh.recoveryAttemptId)
+    globalThis.wx.getUserCryptoManager = () => ({ getRandomValues: options => {
+      const bytes = new Uint8Array(16)
+      require('node:crypto').randomFillSync(bytes)
+      queueMicrotask(() => options.success({ randomValues: bytes.buffer }))
+    } })
+    await testFriendRoomGateway()
+    Object.defineProperty(globalThis, 'wx', { configurable: true, value: undefined })
+    const beforeUnsupported = requests.length
+    await assert.rejects(gateways.matchRecovery.recover(), /安全随机数/)
+    assert.equal(requests.length, beforeUnsupported, 'unsupported environments must fail closed, never fall back to Math.random')
+  } finally {
+    for (const key of ['crypto', 'wx']) {
+      if (descriptors[key]) Object.defineProperty(globalThis, key, descriptors[key])
+      else delete globalThis[key]
+    }
+  }
 }
 
 const testFriendRoomGateway = async () => {
@@ -857,10 +1052,13 @@ const testMalformedCollections = async () => {
   await testBasicGateways()
   await testWechatLoginBody()
   await testLoginLifecycle()
+  await testRequestGenerationAfterSignOut()
+  await testFriendRoomIdempotentResponseOwnership()
   await testErrorMetadata()
   await testConcurrentUnauthorizedRefresh()
   await testTicketValidation()
   await testMatchRecoveryGateway()
+  await testWechatRecoveryRandomness()
   await testFriendRoomGateway()
   await testOrderIdempotencyRecovery()
   await testMerchantIdempotencyRecovery()

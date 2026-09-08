@@ -1,5 +1,6 @@
 import { Card, PlayAction, PlayType, Player, PlayerId, Team } from '../../types/game';
 import { compareBombResolutions, getFaceValue } from '../../lib/rules';
+import { haveSameCardIds, removePlayedCards } from '../resourceProtection';
 import type { AIContext, MasterRuntimeTuning } from '../types';
 
 type AdvancedRole = 'striker' | 'support';
@@ -17,12 +18,22 @@ type MasterDeps = {
     teammateId: PlayerId,
   ) => { sprintRisk: number; baitRisk: number };
   getRankCounts: (cards: Card[]) => Array<{ value: number; count: number }>;
+  getPlayResourceDamage: (hand: Card[], play: Card[]) => {
+    bombSplits: number;
+    groupSplits: number;
+    wildcardCount: number;
+    score: number;
+  };
   memoGetPlayInfo: (play: Card[]) => { type: PlayType; maxValue: number; length?: number } | null;
   isBombType: (type: PlayType) => boolean;
   chooseLowestComplexPlay: (plays: Card[][]) => Card[] | null;
   pickLowestWinningPlay: (plays: Card[][]) => Card[] | null;
   chooseByType: (plays: Card[][], type: PlayType, nonBombOnly?: boolean) => Card[] | undefined;
-  chooseFeedPlayByScore: (possiblePlays: Card[][], teammateType: PlayType | undefined) => Card[] | null;
+  chooseFeedPlayByScore: (
+    possiblePlays: Card[][],
+    teammateType: PlayType | undefined,
+    hand: Card[],
+  ) => Card[] | null;
   chooseByTypeOrder: (plays: Card[][], order: PlayType[]) => Card[] | null;
   chooseSmallProbeFollow: (plays: Card[][], lastPlay: PlayAction | null, maxValue: number) => Card[] | null;
   chooseSmallProbeLead: (plays: Card[][], maxValue: number, preferPair?: boolean) => Card[] | null;
@@ -113,13 +124,6 @@ const triplePairUsesSmallPair = (
 
 const hasJoker = (hand: Card[]): boolean => hand.some((c) => c.suit === 'joker');
 
-const isSameBomb = (a: Card[] | null, b: Card[] | null): boolean => {
-  if (!a || !b || a.length !== b.length) return false;
-  const as = [...a].map((c) => c.id).sort().join(',');
-  const bs = [...b].map((c) => c.id).sort().join(',');
-  return as === bs;
-};
-
 const isSmallBomb = (
   bomb: Card[],
   memoGetPlayInfo: (play: Card[]) => { type: PlayType; maxValue: number; length?: number } | null
@@ -194,16 +198,11 @@ const canUseBombNow = (
   enemyHands: number[],
   memoGetPlayInfo: (play: Card[]) => { type: PlayType; maxValue: number; length?: number } | null
 ): boolean => {
-  const isMax = isSameBomb(bomb, maxBomb);
+  const isMax = haveSameCardIds(bomb, maxBomb);
   const enemyAt6 = hasEnemyAt6(enemyHands);
   if (isMax && !enemyAt6) return false;
   if (isSmallBomb(bomb, memoGetPlayInfo) && handSize >= 10) return true;
   return true;
-};
-
-const removeCards = (hand: Card[], play: Card[]): Card[] => {
-  const used = new Set(play.map((c) => c.id));
-  return hand.filter((c) => !used.has(c.id));
 };
 
 type MasterScoreContext = {
@@ -216,22 +215,27 @@ type MasterScoreContext = {
   maxBomb: Card[] | null;
   memoGetPlayInfo: (play: Card[]) => { type: PlayType; maxValue: number; length?: number } | null;
   isBombType: (type: PlayType) => boolean;
+  getPlayResourceDamage: MasterDeps['getPlayResourceDamage'];
 };
 
 const evaluateMasterPlayScore = (play: Card[], ctx: MasterScoreContext): number => {
   const info = ctx.memoGetPlayInfo(play);
   if (!info) return Number.NEGATIVE_INFINITY;
-  const remaining = removeCards(ctx.hand, play);
+  const remaining = removePlayedCards(ctx.hand, play);
   let score = 0;
+  const resourceDamage = ctx.getPlayResourceDamage(ctx.hand, play);
 
   score += penaltyForSmallCardsInEndgame(remaining);
   score += scoreTriplePairPlay(play, ctx.memoGetPlayInfo);
+  score -= resourceDamage.bombSplits * 1_800;
+  score -= resourceDamage.wildcardCount * 240;
+  score -= resourceDamage.groupSplits * 45;
 
   if (!allowPlayInEndgame(info.type, ctx.hand)) score -= 9999;
   if (!allowBreakBigCards(ctx.hand, play, info, ctx.countByValue)) score -= 9999;
 
   if (ctx.isBombType(info.type) && !canUseBombNow(play, ctx.maxBomb, ctx.hand.length, ctx.enemyHands, ctx.memoGetPlayInfo)) score -= 9999;
-  if (shouldReserveMaxBombFor6(ctx.maxBomb, ctx.enemyHands) && isSameBomb(play, ctx.maxBomb)) score -= 9999;
+  if (shouldReserveMaxBombFor6(ctx.maxBomb, ctx.enemyHands) && haveSameCardIds(play, ctx.maxBomb)) score -= 9999;
 
   if (mustBombAt5(ctx.enemyHands) && ctx.enemyLed) {
     score += ctx.isBombType(info.type) ? 1400 : -1800;
@@ -351,6 +355,7 @@ export const chooseMasterOverride = (args: MasterArgs, deps: MasterDeps): Card[]
     maxBomb,
     memoGetPlayInfo: deps.memoGetPlayInfo,
     isBombType: deps.isBombType,
+    getPlayResourceDamage: deps.getPlayResourceDamage,
   };
   const mySinglePairStreak = runtimeIntelState.singlePairStreakByPlayer.get(myPlayerId) || 0;
   const complexLowPick = deps.chooseLowestComplexPlay(nonBombs);
@@ -411,9 +416,9 @@ export const chooseMasterOverride = (args: MasterArgs, deps: MasterDeps): Card[]
     return pickBestByMasterScore(nonBombs, scoreCtx);
   }
 
-  if (teammate.hand.length <= 6) {
+  if (teammate.hand.length > 0 && teammate.hand.length <= 6) {
     const teammateType = runtimeIntelState.lastTypeByPlayer.get(teammateId);
-    const feedPick = deps.chooseFeedPlayByScore(possiblePlays, teammateType);
+    const feedPick = deps.chooseFeedPlayByScore(possiblePlays, teammateType, hand);
     if (feedPick) return feedPick;
     if (nonBombs.length > 0) return pickBestByMasterScore(nonBombs, scoreCtx);
     return pickBestByMasterScore(possiblePlays, scoreCtx);
@@ -421,7 +426,11 @@ export const chooseMasterOverride = (args: MasterArgs, deps: MasterDeps): Card[]
   // 队友 7~9 张进入冲刺，自己停攻递牌
   if (shouldOnlyFeedTeammate(teammate.hand.length) && enemyMin > 6) {
     const teammateType = runtimeIntelState.lastTypeByPlayer.get(teammateId);
-    const feedPick = deps.chooseFeedPlayByScore(nonBombs.length > 0 ? nonBombs : possiblePlays, teammateType);
+    const feedPick = deps.chooseFeedPlayByScore(
+      nonBombs.length > 0 ? nonBombs : possiblePlays,
+      teammateType,
+      hand,
+    );
     if (feedPick) return feedPick;
     return null;
   }

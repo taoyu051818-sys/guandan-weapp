@@ -54,7 +54,7 @@ export class LocalHandSelectionController {
 
   public toggle (cardId: string, context: LocalHandSelectionContext): string {
     const blocked = this.blockedHint(context)
-    if (blocked) return blocked
+    if (blocked !== null) return blocked
     if (!context.state.players[context.humanId].hand.some(card => card.id === cardId)) {
       this.selectedCardIds.delete(cardId)
       return '手牌已更新，请重新选择'
@@ -69,7 +69,7 @@ export class LocalHandSelectionController {
 
   public replaceFromInput (cardIds: readonly string[], context: LocalHandSelectionContext): string {
     const blocked = this.blockedHint(context)
-    if (blocked) return blocked
+    if (blocked !== null) return blocked
     const requested = Array.from(new Set(cardIds))
     const handIds = new Set(context.state.players[context.humanId].hand.map(card => card.id))
     if (requested.some(cardId => !handIds.has(cardId))) {
@@ -132,10 +132,10 @@ export class LocalHandSelectionController {
   }
 
   private blockedHint (context: LocalHandSelectionContext): string | null {
-    if (context.actionPending) return '正在等待服务器确认'
+    if (context.actionPending) return ''
     if (context.phase !== 'playing' && context.phase !== 'tribute') return '当前不能选择手牌'
     if (context.phase === 'playing' && !canSelectPlayingHand(context.state, context.humanId, context.actionPending)) {
-      return '请等待其他玩家出牌'
+      return ''
     }
     if (context.phase === 'tribute' && !this.canActInTribute(context)) return '当前等待其他玩家操作'
     return null
@@ -144,6 +144,7 @@ export class LocalHandSelectionController {
   private selectionHint (context: LocalHandSelectionContext): string {
     const cards = this.selectedCards(context.state, context.humanId)
     if (context.phase === 'tribute') return cards.length === 1 ? '确认这张牌' : '请选择一张牌'
+    if (context.state.currentTurn !== context.humanId) return ''
     return playValidationHint(diagnosePlay(cards, context.state.lastValidPlay, context.state.ruleProfile))
   }
 

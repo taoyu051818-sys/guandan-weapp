@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>陵水掼蛋 · 大厅布局实验室</title><link rel="stylesheet" href="/style.css"></head>
+<body><header><div><small>LINGSHUI / LAYOUT LAB 01</small><h1>大厅布局实验室</h1></div><p>先看布局，再进引擎。<br>原版素材 · 独立候选 · 不连接游戏服务</p></header>
+<main><section class="workspace" aria-label="大厅预览">
+  <div class="toolbar"><div class="tabs" role="group" aria-label="版本切换"><button id="baseline" aria-pressed="false">原版基准</button><button id="candidate" aria-pressed="false">候选 01</button><button id="candidate2" aria-pressed="true">候选 02</button></div><label class="check"><input id="guides" type="checkbox">安全区域 / 重叠</label></div>
+  <div class="stage-wrap"><div class="stage" id="stage"><canvas id="canvas" width="1748" height="804" aria-label="874 × 402 大厅布局模拟画面"></canvas><div id="hotspots"></div></div></div>
+  <div class="caption"><span id="version">候选 01</span><span>874 × 402 px · 等比预览</span></div>
+  <p id="feedback" role="status" aria-live="polite">正在加载原版素材…</p>
+  <section class="notes"><h2 id="notes-title">两主一辅，左侧留景</h2><p id="notes-copy"></p><p class="muted">基准对应 table-polish-final-20260907。头像与账号为模拟数据；候选 02 已迁入 Cocos；本页保留为布局试验工具。骨骼与序列帧尚未接入。</p></section>
+  <details id="audit"><summary>区域交叠报告 <span id="audit-count"></span></summary><p>只提示，不挤开。百分比分别以两个区域面积为分母；数字为 874 × 402 设计像素，不是设备物理像素。</p><div id="audit-list"></div></details>
+</section><aside aria-label="布局参数"><div class="aside-title"><h2>微调面板</h2><span>候选版本</span></div><p class="muted">滑块和数字输入同步。上下左右以画布方向为准，不改正式游戏。</p><div id="controls"></div>
+<label class="field">模拟状态<select id="state"><option value="idle">普通大厅</option><option value="resume">有未完成牌局</option><option value="loading">正在恢复牌局</option><option value="long">长昵称 / 大积分</option></select></label>
+<label class="field">安全区预设<select id="safe"><option value="none">无额外边距（基准）</option><option value="notch">左右 32 px / 底部 8 px</option></select></label>
+<div class="actions"><button id="undo">撤销一步</button><button id="reset">重置候选</button><button id="save">保存到本机</button><button id="export">导出参数</button><button id="png">导出画面 PNG</button></div><p id="save-note" class="muted">保存只在当前浏览器生效；导出文件便于定稿和迁移。</p>
+</aside></main><footer>原版几何已归档在 baseline-layout.ts；候选 02 的定稿已迁入 Cocos。本页不执行登录、匹配或购买。</footer>
+<dialog id="flow-dialog" aria-labelledby="flow-title"><div class="flow-header"><div><small>本地交互预览</small><h2 id="flow-title"></h2></div><button id="flow-close" aria-label="关闭预览">关闭</button></div><div id="flow-body"></div></dialog>
+<script type="module" src="/app.js"></script></body></html>

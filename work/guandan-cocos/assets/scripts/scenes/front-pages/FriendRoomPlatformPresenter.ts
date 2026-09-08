@@ -25,12 +25,12 @@ export class FriendRoomPlatformPresenter {
     this.inviteInput = null
     ui.menuLabel('好友房', 0, this.screen.safeTopY(80), 42)
     ui.menuLabel(
-      state.busy === 'creating' ? '正在安全创建房间…' : state.busy === 'joining' ? '正在验证邀请并预留席位…' : '创建新房间，或粘贴好友发来的完整邀请口令',
+      state.busy === 'creating' ? '正在安全创建房间…' : state.busy === 'joining' ? '正在加入好友房…' : '创建房间后，点击邀请好友发送微信邀请卡片',
       0,
       this.screen.safeTopY(138),
       20,
     )
-    ui.outlinedLabel('六位房间号仅用于展示 · 加入必须粘贴完整邀请口令', 0, 112, 20, {
+    ui.outlinedLabel('点击微信邀请卡片即可加入 · 旧邀请口令仍可在下方使用', 0, 112, 20, {
       width: Math.min(720, this.screen.safeSize().x - 40), height: 34,
     })
     if (state.busy) {
@@ -41,18 +41,6 @@ export class FriendRoomPlatformPresenter {
       this.button(ui, '加入好友房', 0, -86, 260, () => actions.join(this.inviteInput?.string.trim() ?? ''))
     }
     this.button(ui, '返回大厅', 0, this.screen.safeBottomY(42), 220, actions.back)
-  }
-
-  public renderInviteShare (ui: RuntimeUiFactory, inviteText: string | null, copy: () => void): void {
-    if (!inviteText) return
-    this.button(
-      ui,
-      '复制完整邀请口令',
-      this.screen.safeRightX(134),
-      this.screen.safeTopY(44),
-      238,
-      copy,
-    )
   }
 
   public resetInput (): void { this.inviteInput = null }

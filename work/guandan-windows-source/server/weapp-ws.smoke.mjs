@@ -1,15 +1,27 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { createServer as createNetServer } from 'node:net'
 import { gameVersionFor, sendProtocolCommand } from './weapp-smoke-protocol.mjs'
 
-const port = 39102
+const allocatePort = () => new Promise((resolve, reject) => {
+  const probe = createNetServer()
+  probe.once('error', reject)
+  probe.listen(0, '127.0.0.1', () => {
+    const address = probe.address()
+    probe.close(error => error ? reject(error) : resolve(address.port))
+  })
+})
+const port = await allocatePort()
 const roomId = '314159'
 const randomPrelude = `data:text/javascript,${encodeURIComponent('let seed=0x5eed1234; Math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296)')}`
 const child = spawn(process.execPath, ['--import', randomPrelude, 'server/weapp-ws.js'], {
   cwd: process.cwd(),
-  env: { ...process.env, WEAPP_WS_PORT: String(port), WEAPP_TURN_TIMEOUT_MS: '10000', WEAPP_TRUSTEE_ACTION_DELAY_MS: '5000' },
-  stdio: 'ignore',
+  env: { ...process.env, WEAPP_HOST: '127.0.0.1', WEAPP_WS_PORT: String(port), WEAPP_TURN_TIMEOUT_MS: '10000', WEAPP_TRUSTEE_ACTION_DELAY_MS: '5000' },
+  stdio: ['ignore', 'pipe', 'pipe'],
 })
+let childOutput = ''
+child.stdout.on('data', chunk => { childOutput += chunk.toString() })
+child.stderr.on('data', chunk => { childOutput += chunk.toString() })
 const sockets = []
 const playerIds = ['p1', 'p2', 'p3', 'p4']
 let nextRequestId = 1
@@ -23,6 +35,7 @@ const connect = async () => {
   const deadline = Date.now() + 8000
   let lastError
   while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error(`WebSocket 服务提前退出 (${child.exitCode})\n${childOutput}`)
     try {
       return await connectOnce()
     } catch (error) {
@@ -30,7 +43,7 @@ const connect = async () => {
       await delay(50)
     }
   }
-  throw lastError || new Error('WebSocket 服务启动超时')
+  throw new Error(`WebSocket 服务启动超时：${lastError?.message || '连接失败'}\n${childOutput}`)
 }
 const message = (socket, type, matches = () => true) => new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error(`等待 ${type} 超时`)), 3000)

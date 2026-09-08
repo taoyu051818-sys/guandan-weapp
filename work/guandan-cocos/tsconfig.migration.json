@@ -1,7 +1,11 @@
 {
   "extends": "./tsconfig.json",
   "files": [
-    "migration/merchant/MerchantPageDomain.ts"
+    "migration/merchant/MerchantPageDomain.ts",
+    "migration/spectator/SpectatorPollingPolicy.ts",
+    "migration/rules/RuleHelpProjection.ts",
+    "migration/platform/RetiredPlatformApi.ts",
+    "migration/platform/RetiredDevelopmentApis.ts"
   ],
   "include": []
 }

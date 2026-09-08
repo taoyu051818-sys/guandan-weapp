@@ -6,11 +6,11 @@ const projectRoot = path.resolve(__dirname, '..')
 const read = relativePath => fs.readFileSync(path.join(projectRoot, relativePath), 'utf8')
 const lobbyPage = read('assets/scripts/scenes/front-pages/LobbyPageDomain.ts')
 const lobbyCatalog = read('assets/scripts/scenes/front-pages/LobbyPageCatalog.ts')
+const lobbyView = read('assets/scripts/ui/LobbyMenuView.ts')
 const lobbyPlayerProfile = read('assets/scripts/scenes/front-pages/LobbyPlayerProfilePresenter.ts')
 const friendRoomPresenter = read('assets/scripts/scenes/front-pages/FriendRoomSettingsPresenter.ts')
 const friendRoomPolicy = read('assets/scripts/scenes/front-pages/FriendRoomSettingsPolicy.ts')
 const matchmakingPage = read('assets/scripts/scenes/front-pages/MatchmakingPageDomain.ts')
-const competitionPage = read('assets/scripts/scenes/front-pages/CompetitionPageDomain.ts')
 const frontPageController = read('assets/scripts/scenes/FrontPageController.ts')
 const uiFactory = read('assets/scripts/ui/RuntimeUiFactory.ts')
 const pageRouter = read('assets/scripts/scenes/PageRouter.ts')
@@ -68,53 +68,39 @@ const tierDefinition = lobbyCatalog.match(/const CLASSIC_ROOM_TIERS[\s\S]*?\n\]/
 assert.doesNotMatch(tierDefinition, /difficulty/, 'classic room tiers must never select AI difficulty')
 assert.match(lobbyPage, /startClassicTier[\s\S]*?dependencies\.beginMatch\(tier\.queueId,[\s\S]*?'classic-rooms'\)/, 'classic room cards must enter distinct human matchmaking queues')
 assert.match(lobbyPage, /to\(0\.34, \{ position: new Vec3\(targetX, cardY, 0\) \}/, 'classic room cards must enter from right to left')
-assert.match(competitionPage, /锦标赛[\s\S]*老乡赛[\s\S]*校友赛[\s\S]*自建赛[\s\S]*我的比赛/)
-assert.match(friendRoomPresenter, /经典过A\s+·\s+四人组队\s+·\s+服务器验牌/)
-assert.match(lobbyPage, /renderShopShortcut[\s\S]*ShopChickArtwork[\s\S]*'商城'/)
+assert.match(friendRoomPresenter, /describeFriendRoomRules\(this\.settingsDraft\)/, 'rule summary must reflect the selected format')
+assert.match(lobbyView, /renderLobbyShop[\s\S]*ShopChickArtwork[\s\S]*'商城'/)
 assert.match(lobbyCatalog, /coin:[^\n]+ui\/lobby\/coin\/texture/)
 assert.match(lobbyPlayerProfile, /LobbyCoinIcon[\s\S]*LOBBY_ART\.coin/, 'the lobby points row must use the transparent coin asset')
-const shopShortcut = lobbyPage.match(/private renderShopShortcut[\s\S]*?\n  }/)?.[0] ?? ''
+const shopShortcut = lobbyView.slice(lobbyView.indexOf('export function renderLobbyShop'))
 assert.match(shopShortcut, /new Node\('ShopShortcut'\)/, 'the shop shortcut container must be transparent')
 assert.doesNotMatch(shopShortcut, /ui\.panel\('ShopShortcut'|ShopFade/, 'the transparent shop art must not receive a panel or artificial fade bands')
 assert.match(lobbyCatalog, /defaultAvatar:[^\n]+ui\/common\/default-avatar\/texture/, 'the lobby must load the supplied image instead of a text avatar placeholder')
 const showMenuSection = lobbyPage.slice(lobbyPage.indexOf('public showMenu'), lobbyPage.indexOf('public renderMenu'))
 assert.match(showMenuSection, /if \(this\.dependencies\.gateways\.configured\) \{[\s\S]*this\.dependencies\.player\.invalidate\(\)[\s\S]*this\.dependencies\.wallet\.invalidate\(\)[\s\S]*\}/, 'each online lobby entry must invalidate cached profile and wallet freshness before refreshing')
-const profileSection = lobbyPlayerProfile.slice(lobbyPlayerProfile.indexOf('public render'), lobbyPlayerProfile.indexOf('private resolveLocalAccountId'))
+const profileSection = lobbyPlayerProfile.slice(lobbyPlayerProfile.indexOf('public render'), lobbyPlayerProfile.length)
 assert.ok(profileSection.length > 0, 'the horizontal lobby identity lane must exist')
-assert.match(profileSection, /const hasRemoteDashboard = player\.dashboard !== null[\s\S]*const awaitingRemoteDashboard = platformConfigured && !hasRemoteDashboard/, 'online profile placeholders must be driven by remote dashboard availability')
-assert.match(profileSection, /const displayName = awaitingRemoteDashboard \? '账号同步中' : player\.dashboard/, 'an online lobby without profile data must not show a sample username')
-assert.match(profileSection, /const accountId = [^\n]*remoteAccountId[^\n]*platformConfigured \? '同步中' : this\.localAccountId/, 'an online lobby without profile data must not expose the locally generated account id')
-assert.match(profileSection, /ui\.outlinedLabel\(`ID \$\{accountId\}`/, 'the synchronized account placeholder must render as ID 同步中')
-assert.match(profileSection, /ui\.outlinedLabel\(`ID \$\{accountId\}`,[^\n]*20,/, 'the eight-digit account ID must not render below the global text floor')
-assert.match(profileSection, /const comprehensiveScore = awaitingRemoteDashboard[\s\S]*\? null[\s\S]*const pointsText = platformConfigured && !wallet\.fresh \? '积分 --' : `积分 \$\{Math\.max\(0, Math\.round\(wallet\.value\.points\)\)\}`[\s\S]*const comprehensiveText = `综合分 \$\{comprehensiveScore \?\? '--'\}`/, 'online loading state must show 积分 -- and 综合分 -- instead of local defaults')
-assert.match(profileSection, /resolveSafeHorizontalLane\([\s\S]*priority: 100[\s\S]*priority: 95[\s\S]*priority: 90/, 'identity fields must declare explicit collision priorities')
-assert.match(profileSection, /ui\.image\('LobbyDefaultAvatar', LOBBY_ART\.defaultAvatar/, 'the player identity lane must use the supplied default avatar image')
-assert.match(profileSection, /resolveSafeHorizontalLane\(left, right, \[[\s\S]*id: 'avatar'[\s\S]*id: 'identity'[\s\S]*id: 'points'[\s\S]*id: 'win-rate'[\s\S]*id: 'games'[\s\S]*id: 'comprehensive'/, 'account and performance fields must remain in one horizontal lane')
-assert.match(profileSection, /ID \$\{accountId\}/)
-assert.match(profileSection, /LobbyPlayerProfileHitArea/, 'the unframed identity lane may retain one transparent interaction target')
-assert.doesNotMatch(profileSection, /ui\.panel\(['"`]LobbyPlayerProfile['"`]|new Node\(['"`]LobbyPlayerProfile['"`]\)/, 'the identity lane must not recreate a profile-wide outer frame')
-assert.match(profileSection, /ui\.panel\('LobbyAvatarBacking', avatar\.x, y, 64, 64, \{ fill: new Color\(5, 9, 8, 178\), lineWidth: 0, radius: 32 \}\)/, 'the avatar may use its own black translucent circular backing')
-assert.match(profileSection, /ui\.panel\('LobbyIdentityPill', identity\.x, y, identity\.width, 64, \{ fill: new Color\(4, 8, 8, 172\), lineWidth: 0, radius: 32 \}\)/, 'the identity field must use a taller half-height black translucent capsule')
-assert.match(profileSection, /ui\.panel\(`Lobby-\$\{id\}-Pill`, placement\.x, y, placement\.width, 36, \{ fill: new Color\(4, 8, 8, 172\), lineWidth: 0, radius: 18 \}\)/, 'each performance field must use its own half-height black translucent capsule')
-assert.match(profileSection, /ui\.panel\('Lobby-points-Pill', points\.x, y, points\.width, 36, \{ fill: new Color\(4, 8, 8, 172\), lineWidth: 0, radius: 18 \}\)/, 'the points field must use its own half-height black translucent capsule')
-assert.match(profileSection, /: Math\.round\(rating\?\.comprehensiveScore \?\?/, 'the displayed comprehensive score must prefer the server rating snapshot once synchronization completes')
-assert.match(profileSection, /LobbyPlayerProfileHitArea[\s\S]*this\.dependencies\.showPlayerCenter/, 'touching the lobby identity lane must open the unified player center')
-assert.match(profileSection, /ui\.outlinedLabel\(pointsText,[^\n]*20,[\s\S]*renderPill\('win-rate', winRateText, 20,[\s\S]*renderPill\('games', gamesText, 20,[\s\S]*renderPill\('comprehensive', comprehensiveText, 20,/, 'points and performance pills must retain the 20px mobile baseline')
-assert.doesNotMatch(profileSection, /this\.dependencies\.showNotice\(/, 'the lobby identity lane must not stop at an informational popup')
-assert.match(lobbyPlayerProfile, /LOCAL_ACCOUNT_ID_STORAGE_KEY = 'guandan-local-account-id-v1'/)
-assert.match(lobbyPlayerProfile, /\^\\d\{8\}\$[\s\S]*String\(10_000_000 \+ random % 90_000_000\)[\s\S]*localStorage\.setItem/, 'the local account id must be exactly eight digits and persist across launches')
-assert.match(lobbyPlayerProfile, /rawWinRateText = awaitingRemoteDashboard \? '--' : games > 0 \? rawWinRate\.toFixed\(1\) : '0'/, 'a synchronized player with no games must display 0%, while pending data remains unknown')
-assert.match(lobbyPlayerProfile, /adjustedWinRate = \(Math\.max\(0, wins\) \+ 25\) \/ \(safeGames \+ 50\)/)
-assert.match(lobbyPlayerProfile, /experience = 0\.3 \+ 0\.7 \* Math\.log1p\(safeGames\) \/ Math\.log\(101\)/)
-assert.match(lobbyPlayerProfile, /baseScore = 60_000 \* Math\.pow\(adjustedWinRate, 1\.8\) \* experience/)
-assert.match(lobbyPlayerProfile, /return Math\.max\(1_000, Math\.round\(baseScore \+ Math\.max\(0, legacyElo\) - 1_000\)\)/)
+assert.match(profileSection, /const profile = player\.profile \?\? player\.dashboard\?\.user/)
+assert.match(profileSection, /platformConfigured && !profile \? '账号同步中'/)
+assert.doesNotMatch(profileSection, /localAccountId|ID /)
+assert.match(profileSection, /platformConfigured && !wallet\.fresh \? '--'/)
+assert.match(profileSection, /LobbyAccountBacking/)
+assert.doesNotMatch(profileSection, /id: 'win-rate'|id: 'games'|id: 'comprehensive'|renderPill/, 'detailed performance belongs in the personal center')
+assert.match(profileSection, /mountProfileAvatar\(ui\.parent, profile, this\.dependencies\.auth/)
+assert.match(profileSection, /leftText\(points, 87, 48, 15, 69\)/)
+assert.match(profileSection, /hit\('LobbyPlayerProfileHitArea', 123.5, 121/)
+assert.match(profileSection, /LobbyPlayerProfileHitArea[\s\S]*this\.dependencies\.showPlayerCenter/)
+assert.doesNotMatch(profileSection, /this\.dependencies\.showNotice\(/)
+assert.doesNotMatch(lobbyPlayerProfile, /LOCAL_ACCOUNT_ID_STORAGE_KEY|localStorage\.setItem/, 'removed lobby ID must not retain fake-ID generation')
+const personalCenter = read('assets/scripts/scenes/front-pages/PlayerCenterPageDomain.ts')
+assert.match(personalCenter, /dashboard\.rating\.games[\s\S]*dashboard\.rating\.wins[\s\S]*综合分[\s\S]*总场数[\s\S]*胜率/, 'performance remains available from authoritative personal-center data')
 assert.match(ratingServer, /baseScale: 60_000[\s\S]*priorGames: 50[\s\S]*priorWinRate: 0\.5[\s\S]*winRateExponent: 1\.8[\s\S]*experienceFloor: 0\.3[\s\S]*experienceWeight: 0\.7[\s\S]*experienceReferenceGames: 100[\s\S]*minimumScore: 1_000/, 'the authoritative rating configuration must preserve both win rate and experience weight')
 assert.match(ratingServer, /priorWins = config\.priorGames \* config\.priorWinRate[\s\S]*return \(player\.wins \+ priorWins\) \/ \(player\.games \+ config\.priorGames\)/)
 assert.match(ratingServer, /config\.experienceFloor \+ config\.experienceWeight \* Math\.log1p\(games\) \/ Math\.log1p\(config\.experienceReferenceGames\)/)
 assert.match(ratingServer, /return Math\.max\(config\.minimumScore, calculateBaseScore\(player, config\) \+ player\.eloOffset\)/, 'the authoritative comprehensive score must combine the long-term base with the ELO correction')
 assert.match(lobbyPage, /dependencies\.beginMatch\('classic_50', '经典 · 初级场 · 底分50', 'menu'\)/, 'quick start must enter the lowest classic matchmaking queue')
 assert.match(matchmakingPage, /returnPage === 'menu'\) this\.dependencies\.showMenu\(\)/, 'quick-start cancellation and failures must return to the main lobby')
-const matchErrorSection = matchmakingPage.slice(matchmakingPage.indexOf('private matchErrorDetail'), matchmakingPage.lastIndexOf('\n}'))
+const matchErrorSection = read('assets/scripts/services/MatchmakingErrorPresentation.ts')
 assert.match(matchErrorSection, /error\.code === 'INSUFFICIENT_CLASSIC_STAKE'/)
 assert.match(matchErrorSection, /typeof details\.required === 'number' && Number\.isFinite\(details\.required\)[\s\S]*Math\.max\(0, Math\.round\(details\.required\)\)/, 'classic stake errors must validate and normalize the required points returned by the platform')
 assert.match(matchErrorSection, /`积分不足：进入该场至少需要 \$\{required\} 积分`/, 'classic stake errors must tell the player exactly how many points are required')
@@ -122,6 +108,7 @@ const prohibitedAudienceClaim = ['真', '人'].join('')
 const collectRuntimeSources = root => fs.readdirSync(root, { withFileTypes: true }).flatMap(entry => {
   const entryPath = path.join(root, entry.name)
   if (entry.isDirectory()) return collectRuntimeSources(entryPath)
+  if (/\.(?:test|smoke)\.mjs$/.test(entry.name)) return []
   return /\.(?:ts|js|cjs|mjs)$/.test(entry.name) ? [entryPath] : []
 })
 for (const filePath of [
@@ -131,7 +118,7 @@ for (const filePath of [
   assert.equal(fs.readFileSync(filePath, 'utf8').includes(prohibitedAudienceClaim), false, `${filePath} must not claim the audience type in runtime copy`)
 }
 assert.doesNotMatch(matchmakingPage, /匹配入桌失败/)
-assert.equal((matchmakingPage.match(/比赛匹配失败/g) ?? []).length, 3, 'all matchmaking failures must use the requested competition wording')
+assert.equal((matchmakingPage.match(/this\.failMatch\(/g) ?? []).length, 3, 'join, invalid-ticket and poll failures must offer inline retry instead of abandoning the page')
 assert.doesNotMatch(`${gameScene}\n${lobbyController}`, /匹配入桌失败/)
 assert.match(gameScene, /showNotice\('比赛匹配失败', '匹配服务返回了不完整的房间凭证'\)/)
 assert.match(gameScene, /entryAttemptId: ticket\.entryAttemptId/, 'normal and fixed tournament tickets must preserve the platform-bound entry attempt into WebSocket entry')
@@ -140,7 +127,7 @@ assert.match(matchedEntryCoordinator, /this\.fail\('比赛匹配失败，请稍�
 const friendTableSection = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomWaitingPresenter.ts'), 'utf8')
 assert.match(friendTableSection, /ui\.image\(`FriendAvatar-\$\{playerId\}`, this\.defaultAvatar/, 'occupied friend-room seats must render the injected default avatar image')
 assert.match(friendTableSection, /botPlayerIds[\s\S]*capabilities\?\.canUseBots[\s\S]*removeBot\(playerId\)[\s\S]*addBot\(playerId\)/, 'only a room whose authoritative capability allows bots may fill and clear seats')
-assert.match(friendTableSection, /gameStartPending[\s\S]*if \(!gameStartPending\) this\.compactButton[\s\S]*if \(gameStartPending\) \{[\s\S]*平台确认中[\s\S]*return/, 'the waiting room must become read-only while platform start confirmation is pending')
+assert.match(friendTableSection, /gameStartPending[\s\S]*if \(!gameStartPending\) this\.compactButton[\s\S]*if \(gameStartPending\) \{\s*return/, 'pending start stays read-only without displaying internal platform confirmation copy')
 const friendWaitingSection = gameScene.slice(gameScene.indexOf('private setFriendRoomWaitingVisible'), gameScene.indexOf('private layoutSeats'))
 assert.match(friendWaitingSection, /backdropController\?\.setMode\('table'\)/, 'an entered friend room must use the table backdrop instead of the lobby background')
 
@@ -150,7 +137,7 @@ const friendRoomType = lobbyModels.slice(lobbyModels.indexOf('export type Friend
   /rounds: number/,
   /scoring: 'double-3' \| 'double-4'/,
   /scoreVisibility: 'live' \| 'hidden'/,
-  /turnSeconds: 20 \| 40 \| 60/,
+  /turnSeconds: 15 \| 20 \| 30 \| 40 \| 60/,
   /trusteeSeconds: 0 \| 15 \| 30 \| 60/,
   /totalTimeMinutes: 0 \| 20 \| 30 \| 60/,
   /spectator: 'off' \| 'live' \| 'delayed-round'/,
@@ -164,20 +151,20 @@ assert.match(friendRoomPresenter, /selectedTab: FriendRoomSettingsTab = 'rules'/
 assert.match(lobbyPage, /new FriendRoomSettingsPresenter\([\s\S]*createRoom: settings => this\.openLobby\(settings\)/, 'the lobby domain must delegate the page draft and rendering to its presenter')
 assert.doesNotMatch(lobbyPage, /private friend(?:Stepper|Choice)Row\b/, 'friend-room view helpers must not leak back into lobby orchestration')
 assert.match(friendRoomPolicy, /FRIEND_ROOM_SETTINGS_TABS[\s\S]*id: 'rules', label: '基础规则'[\s\S]*id: 'experience', label: '体验设置'/, 'friend-room settings must be split into policy-owned rules and experience tabs')
-assert.match(friendRoomPolicy, /FRIEND_ROOM_ROUNDS = Object\.freeze\(\{[\s\S]*minimum: 4,[\s\S]*maximum: 32,[\s\S]*step: 4,/, 'the settings policy must constrain round count to 4 through 32 in steps of four')
+assert.match(friendRoomPolicy, /FRIEND_ROOM_ROUNDS = Object\.freeze\(\{[\s\S]*minimum: 1,[\s\S]*maximum: 32,[\s\S]*step: 1,/, '定局玩法 supports 1–32 integer hands')
 for (const expectedChoice of [
   /id: 'scoring',[^\n]*label: '计分',[^\n]*options: \['双下3分', '双下4分'\]/,
   /id: 'score-visibility',[^\n]*label: '比分',[^\n]*options: \['实时显示', '结算显示'\]/,
-  /id: 'turn-seconds',[^\n]*label: '首出',[^\n]*options: \['20秒', '40秒', '60秒'\]/,
+  /id: 'turn-seconds',[^\n]*label: '出牌时间',[^\n]*options: \['15秒', '20秒', '30秒', '60秒'\]/,
   /id: 'trustee-seconds',[^\n]*label: '托管',[^\n]*options: \['无托管', '15秒', '30秒', '60秒'\]/,
   /id: 'total-time',[^\n]*label: '总时长',[^\n]*options: \['不限制', '20分钟', '30分钟', '60分钟'\]/,
-  /id: 'spectator',[^\n]*label: '观战',[^\n]*options: \['禁止观战', '实时观战', '延迟1局'\]/,
+  /id: 'spectator',[^\n]*label: '允许观战',[^\n]*options: \['禁止观战', '实时观战', '延迟观战'\]/,
   /id: 'auto-sort',[^\n]*label: '一键理牌',[^\n]*options: \['开启', '关闭'\]/,
-  /id: 'interaction',[^\n]*label: '互动',[^\n]*options: \['禁止互动', '允许互动'\]/,
+  /id: 'interaction',[^\n]*label: '聊天',[^\n]*options: \['禁止聊天', '允许聊天'\]/,
   /id: 'sort-order',[^\n]*label: '牌序',[^\n]*options: \['大牌在左', '小牌在左'\]/,
 ]) assert.match(friendRoomPolicy, expectedChoice)
-assert.match(friendSettingsSection, /FRIEND_ROOM_SETTINGS_TABS\.forEach[\s\S]*FRIEND_ROOM_ROUNDS[\s\S]*friendRoomChoiceRows\(this\.settingsDraft, this\.selectedTab\)/, 'the presenter must render policy projections instead of duplicating setting conversion rules')
-assert.match(friendSettingsSection, /updateFriendRoomRounds\(this\.settingsDraft, value\)[\s\S]*updateFriendRoomChoice\(this\.settingsDraft, row\.id, value\)/, 'all friend-room edits must flow through the pure policy')
+assert.match(friendSettingsSection, /FRIEND_ROOM_SETTINGS_TABS\.forEach[\s\S]*friendRoomChoiceRows\(this\.settingsDraft, this\.selectedTab\)/, 'the presenter renders policy projections')
+assert.match(friendSettingsSection, /updateFriendRoomChoice\(this\.settingsDraft, row\.id, value\)[\s\S]*updateFriendRoomRounds\(this\.settingsDraft, value\)/, 'all friend-room edits flow through the pure policy')
 assert.match(friendSettingsSection, /ui\.button\('FriendModeTab',[^\n]*50, Math\.max\(22, Math\.min\(24, leftWidth \* 0\.13\)\)/, 'friend-room mode tabs must retain a 22px minimum and 50px container')
 assert.match(friendSettingsSection, /ui\.button\('FriendSettingsTab',[^\n]*44, 22,/, 'friend-room settings tabs must retain 22px labels in 44px containers')
 assert.match(friendSettingsSection, /compactButton\(ui, '重置',[^\n]*82, 42, 22,/, 'friend-room reset must retain a 22px label and sufficient height')
@@ -212,15 +199,13 @@ assert.doesNotMatch(uiFactory, /LabelOutline/, 'deprecated LabelOutline componen
 assert.match(uiFactory, /public imageCard \(/)
 assert.match(uiFactory, /loadGameAsset\(assetPath, Texture2D/)
 
-assert.match(lobbyPage, /compactButton\(ui, '规则',[^\n]*84, 44, 22,[\s\S]*compactButton\(ui, '更多',[^\n]*84, 44, 22,/, 'main-lobby utility buttons must retain 22px labels in 44px containers')
+assert.doesNotMatch(lobbyPage, /compactButton\(ui, '规则'|compactButton\(ui, '更多'/)
 assert.match(lobbyPage, /ui\.button\('ClassicModeTab',[^\n]*48, Math\.max\(22, Math\.min\(24, leftWidth \* 0\.13\)\)/, 'classic room mode tabs must retain a 22px minimum and 48px container')
 assert.match(lobbyPage, /ui\.outlinedLabel\('底分',[^\n]*Math\.max\(20, cardWidth \* 0\.1\)/, 'classic room stake labels must retain the 20px text baseline')
 assert.match(lobbyPage, /safeBottomY\(30\), Math\.max\(20, Math\.min\(22, safeHeight \* 0\.038\)\)[\s\S]*height: 36/, 'classic settlement copy must keep readable type and a stable text container')
-assert.match(frontPageController, /sizedButton\(ui, label, column \? 165 : -165, 136 - row \* 76, 292, 64, 22, action\)/, 'two-line More-menu actions must have a 22px font and enough vertical room')
-assert.match(competitionPage, /ui\.button\('CompetitionCategoryTab',[^\n]*48, Math\.max\(22, Math\.min\(24, leftWidth \* 0\.13\)\)/, 'competition navigation must retain a 22px minimum and 48px container')
-assert.match(competitionPage, /ui\.outlinedLabel\(item\.detail,[^\n]*Math\.max\(20, Math\.min\(22, cardWidth \* 0\.055\)\)[\s\S]*height: cardHeight \* 0\.5/, 'competition details must retain the 20px baseline and enough vertical room')
+assert.doesNotMatch(frontPageController, /showMoreMenu|快速开始·人机测试/, 'the retired More menu must not be reconstructed')
 
-assert.match(gameSessionModel, /APPLICATION_AI_DIFFICULTY = 'master' as const/, 'the client AI tier must be a master-only literal')
+assert.doesNotMatch(gameSessionModel, /APPLICATION_AI_DIFFICULTY/, 'local AI defaults must not remain after local mode retirement')
 assert.doesNotMatch(gameSession, /import type \{ Difficulty \}/, 'the application session must not expose lower AI difficulty types')
 const restoreSessionSection = gameSessionModel.slice(gameSessionModel.indexOf('export const restoreSessionSnapshot'))
 assert.match(restoreSessionSection, /const base = createDefaultSessionSnapshot\(\)[\s\S]*\.\.\.base/, 'restored sessions must begin from the master-only default')
@@ -245,7 +230,7 @@ assert.match(lobbyController, /export type \{[\s\S]*FriendRoomSettings/, 'LobbyC
 assert.match(lobbyController, /\{ roomId, hostName, roomSettings \}/, 'friend-room creation must transmit the selected settings')
 assert.match(lobbyModels, /next\.roomSettings = message\.roomSettings/, 'room settings must survive entry and reconnect snapshots')
 assert.match(friendRoomSettingsServer, /const ROUND_COUNT_MIN = 4[\s\S]*const ROUND_COUNT_MAX = 32/)
-assert.match(friendRoomSettingsServer, /const TURN_SECONDS = new Set\(\[20, 40, 60\]\)/)
+assert.match(friendRoomSettingsServer, /const TURN_SECONDS = new Set\(\[15, 20, 30, 40, 60\]\)/)
 assert.match(friendRoomSettingsServer, /const TRUSTEE_SECONDS = new Set\(\[0, 15, 30, 60\]\)/)
 assert.match(friendRoomSettingsServer, /const TOTAL_TIME_MINUTES = new Set\(\[0, 20, 30, 60\]\)/)
 assert.match(friendRoomSettingsServer, /const validRoundCount[\s\S]*value >= ROUND_COUNT_MIN[\s\S]*value <= ROUND_COUNT_MAX[\s\S]*value % 4 === 0/, 'the server must enforce the same round stepper domain')
@@ -263,8 +248,9 @@ assert.match(roomPublisherServer, /spectatorPolicy: spectatorPolicyFor\(roomSett
 assert.match(matchLifecycleServer, /room\.totalDeadlineAt = room\.matchStartedAt \+ totalTimeMinutes \* totalMinuteMs/, 'total room duration must arm an authoritative deadline')
 assert.match(matchLifecycleServer, /adjustDoubleDownSettlement\(\{[\s\S]*result: settlementEvent\.settlement,[\s\S]*state: transitionResult\.state,[\s\S]*previousTeamLevels: previousState\.teamLevels,[\s\S]*roomSettings,[\s\S]*\}\)/, 'double-four scoring must adjust the atomic settlement emitted by the shared engine')
 assert.match(matchLifecycleServer, /hasReachedRoundLimit\(room\.roundSequence, roomSettings\)/)
-assert.match(matchLifecycleServer, /roomSettings\.trusteeSeconds \* friendSecondMs/, 'manual trustee timing must be enforced by the authoritative server')
-assert.match(matchLifecycleServer, /roomSettings\.turnSeconds \* friendSecondMs/, 'manual first-play timing must be enforced by the authoritative server')
+const turnClockServer = fs.readFileSync(path.join(serverRoot, 'weapp-turn-clock.js'), 'utf8')
+assert.match(turnClockServer, /settings\.trusteeSeconds \* friendSecondMs/, 'manual trustee timing must be enforced by the authoritative clock')
+assert.match(turnClockServer, /settings\.turnSeconds \* friendSecondMs/, 'manual first-play timing must be enforced by the authoritative clock')
 assert.match(fs.readFileSync(path.join(serverRoot, 'weapp-game-command-handler.js'), 'utf8'), /normalizeFriendRoomSettings\(room\.roomSettings\)\.disableInteraction\) return reply\('error', \{ message: '本好友房已禁止互动' \}\)/, 'disabled interaction must be rejected by the authoritative server')
 
 console.log('lobby redesign regression checks passed')

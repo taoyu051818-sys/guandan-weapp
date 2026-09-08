@@ -7,7 +7,7 @@ const { loadTypeScript } = require('./support/typescript.cjs')
 const root = path.resolve(__dirname, '..')
 const sourcePath = path.join(root, 'assets/scripts/ui/ReplayViewpoint.ts')
 const boardPath = path.join(root, 'assets/scripts/ui/ReplayBoardView.ts')
-const pagePath = path.join(root, 'assets/scripts/scenes/front-pages/ReplaySpectatorPageDomain.ts')
+const pagePath = path.join(root, 'assets/scripts/scenes/front-pages/ReplayPageDomain.ts')
 const ts = loadTypeScript()
 const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },

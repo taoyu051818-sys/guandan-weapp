@@ -1,4 +1,4 @@
-export type MatchWaitingStage = 'requesting' | 'queued'
+export type MatchWaitingStage = 'requesting' | 'queued' | 'cancelling' | 'cancel-uncertain' | 'entering' | 'failed'
 
 export const formatMatchElapsed = (elapsedMs: number): string => {
   const totalSeconds = Math.max(0, Math.floor(Number.isFinite(elapsedMs) ? elapsedMs / 1000 : 0))
@@ -8,14 +8,15 @@ export const formatMatchElapsed = (elapsedMs: number): string => {
 }
 
 /**
- * Only presents facts the client can verify. The platform currently exposes
- * no queue population or ETA, so the UI must not invent either value.
+ * Routine progress is shown by the matching animation. Only actionable failures
+ * need copy; never invent population, a human identity, or a completion ETA.
  */
 export const matchWaitingText = (
-  queueName: string,
+  _queueName: string,
   stage: MatchWaitingStage,
-  elapsedMs: number,
+  _elapsedMs: number,
+  _botFillEnabled = false,
 ): string => {
-  const status = stage === 'queued' ? '已进入队列，正在分配牌桌…' : '正在请求匹配服务…'
-  return `${queueName}\n${status}\n已等待 ${formatMatchElapsed(elapsedMs)} · 可随时取消`
+  if (stage === 'cancel-uncertain') return '网络不稳定，取消尚未完成，请重试。'
+  return ''
 }

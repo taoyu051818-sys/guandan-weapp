@@ -3,9 +3,9 @@ export type PlayingHandInteractionState = Readonly<{
   finishedPlayers: readonly string[]
 }>
 
-/** Pure policy shared by the manager and scene so input cannot stay disabled after a turn cycles back. */
+/** Selection is local preparation; only submitting a play requires the player's turn. */
 export const canSelectPlayingHand = (
   state: PlayingHandInteractionState,
   humanId: string,
   actionPending: boolean,
-): boolean => !actionPending && state.currentTurn === humanId && !state.finishedPlayers.includes(humanId)
+): boolean => !actionPending && !state.finishedPlayers.includes(humanId)

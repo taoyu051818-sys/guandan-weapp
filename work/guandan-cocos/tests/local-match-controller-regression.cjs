@@ -16,19 +16,22 @@ require.extensions['.ts'] = (module, filePath) => {
   module._compile(result.outputText, filePath)
 }
 
-const controllerPath = path.join(root, 'assets/scripts/game/LocalMatchController.ts')
-const aiTurnControllerPath = path.join(root, 'assets/scripts/game/LocalAITurnController.ts')
+const controllerPath = path.join(root, 'tests/support/local-match/LocalMatchController.ts')
+const aiTurnControllerPath = path.join(root, 'tests/support/local-match/LocalAITurnController.ts')
 const selectionControllerPath = path.join(root, 'assets/scripts/game/LocalHandSelectionController.ts')
-const eventControllerPath = path.join(root, 'assets/scripts/game/LocalMatchEventController.ts')
-const schedulerPath = path.join(root, 'assets/scripts/game/LocalTurnScheduler.ts')
+const eventControllerPath = path.join(root, 'tests/support/local-match/LocalMatchEventController.ts')
+const schedulerPath = path.join(root, 'tests/support/local-match/LocalTurnScheduler.ts')
 const networkActionControllerPath = path.join(root, 'assets/scripts/game/NetworkActionController.ts')
-const synchronousAIPath = path.join(root, 'assets/scripts/game/SynchronousLocalAIEngine.ts')
+const synchronousAIPath = path.join(root, 'tests/support/local-match/SynchronousLocalAIEngine.ts')
 const managerPath = path.join(root, 'assets/scripts/game/GameManager.ts')
 const managerProjectionPath = path.join(root, 'assets/scripts/game/GameManagerProjection.ts')
 const networkSnapshotControllerPath = path.join(root, 'assets/scripts/game/NetworkMatchSnapshotController.ts')
 const sessionPath = path.join(root, 'assets/scripts/session/GameSession.ts')
 const sessionModelPath = path.join(root, 'assets/scripts/session/GameSessionModel.ts')
 const { LocalMatchController } = require(controllerPath)
+const { createLocalMatchFixtureFactory } = require('./support/create-local-match-fixture.cjs')
+const fromEngineState = createLocalMatchFixtureFactory(LocalMatchController, require(path.join(root, 'assets/scripts/core/generated/index.ts')).createMatchState)
+assert.equal(LocalMatchController.fromEngineState, undefined, 'fixed-state injection must remain test-only')
 const { LocalAITurnController } = require(aiTurnControllerPath)
 const { LocalHandSelectionController } = require(selectionControllerPath)
 const { countPlayerBombs, LocalMatchEventController } = require(eventControllerPath)
@@ -76,7 +79,7 @@ const restoredSession = restoreSessionSnapshot({
 assert.deepEqual(restoredSession.teamLevels, { teamA: 'A', teamB: 2 }, 'partial nested progression must merge over defaults')
 assert.equal(restoredSession.currentLevel, 2, 'invalid persisted ranks must fall back safely')
 assert.equal(restoredSession.settings.rulePreset, 'classic', 'unknown persisted presets must not produce an undefined RuleProfile')
-assert.equal(restoredSession.settings.voicePack, 'male')
+assert.equal(restoredSession.settings.voicePack, 'female')
 assert.equal(restoredSession.settings.volume, 1, 'persisted numeric settings must be bounded')
 assert.deepEqual(restoredSession.playerStats, {
   gamesPlayed: 4,
@@ -88,7 +91,7 @@ assert.deepEqual(restoredSession.playerStats, {
 assert.equal(restoredSession.status, 'menu', 'transient routes must never be restored without a matching engine')
 assert.equal(restoredSession.schemaVersion, createDefaultSessionSnapshot().schemaVersion)
 
-const match = LocalMatchController.fromEngineState(engineState({
+const match = fromEngineState(engineState({
   currentTurn: 'p3',
   finishedPlayers: ['p1'],
   hands: { p1: [], p2: [card('p2-4', 4)], p3: [card('p3-5', 5)], p4: [card('p4-6', 6)] },
@@ -143,17 +146,50 @@ const networkHarness = initialState => {
   let projection = createGameManagerProjection()
   const records = []
   const phases = []
+  const selection = new LocalHandSelectionController()
   const controller = new NetworkMatchSnapshotController({
     getState: () => state,
     getProjection: () => projection,
     getRoomId: () => 'room-1',
     getHumanId: () => 'p1',
     commit: (nextState, nextProjection) => { state = nextState; projection = nextProjection },
-    retireLocalMatch: () => {}, clearSelection: () => {}, cancelPendingAction: () => {},
+    retireLocalMatch: () => {}, clearSelection: () => selection.clear(), cancelPendingAction: () => {},
     setSessionPhase: phase => phases.push(phase),
     recordRound: record => records.push(record), publishHint: () => {},
   })
-  return { controller, records, phases, state: () => state, projection: () => projection }
+  return { controller, records, phases, selection, state: () => state, projection: () => projection }
+}
+
+// Preselection survives other seats' network turns, but never submits a move or crosses a round.
+{
+  const initial = { ...engineState({ currentTurn: 'p2', hands: {
+    p1: [card('pre-a', 3), card('pre-b', 5)], p2: [card('other', 6)], p3: [], p4: [],
+  } }), roundId: 1, revision: 1 }
+  const h = networkHarness(initial)
+  h.controller.applyServerState(initial)
+  const context = () => ({ state: h.state(), humanId: 'p1', actionPending: false, phase: 'playing', tribute: null })
+  h.selection.toggle('pre-a', context())
+  assert.deepEqual([...h.selection.selectedCardIds], ['pre-a'])
+  assert.equal(h.selection.hint(context()), null, 'off-turn hint does not imply a legal turn')
+  h.selection.replaceFromInput(['pre-a', 'pre-b'], context())
+  for (const [index, currentTurn] of ['p3', 'p4', 'p1'].entries()) {
+    h.controller.applyServerState({ ...initial, currentTurn, revision: index + 2 })
+    assert.deepEqual([...h.selection.selectedCardIds], ['pre-a', 'pre-b'], 'other seat updates and arrival of our turn keep the selection')
+  }
+  h.selection.toggle('pre-a', { ...context(), actionPending: true })
+  h.selection.replaceFromInput([], { ...context(), actionPending: true })
+  assert.equal(h.selection.selectedCardIds.size, 2, 'pending action cannot mutate the submitted choice')
+  h.controller.applyServerState({ ...initial, currentTurn: 'p2', revision: 5 })
+  assert.equal(h.selection.selectedCardIds.size, 0, 'our own pass/turn completion retires the selection')
+  h.selection.toggle('pre-b', context())
+  h.controller.applyServerState({ ...initial, roundId: 2, revision: 6 })
+  assert.equal(h.selection.selectedCardIds.size, 0, 'new round clears even reused physical card IDs')
+  h.selection.toggle('pre-b', context())
+  const changed = structuredClone(h.state())
+  changed.revision++
+  changed.players.p1.hand.pop()
+  h.controller.applyServerState(changed)
+  assert.equal(h.selection.selectedCardIds.size, 0, 'an authoritative hand change retires missing cards')
 }
 
 const settledFirst = networkHarness(settledState)
@@ -244,7 +280,7 @@ const ai = {
   reset () {},
   dispose () { disposed += 1 },
 }
-const aiMatch = LocalMatchController.fromEngineState(engineState({
+const aiMatch = fromEngineState(engineState({
   currentTurn: 'p2',
   hands: { p1: [card('p1-9', 9)], p2: [card('p2-3', 3), card('p2-8', 8)], p3: [card('p3-4', 4)], p4: [card('p4-5', 5)] },
 }), { teamA: 2, teamB: 2 })
@@ -272,7 +308,7 @@ const stateAfterDispose = JSON.stringify(aiMatch.state)
 aiCallbacks[1].callback()
 assert.equal(JSON.stringify(aiMatch.state), stateAfterDispose, 'disposing the AI turn controller must invalidate retained callbacks')
 
-const failingMatch = LocalMatchController.fromEngineState(engineState({
+const failingMatch = fromEngineState(engineState({
   currentTurn: 'p2',
   hands: { p1: [card('retry-p1', 9)], p2: [card('retry-p2', 3)], p3: [card('retry-p3', 4)], p4: [card('retry-p4', 5)] },
 }), { teamA: 2, teamB: 2 })
@@ -380,6 +416,11 @@ networkActions.cancel()
 const hintCountAfterCancel = networkHints.length
 networkCallbacks[1].callback()
 assert.equal(networkHints.length, hintCountAfterCancel, 'leaving the session must invalidate an old network timeout')
+assert.equal(networkActions.begin(available, 'pending-3', 'play', () => {
+  networkActions.fail('平台确认开局期间暂不能操作')
+  return null
+}), false)
+assert.equal(networkHints.at(-1), '平台确认开局期间暂不能操作', 'a synchronous lifecycle rejection must not be overwritten by the generic send fallback')
 
 const scheduled = []
 const scheduler = new LocalTurnScheduler((callback, delay) => scheduled.push({ callback, delay }))
@@ -418,7 +459,7 @@ eventController.consume([
   { type: 'ROUND_PREPARED', roundId: 2, mode: 'double', status: 'selecting_tribute' },
   { type: 'PLAY_STARTED_AFTER_TRIBUTE', leaderId: 'p1', wasResisted: false },
   settlementEvent,
-], { state: settledState, humanId: 'p1', scores: settledState.scores, recordProgress: true })
+], { state: settledState, humanId: 'p1', scores: settledState.scores })
 assert.deepEqual(effects, [
   'pass-audio',
   'round-audio',
@@ -432,19 +473,6 @@ assert.deepEqual(effects, [
 
 effects.length = 0
 eventController.consume([settlementEvent], {
-  state: settledState,
-  humanId: 'p1',
-  scores: settledState.scores,
-  recordProgress: false,
-})
-assert.deepEqual(effects, [
-  'phase:settlement',
-  'clear-selection',
-  `hint:${settlementEvent.settlement.message}`,
-], 'development fixtures must preserve settlement presentation without recording progression')
-
-effects.length = 0
-eventController.consume([settlementEvent], {
   state: {
     ...settledState,
     playHistory: [
@@ -455,7 +483,6 @@ eventController.consume([settlementEvent], {
   },
   humanId: 'p1',
   scores: settledState.scores,
-  recordProgress: true,
 })
 assert.ok(effects.includes(`record:${settlementEvent.settlement.message}:2`), 'personal stats must count only the human seat bombs')
 assert.equal(countPlayerBombs({
@@ -470,13 +497,12 @@ assert.equal(countPlayerBombs({
 
 const managerSource = fs.readFileSync(managerPath, 'utf8')
 const networkSnapshotSource = fs.readFileSync(networkSnapshotControllerPath, 'utf8')
-assert.match(managerSource, /LocalMatchController/)
-assert.match(managerSource, /LocalAITurnController/)
+assert.doesNotMatch(managerSource, /LocalMatchController/)
+assert.doesNotMatch(managerSource, /LocalAITurnController/)
 assert.match(managerSource, /LocalHandSelectionController/)
-assert.match(managerSource, /LocalMatchEventController/)
+assert.doesNotMatch(managerSource, /LocalMatchEventController/)
 assert.match(managerSource, /NetworkActionController/)
 assert.match(managerSource, /NetworkMatchSnapshotController/)
-assert.match(managerSource, /createSynchronousLocalAIEngine\(\{[\s\S]*ruleProfile: match\.ruleProfile,[\s\S]*seed:/, 'each local match must receive an explicitly configured AI engine instance')
 assert.doesNotMatch(managerSource, /LocalTurnScheduler/, 'Cocos must not own delayed-turn generations')
 assert.doesNotMatch(managerSource, /\btransition\(/, 'GameManager must not write MatchState directly')
 assert.doesNotMatch(managerSource, /\bmakeDecision\(/, 'GameManager must not bind the legacy module-level AI')
@@ -490,14 +516,14 @@ assert.match(networkSnapshotSource, /current\.scores\[result\.winnerTeam\] \+ Ma
 assert.match(networkSnapshotSource, /!this\.recordedRoundKeys\.has\(roundKey\)[\s\S]*this\.ports\.recordRound/, 'network settlement statistics must be idempotent by room and protocol event')
 assert.match(networkSnapshotSource, /stats\?\.bombsPlayed[\s\S]*countPlayerBombs\(state, humanId\)/, 'server-projected viewer stats must win while legacy packets retain the local history fallback')
 assert.match(networkSnapshotSource, /commitLegacyRoundEnd[\s\S]*mergeGameManagerProjection\(adapted\.projection, patch\)/, 'legacy result-only packets must have an explicit settlement lifecycle adapter')
-assert.match(managerSource, /resetMatchProgress\(\)[\s\S]*this\.startRound\(\)/, 'a local terminal restart must reset progression before dealing a new match')
 assert.ok(managerSource.split('\n').length <= 470, 'GameManager must keep maintenance margin as a bounded Cocos input adapter')
 
 const sessionSource = fs.readFileSync(sessionPath, 'utf8')
 assert.match(sessionSource, /get ruleProfile \(\): RuleProfile \{ return getRuleProfile\(this\.snapshot\.settings\.rulePreset\) \}/)
 assert.doesNotMatch(sessionSource, /setRuleProfileByPreset/, 'GameSession must not mutate a module-level rule profile')
 assert.match(sessionSource, /restoreSessionSnapshot\(JSON\.parse\(raw\)\)/, 'persisted session data must pass through the versioned schema migrator')
-assert.match(sessionSource, /public resetMatchProgress \(\): void/, 'GameSession must expose one explicit new-match progression reset')
 assert.doesNotMatch(sessionSource, /setRoundLevels/, 'round progression must be committed atomically with the round record')
 
 process.stdout.write('local match controller and delayed-turn guards passed\n')
+
+assert.doesNotMatch(sessionSource, /beginLocalGame|completeGrouping|resetMatchProgress|campaignProgress/, 'retired local lifecycle stays outside runtime')

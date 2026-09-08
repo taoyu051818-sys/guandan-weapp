@@ -1,4 +1,5 @@
 import { Color, Graphics, Label, Node, Sprite, SpriteFrame, UITransform, Vec3 } from 'cc'
+import type { PlayerId } from '../core/generated'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
 import {
   TABLE_HUD_SEAT_PLACES,
@@ -8,6 +9,7 @@ import {
 } from './TableHudLayoutPolicy'
 
 export type TableHudSeatState = Readonly<{
+  playerId?: PlayerId
   place: TableHudSeatPlace
   name: string
   status: string
@@ -45,7 +47,7 @@ const AVATAR_COLORS: Readonly<Record<TableHudSeatPlace, Color>> = Object.freeze(
 export const createDefaultTableHudSeats = (): readonly TableHudSeatState[] => TABLE_HUD_SEAT_PLACES.map(place => ({
   place,
   name: TABLE_HUD_DEFAULT_SEAT_NAMES[place],
-  status: '剩27张',
+  status: '',
 }))
 
 const compactHudText = (value: string, maximumCharacters: number): string => {
@@ -86,6 +88,22 @@ export class TableHudSeatViewGroup {
   private readonly views = new Map<TableHudSeatPlace, SeatView>()
   private seats: readonly TableHudSeatState[] = createDefaultTableHudSeats()
   private defaultAvatarFrame: SpriteFrame | null = null
+  private ownAvatarFrame: SpriteFrame | null = null
+  public ownAvatarHitNode: Node | null = null
+  public onSeatAvatar: ((playerId: PlayerId) => void) | undefined
+
+  public bindOwnAvatar (callback: () => void): void {
+    const parent = this.views.get('bottom')?.node
+    if (!parent || this.ownAvatarHitNode) return
+    const hit = new Node('EditOwnAvatar')
+    hit.parent = parent
+    configureTransform(hit, 80, 80)
+    hit.setPosition(new Vec3(-96, 0, 3))
+    hit.on(Node.EventType.TOUCH_END, callback)
+    this.ownAvatarHitNode = hit
+  }
+
+  public setOwnAvatarFrame (frame: SpriteFrame | null): void { this.ownAvatarFrame = frame; this.renderViews() }
 
   public mount (parent: Node): void {
     if (this.views.size === 0) {
@@ -122,6 +140,7 @@ export class TableHudSeatViewGroup {
       view.avatarSprite.spriteFrame = frame
       view.avatarSprite.node.active = Boolean(frame)
     })
+    this.renderViews()
   }
 
   public dispose (): void {
@@ -140,7 +159,11 @@ export class TableHudSeatViewGroup {
     const avatarSprite = avatarNode.addComponent(Sprite)
     avatarSprite.sizeMode = Sprite.SizeMode.CUSTOM
     avatarSprite.node.active = false
-    const nameLabel = createLabel(node, 'PlayerName', 180, 40, 28, new Color(240, 246, 243))
+    avatarNode.on(Node.EventType.TOUCH_END, () => {
+      const id = this.seats.find(seat => seat.place === place)?.playerId
+      if (id) this.onSeatAvatar?.(id)
+    })
+    const nameLabel = createLabel(node, 'PlayerName', 180, 32, 22, new Color(240, 246, 243))
     const rankLabel = createLabel(node, 'PlayerRank', 172, 34, 24, new Color(255, 216, 105))
     return { node, graphics, avatarSprite, nameLabel, rankLabel }
   }
@@ -151,7 +174,7 @@ export class TableHudSeatViewGroup {
       const seat = byPlace.get(place) ?? {
         place,
         name: TABLE_HUD_DEFAULT_SEAT_NAMES[place],
-        status: '剩27张',
+        status: '',
       }
       const view = this.views.get(place)
       if (view) this.renderSeat(view, seat, place)
@@ -161,31 +184,37 @@ export class TableHudSeatViewGroup {
   private renderSeat (view: SeatView, seat: TableHudSeatState, place: TableHudSeatPlace): void {
     const offline = Boolean(seat.offline)
     const active = Boolean(seat.active) && !offline
+    const side = place === 'left' || place === 'right'
+    configureTransform(view.node, side ? 156 : SEAT_WIDTH, side ? 168 : SEAT_HEIGHT)
     const avatarSize = 72
-    const avatarX = -96
-    const textWidth = 180
-    const textX = 42
+    const avatarX = side ? 0 : -96
+    const avatarY = side ? 30 : 0
+    const textWidth = side ? 144 : 180
+    const textX = side ? 0 : 42
     const statusHeight = 34
-    const statusY = -23
+    const statusY = side ? -62 : -23
     view.graphics.clear()
     view.graphics.fillColor = offline ? new Color(71, 82, 84) : AVATAR_COLORS[place]
     view.graphics.strokeColor = active ? new Color(255, 218, 104) : new Color(221, 236, 232)
     view.graphics.lineWidth = active ? 2.5 : 1.5
-    view.graphics.roundRect(avatarX - avatarSize / 2, -avatarSize / 2, avatarSize, avatarSize, 16)
+    view.graphics.roundRect(avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize, 16)
     view.graphics.fill()
     view.graphics.stroke()
-    view.graphics.fillColor = active ? new Color(98, 70, 20, 245) : new Color(31, 60, 68, 245)
-    view.graphics.roundRect(-48, statusY - statusHeight / 2, textWidth, statusHeight, statusHeight / 2)
-    view.graphics.fill()
+    if (seat.status.trim()) {
+      view.graphics.fillColor = active ? new Color(98, 70, 20, 245) : new Color(31, 60, 68, 245)
+      view.graphics.roundRect(textX - textWidth / 2, statusY - statusHeight / 2, textWidth, statusHeight, statusHeight / 2)
+      view.graphics.fill()
+    }
     configureTransform(view.avatarSprite.node, avatarSize - 8, avatarSize - 8)
-    view.avatarSprite.node.setPosition(new Vec3(avatarX, 0, 2))
-    configureLabelMetrics(view.nameLabel, textWidth, 40, 28, textX, 22)
+    view.avatarSprite.node.setPosition(new Vec3(avatarX, avatarY, 2))
+    configureLabelMetrics(view.nameLabel, textWidth, 32, 22, textX, side ? -26 : 22)
     configureLabelMetrics(view.rankLabel, textWidth - 8, statusHeight, 24, textX, statusY)
-    view.avatarSprite.spriteFrame = this.defaultAvatarFrame
-    view.avatarSprite.node.active = Boolean(this.defaultAvatarFrame)
+    view.avatarSprite.spriteFrame = place === 'bottom' ? this.ownAvatarFrame ?? this.defaultAvatarFrame : this.defaultAvatarFrame
+    view.avatarSprite.node.active = Boolean(view.avatarSprite.spriteFrame)
     view.avatarSprite.color = offline ? new Color(150, 156, 154) : new Color(255, 255, 255)
     view.nameLabel.string = compactHudText(seat.name || TABLE_HUD_DEFAULT_SEAT_NAMES[place], 6)
     view.nameLabel.color = offline ? new Color(148, 163, 163) : new Color(240, 246, 243)
     view.rankLabel.string = compactHudText(seat.status, 7)
+    view.rankLabel.node.active = Boolean(view.rankLabel.string)
   }
 }
