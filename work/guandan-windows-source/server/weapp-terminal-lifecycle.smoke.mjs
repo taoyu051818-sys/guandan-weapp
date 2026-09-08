@@ -28,14 +28,16 @@ let collectorError = null
 let nextRequestId = 1
 
 const matches = {
-  round: { matchId: 'mat-terminal-round-limit', roomId: '401001', port: 39117 },
-  time: { matchId: 'mat-terminal-time-limit', roomId: '401002', port: 39118 },
-  rejected: { matchId: 'mat-terminal-start-rejected', roomId: '401003', port: 39119 },
-  participantLost: { matchId: 'mat-terminal-participant-lost', roomId: '401004', port: 39120 },
-  passedA: { matchId: 'mat-terminal-passed-a', roomId: '401005', port: 39121 },
-  ordinaryRound: { matchId: 'mat-terminal-ordinary-round', roomId: '401006', port: 39122 },
-  claimedRestart: { matchId: 'mat-terminal-claimed-restart', roomId: '401007', port: 39123 },
-  claimedTimeout: { matchId: 'mat-terminal-claimed-timeout', roomId: '401008', port: 39124 },
+  // Keep fixed restart targets outside Linux's default ephemeral port range:
+  // prior HTTP/WebSocket client connections may still own ports in 32768+.
+  round: { matchId: 'mat-terminal-round-limit', roomId: '401001', port: 19017 },
+  time: { matchId: 'mat-terminal-time-limit', roomId: '401002', port: 19018 },
+  rejected: { matchId: 'mat-terminal-start-rejected', roomId: '401003', port: 19019 },
+  participantLost: { matchId: 'mat-terminal-participant-lost', roomId: '401004', port: 19020 },
+  passedA: { matchId: 'mat-terminal-passed-a', roomId: '401005', port: 19021 },
+  ordinaryRound: { matchId: 'mat-terminal-ordinary-round', roomId: '401006', port: 19022 },
+  claimedRestart: { matchId: 'mat-terminal-claimed-restart', roomId: '401007', port: 19023 },
+  claimedTimeout: { matchId: 'mat-terminal-claimed-timeout', roomId: '401008', port: 19024 },
 }
 
 const deferred = () => {
@@ -151,6 +153,7 @@ const pathsFor = label => ({
   resultOutboxFile: join(root, `${label}-result-outbox.json`),
 })
 
+const launchesByPort = new Map()
 const launch = ({ port, stateFile, outboxFile, resultOutboxFile, totalMinuteMs = 60_000, extraEnv = {} }) => {
   const child = spawn(process.execPath, ['server/weapp-ws.js'], {
     cwd: process.cwd(),
@@ -172,8 +175,14 @@ const launch = ({ port, stateFile, outboxFile, resultOutboxFile, totalMinuteMs =
       GAME_SPECTATOR_OUTBOX_FILE: outboxFile,
       ...extraEnv,
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
+  const status = { child, output: '', error: null }
+  const record = chunk => { status.output = (status.output + chunk.toString()).slice(-8000) }
+  child.stdout.on('data', record)
+  child.stderr.on('data', record)
+  child.on('error', error => { status.error = error })
+  launchesByPort.set(port, status)
   children.add(child)
   return child
 }
@@ -218,9 +227,13 @@ const connectOnce = port => new Promise((resolve, reject) => {
 const connect = async port => {
   const deadline = Date.now() + 15_000
   while (Date.now() < deadline) {
+    const status = launchesByPort.get(port)
+    if (status && (status.error || status.child.exitCode !== null || status.child.signalCode !== null)) {
+      throw new Error(`终局联机服务 ${port} 已退出: ${status.error?.message ?? status.child.exitCode ?? status.child.signalCode}\n${status.output}`)
+    }
     try { return await connectOnce(port) } catch { await delay(50) }
   }
-  throw new Error(`终局联机服务 ${port} 启动超时`)
+  throw new Error(`终局联机服务 ${port} 启动超时\n${launchesByPort.get(port)?.output || ''}`)
 }
 
 const waitMessage = (socket, type, requestId, timeoutMs = 6000) => new Promise((resolve, reject) => {
