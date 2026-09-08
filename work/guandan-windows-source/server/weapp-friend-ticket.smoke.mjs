@@ -53,6 +53,8 @@ let firstSeatLeftHandled = false
 let nextSeatReleaseRevocations = []
 const firstSeatLeftSeen = new Promise(resolve => { firstSeatLeftSeenResolve = resolve })
 const firstSeatLeftRelease = new Promise(resolve => { firstSeatLeftReleaseResolve = resolve })
+let kickedSeatReleaseResolve
+const kickedSeatRelease = new Promise(resolve => { kickedSeatReleaseResolve = resolve })
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const lifecycleTypes = new Set(['game-start', 'match-ended', 'seat-left', 'room-closed'])
@@ -89,6 +91,7 @@ const collector = createServer((request, response) => {
         await startClaimRelease
       }
       let seatRelease = null
+      if (event.type === 'seat-left' && event.reason === 'kicked') await kickedSeatRelease
       if (event.type === 'seat-left' && event.matchId === matchId && !firstSeatLeftHandled) {
         firstSeatLeftHandled = true
         firstSeatLeftSeenResolve(event)
@@ -215,6 +218,12 @@ const waitMessage = (socket, type, requestId, timeoutMs = 4000) => new Promise((
   }, timeoutMs)
   const handler = ({ data }) => {
     const packet = JSON.parse(data)
+    if (requestId !== undefined && packet.requestId === requestId && packet.type === 'error' && type !== 'error') {
+      clearTimeout(timer)
+      socket.removeEventListener('message', handler)
+      reject(new Error(`等待 ${type}/${requestId} 时收到 ${packet.code || 'error'}: ${packet.message}`))
+      return
+    }
     if (packet.type !== type || (requestId !== undefined && packet.requestId !== requestId)) return
     clearTimeout(timer)
     socket.removeEventListener('message', handler)
@@ -408,6 +417,15 @@ try {
   assert.equal(kickedNewTicket.code, 'FRIEND_ROOM_PARTICIPANT_REVOKED')
 
   const replacementTicket = issueFriendTicket(longTickets, { userId: 'usr-friend-3-replacement', seat: 'p3' })
+  const replacementPending = await expectError(thirdSeat, 'joinRoom', {
+    roomId,
+    ...ticketPayload(replacementTicket),
+  })
+  assert.equal(replacementPending.code, 'FRIEND_SEAT_RELEASE_PENDING', '踢人回执前替补入座必须被封锁，且不得消耗票据')
+  kickedSeatReleaseResolve()
+  await waitForPersistedRoom(roomId, room => (
+    !room.pendingSpectatorEvents.some(event => event.type === 'seat-left' && event.playerId === 'p3')
+  ))
   const replacementJoined = await sendAndWait(thirdSeat, 'joinRoom', {
     roomId,
     ...ticketPayload(replacementTicket),
@@ -690,6 +708,7 @@ try {
   assert.equal(collectorError, null)
   console.log('weapp signed friend-ticket integration passed')
 } finally {
+  kickedSeatReleaseResolve()
   startClaimReleaseResolve()
   firstSeatLeftReleaseResolve({ jti: 'cleanup', exp: Math.floor(Date.now() / 1000) + 60 })
   sockets.forEach(socket => socket.close())
