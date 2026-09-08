@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const { pathToFileURL } = require('node:url')
+const { loadTs } = require('./support/load-typescript-module.cjs')
 
 const projectRoot = path.resolve(__dirname, '..')
 const mapperPath = path.join(projectRoot, 'assets/scripts/ui/CardPresentationMapper.ts')
@@ -15,7 +15,7 @@ const read = filePath => fs.readFileSync(filePath, 'utf8')
 const card = (suit, rank) => ({ id: `${suit}-${rank}`, suit, rank, value: 0, isLevelCard: false })
 
 async function verifyMappings () {
-  const { mapCardToPresentation } = await import(`${pathToFileURL(mapperPath).href}?regression=${Date.now()}`)
+  const { mapCardToPresentation } = loadTs(mapperPath)
   assert.deepEqual(mapCardToPresentation(card('spade', 'A')), { rank: 'A', suit: 'spade', red: false, levelCard: false })
   assert.deepEqual(mapCardToPresentation(card('heart', 10)), { rank: '10', suit: 'heart', red: true, levelCard: false })
   assert.deepEqual(mapCardToPresentation(card('club', 'K')), { rank: 'K', suit: 'club', red: false, levelCard: false })

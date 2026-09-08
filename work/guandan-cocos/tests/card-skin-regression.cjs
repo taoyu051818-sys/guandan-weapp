@@ -3,7 +3,7 @@ const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 const zlib = require('node:zlib')
-const { pathToFileURL } = require('node:url')
+const { loadTs } = require('./support/load-typescript-module.cjs')
 
 const projectRoot = path.resolve(__dirname, '..')
 const resolverPath = path.join(projectRoot, 'assets/scripts/ui/CardSkinResolver.ts')
@@ -233,7 +233,7 @@ function authorizedSourceName (runtimeName) {
 }
 
 async function verifyResolverAndAssets () {
-  const resolver = await import(`${pathToFileURL(resolverPath).href}?regression=${Date.now()}`)
+  const resolver = loadTs(resolverPath)
   const suits = [
     { key: 'spade', red: false },
     { key: 'heart', red: true },
