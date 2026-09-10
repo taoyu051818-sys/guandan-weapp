@@ -21,15 +21,16 @@ export type TableMatchCoordinatorDependencies = Readonly<{
   audio: Pick<CocosAudioController, 'playRoundStart' | 'playEvent'>
   effects: Pick<EffectController, 'waitForPresentation' | 'syncActions' | 'resetForRecovery'>
   hand: Pick<HandController, 'node' | 'render' | 'consumeEntranceCompletion' | 'finishEntrances'>
-  playArea: Pick<PlayAreaController, 'getActionWorldPosition' | 'deferAction' | 'beginAction' | 'revealCard' | 'revealAction' | 'resetPresentation' | 'render'>
+  playArea: Pick<PlayAreaController, 'setSeatOrder' | 'getActionWorldPosition' | 'deferAction' | 'beginAction' | 'revealCard' | 'revealAction' | 'resetPresentation' | 'render'>
   playerSeats: ReadonlyMap<string, Pick<PlayerSeatController, 'node' | 'getPlayOriginWorldPosition' | 'render' | 'clearConnectionStatus' | 'setOffline'>>
-  frontPages: Pick<FrontPageController, 'hideAll' | 'showMenu' | 'handoffFriendRoomReservation' | 'showRecoveryMenu' | 'showClassicRooms' | 'renderLobby'>
-  overlays: Pick<TableOverlayController, 'showToast' | 'renderOwnChat' | 'clearModal' | 'clearDialogs'>
+  frontPages: Pick<FrontPageController, 'hideAll' | 'showMenu' | 'handoffFriendRoomReservation' | 'showRecoveryMenu' | 'showClassicRooms' | 'renderLobby' | 'isTournamentRoom' | 'showTournament'>
+  overlays: Pick<TableOverlayController, 'showToast' | 'clearModal' | 'clearDialogs'>
   turnClock: Pick<TableTurnClockController, 'reset' | 'update'>
-  handInteraction: Pick<TableHandInteractionController, 'submit' | 'cancelManualSelection' | 'invalidateAuthoritativeHand' | 'resetForRound' | 'canInteractWithCurrentHand'>
+  handInteraction: Pick<TableHandInteractionController, 'submit' | 'clearSuitPreview' | 'invalidateAuthoritativeHand' | 'resetForRound' | 'canInteractWithCurrentHand'>
   hud: Pick<TableHudPresenter, 'render' | 'mounted'>
   controls: TableMatchControls
   controlsY: () => number
+  renderDuplicateStatus?: () => void
   layoutSeats: (humanId: PlayerId) => void
   setTableVisible: (visible: boolean) => void
   setFriendRoomWaitingVisible: (visible: boolean) => void

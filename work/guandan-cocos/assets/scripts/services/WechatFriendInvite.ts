@@ -1,6 +1,6 @@
 export type FriendInviteLaunch = { query?: Record<string, unknown> }
 export type WechatFriendInviteApi = {
-  shareAppMessage?: (options: { title: string, query: string }) => void
+  shareAppMessage?: (options: { title: string, query: string, imageUrl: string }) => void
   getLaunchOptionsSync?: () => FriendInviteLaunch
   onShow?: (listener: (options: FriendInviteLaunch) => void) => void
   offShow?: (listener: (options: FriendInviteLaunch) => void) => void
@@ -43,7 +43,7 @@ export class WechatFriendInvite {
     const query = text && friendInviteQuery(text)
     if (!query) throw new Error('邀请暂不可用，请等待房间创建完成')
     if (!this.api?.shareAppMessage) throw new Error('请在微信小游戏内邀请好友')
-    this.api.shareAppMessage({ title: '来一起掼蛋，点击加入我的好友房', query })
+    this.api.shareAppMessage({ title: '来一起掼蛋，点击加入我的好友房', query, imageUrl: 'friend-room-share.jpg' })
     // Opening the share sheet is not evidence that a message was sent.
   }
 

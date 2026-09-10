@@ -31,7 +31,7 @@ for (const file of ['entry-classic.jpg', 'entry-friend.jpg', 'entry-tournament.j
 }
 // Restore appearance, not the old mock commerce/network implementation.
 const front = read('assets/scripts/scenes/FrontPageController.ts')
-assert.match(front, /showCompetition: \(\) => this\.host\.showToast\('筹备中'\)/)
+assert.match(front, /showCompetition: \(\) => this\.tournamentPage\.open\(\)/)
 assert.match(front, /showShop: \(\) => this\.shopPage\.showPreview\(\)/)
 assert.match(lobby, /recoverActiveMatch\(\)/)
 assert.match(view, /筹备中/)

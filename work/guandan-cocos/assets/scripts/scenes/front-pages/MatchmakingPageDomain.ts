@@ -5,7 +5,7 @@ import { matchWaitingText, type MatchWaitingStage } from '../../services/MatchWa
 import type { PageRouter } from '../PageRouter'
 import { renderMatchmakingPage } from './MatchmakingPageView'
 
-export type MatchReturnPage = 'menu' | 'online' | 'classic-rooms'
+export type MatchReturnPage = 'menu' | 'online' | 'classic-rooms' | 'tournament-center'
 export type MatchAssignment = { tournamentId: string, assignmentId: string }
 const MAX_TRACKED_MATCH_IDS = 32
 export type MatchmakingPageDependencies = {
@@ -19,6 +19,7 @@ export type MatchmakingPageDependencies = {
   showMenu: () => void
   showOnlinePlay: () => void
   showClassicRooms: () => void
+  showTournament?: () => void
 }
 
 /** Owns the matching page, polling, ticket validation, and cancel/assignment reconciliation. */
@@ -221,6 +222,7 @@ export class MatchmakingPageDomain {
     this.invalidate()
     if (returnPage === 'menu') this.dependencies.showMenu()
     else if (returnPage === 'classic-rooms') this.dependencies.showClassicRooms()
+    else if (returnPage === 'tournament-center') (this.dependencies.showTournament ?? this.dependencies.showMenu)()
     else this.dependencies.showOnlinePlay()
   }
 

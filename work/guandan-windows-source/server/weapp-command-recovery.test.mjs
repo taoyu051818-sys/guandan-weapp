@@ -99,13 +99,6 @@ for (const [phase, type, expected] of [['playing', 'setTrustee', 'trusteeUpdated
   assert.ok(h.sent.some(message => message.type === 'tributeUpdated'), 'new-round state must be recoverable after lost publication')
   h.dispose()
 }
-{
-  const h = fixture({ phase: 'playing' })
-  h.store.remember('viewer-resume:7', JSON.stringify({ type: 'chat', payload: { roomId: h.room.roomId } }), { requestId: 7, roomId: h.room.roomId })
-  await h.request('chat')
-  assert.deepEqual(h.sent.map(message => message.type), ['actionAccepted'], 'chat retry must not replay speech or reset the table')
-  h.dispose()
-}
 for (const phase of [null, 'playing', 'settled']) {
   const h = fixture({ phase })
   h.failures.add(1)

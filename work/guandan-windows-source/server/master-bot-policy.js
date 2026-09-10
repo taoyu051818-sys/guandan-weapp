@@ -55,6 +55,7 @@ export const createRoomBotPolicy = ({
         currentLevel,
         teamLevels: teamLevels || state.teamLevels || { teamA: currentLevel, teamB: currentLevel },
         roundMeta: roundMetaForAI(state.roundMeta),
+        turnOrder: state.turnOrder,
         ruleProfile: engine.ruleProfile,
       },
     )

@@ -38,14 +38,13 @@ export function layoutTableNodes (
   nodes.levelLabel?.node.setPosition(new Vec3(screen?.safeLeftX(165) ?? -475, screen?.safeTopY(92) ?? 268, 0))
   nodes.levelLabel?.node.getComponent(UITransform)?.setContentSize(300, 38)
   if (nodes.levelLabel) nodes.levelLabel.horizontalAlign = Label.HorizontalAlign.LEFT
-  nodes.trusteeButton?.setPosition(new Vec3(screen?.safeRightX(70) ?? 570, controlsY + 54, 0))
   nodes.skipEffectButton?.setPosition(new Vec3(screen?.safeRightX(90) ?? 550, screen?.safeTopY(40) ?? 320, 0))
 }
 
 export function layoutTableSeats (
   humanId: PlayerId, screen: ScreenAdapter | null, seats: ReadonlyMap<string, PlayerSeatController>,
+  order: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4'],
 ): void {
-  const order: Array<'p1' | 'p2' | 'p3' | 'p4'> = ['p1', 'p2', 'p3', 'p4']
   const humanIndex = order.indexOf(humanId)
   const positions = screen
     ? [new Vec3(0, screen.safeBottomY(90), 0), new Vec3(screen.safeRightX(105), 22, 0), new Vec3(-220, 218, 0), new Vec3(screen.safeLeftX(105), 22, 0)]
@@ -54,6 +53,5 @@ export function layoutTableSeats (
     const slot = (index - humanIndex + 4) % 4
     const seat = seats.get(id)
     seat?.node.setPosition(positions[slot])
-    seat?.setChatBubbleAbove(slot !== 2)
   })
 }

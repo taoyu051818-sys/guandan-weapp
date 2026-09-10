@@ -21,7 +21,7 @@ assert.equal(resolveHandGroupBadge(PlayType.Single, 1), undefined)
 assert.equal(resolveHandGroupBadge(PlayType.Pair, 2), undefined, 'pairs remain grouped without a stamp')
 const hand = [0, 1, 2, 3].map((id) => ({ id: String(id), rank: 8, value: 8, suit: ['spade', 'heart', 'club', 'diamond'][id], isLevelCard: false }))
 const grouping = { layoutMode: 'smart-arranged', ruleProfile: getRuleProfile('classic'), displayCardIds: hand.map(c => c.id), groups: [{ id: 'g', cardIds: hand.map(c => c.id), kind: 'manual', origin: 'manual', locked: true }] }
-const input = { hand, grouping, mode: 'play', playSelectedCardIds: [], lockDraftCardIds: [], lockedCardIds: [], availableSuits: [], sortOrder: 'desc', interactive: true, selectedSuit: null, lockAction: 'start', arrangeRestoreAvailable: true }
+const input = { hand, grouping, mode: 'play', playSelectedCardIds: [], lockedCardIds: [], availableSuits: [], sortOrder: 'desc', interactive: true, selectedSuit: null, lockDecision: { kind: 'unavailable', reason: 'empty-selection' }, arrangeRestoreAvailable: true }
 assert.deepEqual(projectHandRenderModel(input).groups[0].badge, { label: '四炸', tone: 'purple' }, 'badge comes from actual rules, not a stale/manual group kind')
 assert.equal(projectHandRenderModel({ ...input, grouping: { ...grouping, layoutMode: 'point-stacked' } }).groups[0].badge, undefined, 'restoring the ordinary view hides stamps')
 assert.equal(projectHandRenderModel({ ...input, hand: hand.slice(0, 2) }).groups[0].badge, undefined, 'a bomb reduced to a pair must clear its stamp')
@@ -49,7 +49,7 @@ class Label { static HorizontalAlign = { CENTER: 1 }; static VerticalAlign = { C
 const file = path.join(root, 'assets/scripts/ui/HandGroupBadgeView.ts')
 const compiled = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } })
 const mod = { exports: {} }
-Function('require', 'exports', 'module', compiled.outputText)(name => { assert.equal(name, 'cc'); return { Node, Color, Vec3, Graphics, Label, UITransform } }, mod.exports, mod)
+Function('require', 'exports', 'module', compiled.outputText)(name => { if (name === './UiFrameStyle') return require('../assets/scripts/ui/UiFrameStyle.ts'); assert.equal(name, 'cc'); return { Node, Color, Vec3, Graphics, Label, UITransform } }, mod.exports, mod)
 const parent = new Node('CardVisual')
 const view = new mod.exports.HandGroupBadgeView(parent)
 for (const label of ['三张', '三带二', '同花顺', '十一炸']) {

@@ -53,7 +53,7 @@ export const createWeAppGameStartCoordinator = ({
         at: now(),
         roundSequence: 1,
         type: 'game-start',
-        ...(room.friendMembers?.length ? { friendRoster: { ...room.userIdsBySeat } } : {}),
+        ...(room.friendMembers?.length || room.entryKind === 'friend' && room.botPlayerIds?.length ? { friendRoster: { ...room.userIdsBySeat } } : {}),
       }
     }
     return room.pendingGameStartEvent
@@ -137,7 +137,7 @@ export const createWeAppGameStartCoordinator = ({
 
   const finalizeClaimedStart = async (room, event) => {
     if (!rooms.has(room.roomId) || room.pendingGameStartEvent?.eventId !== event.eventId) return
-    if (isFriendRoom(room) && (playerIds.some(id => !seatHasLiveConnection(room, id)) || playerIds.some(id => !room.lobbyReady?.[id]))) {
+    if (isFriendRoom(room) && (playerIds.some(id => !seatHasLiveConnection(room, id) && !room.botPlayerIds?.includes(id)) || playerIds.some(id => !room.lobbyReady?.[id]))) {
       const reconnectDeadlineAt = Number(room.gameStartReconnectDeadlineAt)
       if (reconnectRooms.has(room.roomId) && Number.isFinite(reconnectDeadlineAt) && now() < reconnectDeadlineAt) {
         publishPending(room)

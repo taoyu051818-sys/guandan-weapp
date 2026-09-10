@@ -68,6 +68,7 @@ export class DevelopmentMatchmakingGateway implements MatchmakingGateway {
 export class DevelopmentFriendRoomGateway implements FriendRoomGateway {
   public async create (): Promise<never> { throw new FeatureInDevelopmentError('平台好友房') }
   public async join (): Promise<never> { throw new FeatureInDevelopmentError('平台好友房') }
+  public async joinRoomNumber (): Promise<never> { throw new FeatureInDevelopmentError('平台好友房') }
   public async cancel (): Promise<void> {}
 }
 
@@ -78,7 +79,7 @@ export class DevelopmentWalletGateway implements WalletGateway {
 export class DevelopmentAuthGateway implements AuthGateway {
   public constructor (private readonly player = new DevelopmentPlayerStore(SAMPLE_DASHBOARD)) {}
   public async getProfile (): Promise<UserProfile> { return this.player.getProfile() }
-  public async updateProfile (profile: Pick<UserProfile, 'displayName' | 'avatarUrl'>): Promise<UserProfile> {
+  public async updateProfile (profile: Pick<UserProfile, 'displayName' | 'avatarUrl'> & { avatarDataUri?: string }): Promise<UserProfile> {
     return this.player.updateProfile(profile)
   }
   public async getAvatarImage (): Promise<null> { return null }

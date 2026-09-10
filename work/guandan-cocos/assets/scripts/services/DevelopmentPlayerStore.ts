@@ -8,8 +8,10 @@ export class DevelopmentPlayerStore {
   public constructor (seed: DataSnapshot<PlayerDashboard>) { this.dashboard = snapshotData<PlayerDashboard>(seed) }
   public getDashboard (): PlayerDashboard { return copyData<PlayerDashboard>(this.dashboard) }
   public getProfile (): UserProfile { return copyData<UserProfile>(this.dashboard.user) }
-  public updateProfile (profile: Pick<UserProfile, 'displayName' | 'avatarUrl'>): UserProfile {
-    this.dashboard = snapshotData<PlayerDashboard>({ ...this.dashboard, user: { ...this.dashboard.user, ...profile } })
+  public updateProfile (profile: Pick<UserProfile, 'displayName' | 'avatarUrl'> & { avatarDataUri?: string }): UserProfile {
+    const { avatarDataUri, ...change } = profile
+    this.dashboard = snapshotData<PlayerDashboard>({ ...this.dashboard, user: { ...this.dashboard.user, ...change,
+      ...(avatarDataUri ? { avatarUrl: avatarDataUri } : {}), profileSource: 'saved' } })
     return this.getProfile()
   }
 }

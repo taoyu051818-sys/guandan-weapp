@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { finalizeOpenDataPackage } from './wechat-open-data-package.mjs'
 import {
   extractRuntimeConfig,
   injectScriptRuntimeConfig,
@@ -28,4 +29,5 @@ if (!checkOnly && requested) {
 const embedded = extractRuntimeConfig(source)
 verifyWechatRuntimeConfig(embedded)
 if (requested && JSON.stringify(embedded) !== JSON.stringify(requested)) throw new Error('WeChat build runtime config does not match the requested environment.')
-console.log(checkOnly ? 'WeChat runtime client config verified.' : 'WeChat runtime client config injected.')
+await finalizeOpenDataPackage(projectRoot, checkOnly)
+console.log(checkOnly ? 'WeChat runtime config and open data domain verified.' : 'WeChat runtime config and open data domain installed.')

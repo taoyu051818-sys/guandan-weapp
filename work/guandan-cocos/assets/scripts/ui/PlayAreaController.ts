@@ -22,6 +22,13 @@ const actionKey = (action: PlayAction, actionIndex: number): string =>
 /** Displays each seat's newest action, including pass prompts and played-card fans. */
 @ccclass('PlayAreaController')
 export class PlayAreaController extends Component {
+  private seatOrder: readonly PlayerId[] = order
+
+  public setSeatOrder (next: readonly PlayerId[]): void {
+    if (next.join() === this.seatOrder.join()) return
+    this.seatOrder = [...next]
+    this.layout(this.viewport)
+  }
   private viewport: TableViewport = { width: 1280, height: 720, halfWidth: 640, halfHeight: 360, safeLeft: 0, safeRight: 0, safeTop: 0, safeBottom: 0 }
   private actionNodes = new Map<PlayerId, Node>()
   private actionKeys = new Map<PlayerId, string>()
@@ -100,7 +107,7 @@ export class PlayAreaController extends Component {
   }
 
   public getActionWorldPosition (playerId: PlayerId, humanId: PlayerId = 'p1', cardCount = 1): Vec3 {
-    const place = (order.indexOf(playerId) - order.indexOf(humanId) + 4) % 4
+    const place = (this.seatOrder.indexOf(playerId) - this.seatOrder.indexOf(humanId) + 4) % 4
     const transform = this.getComponent(UITransform)
     const position = this.positionFor(place, cardCount)
     return transform?.convertToWorldSpaceAR(position) ?? this.node.worldPosition.clone().add(position)
@@ -116,7 +123,7 @@ export class PlayAreaController extends Component {
     this.actionNodes.forEach((node, id) => {
       Tween.stopAllByTarget(node)
       const count = this.authoritativeActions[this.actionIndexes.get(id) ?? -1]?.cards.length ?? 1
-      node.setPosition(this.positionFor((order.indexOf(id) - order.indexOf(this.authoritativeHumanId) + 4) % 4, count))
+      node.setPosition(this.positionFor((this.seatOrder.indexOf(id) - this.seatOrder.indexOf(this.authoritativeHumanId) + 4) % 4, count))
       if (!node.getChildByName('PassText')) node.setScale(settledScale)
     })
   }
@@ -193,7 +200,7 @@ export class PlayAreaController extends Component {
       }
       const root = new Node(`play-${id}`)
       root.parent = this.node
-      const place = (order.indexOf(id) - order.indexOf(humanId) + 4) % 4
+      const place = (this.seatOrder.indexOf(id) - this.seatOrder.indexOf(humanId) + 4) % 4
       const target = this.positionFor(place, Math.max(1, action.cards.length))
       const pending = this.pendingCards.get(actionIndex)
       root.setPosition(target)

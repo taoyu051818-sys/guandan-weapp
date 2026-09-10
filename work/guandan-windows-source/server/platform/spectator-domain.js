@@ -15,7 +15,7 @@ const friendMatchEndReasons = new Set(['round-limit', 'time-limit'])
 const spectatorEventKeys = new Set([
   'eventId', 'matchId', 'roomId', 'sequence', 'at', 'type', 'roundSequence',
   'playerId', 'cards', 'playType', 'automatic', 'ranking', 'winnerTeam',
-  'isGameWon', 'reason', 'userId', 'scores', 'roundsPlayed', 'endedAt', 'friendRoster',
+  'isGameWon', 'reason', 'userId', 'scores', 'roundsPlayed', 'endedAt', 'friendRoster', 'playerScores',
 ])
 const spectatorCardKeys = new Set(['rank', 'suit'])
 const friendMatchScoresKeys = new Set(['teamA', 'teamB'])
@@ -37,7 +37,7 @@ const spectatorKeysByType = {
   play: new Set([...spectatorCommonKeys, 'playerId', 'cards', 'playType', 'automatic']),
   pass: new Set([...spectatorCommonKeys, 'playerId', 'automatic']),
   'round-end': new Set([...spectatorCommonKeys, 'ranking', 'winnerTeam', 'isGameWon']),
-  'match-ended': new Set([...spectatorCommonKeys, 'reason', 'scores', 'roundsPlayed', 'endedAt', 'winnerTeam']),
+  'match-ended': new Set([...spectatorCommonKeys, 'reason', 'scores', 'roundsPlayed', 'endedAt', 'winnerTeam', 'playerScores']),
   'seat-left': new Set([...spectatorCommonKeys, 'playerId', 'reason', 'userId']),
   'room-closed': new Set([...spectatorCommonKeys, 'reason']),
 }
@@ -112,8 +112,9 @@ export const normalizeSpectatorEvent = (eventId, rawEvent, now) => {
   if (!Number.isSafeInteger(roundSequence) || roundSequence < 1 || roundSequence > 1000) throw badRequest('INVALID_ROUND_SEQUENCE', '观战事件 roundSequence 无效')
   const event = { eventId, matchId, roomId: String(rawEvent.roomId), sequence, at, type: rawEvent.type, roundSequence }
   if (rawEvent.friendRoster !== undefined) {
-    assertOnlyKeys(rawEvent.friendRoster, new Set(seats), 'INVALID_FRIEND_ROSTER', '开局席位表无效')
-    if (!seats.every(seat => typeof rawEvent.friendRoster[seat] === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(rawEvent.friendRoster[seat]))) throw badRequest('INVALID_FRIEND_ROSTER', '开局席位身份无效')
+    const rosterSeats = Object.keys(rawEvent.friendRoster || {}).length === 8 ? [...seats, 'p5', 'p6', 'p7', 'p8'] : seats
+    assertOnlyKeys(rawEvent.friendRoster, new Set(rosterSeats), 'INVALID_FRIEND_ROSTER', '开局席位表无效')
+    if (!rosterSeats.every(seat => typeof rawEvent.friendRoster[seat] === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(rawEvent.friendRoster[seat]))) throw badRequest('INVALID_FRIEND_ROSTER', '开局席位身份无效')
     event.friendRoster = { ...rawEvent.friendRoster }
   }
 
@@ -145,7 +146,7 @@ export const normalizeSpectatorEvent = (eventId, rawEvent, now) => {
   }
   if (rawEvent.type === 'seat-left') {
     if (roundSequence !== 1) throw badRequest('INVALID_FRIEND_SEAT_ROUND', '好友房开局前离席事件 roundSequence 必须为 1')
-    if (![...seats, 'observer'].includes(rawEvent.playerId)) throw badRequest('INVALID_SPECTATOR_PLAYER', '好友房离席位置无效')
+    if (![...seats, 'p5', 'p6', 'p7', 'p8', 'observer'].includes(rawEvent.playerId)) throw badRequest('INVALID_SPECTATOR_PLAYER', '好友房离席位置无效')
     if (!spectatorSeatLeaveReasons.has(rawEvent.reason)) throw badRequest('INVALID_FRIEND_SEAT_LEAVE_REASON', '好友房离席原因只支持 left 或 kicked')
     const userId = typeof rawEvent.userId === 'string' ? rawEvent.userId.trim() : ''
     if (!userId || userId.length > 128 || !/^[A-Za-z0-9:_-]+$/.test(userId)) throw badRequest('INVALID_FRIEND_SEAT_USER', '好友房离席用户无效')
@@ -182,6 +183,12 @@ export const normalizeSpectatorEvent = (eventId, rawEvent, now) => {
     event.roundsPlayed = roundsPlayed
     event.endedAt = endedAt
     event.winnerTeam = rawEvent.winnerTeam
+    if (rawEvent.playerScores !== undefined) {
+      const scores = rawEvent.playerScores
+      assertOnlyKeys(scores, new Set(['p1', 'p2', 'p3', 'p4']), 'INVALID_PERSONAL_SCORES', '个人积分字段无效')
+      if (!['p1', 'p2', 'p3', 'p4'].every(id => Number.isSafeInteger(scores[id]) && Math.abs(scores[id]) <= 6000)) throw badRequest('INVALID_PERSONAL_SCORES', '个人积分须为有效整数')
+      event.playerScores = { ...scores }
+    }
   }
   if (rawEvent.type === 'room-closed') {
     if (!spectatorCloseReasons.has(rawEvent.reason)) throw badRequest('INVALID_SPECTATOR_CLOSE_REASON', '牌桌终止原因无效')

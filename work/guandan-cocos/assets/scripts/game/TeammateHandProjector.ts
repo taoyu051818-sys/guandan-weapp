@@ -43,8 +43,8 @@ export class TeammateHandProjector {
       view: { playerId: teammateId, available },
       hand: projectHandRenderModel({
         hand, mode: 'blocked', interactive: false, sortOrder: direction,
-        grouping: this.workspace.snapshot, playSelectedCardIds: [], lockDraftCardIds: [],
-        lockedCardIds: [], availableSuits: [], selectedSuit: null, lockAction: 'start',
+        grouping: this.workspace.snapshot, playSelectedCardIds: [],
+        lockedCardIds: [], availableSuits: [], selectedSuit: null, lockDecision: { kind: 'unavailable', reason: 'interaction-blocked' },
         arrangeRestoreAvailable: false,
       }),
     }

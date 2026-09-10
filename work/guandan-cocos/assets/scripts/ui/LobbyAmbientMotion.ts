@@ -1,3 +1,4 @@
+import { drawUiFrame } from './UiFrameStyle'
 import { _decorator, Color, Component, Game, game, Graphics, Node, Rect, Size, Sprite, SpriteFrame, Texture2D, UIOpacity, UITransform } from 'cc'
 import { loadGameAsset } from '../services/GameAssetLoader'
 import { LOBBY_MOTION, type LobbyMotionClock, stepLobbyMotion } from './LobbyMotionPolicy'
@@ -25,7 +26,7 @@ export class LobbyAmbientMotion extends Component {
     const g = outline.addComponent(Graphics)
     g.lineWidth = 1.3 * s
     g.strokeColor = new Color(255, 247, 204)
-    g.roundRect(-width / 2 + 3 * s, -height / 2 + 3 * s, width - 6 * s, height - 6 * s, 6 * s)
+    drawUiFrame(g, -width / 2 + 3 * s, -height / 2 + 3 * s, width - 6 * s, height - 6 * s, 'control', s)
     g.stroke()
     this.rim = outline.addComponent(UIOpacity)
     this.rim.opacity = 0

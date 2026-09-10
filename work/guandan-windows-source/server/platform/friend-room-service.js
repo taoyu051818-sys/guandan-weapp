@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto'
 import { normalizeFriendRoomSettings } from '../friend-room-settings.js'
 import { canonicalJsonFingerprint, matchesJsonFingerprint } from './canonical-json.js'
 import { PlatformError, badRequest, conflict, notFound } from './errors.js'
+import { FriendRoomNumberLimiter } from './friend-room-number-limiter.js'
 
 const seats = ['p1', 'p2', 'p3', 'p4']
+const seatsFor = match => match.roomSettings?.format === 'duplicate' ? [...seats, 'p5', 'p6', 'p7', 'p8'] : seats
 export const friendRoomKind = 'friend-room'
 export const friendRoomDefaultTtlMs = 30 * 60_000
 const maxActiveFriendTicketsPerSeat = 256
@@ -57,6 +59,7 @@ export class FriendRoomService {
     this.store = store
     this.gameTickets = gameTickets
     this.now = now
+    this.numberJoinLimiter = new FriendRoomNumberLimiter(now)
     this.createId = createId
     this.createInviteCode = createInviteCode
     this.createEntryAttemptId = createEntryAttemptId
@@ -218,7 +221,7 @@ export class FriendRoomService {
       entryAttemptId: entryAttemptId || participant.claims?.entryAttemptId || this.ensureParticipantEntryAttemptId(participant),
       matchId: match.id,
       roomId: match.roomId,
-      seat: participant.seat,
+      seat: /^p[5-8]$/.test(participant.seat) ? `p${Number(participant.seat.slice(1)) - 4}` : participant.seat,
       isRoomHost: participant.userId === match.hostUserId,
       roomKind: 'friend',
       gameEndpoint: participant.gameEndpoint,
@@ -288,12 +291,20 @@ export class FriendRoomService {
     return outcome.entry
   }
 
-  async join (userId, { entryAttemptId, roomId, inviteCode } = {}) {
+  async join (userId, input = {}) { return this.admit(userId, input, false) }
+
+  async joinByNumber (userId, input = {}) {
+    this.numberJoinLimiter.consume(userId)
+    return this.admit(userId, input, true)
+  }
+
+  async admit (userId, { entryAttemptId, roomId, inviteCode } = {}, byNumber = false) {
     const safeAttemptId = normalizeEntryAttemptId(entryAttemptId)
     const safeRoomId = /^\d{6}$/.test(String(roomId || '')) ? String(roomId) : ''
-    if (!safeRoomId) throw notFound('FRIEND_ROOM_UNAVAILABLE', '好友房不存在或邀请码无效')
-    const suppliedInviteHash = inviteCodeHash(normalizeInviteCode(inviteCode))
-    const request = { action: 'join', roomId: safeRoomId, inviteCodeHash: suppliedInviteHash }
+    const unavailableMessage = byNumber ? '房间不存在或已失效，请核对房间号' : '好友房不存在或邀请码无效'
+    if (!safeRoomId) throw notFound('FRIEND_ROOM_UNAVAILABLE', unavailableMessage)
+    const suppliedInviteHash = byNumber ? null : inviteCodeHash(normalizeInviteCode(inviteCode))
+    const request = byNumber ? { action: 'join-number', roomId: safeRoomId } : { action: 'join', roomId: safeRoomId, inviteCodeHash: suppliedInviteHash }
     const requestFingerprint = fingerprint(request)
     const now = this.now()
     const outcome = await this.store.transaction(state => {
@@ -303,7 +314,7 @@ export class FriendRoomService {
       if (previous && !matchesJsonFingerprint(previous.fingerprint, request)) throw conflict('IDEMPOTENCY_CONFLICT', '同一个 entryAttemptId 不能用于不同好友房加入请求')
       const match = Object.values(state.matches).find(item => item?.kind === friendRoomKind && item.roomId === safeRoomId)
       if (!match || this.cancelExpired(state, match, now)) return { unavailable: true }
-      if (match.inviteCodeHash !== suppliedInviteHash) throw notFound('FRIEND_ROOM_UNAVAILABLE', '好友房不存在或邀请码无效')
+      if (!byNumber && match.inviteCodeHash !== suppliedInviteHash) throw notFound('FRIEND_ROOM_UNAVAILABLE', '好友房不存在或邀请码无效')
       if (Array.isArray(match.bannedUserIds) && match.bannedUserIds.includes(userId)) throw new PlatformError(403, 'FRIEND_ROOM_BANNED', '你已被移出该好友房，不能重新加入')
       if (previous && previous.matchId !== match.id) throw conflict('IDEMPOTENCY_CONFLICT', '同一个 entryAttemptId 不能用于不同好友房加入请求')
       if (match.status === 'playing' && match.roomSettings.spectator === 'off') throw conflict('FRIEND_ROOM_ALREADY_STARTED', '好友房已经开始且不允许观战')
@@ -313,7 +324,7 @@ export class FriendRoomService {
       let participant = match.participants.find(item => item.userId === userId)
       if (!participant) {
         const occupiedSeats = new Set(match.participants.filter(item => ['matching', 'matched'].includes(item.status) || (item.status === 'cancelled' && !item.ticketRevokedAt && Number(item.expiresAt) > now)).map(item => item.seat))
-        const seat = (match.status !== 'playing' && seats.slice(1).find(candidate => !occupiedSeats.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')
+        const seat = (match.status !== 'playing' && seatsFor(match).slice(1).find(candidate => !occupiedSeats.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')
         if (!seat) throw conflict('FRIEND_ROOM_FULL', '好友房席位已满')
         if (match.participants.filter(item => ['matching', 'matched', 'playing'].includes(item.status)).length >= 12) throw conflict('FRIEND_ROOM_FULL', '房间人数已满')
         participant = { userId, status: 'matching', seat, entryAttemptId: safeAttemptId, joinedAt: now }
@@ -330,8 +341,8 @@ export class FriendRoomService {
       }
       if (participant.status === 'cancelled') {
         const occupiedByOthers = new Set(match.participants.filter(item => item !== participant && (['matching', 'matched', 'playing'].includes(item.status) || (item.status === 'cancelled' && !item.ticketRevokedAt && Number(item.expiresAt) > now))).map(item => item.seat))
-        if (match.status === 'playing' || !seats.slice(1).includes(participant.seat) || occupiedByOthers.has(participant.seat)) {
-          const nextSeat = (match.status !== 'playing' && seats.slice(1).find(candidate => !occupiedByOthers.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')
+        if (match.status === 'playing' || !seatsFor(match).slice(1).includes(participant.seat) || occupiedByOthers.has(participant.seat)) {
+          const nextSeat = (match.status !== 'playing' && seatsFor(match).slice(1).find(candidate => !occupiedByOthers.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')
           if (!nextSeat) throw conflict('FRIEND_ROOM_FULL', '好友房席位已满')
           participant.seat = nextSeat
           delete participant.gameTicket
@@ -348,15 +359,15 @@ export class FriendRoomService {
       this.ensureTicket(match, participant, now, { purpose: match.status === 'playing' ? 'rejoin' : 'entry' })
       if (match.status === 'playing') participant.status = 'playing'
       state.activeMatchByUser[userId] = match.id
-      state.friendRoomEntryAttempts[attemptKey] ||= { userId, entryAttemptId: safeAttemptId, action: 'join', fingerprint: requestFingerprint, matchId: match.id, createdAt: now }
-      if (match.participants.filter(item => seats.includes(item.seat) && ['matching', 'matched'].includes(item.status)).length === 4 && match.status === 'matching') {
+      state.friendRoomEntryAttempts[attemptKey] ||= { userId, entryAttemptId: safeAttemptId, action: request.action, fingerprint: requestFingerprint, matchId: match.id, createdAt: now }
+      if (match.participants.filter(item => seatsFor(match).includes(item.seat) && ['matching', 'matched'].includes(item.status)).length === seatsFor(match).length && match.status === 'matching') {
         match.status = 'matched'
         match.matchedAt = now
         match.participants.forEach(item => { if (item.status === 'matching') item.status = 'matched' })
       }
       return { entry: this.entryView(match, participant, safeAttemptId) }
     })
-    if (outcome.unavailable) throw notFound('FRIEND_ROOM_UNAVAILABLE', '好友房不存在或邀请码无效')
+    if (outcome.unavailable) throw notFound('FRIEND_ROOM_UNAVAILABLE', unavailableMessage)
     return outcome.entry
   }
 
@@ -434,7 +445,7 @@ export class FriendRoomService {
       const botUserIdsBySeat = Object.fromEntries(match.participants.filter(item => item.isBot && item.seat).map(item => [item.seat, item.userId]))
       Object.assign(participant, this.gameTickets.issue({ userId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'match', matchMode: participant.claims?.matchMode, purpose, entryAttemptId: safeRecoveryAttemptId, ...(Object.keys(botUserIdsBySeat).length ? { botUserIdsBySeat } : {}) }), { recoveryIssuedAt: now })
       state.activeMatchByUser[userId] = match.id
-      const entry = { entryAttemptId: safeRecoveryAttemptId, recoveryAttemptId: safeRecoveryAttemptId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'match', ticketPurpose: participant.claims?.purpose || purpose, gameEndpoint: participant.gameEndpoint, gameTicket: participant.gameTicket, joinToken: participant.gameTicket, expiresAt: participant.expiresAt }
+      const entry = { entryAttemptId: safeRecoveryAttemptId, recoveryAttemptId: safeRecoveryAttemptId, matchId: match.id, roomId: match.roomId, seat: participant.seat, roomKind: 'match', queueId: match.mode, ticketPurpose: participant.claims?.purpose || purpose, gameEndpoint: participant.gameEndpoint, gameTicket: participant.gameTicket, joinToken: participant.gameTicket, expiresAt: participant.expiresAt }
       this.saveRecoveryReceipt(participant, safeRecoveryAttemptId, requestFingerprint, entry, now)
       return entry
     })

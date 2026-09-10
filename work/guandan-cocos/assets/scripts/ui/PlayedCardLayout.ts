@@ -7,7 +7,10 @@ export const playedCardSpacing = (count: number): number => Math.min(42, 210 / M
 export const playedCardPosition = (viewport: TableHudViewport, place: number, cardCount = 1): { x: number, y: number } => {
   const bounds = resolveTableHudBounds(viewport)
   const centerX = ((viewport.safeLeft ?? 0) - (viewport.safeRight ?? 0)) / 2
-  if (place === 0 || place === 2) return { x: centerX + 72, y: place === 0 ? 86 : 185 }
+  // Lower only the opposite fan by 20 scene units (~14 px at 874px width)
+  // so its rank strip clears the expanded counter on the landscape canvas.
+  // The compact opposite-seat column leaves room to align both fans to the safe centre.
+  if (place === 0 || place === 2) return { x: centerX, y: place === 0 ? 86 : 165 }
   const halfFan = (82 + Math.max(0, cardCount - 1) * playedCardSpacing(cardCount)) * PLAYED_CARD_SCALE / 2
   const avatarInnerOffset = 12 + (78 + 36) * bounds.scale
   const inset = avatarInnerOffset + 18 + halfFan

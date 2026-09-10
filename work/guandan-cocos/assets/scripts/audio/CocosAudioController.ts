@@ -32,7 +32,7 @@ export class CocosAudioController extends Component {
   private readonly variantCursors = new Map<AudioEvent, number>()
   private playbackEpoch = 0
   private roundStartEpoch = 0
-  private lastQuickVoiceAt = -Infinity
+  private lastShortVoiceAt = -Infinity
   private soundEnabled = true
   private bgmMode: BgmMode = 'lobby'
   private readonly pendingBgmAssets = new Set<string>()
@@ -96,14 +96,14 @@ export class CocosAudioController extends Component {
     if (profile) this.playProfile(profile)
   }
 
-  /** Quick-chat clips are optional and intentionally do not fall back to game SFX. */
+  /** Short card announcements do not fall back to unrelated game SFX. */
   public playVoice (key: string): void {
     if (key in RETIRED_AUDIO_ROUTES) return
     const settings = this.session?.snapshot.settings
     if (settings && !settings.soundEnabled) return
     const now = Date.now()
-    if (now - this.lastQuickVoiceAt < 650) return
-    this.lastQuickVoiceAt = now
+    if (now - this.lastShortVoiceAt < 650) return
+    this.lastShortVoiceAt = now
     this.playFirstAvailable(this.selectHumanVoiceKeys([key]), 1)
   }
 

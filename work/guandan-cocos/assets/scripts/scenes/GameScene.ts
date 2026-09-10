@@ -6,7 +6,6 @@ import { LobbyController, type FriendRoomSettings } from '../network/LobbyContro
 import { PlayerSeatController } from '../ui/PlayerSeatController'
 import { PlayAreaController } from '../ui/PlayAreaController'
 import { CocosAudioController } from '../audio/CocosAudioController'
-import { ChatController } from '../ui/ChatController'
 import { getRuleProfile, type PlayerId } from '../core/generated'
 import { ScreenAdapter, type TableViewport } from '../ui/ScreenAdapter'
 import { EffectController } from '../effects/EffectController'
@@ -28,6 +27,7 @@ import { TableHandInteractionController } from './TableHandInteractionController
 import { TableHudPresenter } from './TableHudPresenter'
 import { PlatformMatchRecoveryCoordinator } from './PlatformMatchRecoveryCoordinator'
 import { TableMatchCoordinator } from './TableMatchCoordinator'
+import { renderDuplicateTableStatus } from './DuplicateTableStatusView'
 import { TableLayoutAuditBridge } from './TableLayoutAuditBridge'
 import { orderTableLayers } from '../ui/TableLayerOrder'
 
@@ -112,7 +112,6 @@ export class GameScene extends Component {
 
   private playerSeats = new Map<string, PlayerSeatController>()
   private backdropController: SceneBackdropController | null = null
-  private trusteeButton: Node | null = null
   private screen: ScreenAdapter | null = null
   private ui: RuntimeUiFactory | null = null
   private tableHudPresenter: TableHudPresenter | null = null
@@ -164,7 +163,6 @@ export class GameScene extends Component {
     if (!this.gameManager) this.gameManager = this.getComponent(GameManager) ?? this.addComponent(GameManager)
     if (!this.lobby) this.lobby = this.getComponent(LobbyController) ?? this.addComponent(LobbyController)
     if (!this.audio) this.audio = this.getComponent(CocosAudioController) ?? this.addComponent(CocosAudioController)
-    const chat = (this.getComponent(ChatController) ?? this.addComponent(ChatController)) as ChatController
     const screen = this.screen ?? (this.getComponent(ScreenAdapter) ?? this.addComponent(ScreenAdapter)) as ScreenAdapter
     this.screen = screen
     this.ui = new RuntimeUiFactory(this.node)
@@ -180,11 +178,9 @@ export class GameScene extends Component {
       root: this.node,
       ui: this.ui,
       lobby,
-      chat,
       initialViewport: screen.viewport,
       getHumanId: () => this.session?.snapshot.myPlayerId ?? 'p1',
       isMultiplayer: () => Boolean(this.session?.snapshot.isMultiplayer),
-      isInteractionDisabled: () => Boolean(this.activeFriendRoomSettings()?.disableInteraction),
       shouldLeaveImmediately: () => {
         const multiplayer = Boolean(this.session?.snapshot.isMultiplayer)
         const latest = this.tableMatch?.snapshot
@@ -192,8 +188,6 @@ export class GameScene extends Component {
       },
       playerName: playerId => this.tableMatch?.snapshot?.state.players[playerId].name ?? playerId,
       leaveTable: () => this.tableMatch?.leaveTableToMenu(),
-      playVoice: voice => { if (!this.activeFriendRoomSettings()?.disableVoice) this.audio?.playVoice(voice) },
-      refreshPresentation: () => this.tableMatch?.refresh(),
       schedule: (callback, intervalSeconds) => this.schedule(callback, intervalSeconds),
       scheduleOnce: (callback, delaySeconds) => this.scheduleOnce(callback, delaySeconds),
       unschedule: callback => this.unschedule(callback),
@@ -216,7 +210,7 @@ export class GameScene extends Component {
       },
       refresh: () => {
         if (this.tableMatch?.hasSnapshot) this.tableMatch.refresh()
-        else this.tableHudPresenter?.update({ lockAction: 'start' })
+        else this.tableHudPresenter?.update({ lockDecision: { kind: 'unavailable', reason: 'interaction-blocked' } })
       },
       showToast: message => this.tableOverlays?.showToast(message),
       showNotice: (title, detail) => this.tableOverlays?.showNotice(title, detail),
@@ -241,6 +235,7 @@ export class GameScene extends Component {
       configured: frontPageGateways.configured, gateway: frontPageGateways.matchRecovery, lobby,
       enterLobby: () => this.session?.enterLobby(),
       restoreFriendRoom: entry => this.frontPages?.restoreFriendRoomReservation(entry),
+      restoreMatchOrigin: entry => this.frontPages?.restoreMatchOrigin(entry.roomId, entry.queueId),
       onPendingChanged: pending => this.frontPages?.setRecoveryPending(pending),
       showRecoveryAvailable: message => {
         lobby.offerActiveMatchRecovery(message)
@@ -274,10 +269,11 @@ export class GameScene extends Component {
       controls: {
         hint: this.hintButton, pass: this.passButton, play: this.playButton,
         confirmTribute: this.confirmTributeButton, finishTribute: this.finishTributeButton,
-        nextRound: this.nextRoundButton, trustee: this.trusteeButton,
+        nextRound: this.nextRoundButton,
         hintLabel: this.hintLabel, phaseLabel: this.phaseLabel, levelLabel: this.levelLabel, overlayLabel: this.overlayLabel,
       },
       controlsY: () => this.tableControlsY(),
+      renderDuplicateStatus: () => { if (this.tableHudPresenter?.node) renderDuplicateTableStatus(this.tableHudPresenter.node, screen, lobby, lobby.snapshot) },
       layoutSeats: humanId => this.layoutSeats(humanId),
       setTableVisible: visible => this.setTableVisible(visible),
       setFriendRoomWaitingVisible: visible => this.setFriendRoomWaitingVisible(visible),
@@ -408,7 +404,6 @@ export class GameScene extends Component {
       confirmTributeButton: this.confirmTributeButton,
       finishTributeButton: this.finishTributeButton,
       nextRoundButton: this.nextRoundButton,
-      trusteeButton: this.trusteeButton,
       skipEffectButton: this.skipEffectButton,
       playerSeats: this.playerSeats,
     }
@@ -424,7 +419,7 @@ export class GameScene extends Component {
       levelLabel: this.levelLabel, countdownLabel: this.countdownLabel,
       playButton: this.playButton, passButton: this.passButton, hintButton: this.hintButton,
       confirmTributeButton: this.confirmTributeButton, finishTributeButton: this.finishTributeButton,
-      nextRoundButton: this.nextRoundButton, trusteeButton: this.trusteeButton,
+      nextRoundButton: this.nextRoundButton,
       skipEffectButton: this.skipEffectButton, playerSeats: this.playerSeats,
     } = nodes)
     this.skipEffectButton?.on(Node.EventType.TOUCH_END, () => this.effects?.skipAll(), this)
@@ -440,7 +435,7 @@ export class GameScene extends Component {
         onSuitSelect: suit => this.tableHandInteraction?.handleSuitIntent(suit),
         onHandLockAction: () => this.tableHandInteraction?.handleLockAction(),
         onArrange: () => this.tableHandInteraction?.handleArrangeIntent(),
-        onChat: () => this.tableOverlays?.toggleQuickChatPanel(),
+        onTrustee: () => this.tableMatch?.toggleTrustee(),
         onOwnAvatar: () => { if (!this.session?.snapshot.isObserver) this.frontPages?.showProfileEditor() },
         onSeatAvatar: playerId => { if (this.session?.snapshot.isObserver) this.lobby?.watchPlayer(playerId) },
       },
@@ -458,7 +453,7 @@ export class GameScene extends Component {
     })
     this.hand?.setTouchExclusionPredicate(screenPoint => {
       return Boolean(this.tableOverlays?.blocksHandInput || this.frontPages?.profileEditorOpen) || presenter.hitTestInteractiveScreenPoint(screenPoint) || hitTestVisibleNodes(
-        [this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton, this.trusteeButton], screenPoint,
+        [this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton], screenPoint,
       )
     })
     this.tableLayoutAuditBridge = new TableLayoutAuditBridge({
@@ -466,12 +461,12 @@ export class GameScene extends Component {
       handNode: () => this.hand?.node ?? null,
       playArea: () => this.playArea,
       humanId: () => this.session?.snapshot.myPlayerId ?? 'p1',
+      seatOrder: () => this.tableMatch?.snapshot?.state.turnOrder ?? ['p1', 'p2', 'p3', 'p4'],
       hudRoot: () => presenter.node,
       auxiliaryNodes: () => [
         { id: 'tribute-confirm', label: '确认贡牌', role: 'control', interactive: true, node: this.confirmTributeButton },
         { id: 'tribute-finish', label: '开始本局', role: 'control', interactive: true, node: this.finishTributeButton },
         { id: 'next-round', label: '下一局操作', role: 'control', interactive: true, node: this.nextRoundButton },
-        { id: 'trustee', label: '托管操作', role: 'control', interactive: true, node: this.trusteeButton },
       ],
     })
     this.tableLayoutAuditBridge.install()
@@ -524,7 +519,7 @@ export class GameScene extends Component {
     this.tableOverlays?.setTableVisible(visible)
     if (!visible && this.skipEffectButton) this.skipEffectButton.active = false
     this.tableHudPresenter?.setVisible(visible)
-    const tableNodes = [this.hand?.node, this.tableShakeRoot, this.flightRoot, this.topEffectRoot, this.hintLabel?.node, this.phaseLabel?.node, this.levelLabel?.node, this.countdownLabel?.node, this.overlayLabel?.node, this.trusteeButton, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton]
+    const tableNodes = [this.hand?.node, this.tableShakeRoot, this.flightRoot, this.topEffectRoot, this.hintLabel?.node, this.phaseLabel?.node, this.levelLabel?.node, this.countdownLabel?.node, this.overlayLabel?.node, this.confirmTributeButton, this.finishTributeButton, this.nextRoundButton]
     tableNodes.push(...Array.from(this.playerSeats.values(), seat => seat.node))
     tableNodes.forEach(node => { if (node) node.active = visible })
     if (!visible) {
@@ -549,7 +544,7 @@ export class GameScene extends Component {
   }
 
   private layoutSeats (humanId: PlayerId): void {
-    layoutTableSeats(humanId, this.screen, this.playerSeats)
+    layoutTableSeats(humanId, this.screen, this.playerSeats, this.tableMatch?.snapshot?.state.turnOrder)
   }
 
   private tableControlsY (): number {

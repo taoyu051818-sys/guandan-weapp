@@ -160,12 +160,13 @@ for (const expectedChoice of [
   /id: 'total-time',[^\n]*label: '总时长',[^\n]*options: \['不限制', '20分钟', '30分钟', '60分钟'\]/,
   /id: 'spectator',[^\n]*label: '允许观战',[^\n]*options: \['禁止观战', '实时观战', '延迟观战'\]/,
   /id: 'auto-sort',[^\n]*label: '一键理牌',[^\n]*options: \['开启', '关闭'\]/,
-  /id: 'interaction',[^\n]*label: '聊天',[^\n]*options: \['禁止聊天', '允许聊天'\]/,
   /id: 'sort-order',[^\n]*label: '牌序',[^\n]*options: \['大牌在左', '小牌在左'\]/,
 ]) assert.match(friendRoomPolicy, expectedChoice)
 assert.match(friendSettingsSection, /FRIEND_ROOM_SETTINGS_TABS\.forEach[\s\S]*friendRoomChoiceRows\(this\.settingsDraft, this\.selectedTab\)/, 'the presenter renders policy projections')
 assert.match(friendSettingsSection, /updateFriendRoomChoice\(this\.settingsDraft, row\.id, value\)[\s\S]*updateFriendRoomRounds\(this\.settingsDraft, value\)/, 'all friend-room edits flow through the pure policy')
-assert.match(friendSettingsSection, /ui\.button\('FriendModeTab',[^\n]*50, Math\.max\(22, Math\.min\(24, leftWidth \* 0\.13\)\)/, 'friend-room mode tabs must retain a 22px minimum and 50px container')
+const friendModeTabs = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomModeTabs.ts'), 'utf8')
+assert.match(friendSettingsSection, /renderFriendRoomModeTabs\(/, 'the presenter delegates mode tabs to their rendering owner')
+assert.match(friendModeTabs, /ui\.button\('FriendModeTab',[^\n]*50, Math\.max\(22, Math\.min\(24, width \* 0\.13\)\)/, 'friend-room mode tabs must retain a 22px minimum and 50px container')
 assert.match(friendSettingsSection, /ui\.button\('FriendSettingsTab',[^\n]*44, 22,/, 'friend-room settings tabs must retain 22px labels in 44px containers')
 assert.match(friendSettingsSection, /compactButton\(ui, '重置',[^\n]*82, 42, 22,/, 'friend-room reset must retain a 22px label and sufficient height')
 assert.match(friendRoomPresenter, /ui\.button\('FriendChoice',[^\n]*buttonWidth, 44, Math\.max\(22, Math\.min\(24, buttonWidth \* 0\.17\)\)/, 'friend-room choice buttons must retain a 22px minimum and taller container')
@@ -251,6 +252,6 @@ assert.match(matchLifecycleServer, /hasReachedRoundLimit\(room\.roundSequence, r
 const turnClockServer = fs.readFileSync(path.join(serverRoot, 'weapp-turn-clock.js'), 'utf8')
 assert.match(turnClockServer, /settings\.trusteeSeconds \* friendSecondMs/, 'manual trustee timing must be enforced by the authoritative clock')
 assert.match(turnClockServer, /settings\.turnSeconds \* friendSecondMs/, 'manual first-play timing must be enforced by the authoritative clock')
-assert.match(fs.readFileSync(path.join(serverRoot, 'weapp-game-command-handler.js'), 'utf8'), /normalizeFriendRoomSettings\(room\.roomSettings\)\.disableInteraction\) return reply\('error', \{ message: '本好友房已禁止互动' \}\)/, 'disabled interaction must be rejected by the authoritative server')
+assert.doesNotMatch(fs.readFileSync(path.join(serverRoot, 'weapp-game-command-handler.js'), 'utf8'), /type === 'chat'/, 'retired chat has no server handler')
 
 console.log('lobby redesign regression checks passed')

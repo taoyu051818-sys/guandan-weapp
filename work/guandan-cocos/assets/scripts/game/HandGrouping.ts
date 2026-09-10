@@ -18,7 +18,6 @@ import {
   type StraightFlushSuit,
   type StraightFlushSuitAvailability,
 } from './HandArrangement'
-import { HandGroupingHistory } from './HandGroupingHistory'
 import {
   cardUnitKey,
   cloneArrangement,
@@ -55,14 +54,11 @@ export interface HandGroupingSnapshot {
   layoutMode: HandLayoutMode
   arrangement: HandArrangementOptions
   ruleProfile: RuleProfile
-  canUndo: boolean
-  canRedo: boolean
 }
 
 export interface HandGroupingOptions {
   arrangement?: Partial<HandArrangementOptions>
   ruleProfile?: RuleProfile
-  historyLimit?: number
 }
 
 export type HandAuthoritativeSyncOptions = Partial<HandArrangementOptions> & Readonly<{
@@ -79,11 +75,9 @@ export class HandGrouping {
   private cards: Card[] = []
   private handCardIds: CardId[] = []
   private state: HandGroupingState
-  private readonly history: HandGroupingHistory<HandGroupingState>
   private revision = 0
 
   public constructor (hand: readonly Card[] = [], options: HandGroupingOptions = {}) {
-    this.history = new HandGroupingHistory(options.historyLimit ?? 40, cloneHandGroupingState)
     this.state = {
       groups: [],
       ungroupedCardIds: [],
@@ -117,12 +111,10 @@ export class HandGrouping {
       layoutMode: this.state.layoutMode,
       arrangement: cloneArrangement(this.state.arrangement),
       ruleProfile: cloneRuleProfile(this.state.ruleProfile),
-      canUndo: this.history.canUndo,
-      canRedo: this.history.canRedo,
     }
   }
 
-  /** Starts a fresh presentation transaction and retires all prior card ids/history. */
+  /** Starts a fresh presentation transaction and retires all prior card ids. */
   public reset (hand: readonly Card[] = [], options: HandAuthoritativeSyncOptions = {}): void {
     assertUniqueCardIds(hand)
     const { fallbackOrder = 'arranged', ruleProfile, ...arrangement } = options
@@ -141,7 +133,6 @@ export class HandGrouping {
       ruleProfile: cloneRuleProfile(ruleProfile ?? getRuleProfile('classic')),
       nextGroupSequence: 1,
     }
-    this.history.clear()
     this.revision += 1
   }
 
@@ -224,8 +215,8 @@ export class HandGrouping {
 
   /**
    * Reconciles a server snapshot or post-play hand. Stale ids are removed,
-   * newly dealt ids are appended in the configured order, and old undo states
-   * are discarded so undo can never resurrect a played card.
+   * newly dealt ids are appended in the configured order; stale snapshots cannot
+   * restore cards removed by authoritative updates.
    */
   public syncAuthoritativeHand (
     hand: readonly Card[],
@@ -247,7 +238,6 @@ export class HandGrouping {
       fallbackOrder === 'authoritative' ? this.handCardIds : [],
       true,
     )
-    this.history.clear()
     this.revision += 1
   }
 
@@ -271,7 +261,7 @@ export class HandGrouping {
     if (requested.length !== cardIds.length) throw new Error('A manual group cannot contain the same cardId twice')
     if (requested.length < 2) throw new Error('A manual group needs at least two cards')
     this.assertKnownCards(requested)
-    // Creation and automatic placement are one user action and one undo record.
+    // Creation and automatic placement are one presentation revision.
     const canonicalPlacement = groupIndex === undefined && (locked || this.state.layoutMode === 'smart-arranged')
 
     let groupId = ''
@@ -567,21 +557,6 @@ export class HandGrouping {
     return true
   }
 
-  public undo (): boolean {
-    const previous = this.history.undo(this.state)
-    if (!previous) return false
-    this.state = normalizeHandGroupingState(this.cards, this.handCardIds, previous)
-    this.revision += 1
-    return true
-  }
-
-  public redo (): boolean {
-    const next = this.history.redo(this.state)
-    if (!next) return false
-    this.state = normalizeHandGroupingState(this.cards, this.handCardIds, next)
-    this.revision += 1
-    return true
-  }
 
   private assertKnownCards (cardIds: readonly CardId[]): void {
     const valid = new Set(this.handCardIds)
@@ -609,7 +584,6 @@ export class HandGrouping {
     const after = normalizeHandGroupingState(this.cards, this.handCardIds, draft)
     if (canonicalSort) sortHandGroupingDisplayState(this.cards, after)
     if (equalHandGroupingState(before, after)) return false
-    this.history.record(before)
     this.state = after
     this.revision += 1
     return true

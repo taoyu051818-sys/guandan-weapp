@@ -1,12 +1,23 @@
 import type { PlayerId } from '../core/generated'
 import type { NetworkMatchEnded } from '../network/LobbyController'
+import type { DuplicateRoomSummary } from '../network/DuplicateRoomModel'
+import { duplicateFinalPresentation } from './DuplicateTablePresentation'
 
 export type MatchEndedPresentation = Readonly<{ title: string, detail: string }>
 
 export const projectMatchEndedPresentation = (
   ended: NetworkMatchEnded,
   viewerId: PlayerId,
+  duplicate?: DuplicateRoomSummary | null,
 ): MatchEndedPresentation => {
+  if (duplicate) return duplicateFinalPresentation(duplicate)
+  if (ended.playerScores) {
+    const scores = ended.playerScores
+    const top = Math.max(...Object.values(scores))
+    const leaders = Object.values(scores).filter(score => score === top).length
+    const outcome = scores[viewerId] === top ? leaders > 1 ? '并列第一' : '个人第一' : '积分结算'
+    return { title: `本场结束 · ${outcome}`, detail: `已完成 ${ended.roundsPlayed} 局\n我的积分 ${scores[viewerId]} · 最高积分 ${top}` }
+  }
   const viewerTeam = viewerId === 'p1' || viewerId === 'p3' ? 'teamA' : 'teamB'
   const opponentTeam = viewerTeam === 'teamA' ? 'teamB' : 'teamA'
   const passedA = ended.reason === 'passed-a'

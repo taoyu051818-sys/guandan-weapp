@@ -397,6 +397,26 @@ assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-3'], 'a round signa
 assert.equal(hintRankCalls, 2, 'an authoritative signature change must invalidate the hint cache')
 
 const networkCallbacks = []
+// Hints obey hard lock boundaries, even when the only legal move would split a lock.
+{
+  const pair = [card('locked-a', 8), card('locked-b', 8)]
+  const locked = [{ id: 'manual-pair', kind: 'locked', cardIds: pair.map(c => c.id) }]
+  const state = engineState({ hands: { p1: [...pair, card('free-nine', 9)], p2: [], p3: [], p4: [] } })
+  state.lastValidPlay = { playerId: 'p4', type: 'Single', cards: [card('last-seven', 7)] }
+  const context = { state, humanId: 'p1', actionPending: false, phase: 'playing', tribute: null }
+  const hints = new LocalHandSelectionController()
+  for (let i = 0; i < 4; i++) {
+    assert.match(hints.hint(context, locked), /提示/)
+    assert.deepEqual([...hints.selectedCardIds], ['free-nine'], 'hint cycling cannot select part of the locked pair')
+  }
+  state.players.p1.hand = pair
+  assert.match(hints.hint(context, locked), /没有不拆锁牌/)
+  assert.equal(hints.selectedCardIds.size, 0, 'no protected hint clears stale selection instead of breaking the lock')
+  assert.match(hints.hint(context, []), /提示/, 'restoring a group re-enables split hints')
+  state.lastValidPlay = { playerId: 'p4', type: 'Pair', cards: [card('last-a', 7), card('last-b', 7)] }
+  assert.match(hints.hint(context, locked), /提示/)
+  assert.deepEqual(new Set(hints.selectedCardIds), new Set(pair.map(c => c.id)), 'whole locked combinations remain valid hints')
+}
 const networkHints = []
 const networkActions = new NetworkActionController(
   (callback, delay) => networkCallbacks.push({ callback, delay }),

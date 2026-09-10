@@ -16,7 +16,6 @@ const effectPlaybackPath = path.join(projectRoot, 'assets/scripts/effects/Effect
 const gameManagerPath = path.join(projectRoot, 'assets/scripts/game/GameManager.ts')
 const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts')
 const tableMatchCoordinatorPath = path.join(projectRoot, 'assets/scripts/scenes/TableMatchCoordinator.ts')
-const tableTurnClockPath = path.join(projectRoot, 'assets/scripts/scenes/TableTurnClockController.ts')
 const gameSessionPath = path.join(projectRoot, 'assets/scripts/session/GameSession.ts')
 const gameSessionModelPath = path.join(projectRoot, 'assets/scripts/session/GameSessionModel.ts')
 const licensedCatalogPath = path.join(projectRoot, 'third_party/licenses/gameabc2-audio/catalog.json')
@@ -202,7 +201,7 @@ assert.equal(niumaAudioManifest.license, 'MIT')
 assert.equal(niumaAudioManifest.licenseFile, 'third_party/licenses/NiuMa-client-cocos-MIT.txt')
 assert.match(read(niumaLicensePath), /^MIT License[\s\S]*Copyright \(c\) 2025 NiuMa[\s\S]*Permission is hereby granted/)
 assert.equal(niumaAudioManifest.sourceRevision, 'f9d037feaef5a80867fd97c8dd39b9a7486fbeca')
-assert.equal(niumaAudioManifest.assets.length, 49, 'the curated Female, round-flow and single exact-copy quick-chat clip must enter runtime')
+assert.equal(niumaAudioManifest.assets.length, 48, 'only curated Female and round-flow clips enter runtime')
 assert.equal(niumaAudioManifest.excluded.length, 11)
 assert.equal(niumaAudioManifest.excluded.some(asset => /feiji\.mp3$/.test(asset.sourcePath)), true, '飞机 must stay excluded from steel plate')
 assert.equal(niumaAudioManifest.excluded.some(asset => /yapai\.mp3$/.test(asset.sourcePath)), true, 'random 压牌 must stay excluded without a rule event')
@@ -223,7 +222,6 @@ assert.deepEqual(importedQuickChats.map(asset => ({
   runtimeText: asset.runtimeText,
   key: asset.key,
 })), [
-  { sourcePhraseIndex: 2, sourceText: '你的牌打得太好啦', runtimePhraseId: 'nice-play', runtimeText: '你的牌打得太好啦', key: 'niuma/chat_nice_play' },
 ], 'quick-chat audio must require an exact verified old-client copy rather than file-number or approximate-semantic guesses')
 assert.deepEqual(
   niumaAudioManifest.excluded.filter(asset => /Phrase\/Female\/phrase\d+\.ogg$/.test(asset.sourcePath)).map(asset => asset.sourcePhraseIndex),
@@ -331,7 +329,6 @@ const effectPlayback = read(effectPlaybackPath)
 const gameManager = read(gameManagerPath)
 const gameScene = read(gameScenePath)
 const tableMatchCoordinator = read(tableMatchCoordinatorPath)
-const tableTurnClock = read(tableTurnClockPath)
 const gameSession = read(gameSessionPath)
 const gameSessionModel = read(gameSessionModelPath)
 assert.match(audioController, /if \(!clip\) return this\.playFirstAvailable\(assetKeys, volumeScale, index \+ 1, epoch, current\)/, 'fallback candidates must retain the same announcement identity')
@@ -339,7 +336,7 @@ assert.match(audioController, /new OptionalAudioAssetCache<AudioClip>/, 'optiona
 assert.match(audioController, /if \(settings && !settings\.soundEnabled\) return/, 'the independent sound switch must be authoritative')
 assert.match(audioController, /if \(!this\.isPlaybackCurrent\(epoch\)\) return/, 'a late async load must re-check playback state before sounding')
 assert.match(audioController, /settings\?\.volume \?\? 0\.5\) \* volumeScale/, 'loaded clips must use the current volume rather than the request-time volume')
-assert.match(audioController, /now - this\.lastQuickVoiceAt < 650/, 'quick-chat bursts must be throttled below the minigame one-shot limit')
+assert.match(audioController, /now - this\.lastShortVoiceAt < 650/, 'short announcement bursts must be throttled below the minigame one-shot limit')
 assert.match(audioController, /now - \(this\.lastPlayedAssets\.get\(assetKey\).*< 60/, 'same-asset bursts must be deduplicated')
 assert.match(audioController, /profile\.assetVariants\?\.length/, 'semantic profiles must select pass variants without exposing file names to the scene')
 assert.match(audioController, /resolveCountdownProfile\(remaining\)/, 'countdown seconds must resolve through semantic profiles')
@@ -372,7 +369,7 @@ assert.match(effectController, /this\.policy\.maxMajorEffectCount === 0/, 'the m
 assert.match(effectController, /profile\.level > this\.majorLevel && !this\.policy\.replaceLowerLevelEffect/, 'major-effect replacement policy must be enforced')
 assert.doesNotMatch(effectController, /showTag\(profile\.label/, 'reduced settlement must not fall back to a system-font tag')
 assert.doesNotMatch(effectController, /pauseSystemEvents|resumeSystemEvents|enabled\s*=\s*false/, 'effect playback must not disable gameplay input')
-assert.match(tableTurnClock, /this\.remainingSeconds > 0 && this\.remainingSeconds <= 5[\s\S]*this\.dependencies\.playCountdown\(this\.remainingSeconds\)/, 'the last five countdown seconds must select their dedicated semantic ticks')
+// Countdown warning order/deduplication is exercised by table-turn-clock-controller-regression.
 assert.match(tableMatchCoordinator, /isLiveNextRound[\s\S]*audio\.playRoundStart\(\)/, 'live network next-round preparation must dispatch the layered start/deal cue')
 assert.match(gameScene, /action => this\.audio\?\.playActionVoice\(action\)/, 'the scene must bind action semantics to the audio controller')
 assert.match(gameScene, /this\.audio\?\.setBgmMode\(visible \? 'battle' : 'lobby'\)/, 'only the visible battle table may select the battle BGM')
@@ -386,3 +383,13 @@ process.stdout.write(`audio and effect regression checks passed (web build ${req
 
 assert.doesNotMatch(effectController, /renderFlow|playSettlement|playRoundOpening/, 'retired flow APIs must not remain as audio shims')
 assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableMatchCoordinator.ts'), 'utf8'), /audio\.playEvent\(viewer\.settlementWon \? 'victory' : 'defeat'\)/, 'settlement audio belongs to the live transition, independently of retired visuals')
+
+for (const [rank, key] of Object.entries(pairRankAssets)) {
+  const value = rank === '9' ? 15 : ({ J: 11, Q: 12, K: 13, A: 14 }[rank] ?? Number(rank))
+  const natural = { id: 'natural', rank, suit: 'club', value, isRedJoker: false }
+  const wild = { id: 'wild', rank: 9, suit: 'heart', value: 15, isRedJoker: true }
+  const action = { playerId: 'p1', type: PlayType.Pair, cards: [wild, natural],
+    resolution: { type: PlayType.Pair, maxValue: value, wildcardUsages: [{ cardId: 'wild', representedValue: value, representedSuit: 'club' }] } }
+  assert.equal(voices.resolvePlayVoiceProfile(action).assetKeys[0], `niuma/pair_${key}`, 'wild pair announces the actual pair rank')
+  assert.equal(voices.resolvePlayVoiceProfile({ ...action, cards: [wild, { ...natural, rank: 'Big', suit: 'joker', value: 17 }] }), null, 'invalid wildcard/joker pair stays silent')
+}

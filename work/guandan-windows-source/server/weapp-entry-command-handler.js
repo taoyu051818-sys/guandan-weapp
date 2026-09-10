@@ -265,6 +265,7 @@ export const createEntryCommandHandler = dependencies => async context => {
   if (room.state) return reply('error', { message: '对局已经开始，请使用重连凭证恢复席位' })
   const myPlayerId = claims?.seat || ids.slice(1).find(id => !seatIsOccupied(room, id))
   if (!myPlayerId) return reply('error', { message: '房间已满' })
+  if (room.botPlayerIds?.includes(myPlayerId)) return reply('error', { message: '该席位已有机器人，请房主先移除后再加入' })
   if (seatHasAnotherActiveConnection(room, myPlayerId, connection)) return reply('error', { message: '匹配票据指定席位已被占用' })
   if (claims && room.userIdsBySeat[myPlayerId] && room.userIdsBySeat[myPlayerId] !== claims.sub) {
     const previousTicketExpired = Number(room.ticketExpiresAtBySeat?.[myPlayerId]) * 1000 <= Date.now()

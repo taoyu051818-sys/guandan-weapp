@@ -46,8 +46,13 @@ class FakeVec3 {
 }
 
 const loaded = { exports: {} }
-let projectedPlayKeys = ['hint', 'play']
-new Function('exports', 'module', 'require', result.outputText)(loaded.exports, loaded, request => {
+const runtimeRequire = request => {
+  if (request === './TablePhasePresenter') {
+    const scope = { exports: {} }
+    const output = ts.transpileModule(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TablePhasePresenter.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+    new Function('exports', 'require', output)(scope.exports, runtimeRequire)
+    return scope.exports
+  }
   if (request === 'cc') return {
     Label: class Label {},
     Node: { EventType: { TOUCH_END: 'touch-end' } },
@@ -56,7 +61,7 @@ new Function('exports', 'module', 'require', result.outputText)(loaded.exports, 
   }
   if (request === '../ui/TablePromptPolicy') return { tableHintToast: () => null }
   if (request === '../game/TeammateHandProjector') return { TeammateHandProjector: class { project () { return null } reset () {} } }
-  if (request === '../ui/TablePlayActionPolicy') return { TablePlayActionPolicy: class { resolve () { return projectedPlayKeys } } }
+  if (request === '../ui/TablePlayActionPolicy') return { TablePlayActionPolicy: class { resolve () { return ['hint', 'play'] } } }
   if (request === '../ui/TableSettlementView') return { TableSettlementView: class { clear () {} render () {} } }
   if (request === './SettlementPresentation') return { projectSettlementContent: () => ({}) }
   if (request === './MatchEndedPresentation') return { projectMatchEndedPresentation: () => ({ title: '', detail: '' }) }
@@ -76,12 +81,12 @@ new Function('exports', 'module', 'require', result.outputText)(loaded.exports, 
     projectTributeEffectTokens: () => new Set(),
   }
   throw new Error(`unexpected runtime dependency ${request}`)
-})
+}
+new Function('exports', 'module', 'require', result.outputText)(loaded.exports, loaded, runtimeRequire)
 const { TableMatchCoordinator } = loaded.exports
 
 const managerNode = new ListenerOwner()
 const nextRound = new ListenerOwner()
-const trustee = new ListenerOwner()
 const calls = { handoff: 0, hide: 0, visible: [], reset: [], invalidate: 0, apply: [] }
 const closedCalls = []
 const dependencies = {
@@ -109,7 +114,7 @@ const dependencies = {
   hud: {},
   controls: {
     hint: null, pass: null, play: null, confirmTribute: null, finishTribute: null,
-    nextRound, trustee, hintLabel: null, phaseLabel: null, levelLabel: null, overlayLabel: null,
+    nextRound, hintLabel: null, phaseLabel: null, levelLabel: null, overlayLabel: null,
   },
   controlsY: () => -160,
   layoutSeats: () => {},
@@ -125,7 +130,7 @@ coordinator.mount()
 assert.equal(networkBridge.mountCount, 1, 'mount must be idempotent')
 assert.equal(managerNode.count('guandan:state'), 1, 'mount must subscribe to authoritative snapshots once')
 assert.equal(nextRound.count('touch-end'), 1, 'mount must own the next-round control listener')
-assert.equal(trustee.count('touch-end'), 1, 'mount must own the trustee control listener')
+assert.equal(typeof coordinator.toggleTrustee, 'function', 'HUD owns the trustee button and invokes the coordinator callback')
 
 const state = {
   currentTurn: 'p1', currentLevel: 2, playArea: [{ id: 'action-1' }, { id: 'action-2' }], finishedPlayers: ['p3'],
@@ -156,24 +161,26 @@ closedCalls.length = 0
 networkBridge.handlers.onRoomClosed()
 assert.equal(closedCalls.at(-1), '房间已关闭', 'older close messages without a reason still have readable feedback')
 
-dependencies.turnClock.update = () => {}
-dependencies.hud.mounted = true
-for (const key of ['hint', 'pass', 'play']) dependencies.controls[key] = { active: false }
-const playing = { state, phase: 'playing', actionPending: false }
-projectedPlayKeys = ['pass']
-coordinator.layoutActionControls(playing, 'p1', false, 'play')
-assert.deepEqual(['hint', 'pass', 'play'].map(key => dependencies.controls[key].active), [false, true, false], 'the live coordinator must apply the rule-derived pass-only policy')
-projectedPlayKeys = ['hint', 'play']
-coordinator.layoutActionControls(playing, 'p1', false, 'play')
-assert.deepEqual(['hint', 'pass', 'play'].map(key => dependencies.controls[key].active), [true, false, true], 'lead controls must exclude pass')
-coordinator.layoutActionControls({ ...playing, actionPending: true }, 'p1', false, 'play')
-assert.ok(['hint', 'pass', 'play'].every(key => !dependencies.controls[key].active), 'an in-flight network command still suppresses all play actions')
+dependencies.session = { snapshot: { isMultiplayer: true } }
+closedCalls.length = 0
+coordinator.applyNetworkTurnTimeout({ playerId: 'p1', enteredTrustee: false })
+assert.deepEqual(closedCalls, [], 'routine automatic play must not show a timeout toast')
+coordinator.applyNetworkTurnTimeout({ playerId: 'p1', enteredTrustee: true })
+assert.deepEqual(closedCalls, ['你连续超时，已进入托管'], 'actual trustee state changes remain visible')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableSceneNodes.ts'), 'utf8'), /'NextRoundButton'.*tableButtonWidth\('本场结束 · 返回大厅'/, 'frame reserves the longest supported settlement label width')
+dependencies.lobby.snapshot.matchEnded = { reason: 'single-round' }
+dependencies.frontPages.isTournamentRoom = id => id === 'room-1'
+dependencies.frontPages.showTournament = () => closedCalls.push('tournament-center')
+coordinator.leaveTableToMenu = () => closedCalls.push('leave-completed-table')
+closedCalls.length = 0
+coordinator.handleNextRound()
+assert.deepEqual(closedCalls, ['leave-completed-table', 'tournament-center'], 'completed tournament round must return to its center, not classic matchmaking')
 
 coordinator.dispose()
 coordinator.dispose()
 assert.equal(networkBridge.disposeCount, 1, 'dispose must be idempotent')
 assert.equal(managerNode.count('guandan:state'), 0, 'dispose must release the snapshot listener')
 assert.equal(nextRound.count('touch-end'), 0, 'dispose must release the next-round listener')
-assert.equal(trustee.count('touch-end'), 0, 'dispose must release the trustee listener')
+
 
 process.stdout.write('table match coordinator regression checks passed\n')

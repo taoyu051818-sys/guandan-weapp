@@ -78,6 +78,7 @@ export type AIDecisionTrace = {
 };
 
 export type AIContext = {
+  turnOrder?: readonly PlayerId[];
   currentLevel: Rank;
   teamLevels: Record<Team, Rank>;
   ruleProfile: RuleProfile;

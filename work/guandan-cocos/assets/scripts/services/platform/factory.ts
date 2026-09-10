@@ -7,6 +7,7 @@ import { HttpMatchRecoveryGateway } from './matchRecoveryGateway'
 import type { GameEndpointPolicy, HttpTransport, PlatformApiConfig } from './contracts'
 import { HttpAuthGateway, HttpPlayerCenterGateway, HttpSeasonGateway } from './profileGateways'
 import { HttpReplayGateway } from './replayGateways'
+import { TournamentApiGateway } from './TournamentApiGateway'
 
 export const createHttpGateways = (config: PlatformApiConfig, transport: HttpTransport = new XhrTransport()): FrontPageGateways => {
   const client = new PlatformApiClient(transport, config)
@@ -17,6 +18,7 @@ export const createHttpGateways = (config: PlatformApiConfig, transport: HttpTra
 export const createPlayerGateways = (client: PlatformApiClient, endpointPolicy: GameEndpointPolicy): FrontPageGateways => {
   return {
     configured: true,
+    tournaments: new TournamentApiGateway(client),
     auth: new HttpAuthGateway(client),
     matchmaking: new HttpMatchmakingGateway(client, endpointPolicy),
     friendRooms: new HttpFriendRoomGateway(client, endpointPolicy),

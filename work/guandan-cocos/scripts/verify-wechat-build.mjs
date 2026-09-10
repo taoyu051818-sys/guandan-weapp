@@ -4,8 +4,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { extractRuntimeConfig, verifyWechatRuntimeConfig } from './runtime-client-config.mjs'
+import { finalizeOpenDataPackage } from './wechat-open-data-package.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+await finalizeOpenDataPackage(projectRoot, true)
 const buildRoot = path.join(projectRoot, 'build/wechatgame')
 const packageOnly = process.argv.includes('--package-only')
 const gameJsonPath = path.join(buildRoot, 'game.json')
@@ -100,6 +102,12 @@ const startupUuid = startupMeta.uuid
 const mainAssetFiles = walkFiles(path.join(buildRoot, 'assets/main'))
 const subpackageFiles = walkFiles(gameAssetsRoot)
 const mainScript = fs.readFileSync(path.join(buildRoot, 'assets/main/index.js'), 'utf8')
+const shareImageName = 'friend-room-share.jpg'
+const shareImage = fs.readFileSync(path.join(buildRoot, shareImageName))
+assert.deepEqual(shareImage, fs.readFileSync(path.join(projectRoot, 'build-templates/wechatgame', shareImageName)), 'room share artwork is missing or stale in the package')
+assert.equal(shareImage.readUInt16BE(0), 0xffd8, 'room share artwork must be a JPEG')
+assert.ok(shareImage.length < 200 * 1024, 'room share artwork exceeds its 200 KiB budget')
+assert.ok(mainScript.includes(shareImageName), 'room share artwork is not referenced by the built invitation service')
 assert.ok(mainScript.includes('NetworkEndpoint.ts'), 'stale build: missing mini-game endpoint compatibility parser')
 assert.doesNotMatch(mainScript, /new\s+URL\s*\(/, 'business runtime must not depend on a browser-only URL constructor')
 for (const code of ['GD-S01', 'GD-S02', 'GD-S03', 'GD-S04']) {

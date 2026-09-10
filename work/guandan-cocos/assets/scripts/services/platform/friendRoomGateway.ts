@@ -149,7 +149,7 @@ export class HttpFriendRoomGateway implements FriendRoomGateway {
   public async join (inviteText: string): Promise<FriendRoomEntry> {
     const normalized = inviteText.trim()
     const match = invitePattern.exec(normalized)
-    if (!match) throw new PlatformApiError('请粘贴完整的好友房邀请口令', { code: 'INVALID_FRIEND_ROOM_INVITE', retryable: false })
+    if (!match) throw new PlatformApiError('邀请卡片无效，请让好友重新发送邀请', { code: 'INVALID_FRIEND_ROOM_INVITE', retryable: false })
     return this.run(`join:${normalized}`, async entryAttemptId => {
       const payload = requireRecord(await this.client.request<unknown>('/api/v1/friend-rooms/join', 'POST', {
         entryAttemptId, roomId: match[1], inviteCode: match[2],
@@ -162,6 +162,19 @@ export class HttpFriendRoomGateway implements FriendRoomGateway {
     const safeMatchId = matchId.trim()
     if (!safeMatchId) return
     await this.client.request<unknown>('/api/v1/match/cancel', 'POST', { matchId: safeMatchId })
+  }
+
+  public async joinRoomNumber (roomId: string): Promise<FriendRoomEntry> {
+    const normalized = roomId.trim()
+    if (!/^\d{6}$/.test(normalized)) throw new PlatformApiError('请输入六位数字房间号', { code: 'INVALID_ROOM_NUMBER', retryable: false })
+    return this.run(`join-number:${normalized}`, async entryAttemptId => {
+      const payload = requireRecord(await this.client.request<unknown>('/api/v1/friend-rooms/join-by-number', 'POST', {
+        entryAttemptId, roomId: normalized,
+      }), '房号加入响应')
+      const entry = normalizeEntry(payload.entry, entryAttemptId, this.endpointPolicy)
+      if (entry.roomId !== normalized) throw malformedResponse('入桌凭证与输入的房间号不一致')
+      return entry
+    })
   }
 
   private async run<T> (operation: string, request: (entryAttemptId: string) => Promise<T>): Promise<T> {

@@ -241,6 +241,10 @@ npm run test:server
 
 固定16人赛事专用，需要访问令牌且必须先报名。检录幂等；第16名玩家检录后立即锁定名单并生成3轮、每轮4桌的稳定 Latin 编排。锁定后不再接收第17名玩家，也不会因进程重启重新洗牌。
 
+### `POST /api/v1/tournaments/:tournamentId/withdraw`
+
+需要访问令牌及 `Idempotency-Key`。只允许免费 fixed16-latin-3 赛事在名单锁定前取消报名；已检录也可取消并释放名额、移除零场次排名。满 16 人锁定后返回 `409 ROSTER_LOCKED`。返回赛事状态。重复请求不会取消后来重新提交的报名；重新报名必须使用新的报名幂等键。不涉及收费赛事退款。
+
 ### `GET /api/v1/tournaments/:tournamentId/state`
 
 固定16人赛事专用，需要访问令牌。返回 `phase`、检录人数、当前轮、已完成桌数、本人分桌 assignment 和本人排名。`phase` 为 `check-in | round-active | blocked | finished`；每轮前3桌完成时不会推进，第4桌完成后才统一激活下一轮。

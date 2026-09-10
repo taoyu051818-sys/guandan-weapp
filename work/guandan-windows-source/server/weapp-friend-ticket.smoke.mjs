@@ -272,7 +272,7 @@ const assertFriendLobby = packet => {
   assert.equal(packet.entryKind, 'friend')
   assert.equal(packet.lobbyReadyRequired, true)
   assert.deepEqual(packet.capabilities, {
-    canUseBots: false,
+    canUseBots: true,
     canKickMembers: true,
     requiresLobbyReady: true,
   })
@@ -340,8 +340,10 @@ try {
   assertFriendLobby(hostCreated)
   assert.equal((await waitForPersistedRoom(roomId)).room.entryDeadlineAt, roomExpiresAt)
 
-  const botDenied = await expectError(host, 'addBot', { roomId, playerId: 'p4' })
-  assert.match(botDenied.message, /票据房.*不允许.*机器人/)
+  await sendAndWait(host, 'addBot', { roomId, playerId: 'p4' }, 'actionAccepted')
+  const withBot = await waitForPersistedRoom(roomId, room => room.botPlayerIds.includes('p4'))
+  assert.match(withBot.room.userIdsBySeat.p4, /^friendbot_[a-f0-9]{24}$/)
+  await sendAndWait(host, 'removeBot', { roomId, playerId: 'p4' }, 'actionAccepted')
 
   const firstLeave = sendAndWait(guest, 'safeExit', { roomId }, 'roomLeft')
   const firstSeatLeftEvent = await firstSeatLeftSeen

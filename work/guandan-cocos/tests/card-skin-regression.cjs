@@ -357,7 +357,7 @@ function verifySingleRendererBoundary () {
   assert.match(cardView, /CardLevelBadge[\s\S]*moveTo\(5, 56\)[\s\S]*lineTo\(38, 23\)[\s\S]*label.string = '级'/, 'level cards use a small top-right triangular marker')
   assert.match(cardView, /private setLevelBadge[\s\S]*this.levelBadge.active = isLevelCard/, 'rebinding a non-level card clears a recycled level marker')
   assert.equal((cardView.match(/emit\('guandan:card-toggle'/g) || []).length, 0, 'CardView must forward raw touch input without maintaining another selection state machine')
-  assert.equal((handController.match(/this\.node\.emit\('guandan:card-toggle', cardId\)/g) || []).length, 1, 'HandController must retain exactly one authoritative selection event emission')
+  assert.equal((handController.match(/this\.node\.emit\('guandan:card-toggle', cardId, selected\)/g) || []).length, 1, 'HandController must retain exactly one authoritative selection event emission')
   assert.match(cardView, /private inputTargets \(\): Node\[\] \{\s*return this\.hitArea \? \[this\.hitArea\] : \[\]/, 'only the dedicated visible-card hit area may own selection input')
 }
 

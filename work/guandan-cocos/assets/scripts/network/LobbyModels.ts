@@ -1,6 +1,7 @@
 import type { EngineState, PlayerId, Rank, RoomFormatSettings, SettlementResult, TributeState } from '../core/generated'
 import type { NetworkEffectSync } from '../effects/NetworkEffectSyncPolicy'
 import type { NetworkRequestResult } from './LobbySocketClient'
+import { normalizeDuplicateRoom, type DuplicateRoomSummary } from './DuplicateRoomModel'
 
 export const protocolVersion = (value: unknown): number | null => Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null
 
@@ -60,6 +61,7 @@ export type LobbyCapabilities = {
 }
 export type MatchEndedReason = 'passed-a' | 'round-limit' | 'time-limit' | 'single-round'
 export type NetworkMatchEnded = Readonly<{
+  playerScores?: Readonly<Record<PlayerId, number>>
   reason: MatchEndedReason
   endedAt: number
   roundsPlayed: number
@@ -68,6 +70,7 @@ export type NetworkMatchEnded = Readonly<{
   winnerTeam: 'teamA' | 'teamB' | null
 }>
 export type LobbySnapshot = RoomViewMetadata & {
+  duplicate?: DuplicateRoomSummary | null
   connected: boolean
   rooms: NetworkRoom[]
   roomId: string | null
@@ -122,6 +125,7 @@ export type MatchedRoomEntry = {
 }
 
 export type LobbyLiveMetadata = {
+  duplicate?: DuplicateRoomSummary | null
   gameVersion?: number
   turnDeadlineAt?: number | null
   deadlinePlayerId?: PlayerId | null
@@ -191,6 +195,7 @@ export const createEmptyTrustees = (): Record<PlayerId, NetworkTrustee | null> =
 export const createEmptyTimeouts = (): Record<PlayerId, number> => ({ p1: 0, p2: 0, p3: 0, p4: 0 })
 
 export const createRoomMetadataDefaults = (): Partial<LobbySnapshot> => ({
+  duplicate: null,
   roomRole: 'player', seatedPlayerId: null, viewPlayerId: undefined, isRoomHost: undefined,
   hostPlayerId: undefined, observers: [], observerWaiting: false, observerClockAt: undefined, viewRevision: undefined,
   gameVersion: 0,
@@ -237,6 +242,7 @@ export const createClearedRoomPatch = (error?: string): Partial<LobbySnapshot> =
 
 export const projectLobbyLiveMetadata = (message: LobbyLiveMetadata): Partial<LobbySnapshot> => {
   const next: Partial<LobbySnapshot> = {}
+  if (Object.prototype.hasOwnProperty.call(message, 'duplicate')) next.duplicate = normalizeDuplicateRoom(message.duplicate)
   if (Number.isSafeInteger(message.gameVersion) && Number(message.gameVersion) >= 0) next.gameVersion = Number(message.gameVersion)
   if (Object.prototype.hasOwnProperty.call(message, 'turnDeadlineAt')) next.turnDeadlineAt = message.turnDeadlineAt ?? null
   if (Object.prototype.hasOwnProperty.call(message, 'deadlinePlayerId')) next.deadlinePlayerId = message.deadlinePlayerId ?? null
@@ -284,8 +290,12 @@ export const normalizeNetworkMatchEnded = (value: unknown): NetworkMatchEnded | 
     !scores || !finiteInteger(scores.teamA) || !finiteInteger(scores.teamB) ||
     (candidate.winnerTeam !== null && candidate.winnerTeam !== 'teamA' && candidate.winnerTeam !== 'teamB')
   ) return null
+  const playerScores = candidate.playerScores as Record<PlayerId, unknown> | undefined
+  if (playerScores !== undefined && (!playerScores || typeof playerScores !== 'object' || Array.isArray(playerScores)
+    || !(['p1', 'p2', 'p3', 'p4'] as const).every(id => finiteInteger(playerScores[id])))) return null
   return {
     reason: candidate.reason,
+    ...(playerScores ? { playerScores: { ...playerScores } as Record<PlayerId, number> } : {}),
     endedAt: candidate.endedAt,
     roundsPlayed: candidate.roundsPlayed,
     configuredRounds: candidate.configuredRounds,

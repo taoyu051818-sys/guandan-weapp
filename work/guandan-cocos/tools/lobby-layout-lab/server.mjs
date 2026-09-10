@@ -14,7 +14,7 @@ const assets = {
   tournament: 'ui/lobby/entry-tournament.jpg', shop: 'ui/lobby/shop-float-chick.png',
   coin: 'ui/lobby/coin.png', avatar: 'ui/common/default-avatar.jpg',
 }
-const shared = ['LobbyLayoutPolicy', 'SafeAreaLayout', 'TableLayoutOverlapAudit']
+const shared = ['LobbyLayoutPolicy', 'SafeAreaLayout', 'TableLayoutOverlapAudit', 'UiFrameStyle']
 const routes = new Map([
   ['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],

@@ -42,6 +42,8 @@ class MockNode {
     if (parent) parent.children.push(this)
   }
   get parent () { return this._parent }
+  getChildByName (name) { return this.children.find(child => child.name === name) ?? null }
+  setScale (scale) { this.scale = scale }
   addComponent (ComponentType) {
     const component = new ComponentType()
     component.node = this
@@ -66,6 +68,8 @@ class MockNode {
 
 const stoppedTweens = []
 const cc = {
+  BlockInputEvents: class {},
+  EditBox: { InputMode: { NUMERIC: 'numeric' } },
   Mask: class {},
   ScrollView: class { isValid = true; offset = { y: 0 }; scrollToOffset (v) { this.offset = v }; scrollToTop () { this.offset = { y: 0 } }; getScrollOffset () { return this.offset } },
   Vec2: MockVec3,
@@ -160,14 +164,29 @@ class MockRuntimeUiFactory {
     this.buttons.push(node)
     return node
   }
+  makeInteractive (node, action) { node.on(MockNode.EventType.TOUCH_END, action) }
+  formInput (name, placeholder, x, y, options) {
+    const node = new MockNode(name)
+    node.parent = this.parent
+    const input = { node, string: '', enabled: true, options, blur () { this.blurred = true } }
+    node.input = input
+    return input
+  }
 }
 
+const formUiModule = compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomFormUi.ts'), { cc, '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory } })
+const numberModalModule = compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomNumberModal.ts'), {
+  cc, '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory }, './FriendRoomFormUi': formUiModule,
+})
 const { FriendRoomSettingsPresenter } = compile(sourcePath, {
   cc,
   '../../core/generated/lib/matchFormat': compile(path.join(projectRoot, 'assets/scripts/core/generated/lib/matchFormat.ts'), {}),
   './FriendRoomFormUi': compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomFormUi.ts'), { cc, '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory } }),
   '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory },
   './FriendRoomSettingsPolicy': policy,
+  './FriendRoomNumberModal': numberModalModule,
+  './FriendRoomRulesModal': { showFriendRoomRulesModal: () => {} },
+  './FriendRoomModeTabs': compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomModeTabs.ts'), { cc, './FriendRoomSettingsPolicy': policy }),
 })
 
 const pages = []
@@ -194,15 +213,15 @@ const screen = {
 }
 const sessionUpdates = []
 const createdSettings = []
-let joinCount = 0
+const joinedNumbers = []
 let backCount = 0
 const presenter = new FriendRoomSettingsPresenter({
   router,
   screen,
   backgroundArt: 'ui/lobby/friend-room-green/texture',
   updateSessionSettings: settings => sessionUpdates.push(settings),
-  joinRoom: () => { joinCount += 1 },
   createRoom: settings => createdSettings.push(settings),
+  joinRoom: roomId => joinedNumbers.push(roomId),
   goBack: () => { backCount += 1 },
 })
 
@@ -227,7 +246,7 @@ assert.deepEqual(router.currentRoot.children[0].components.get(MockUITransform).
 const backdrop = currentUi().images.find(node => node.name === 'FriendRoomBackdrop')
 const coverScale = Math.max(viewport.width / 1672, viewport.height / 941)
 assert.deepEqual(backdrop.size, { width: 1672 * coverScale, height: 941 * coverScale }, 'the extracted page must preserve cover scaling')
-assert.equal(currentUi().buttons.filter(node => node.name === 'FriendModeTab').length, 2)
+assert.equal(currentUi().buttons.filter(node => node.name === 'FriendModeTab').length, 4)
 assert.equal(button('基础规则').fontSize, 22)
 assert.equal(button('重置').size.height, 42)
 
@@ -248,21 +267,42 @@ assert.equal(createdSettings.length, 1)
 assert.equal(createdSettings[0].rounds, 5)
 assert.equal(createdSettings[0].sortOrder, 'asc')
 button('加入房间').emit(MockNode.EventType.TOUCH_END)
+const modalRoot = router.currentRoot.children[0].getChildByName('FriendRoomNumberModal')
+const modalPanel = modalRoot.getChildByName('RoomNumberPanel')
+const numberInput = modalPanel.getChildByName('FriendRoomNumberInput').input
+assert.ok(modalRoot.components.has(cc.BlockInputEvents), 'modal must block table/form click-through')
+assert.equal(numberInput.options.maxLength, 6)
+assert.equal(numberInput.options.inputMode, 'numeric')
+button('加入房间').emit(MockNode.EventType.TOUCH_END)
+assert.equal(router.currentRoot.children[0].children.filter(node => node.name === 'FriendRoomNumberModal').length, 1)
+for (const invalid of ['', '12345', '12x456', '123456.token']) {
+  numberInput.string = invalid
+  button('加入').emit(MockNode.EventType.TOUCH_END)
+}
+assert.deepEqual(joinedNumbers, [], 'invalid room numbers must not issue requests')
+assert.ok(currentUi().labels.some(label => label.string === '请输入完整的六位数字房间号'))
+numberInput.string = '012345'
+const staleJoin = button('加入')
+numberInput.node.emit('editing-return')
+staleJoin.emit(MockNode.EventType.TOUCH_END)
+assert.deepEqual(joinedNumbers, ['012345'], 'keyboard submit and touch must issue one request and preserve leading zero')
+assert.equal(numberInput.blurred, true)
+button('加入房间').emit(MockNode.EventType.TOUCH_END)
+const cancelledJoin = button('加入')
+button('取消').emit(MockNode.EventType.TOUCH_END)
+cancelledJoin.emit(MockNode.EventType.TOUCH_END)
+assert.equal(joinedNumbers.length, 1)
 button('返回').emit(MockNode.EventType.TOUCH_END)
-assert.equal(joinCount, 1)
 assert.equal(backCount, 1)
 
 const staleCreate = button('创建房间')
-const staleJoin = button('加入房间')
 const staleBack = button('返回')
 const visibleView = router.currentRoot.children[0]
 presenter.hide()
 assert.equal(visibleView.isValid, false)
 staleCreate.emit(MockNode.EventType.TOUCH_END)
-staleJoin.emit(MockNode.EventType.TOUCH_END)
 staleBack.emit(MockNode.EventType.TOUCH_END)
 assert.equal(createdSettings.length, 1, 'hidden-page callbacks must be invalidated')
-assert.equal(joinCount, 1, 'hidden-page join callbacks must be invalidated')
 assert.equal(backCount, 1, 'hidden-page navigation callbacks must be invalidated')
 
 presenter.show()
@@ -303,7 +343,7 @@ class MockLobbyPresenter {
     this.disposed = 0
     lobbyPresenterInstances.push(this)
   }
-  show () {}
+  show () { this.dependencies.router.current = 'friend-room-settings' }
   hide () { this.hidden += 1 }
   dispose () { this.disposed += 1 }
 }
@@ -351,10 +391,18 @@ const { LobbyPageDomain } = compile(lobbyPagePath, {
   '../../ui/RuntimeUiFactory': { RuntimeUiFactory: class {} },
   '../PageRouter': {},
   './FriendRoomSettingsPresenter': { FriendRoomSettingsPresenter: MockLobbyPresenter },
-  './FriendRoomPlatformFlow': { FriendRoomPlatformFlow: class {} },
-  './FriendRoomPlatformPresenter': { FriendRoomPlatformPresenter: class { resetInput () {}; renderEntry () {}; renderInviteShare () {} } },
-  './FriendRoomWaitingPresenter': { FriendRoomWaitingPresenter: class { render () {} } },
-  '../../services/WechatFriendInvite': { WechatFriendInvite: class { activate () {}; dispose () {} } },
+  './FriendRoomPlatformFlow': compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomPlatformFlow.ts'), {
+    './FriendRoomReservationCleanup': compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomReservationCleanup.ts'), {}),
+  }),
+  './FriendRoomWaitingPresenter': { FriendRoomWaitingPresenter: class {
+    constructor (_screen, _lobby, _avatar, leave) { this.leave = leave; waitingInstances.push(this) }
+    render (_ui, snapshot, _signed, invite) { this.snapshot = snapshot; this.invite = invite }
+    renderEntering (_ui, status) { this.status = status }
+  } },
+  '../../services/WechatFriendInvite': { WechatFriendInvite: class {
+    constructor (receive) { this.receive = receive; inviteInstances.push(this) }
+    activate () {}; dispose () {}; share (credential) { this.shared = credential }
+  } },
   './FriendRoomSettingsPolicy': { describeFriendRoomRules: () => '好友房规则' },
   './FrontPagePlayerState': {},
   './FrontPageWalletState': {},
@@ -379,7 +427,6 @@ const lobbyUi = {
   outlinedLabel: () => makeUiNode(),
   menuLabel: () => makeUiNode(),
   makeInteractive: () => {},
-  roomCodeInput: () => ({ getComponentInChildren: () => ({ string: '' }) }),
 }
 const lobbyRouter = {
   current: null,
@@ -402,7 +449,10 @@ const lobbySession = {
 }
 let domainDisposed = false
 let pageRequest = 0
-const domain = new LobbyPageDomain({
+const waitingInstances = []
+const inviteInstances = []
+const waitingVisibility = []
+const domainDependencies = {
   router: lobbyRouter,
   session: lobbySession,
   lobby: lobbyController,
@@ -420,14 +470,17 @@ const domain = new LobbyPageDomain({
   isDisposed: () => domainDisposed,
   issuePageRequest: () => ++pageRequest,
   currentPageRequest: () => pageRequest,
-  invalidateMatchAttempt () {}, closeModal () {}, setTableVisible () {}, setFriendRoomWaitingVisible () {},
+  invalidateMatchAttempt () {}, closeModal () {}, setTableVisible () {}, setFriendRoomWaitingVisible (visible) { waitingVisibility.push(visible) },
   scheduleOnce: callback => scheduled.push(callback),
   getLobbyEndpoint: () => 'ws://127.0.0.1:3002/weapp',
   showNotice () {}, showCompetition () {}, showPlayerCenter () {}, showShop () {}, beginMatch () {},
-})
+}
+const domain = new LobbyPageDomain(domainDependencies)
 const domainPresenter = lobbyPresenterInstances.at(-1)
 const forwardedSettings = { ...defaultSettings, rounds: 20, scoring: 'double-4', sortOrder: 'asc' }
 domainPresenter.dependencies.createRoom(forwardedSettings)
+assert.equal(lobbyRouter.current, 'lobby')
+assert.equal(waitingVisibility.at(-1), true, 'creation must immediately show the empty table before connecting')
 assert.deepEqual(lobbyController.connectCalls, ['ws://127.0.0.1:3002/weapp'])
 lobbyController.snapshot = { ...lobbyController.snapshot, connected: true }
 domain.renderLobby(lobbyController.snapshot)
@@ -435,8 +488,7 @@ assert.equal(scheduled.length, 1, 'connected idle state must schedule one room c
 scheduled.shift()()
 assert.deepEqual(roomCreations, [{ hostName: '玩家', settings: forwardedSettings }], 'the complete presenter draft must reach LobbyController unchanged')
 
-domainPresenter.dependencies.joinRoom()
-assert.equal(scheduled.length, 0, 'join flow must not create a room implicitly')
+assert.equal(typeof domainPresenter.dependencies.joinRoom, 'function', 'short room-number modal must use the authenticated flow')
 domainPresenter.dependencies.createRoom({ ...forwardedSettings, rounds: 24 })
 assert.equal(scheduled.length, 1)
 domainPresenter.dependencies.goBack()
@@ -452,8 +504,112 @@ assert.equal(roomCreations.length, 1, 'destroying the domain must invalidate a q
 assert.equal(domainPresenter.disposed, 1, 'the friend-room presenter must be disposed exactly once')
 domainDisposed = true
 
+async function verifyDirectTableEntry () {
+  const requests = []
+  const entered = []
+  const cancelled = []
+  const notices = []
+  const deferredRequest = (kind, value) => new Promise((resolve, reject) => requests.push({ kind, value, resolve, reject }))
+  const flush = async () => { for (let i = 0; i < 20; i += 1) await Promise.resolve() }
+  const session = { ...lobbySession, snapshot: { ...lobbySession.snapshot, status: 'menu' } }
+  const idle = { connected: false, rooms: [], roomId: null, members: [], myPlayerId: null, roomStatus: 'idle', error: null }
+  const controller = { ...lobbyController, snapshot: { ...idle, error: '上次恢复失败' },
+    enterMatchedRoom (entry) { entered.push(entry); this.snapshot = { ...idle }; direct.renderLobby(this.snapshot) },
+    leaveRoom () { this.snapshot = { ...idle } },
+  }
+  const direct = new LobbyPageDomain({ ...domainDependencies,
+    session, lobby: controller, isDisposed: () => false,
+    player: { ...domainDependencies.player, loading: true },
+    gateways: { configured: true, friendRooms: {
+      create: settings => deferredRequest('create', settings),
+      join: credential => deferredRequest('join', credential),
+      joinRoomNumber: roomId => deferredRequest('join-number', roomId),
+      cancel: async matchId => cancelled.push(matchId),
+    } },
+    showNotice: (title, detail) => notices.push({ title, detail }),
+  })
+  const settingsView = lobbyPresenterInstances.at(-1)
+  const tableView = waitingInstances.at(-1)
+  const nativeInvite = inviteInstances.at(-1)
+  settingsView.dependencies.createRoom(forwardedSettings)
+  assert.equal(lobbyRouter.current, 'lobby')
+  assert.equal(waitingVisibility.at(-1), true, 'HTTP creation must display the table immediately')
+  assert.equal(tableView.status, '正在创建房间…', 'a stale recovery error must not replace the current HTTP progress')
+  assert.equal(requests.length, 1)
+  assert.deepEqual(requests[0].value, forwardedSettings)
+  assert.equal(tableView.invite, undefined, 'cannot share before the server has admitted a room')
+  direct.reflow()
+  assert.equal(requests.length, 1, 'resizing must not recreate a room')
+  requests[0].reject(new Error('暂时无法创建'))
+  await flush()
+  assert.equal(lobbyRouter.current, 'friend-room-settings', 'failed create must restore settings, not the retired interstitial')
+  assert.equal(waitingVisibility.at(-1), false)
+  assert.equal(notices.at(-1).title, '创建好友房失败')
+
+  settingsView.dependencies.createRoom(forwardedSettings)
+  const entry = { matchId: 'friend-direct', roomId: '123456', seat: 'p1', gameTicket: 'private-seat-ticket',
+    entryAttemptId: 'attempt-direct', gameEndpoint: 'wss://example.invalid/weapp',
+    ticketPurpose: 'entry', expiresAt: Date.now() + 60000, inviteText: '123456.private-invite-credential' }
+  requests[1].resolve(entry)
+  await flush()
+  assert.equal(entered.length, 1)
+  assert.equal(entered[0].gameTicket, entry.gameTicket)
+  assert.equal(tableView.status, '正在进入牌桌…', 'HTTP success stays on the table while WebSocket admission is pending')
+  assert.equal(tableView.invite, undefined)
+  controller.snapshot = { ...idle, roomId: entry.roomId, myPlayerId: 'p1', members: ['p1'], roomStatus: 'waiting' }
+  direct.renderLobby(controller.snapshot)
+  assert.equal(tableView.snapshot.roomId, entry.roomId)
+  tableView.invite()
+  assert.equal(nativeInvite.shared, entry.inviteText, 'table invite must retain the secure WeChat card credential')
+  tableView.leave()
+  await flush()
+  assert.equal(lobbyRouter.current, 'menu')
+  assert.ok(cancelled.includes(entry.matchId))
+
+  nativeInvite.receive('654321.received-wechat-credential')
+  assert.equal(waitingVisibility.at(-1), true)
+  assert.equal(tableView.status, '正在加入好友房…')
+  assert.equal(requests[2].kind, 'join')
+  assert.equal(requests[2].value, '654321.received-wechat-credential')
+  requests[2].reject(new Error('邀请已失效'))
+  await flush()
+  assert.equal(lobbyRouter.current, 'menu', 'failed invitation must return to the hall')
+  assert.equal(notices.at(-1).title, '加入好友房失败')
+
+  settingsView.dependencies.createRoom(forwardedSettings)
+  tableView.leave()
+  requests[3].resolve({ ...entry, matchId: 'late-cancelled-room' })
+  await flush()
+  assert.equal(lobbyRouter.current, 'menu')
+  assert.equal(entered.length, 1, 'late creation must never reopen the table after cancellation')
+  assert.ok(cancelled.includes('late-cancelled-room'), 'late room reservation must be released')
+  settingsView.dependencies.joinRoom('012345')
+  assert.equal(requests[4].kind, 'join-number')
+  assert.equal(requests[4].value, '012345')
+  assert.equal(tableView.status, '正在加入好友房…')
+  requests[4].reject(new Error('房间不存在'))
+  await flush()
+  assert.equal(lobbyRouter.current, 'friend-room-settings', 'failed number join returns to settings')
+  settingsView.dependencies.joinRoom('123456')
+  const numberEntry = { ...entry, seat: 'p2', inviteText: undefined }
+  requests[5].resolve(numberEntry)
+  await flush()
+  controller.snapshot = { ...idle, roomId: entry.roomId, myPlayerId: 'p2', members: ['p1', 'p2'], roomStatus: 'waiting' }
+  direct.renderLobby(controller.snapshot)
+  assert.equal(entered.at(-1).seat, 'p2')
+  assert.equal(tableView.invite, undefined, 'number guests must not see a broken share action without invite credentials')
+  tableView.leave()
+  direct.destroy()
+  console.log('Direct friend-room table entry, native invite, failed retry and cancellation regressions passed')
+}
+verifyDirectTableEntry().catch(error => { console.error(error); process.exitCode = 1 })
+
 const { FriendRoomWaitingPresenter } = compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomWaitingPresenter.ts'), {
   cc, './FriendRoomSettingsPolicy': policy,
+  './DuplicateRoomWaitingView': compile(path.join(projectRoot, 'assets/scripts/scenes/front-pages/DuplicateRoomWaitingView.ts'), {
+    '../../services/DefaultProfileFrames': { defaultProfileAsset: () => undefined },
+    cc, '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory }, './FriendRoomRulesModal': { showFriendRoomRulesModal: () => {} },
+  }),
   '../../ui/RuntimeUiFactory': { RuntimeUiFactory: MockRuntimeUiFactory },
 })
 const waitingCalls = []
@@ -511,6 +667,72 @@ for (const width of [874, 1280]) {
     row[0].emit(MockNode.EventType.TOUCH_END)
     assert.deepEqual(actions, ['invite'])
     assert.equal(ui.buttons.some(b => /复制.*口令/.test(b.text)), false)
+  }
+}
+
+for (const isRoomHost of [true, false]) {
+  for (const gameStartPending of [true, false]) {
+    for (const movable of [true, false]) {
+      const calls = [], root = new MockNode('FourSeatBots')
+      const screen = { safeSize: () => ({ x: 1280, y: 589 }), safeLeftX: m => -640 + m,
+        safeRightX: m => 640 - m, safeTopY: m => 294.5 - m, safeBottomY: m => -294.5 + m }
+      new FriendRoomWaitingPresenter(screen, { addBot: id => calls.push(id), sitDown: () => {} }, 'avatar', () => {}).render(new MockRuntimeUiFactory(root), {
+        roomId: '123456', myPlayerId: 'p1', members: ['p1'], botPlayerIds: [], isRoomHost, gameStartPending,
+        roomRole: 'player', roomSettings: { spectator: movable ? 'live' : 'off' },
+        capabilities: { canUseBots: true, canKickMembers: false },
+      }, true)
+      for (const id of ['p2', 'p3', 'p4']) {
+        const seat = root.getChildByName(`FriendSeat-${id}`)
+        const add = seat.getChildByName(`FriendAddBot-${id}`)
+        assert.ok(add && add.text === '添加机器人')
+        assert.equal(add.style.disabled, !isRoomHost || gameStartPending)
+        assert.ok(add.position.y < 0 && add.size.height >= 44)
+        add.emit(MockNode.EventType.TOUCH_END)
+        const sit = seat.children.find(n => n.text === '坐下')
+        assert.equal(Boolean(sit), movable && !gameStartPending)
+        if (sit) assert.ok(sit.position.x - sit.size.width / 2 - add.position.x - add.size.width / 2 >= 8)
+      }
+      assert.deepEqual(calls, isRoomHost && !gameStartPending ? ['p2', 'p3', 'p4'] : [])
+      assert.equal(root.getChildByName('FriendSeat-p1').children.some(n => n.name.startsWith('FriendAddBot-')), false)
+    }
+  }
+}
+
+for (const width of [874, 1280]) {
+  for (const isRoomHost of [true, false]) {
+    for (const gameStartPending of [false, true]) {
+      const height = 589
+      const screen = { viewport: { safeLeft: 0, safeRight: 0 }, safeSize: () => ({ x: width, y: height }),
+        safeLeftX: m => -width / 2 + m, safeRightX: m => width / 2 - m,
+        safeTopY: m => height / 2 - m, safeBottomY: m => -height / 2 + m }
+      const calls = []
+      const ui = new MockRuntimeUiFactory(new MockNode('DuplicateWaiting'))
+      const slots = Array.from({ length: 8 }, (_, i) => ({ seat: `p${i + 1}`, occupied: i === 0,
+        team: i % 2 ? 'blue' : 'red', direction: ['南', '东', '北', '西'][i % 4], name: '牌友', host: i === 0, online: true }))
+      new FriendRoomWaitingPresenter(screen, { sendRoomIntent: (...args) => calls.push(args) }, 'avatar', () => {}).render(ui, {
+        roomId: '123456', isRoomHost, gameStartPending,
+        duplicate: { slots, configuredRounds: 4, mySeat: 'p1', ready: false, canStart: false },
+      }, true)
+      const buttons = ui.buttons.filter(b => b.name.startsWith('DuplicateAddBot-'))
+      assert.equal(buttons.length, 7, 'every empty seat has a named add-bot button, occupied seats do not')
+      for (const button of buttons) {
+        const id = button.name.slice('DuplicateAddBot-'.length)
+        const panel = ui.parent.getChildByName(`DuplicateSeat-${id}`)
+        const sit = ui.buttons.find(b => b.name === `DuplicateSit-${id}`)
+        assert.equal(button.text, '添加机器人')
+        assert.equal(button.position.x, panel.position.x, 'add button sits below its own slot')
+        assert.ok(button.size.height >= 44)
+        assert.ok(sit.position.y - sit.size.height / 2 - button.position.y - button.size.height / 2 >= 8,
+          'sit and add actions have separate, non-overlapping tap targets')
+        assert.ok(button.position.y - button.size.height / 2 >= panel.position.y - panel.size.height / 2)
+        assert.ok(button.position.x - button.size.width / 2 >= -width / 2)
+        assert.ok(button.position.x + button.size.width / 2 <= width / 2)
+        assert.equal(button.style.disabled, !isRoomHost || gameStartPending)
+        button.emit(MockNode.EventType.TOUCH_END)
+        if (isRoomHost && !gameStartPending) assert.deepEqual(calls.at(-1), ['addBot', { duplicateSeat: id }])
+      }
+      assert.equal(calls.length, isRoomHost && !gameStartPending ? 7 : 0, 'guests and pending starts never send bot mutations')
+    }
   }
 }
 

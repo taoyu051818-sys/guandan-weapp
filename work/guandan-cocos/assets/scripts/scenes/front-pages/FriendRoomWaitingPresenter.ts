@@ -4,6 +4,7 @@ import type { LobbyController, LobbySnapshot } from '../../network/LobbyControll
 import type { ScreenAdapter } from '../../ui/ScreenAdapter'
 import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import { describeFriendRoomRules } from './FriendRoomSettingsPolicy'
+import { renderDuplicateWaiting } from './DuplicateRoomWaitingView'
 
 /** Owns waiting-room seats, ready state, and server-projected room capabilities. */
 export class FriendRoomWaitingPresenter {
@@ -14,7 +15,17 @@ export class FriendRoomWaitingPresenter {
     private readonly leave: () => void,
   ) {}
 
+  /** Connection feedback on the table; no intermediate lobby or manual token UI. */
+  public renderEntering (ui: RuntimeUiFactory, status: string): void {
+    this.compactButton(ui, '取消', this.screen.safeLeftX(60), this.screen.safeTopY(42), 82, this.leave)
+    ui.outlinedLabel(status, 0, 0, 22, {
+      width: Math.min(580, this.screen.safeSize().x * 0.7), height: 64,
+      color: new Color(247, 232, 185), outlineColor: new Color(46, 55, 40), outlineWidth: 2,
+    })
+  }
+
   public render (ui: RuntimeUiFactory, snapshot: LobbySnapshot, signedPlatformEntry: boolean, invite?: () => void): void {
+    if (snapshot.duplicate) return renderDuplicateWaiting(ui, this.screen, this.lobby, snapshot, this.leave, invite, this.defaultAvatar)
     const roomId = snapshot.roomId
     const myPlayerId = snapshot.myPlayerId
     if (!roomId || !myPlayerId) return
@@ -84,14 +95,17 @@ export class FriendRoomWaitingPresenter {
       }
       const addHit = new Node(`AddBot-${playerId}`)
       addHit.parent = seat
-      addHit.setPosition(new Vec3(0, 24, 0))
-      addHit.addComponent(UITransform).setContentSize(72, 72)
-      ui.outlinedLabel('+', 0, 0, 44, { parent: addHit, width: 64, height: 64, color: new Color(230, 242, 221), outlineColor: new Color(37, 72, 61), outlineWidth: 3 })
-      ui.outlinedLabel('空座位', 0, -17, 20, { parent: seat, width: 120, height: 28, color: new Color(230, 239, 225), outlineColor: new Color(37, 62, 55), outlineWidth: 2 })
-      if (canMove && !snapshot.observerWaiting) this.coloredButton(new RuntimeUiFactory(seat), '坐下', 0, -48, 106, new Color(45, 157, 102), () => this.lobby.sitDown(playerId))
-      else ui.outlinedLabel('等待加入', 0, -45, 20, { parent: seat, width: 150, height: 28, color: new Color(200, 218, 209), outlineWidth: 2 })
-      if (host && canUseBots) {
-        ui.makeInteractive(addHit, () => this.lobby.addBot(playerId), 0.96)
+      addHit.setPosition(new Vec3(0, 30, 0))
+      addHit.addComponent(UITransform).setContentSize(56, 56)
+      ui.outlinedLabel('+', 0, 0, 44, { parent: addHit, width: 56, height: 56, color: new Color(230, 242, 221), outlineColor: new Color(37, 72, 61), outlineWidth: 3 })
+      ui.outlinedLabel('空座位', 0, -12, 18, { parent: seat, width: 120, height: 20, color: new Color(230, 239, 225), outlineColor: new Color(37, 62, 55), outlineWidth: 2 })
+      if (!matched) {
+        const seatUi = new RuntimeUiFactory(seat)
+        const showSit = canMove && !snapshot.observerWaiting
+        const addBot = host && canUseBots ? () => this.lobby.addBot(playerId) : undefined
+        this.coloredButton(seatUi, '添加机器人', showSit ? -36 : 0, -52, showSit ? 110 : 132, new Color(45, 157, 102), addBot, 18).name = `FriendAddBot-${playerId}`
+        if (showSit) this.coloredButton(seatUi, '坐下', 59, -52, 64, new Color(45, 157, 102), () => this.lobby.sitDown(playerId), 18)
+        if (addBot) ui.makeInteractive(addHit, addBot, 0.96)
       }
     })
 
@@ -122,7 +136,7 @@ export class FriendRoomWaitingPresenter {
     }
     const emptyCount = Math.max(0, 4 - occupied.size)
     const status = snapshot.observerWaiting ? '观战缓冲中 · 等待延迟画面，不占用玩家席位' : observer ? `观战位 ${snapshot.observers?.length ?? 1} 人 · 点空座下方“坐下”可入座` : emptyCount > 0
-      ? host && canUseBots ? `还差 ${emptyCount} 个座位 · 可点击空座加入机器人` : `等待 ${emptyCount} 名牌友加入`
+      ? host && canUseBots ? `还差 ${emptyCount} 个座位 · 点“添加机器人”补位` : `等待 ${emptyCount} 名牌友加入`
       : host ? '等待其他玩家准备' : '等待房主开始'
     // Guests also have a ready button at x=0. Put the explanation on its own
     // line; sharing actionY used to paint the waiting copy on top of the button.
@@ -134,18 +148,19 @@ export class FriendRoomWaitingPresenter {
 
   private compactButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, action: () => void): void {
     const node = ui.button('CompactButton', text, x, width, 42, 22, {
-      fill: new Color(26, 51, 56, 224), pressedFill: new Color(52, 83, 72, 240), stroke: new Color(241, 207, 101, 245), textColor: new Color(255, 240, 181), textOutlineWidth: 2, radius: 6,
+      fill: new Color(26, 51, 56, 224), pressedFill: new Color(52, 83, 72, 240), stroke: new Color(241, 207, 101, 245), textColor: new Color(255, 240, 181), textOutlineWidth: 2, frame: 'control',
     })
     node.setPosition(new Vec3(x, y, 0))
     node.on(Node.EventType.TOUCH_END, action)
   }
 
-  private coloredButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, fill: Color, action: () => void): void {
-    const node = ui.button('ColoredButton', text, x, width, 44, 20, {
-      fill, pressedFill: new Color(Math.max(0, fill.r - 28), Math.max(0, fill.g - 28), Math.max(0, fill.b - 28), fill.a),
-      stroke: new Color(255, 235, 151, 255), textColor: new Color(255, 252, 224), textOutlineColor: new Color(43, 58, 37, 255), textOutlineWidth: 3, radius: 7,
+  private coloredButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, fill: Color, action?: () => void, fontSize = 20): Node {
+    const node = ui.button('ColoredButton', text, x, width, 44, fontSize, {
+      fill, disabled: !action, pressedFill: new Color(Math.max(0, fill.r - 28), Math.max(0, fill.g - 28), Math.max(0, fill.b - 28), fill.a),
+      stroke: new Color(255, 235, 151, 255), textColor: new Color(255, 252, 224), textOutlineColor: new Color(43, 58, 37, 255), textOutlineWidth: 3, frame: 'control',
     })
     node.setPosition(new Vec3(x, y, 0))
-    node.on(Node.EventType.TOUCH_END, action)
+    if (action) node.on(Node.EventType.TOUCH_END, action)
+    return node
   }
 }

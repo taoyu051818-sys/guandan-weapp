@@ -54,16 +54,13 @@ async function main () {
   assert.equal(fs.existsSync(`${sourcePath}.meta`), true, 'platform friend-room flow needs Cocos metadata')
   assert.equal(fs.existsSync(clipboardPath), false, 'retired copy-invitation adapter must stay outside runtime assets')
   assert.equal(fs.existsSync(`${clipboardPath}.meta`), false, 'retired adapter must not leave orphan Cocos metadata')
-  assert.equal(fs.existsSync(presenterPath), true, 'authenticated friend-room UI presenter is missing')
-  assert.equal(fs.existsSync(`${presenterPath}.meta`), true, 'authenticated friend-room UI presenter needs Cocos metadata')
+  assert.equal(fs.existsSync(presenterPath), false, 'retired invitation interstitial must not return')
+  assert.equal(fs.existsSync(`${presenterPath}.meta`), false, 'retired invitation interstitial must not leave metadata')
   assert.equal(fs.existsSync(waitingPresenterPath), true, 'friend-room waiting presenter is missing')
   assert.equal(fs.existsSync(`${waitingPresenterPath}.meta`), true, 'friend-room waiting presenter needs Cocos metadata')
-  const presenterSource = fs.readFileSync(presenterPath, 'utf8')
   const lobbyPageSource = fs.readFileSync(lobbyPagePath, 'utf8')
   const runtimeUiSource = fs.readFileSync(runtimeUiPath, 'utf8')
-  assert.match(presenterSource, /点击微信邀请卡片即可加入/, 'native invitation is the primary joining route')
-  assert.doesNotMatch(presenterSource, /复制完整邀请口令/, 'the obsolete top-right clipboard action must not return')
-  assert.match(runtimeUiSource, /friendRoomInviteInput[\s\S]*粘贴完整邀请口令[\s\S]*InputMode\.ANY/, 'platform invite input must accept the full opaque credential')
+  assert.doesNotMatch(lobbyPageSource + runtimeUiSource, /复制完整邀请口令|粘贴完整邀请口令|friendRoomInviteInput|roomCodeInput|FriendRoomPlatformPresenter/, 'manual invitation entry must not return')
   assert.match(lobbyPageSource, /gateways\.configured[\s\S]*new FriendRoomPlatformFlow/, 'platform-configured builds must own an authenticated friend-room flow')
   assert.match(lobbyPageSource, /enterMatchedRoom\(\{[\s\S]*entryAttemptId: entry\.entryAttemptId/, 'HTTP entry identity must be forwarded to the WebSocket room entry')
   assert.match(lobbyPageSource, /showLobby \(compensateReservation = true\)[\s\S]*if \(compensateReservation\) this\.friendRoomPlatformFlow\?\.handleRoomClosed/, 'local recovery resets must preserve the platform reservation while authoritative closure still compensates')
@@ -121,6 +118,10 @@ async function main () {
   assert.deepEqual(arrivals, [created.inviteText])
   nativeInvite.share(flow.snapshot.inviteText)
   assert.equal(shares[0].query, friendInviteQuery(created.inviteText))
+  assert.equal(shares[0].imageUrl, 'friend-room-share.jpg', 'room invite uses the packaged artwork, not a remote URL or live hand screenshot')
+  const shareImage = fs.readFileSync(path.join(projectRoot, 'build-templates/wechatgame', shares[0].imageUrl))
+  assert.equal(shareImage.readUInt16BE(0), 0xffd8, 'share artwork is a JPEG')
+  assert.ok(shareImage.length < 200 * 1024, 'share artwork stays below the project 200 KiB budget')
   assert.doesNotMatch(shares[0].query, /signed-ticket|gameTicket|resumeToken/)
   assert.equal(friendInviteFromLaunch({ query: { friendRoom: '123456', friendInvite: '../bad' } }), null)
   assert.equal(friendInviteFromLaunch({ query: { friendRoom: ['123456'], friendInvite: created.inviteCode } }), null)
@@ -198,10 +199,10 @@ async function main () {
   assert.equal(cancellations.includes(terminalEntry.matchId), false, 'a terminal authoritative room must not leave a permanent platform cancel retry')
 
   const failed = flow.join('bad invite')
-  joins[1].call.reject(new Error('请粘贴完整的好友房邀请口令'))
+  joins[1].call.reject(new Error('邀请卡片无效，请让好友重新发送邀请'))
   await failed
   assert.equal(flow.snapshot.busy, null)
-  assert.match(notices.at(-1).detail, /完整的好友房邀请口令/)
+  assert.match(notices.at(-1).detail, /邀请卡片无效/)
 
   let releaseAttempts = 0
   const retryFlow = new FriendRoomPlatformFlow({

@@ -1,3 +1,4 @@
+import { drawUiFrame } from './UiFrameStyle'
 import { Color, Graphics, Label, Node, Sprite, SpriteFrame, UITransform, Vec3 } from 'cc'
 import type { PlayerId } from '../core/generated'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
@@ -14,6 +15,7 @@ export type TableHudSeatState = Readonly<{
   name: string
   status: string
   avatarText?: string
+  avatarFrame?: SpriteFrame
   active?: boolean
   offline?: boolean
 }>
@@ -184,15 +186,15 @@ export class TableHudSeatViewGroup {
   private renderSeat (view: SeatView, seat: TableHudSeatState, place: TableHudSeatPlace): void {
     const offline = Boolean(seat.offline)
     const active = Boolean(seat.active) && !offline
-    const side = place === 'left' || place === 'right'
-    configureTransform(view.node, side ? 156 : SEAT_WIDTH, side ? 168 : SEAT_HEIGHT)
+    const column = place !== 'bottom'
+    configureTransform(view.node, column ? 156 : SEAT_WIDTH, column ? 168 : SEAT_HEIGHT)
     const avatarSize = 72
-    const avatarX = side ? 0 : -96
-    const avatarY = side ? 30 : 0
-    const textWidth = side ? 144 : 180
-    const textX = side ? 0 : 42
+    const avatarX = column ? 0 : -96
+    const avatarY = column ? 30 : 0
+    const textWidth = column ? 144 : 180
+    const textX = column ? 0 : 42
     const statusHeight = 34
-    const statusY = side ? -62 : -23
+    const statusY = column ? -62 : -23
     view.graphics.clear()
     view.graphics.fillColor = offline ? new Color(71, 82, 84) : AVATAR_COLORS[place]
     view.graphics.strokeColor = active ? new Color(255, 218, 104) : new Color(221, 236, 232)
@@ -202,14 +204,14 @@ export class TableHudSeatViewGroup {
     view.graphics.stroke()
     if (seat.status.trim()) {
       view.graphics.fillColor = active ? new Color(98, 70, 20, 245) : new Color(31, 60, 68, 245)
-      view.graphics.roundRect(textX - textWidth / 2, statusY - statusHeight / 2, textWidth, statusHeight, statusHeight / 2)
+      drawUiFrame(view.graphics, textX - textWidth / 2, statusY - statusHeight / 2, textWidth, statusHeight, 'tag')
       view.graphics.fill()
     }
     configureTransform(view.avatarSprite.node, avatarSize - 8, avatarSize - 8)
     view.avatarSprite.node.setPosition(new Vec3(avatarX, avatarY, 2))
-    configureLabelMetrics(view.nameLabel, textWidth, 32, 22, textX, side ? -26 : 22)
+    configureLabelMetrics(view.nameLabel, textWidth, 32, 22, textX, column ? -26 : 22)
     configureLabelMetrics(view.rankLabel, textWidth - 8, statusHeight, 24, textX, statusY)
-    view.avatarSprite.spriteFrame = place === 'bottom' ? this.ownAvatarFrame ?? this.defaultAvatarFrame : this.defaultAvatarFrame
+    view.avatarSprite.spriteFrame = place === 'bottom' ? this.ownAvatarFrame ?? seat.avatarFrame ?? this.defaultAvatarFrame : seat.avatarFrame ?? this.defaultAvatarFrame
     view.avatarSprite.node.active = Boolean(view.avatarSprite.spriteFrame)
     view.avatarSprite.color = offline ? new Color(150, 156, 154) : new Color(255, 255, 255)
     view.nameLabel.string = compactHudText(seat.name || TABLE_HUD_DEFAULT_SEAT_NAMES[place], 6)

@@ -15,6 +15,11 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": [
+    "assets/scripts/scenes/front-pages/TournamentCenterModel.ts",
+    "assets/scripts/ui/TableButtonMetrics.ts",
+    "assets/scripts/network/DuplicateRoomModel.ts",
+    "assets/scripts/scenes/DuplicateTablePresentation.ts",
+    "assets/scripts/scenes/front-pages/FriendRoomRuleContent.ts",
     "assets/scripts/audio/ActionVoiceGate.ts",
     "assets/scripts/audio/OptionalAudioAssetCache.ts",
     "assets/scripts/services/ProfileSaveCoordinator.ts",
@@ -24,6 +29,7 @@
     "tests/fixtures/FixedMatchFixtures.ts",
     "assets/scripts/development/FrontPagePreviewData.ts",
     "tests/fixtures/TableLayoutFixtures.ts",
+    "assets/scripts/ui/UiFrameStyle.ts",
     "assets/scripts/ui/TablePlayActionPolicy.ts",
     "assets/scripts/effects/ArchivedPlayVisuals.ts",
     "assets/scripts/effects/EffectActionPresentationCoordinator.ts",
@@ -34,6 +40,7 @@
     "assets/scripts/game/TeammateHandProjector.ts",
     "assets/scripts/game/PublicStraightFlushPossibility.ts",
     "assets/scripts/game/GameManagerProjection.ts",
+    "assets/scripts/game/RoundViewState.ts",
     "assets/scripts/game/Local*.ts",
     "assets/scripts/game/NetworkActionController.ts",
     "assets/scripts/game/NetworkMatchSnapshotController.ts",
@@ -80,6 +87,7 @@
     "assets/scripts/ui/TablePromptPolicy.ts"
   ],
   "exclude": [
+    "assets/scripts/services/DefaultProfileFrames.ts",
     "assets/scripts/services/GameAssetLoader.ts"
   ]
 }

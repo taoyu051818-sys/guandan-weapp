@@ -13,8 +13,8 @@ export class TableHandViewStatus {
     this.label.node.active = false
   }
 
-  public render (text: string, toolsVisible: boolean): void {
-    this.tools.forEach(node => { if (node) node.active = toolsVisible })
+  public render (text: string, toolsVisible: boolean, arrangeVisible = toolsVisible): void {
+    this.tools.forEach((node, index) => { if (node) node.active = index === 1 ? arrangeVisible : toolsVisible })
     if (!this.label) return
     this.label.string = text
     this.label.node.active = Boolean(text)

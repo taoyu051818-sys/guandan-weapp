@@ -22,6 +22,8 @@ export type FriendRoomChoiceId =
   | 'upgrade-target'
   | 'counter'
   | 'voice'
+  | 'team-rotation'
+  | 'rotating-scoring'
 
 export type FriendRoomChoiceRow = Readonly<{
   id: FriendRoomChoiceId
@@ -42,6 +44,8 @@ type FriendRoomChoiceSchema = Readonly<{
 export const FRIEND_ROOM_MODES = [
   { id: 'rounds', label: '定局玩法', available: true },
   { id: 'upgrade', label: '传统升级', available: true },
+  { id: 'rotating', label: '转蛋', available: true },
+  { id: 'duplicate', label: '复式', available: true },
 ] as const
 
 export const FRIEND_ROOM_SETTINGS_TABS: ReadonlyArray<Readonly<{ id: FriendRoomSettingsTab, label: string }>> = [
@@ -58,6 +62,12 @@ export const FRIEND_ROOM_ROUNDS = Object.freeze({
 })
 
 const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
+  { id: 'team-rotation', tab: 'rules', label: '队友轮换', options: ['随机抽牌', '顺时针轮换'],
+    selected: settings => settings.teamRotation === 'clockwise' ? '顺时针轮换' : '随机抽牌',
+    update: (settings, selected) => ({ ...settings, teamRotation: selected === '顺时针轮换' ? 'clockwise' : 'draw' }) },
+  { id: 'rotating-scoring', tab: 'rules', label: '个人计分', options: ['3分制', '6分制'],
+    selected: settings => settings.rotatingScoring === 6 ? '6分制' : '3分制',
+    update: (settings, selected) => ({ ...settings, rotatingScoring: selected === '6分制' ? 6 : 3 }) },
   {
     id: 'upgrade-target', tab: 'rules', label: '目标', options: ['过6', '过10', '过A', '过A翻山'],
     selected: settings => settings.upgradeTarget === 6 ? '过6' : settings.upgradeTarget === 10 ? '过10' : settings.upgradeTarget === 'A-reset' ? '过A翻山' : '过A',
@@ -119,16 +129,6 @@ const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
     update: (settings, selected) => ({ ...settings, autoSort: selected === '开启' }),
   },
   {
-    id: 'interaction', tab: 'experience', label: '聊天', options: ['禁止聊天', '允许聊天'],
-    selected: settings => settings.disableInteraction ? '禁止聊天' : '允许聊天',
-    update: (settings, selected) => ({ ...settings, disableInteraction: selected === '禁止聊天' }),
-  },
-  {
-    id: 'voice', tab: 'experience', label: '聊天语音', options: ['允许语音', '禁止语音'],
-    selected: settings => settings.disableVoice ? '禁止语音' : '允许语音',
-    update: (settings, selected) => ({ ...settings, disableVoice: selected === '禁止语音' }),
-  },
-  {
     id: 'counter', tab: 'experience', label: '记牌器', options: ['开启', '关闭'],
     selected: settings => settings.counterEnabled === false ? '关闭' : '开启',
     update: (settings, selected) => ({ ...settings, counterEnabled: selected === '开启' }),
@@ -144,13 +144,16 @@ export const createDefaultFriendRoomSettings = (): FriendRoomSettings => ({
   ...DEFAULT_FRIEND_ROOM_SETTINGS, format: 'rounds', levelMode: 'random', levelRank: 2, tributeEnabled: false,
 })
 
-export const changeFriendRoomFormat = (settings: FriendRoomSettings, format: 'rounds' | 'upgrade'): FriendRoomSettings => ({
-  ...settings, format, levelMode: format === 'upgrade' ? 'fixed' : 'random', levelRank: 2, tributeEnabled: format === 'upgrade',
+export const changeFriendRoomFormat = (settings: FriendRoomSettings, format: 'rounds' | 'upgrade' | 'rotating' | 'duplicate'): FriendRoomSettings => ({
+  ...settings, format, levelMode: format === 'rounds' ? 'random' : 'fixed', levelRank: 2, tributeEnabled: format === 'upgrade',
   upgradeTarget: format === 'upgrade' ? 'A' : undefined,
+  teamRotation: format === 'rotating' ? 'draw' : undefined,
+  rotatingScoring: format === 'rotating' ? 3 : undefined,
+  scoring: ['rotating', 'duplicate'].includes(format) ? 'double-3' : settings.scoring,
 })
 
 export const updateFriendRoomLevel = (settings: FriendRoomSettings, index: number): FriendRoomSettings =>
-  settings.format === 'rounds' && settings.levelMode === 'fixed' && Number.isInteger(index) && MATCH_LEVELS[index] !== undefined
+  settings.format !== 'upgrade' && settings.levelMode === 'fixed' && Number.isInteger(index) && MATCH_LEVELS[index] !== undefined
     ? { ...settings, levelRank: MATCH_LEVELS[index] } : settings
 
 export const friendRoomChoiceRows = (
@@ -159,8 +162,9 @@ export const friendRoomChoiceRows = (
 ): readonly FriendRoomChoiceRow[] => CHOICE_SCHEMAS
   .filter(schema => schema.tab === tab)
   .filter(schema => schema.id !== 'spectator-delay' || !['off', 'live'].includes(settings.spectator))
+  .filter(schema => ['team-rotation', 'rotating-scoring'].includes(schema.id) ? settings.format === 'rotating' : schema.id !== 'scoring' || !['rotating', 'duplicate'].includes(settings.format || ''))
   .filter(schema => ['tribute', 'upgrade-target'].includes(schema.id) ? settings.format === 'upgrade'
-    : ['rounds-preset', 'level-mode'].includes(schema.id) ? settings.format === 'rounds' : true)
+    : ['rounds-preset', 'level-mode'].includes(schema.id) ? settings.format !== 'upgrade' : true)
   .map(schema => ({
     id: schema.id,
     label: schema.id === 'scoring' && settings.format === 'upgrade' ? '升级' : schema.label,
@@ -191,6 +195,8 @@ export const updateFriendRoomRounds = (
 }
 
 export const describeFriendRoomRules = (settings: FriendRoomSettings): string => {
+  if (settings.format === 'rotating') return `转蛋 · ${settings.rounds}局 · ${settings.levelMode === 'fixed' ? `固定打${settings.levelRank}` : '每局随机'} · ${settings.teamRotation === 'clockwise' ? '顺时针换队' : '抽牌换队'} · ${settings.rotatingScoring ?? 3}分制`
+  if (settings.format === 'duplicate') return `复式 · 八人双桌 · ${settings.rounds}局 · ${settings.levelMode === 'fixed' ? `固定打${settings.levelRank}` : '双桌共同随机级牌'} · 胜方3/2/1分`
   const format = settings.format === 'rounds'
     ? `${settings.rounds}局 · ${settings.levelMode === 'fixed' ? `固定打${settings.levelRank}` : '每局随机2–A'} · 不进贡`
     : settings.format === 'upgrade' ? `从2过${settings.upgradeTarget === 'A-reset' ? 'A翻山' : settings.upgradeTarget ?? 'A'} · ${settings.tributeEnabled ? '进贡' : '不进贡'}` : `${settings.rounds}局 · 经典升级`
@@ -200,7 +206,8 @@ export const describeFriendRoomRules = (settings: FriendRoomSettings): string =>
 
 export const friendRoomRuleHelp = (settings: FriendRoomSettings, tab: FriendRoomSettingsTab): string => tab === 'experience'
   ? '观战可点头像切换手牌；仅开局前可站起、坐下。延迟由服务器控制。'
-  : settings.trusteeSeconds === 0 ? '无托管：不倒计时、不自动代打；房间总时长限制仍有效。'
+  : settings.format === 'rotating' ? '每局换队，积分跟随玩家累计。具体换队与计分见“玩法规则”。'
+    : settings.trusteeSeconds === 0 ? '无托管：不倒计时、不自动代打；房间总时长限制仍有效。'
     : settings.format === 'upgrade'
       ? settings.upgradeTarget === 'A-reset' ? 'A必打；头游且搭档非末游过关。己方三次冲A未过回2。'
         : '目标级必打，不能跳过；打目标级时头游且搭档非末游过关。'

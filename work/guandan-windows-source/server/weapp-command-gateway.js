@@ -58,7 +58,7 @@ export const createCommandGateway = ({
     }
     if (requestedRoom) stagePendingSideEffects(requestedRoom)
     send(connection, previousAccepted.messageType || 'actionAccepted', previousAccepted.response)
-    if (requestedRoom && type !== 'chat') publishCurrentRoom(requestedRoom)
+    if (requestedRoom) publishCurrentRoom(requestedRoom)
     return
   }
   if (requestedRoom?.closingReason) return reply('error', { code: 'ROOM_CLOSING', message: '房间正在安全关闭，请稍后重试' })

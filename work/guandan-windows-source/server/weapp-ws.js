@@ -33,6 +33,7 @@ import { createRoomMetadata } from './weapp-room-metadata.js'
 import { createRoomExpiry } from './weapp-room-expiry.js'
 import { roomMember } from './friend-room-members.js'
 import { createFriendRoomObserverRuntime, FRIEND_VIEW_COMMANDS } from './friend-room-observer-runtime.js'
+import { DuplicateRoomRuntime } from './duplicate-room-runtime.js'
 
 const require = createRequire(import.meta.url)
 const { PlayType, getRuleProfile } = require('../../../shared-core/dist')
@@ -51,7 +52,7 @@ const idempotentActionTypes = new Set([
   ...FRIEND_VIEW_COMMANDS,
   'startGame', 'setLobbyReady', 'cancelLobbyReady', 'kickMember', 'addBot', 'removeBot',
   'play', 'pass', 'nextRound', 'readyNextRound', 'roundReady', 'ready', 'cancelRoundReady', 'cancelReady',
-  'setTrustee', 'cancelTrustee', 'proposeDissolve', 'dissolveVote', 'voteDissolve', 'chat',
+  'setTrustee', 'cancelTrustee', 'proposeDissolve', 'dissolveVote', 'voteDissolve',
   'tribute', 'returnTribute', 'finishTribute', 'leaveRoom', 'safeExit',
 ])
 let nextConnection = 1
@@ -74,9 +75,6 @@ const COMMAND_RATE_WINDOW_MS = security.commandRateWindowMs
 const COMMAND_RATE_LIMIT = security.commandRateLimit
 const MAX_PENDING_COMMANDS = security.maxPendingCommands
 const PERSIST_DEBOUNCE_MS = security.persistDebounceMs
-const QUICK_CHAT_INTERVAL_MS = 1200
-const QUICK_CHAT_REPEAT_MS = 8000
-const QUICK_CHAT_PHRASES = new Set(['请尽快出牌', '你的牌打得太好啦', '配合得好', '大家加油', '谢谢', '再来一局'])
 const roomStateStore = new JsonRoomStateStore({ filePath: security.roomStateFile })
 const gameTicketVerifier = new GameTicketVerifier({ secret: security.gameTicketSecret, required: security.ticketRequired })
 const resultReporter = new GameResultReporter({ endpoint: security.resultEndpoint, secret: security.gameResultSecret, outboxFilePath: security.resultOutboxFile })
@@ -439,8 +437,8 @@ const matchLifecycle = createWeAppMatchLifecycle({
   closeRoomWithoutAck: (...args) => closeRoomWithoutAck(...args),
 })
 const {
-  applyRoomSettlementPolicy, armMatchDuration, armTurnDeadline, clearMatchDurationTimer, clearTurnTimer,
-  consumeRoundSettlement, finalizePendingRound, finishTributeState, markOfflineReady, prepareNextRound,
+  applyPlayerAction, commitPlayerAction, armMatchDuration, armTurnDeadline, clearMatchDurationTimer, clearTurnTimer,
+  finalizePendingRound, markOfflineReady, prepareNextRound,
   restoreTurnDeadline, schedulePendingRoundFinalization, syncRoomFromMatchState,
 } = matchLifecycle
 const finalizeRemovedRoom = (room, reason = 'vote-approved', eventType = 'roomDissolved', keepAcceptedKey = null) => {
@@ -539,15 +537,12 @@ const consumeCommandBudget = connection => {
 const gameCommandDependencies = {
   ids, rooms, connections, acceptedActions,
   dissolveTimeoutMs: DISSOLVE_TIMEOUT_MS,
-  quickChatIntervalMs: QUICK_CHAT_INTERVAL_MS,
-  quickChatRepeatMs: QUICK_CHAT_REPEAT_MS,
-  quickChatPhrases: QUICK_CHAT_PHRASES,
   playerIn, ensureLiveMetadata, ensureLobbyMetadata, isFriendRoom,
-  applyRoomSettlementPolicy,
+  applyPlayerAction,
+  commitPlayerAction,
   syncRoomFromMatchState,
   recordRoomAction,
   reportSpectatorAction,
-  consumeRoundSettlement,
   armTurnDeadline,
   finalizePendingRound,
   publishState, publishRoundEnded, prepareNextRound, publishTribute,
@@ -562,7 +557,6 @@ const gameCommandDependencies = {
   persistRuntimeState,
   finalizeRemovedRoom,
   reportSpectatorEvent,
-  finishTributeState,
   broadcast,
   rememberAccepted,
   syncConnectionRoomId,
@@ -678,7 +672,7 @@ const enqueueCommand = (connection, message) => {
   connection.pendingCommands += 1
   const task = () => {
     if (connection.dropQueuedCommands) return undefined
-    return handleCommand(connection, message)
+    return duplicateRooms.owns(connection, message) ? duplicateRooms.handle(connection, message) : handleCommand(connection, message)
   }
   const key = operationKeyForCommand({ connection, message, rooms, entryTypes: ENTRY_COMMAND_TYPES })
   const operation = (key !== GLOBAL_OPERATION_KEY
@@ -703,6 +697,7 @@ const rejectInvalidProtocolMessage = connection => {
 
 const handleConnectionClosed = connection => {
   connection.acceptingCommands = false
+  if (connection.duplicateRoomId) { void duplicateRooms.disconnected(connection).catch(error => console.warn(error.message)); connections.delete(connection.id); return }
   if (shuttingDown) {
     connections.delete(connection.id)
     return
@@ -777,6 +772,8 @@ const restorePersistedRuntime = async () => {
   })
 }
 const port = security.wsPort
+const duplicateRooms = new DuplicateRoomRuntime({ connections, send, verifier: gameTicketVerifier, reporter: spectatorEventReporter,
+  filePath: security.roomStateFile ? `${security.roomStateFile}.duplicate` : '', random: shuffleRandom, maxRooms: Math.min(MAX_ROOMS, 64) })
 await restorePersistedRuntime()
 server.listen(port, security.host, () => console.log(`Guandan WeApp WebSocket server running at ${security.host}:${port}`))
 
@@ -802,6 +799,7 @@ const shutdown = async signal => {
     }
     await Promise.allSettled([...sideEffectCompletionHandlers.values()])
     await operationScheduler.drain()
+    await duplicateRooms.dispose()
     await commitRuntimeState()
     await roomStateStore.whenIdle()
   } catch (error) {

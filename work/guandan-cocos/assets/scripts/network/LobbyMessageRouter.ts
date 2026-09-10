@@ -112,9 +112,6 @@ export class LobbyMessageRouter {
       const packet = this.statePacket(message.state, message.roomId, message.version, message.gameVersion)
       if (packet) this.dependencies.emit('guandan:round-prepared', { ...packet, tribute: message.tribute ?? null } satisfies NetworkRoundPacket)
     })
-    listen('chat', (message: LobbyWire<{ roomId?: string, playerId?: PlayerId, text?: string }>) => {
-      if (this.acceptRoomMessage(message.roomId) && message.playerId && message.text) this.dependencies.emit('guandan:chat', { playerId: message.playerId, text: message.text })
-    })
     listen('hostLeft', (message: LobbyWire<{ roomId?: string }>) => {
       if (this.acceptRoomMessage(message.roomId)) this.dependencies.closeRoom('房主已离开，房间已关闭')
     })

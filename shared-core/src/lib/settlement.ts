@@ -1,5 +1,6 @@
 import type { PlayerId, Rank, Team } from '../types/game'
 import type { EngineState, MatchState } from './engine'
+import { rotatingRoundPoints } from './variantRules'
 
 const ranks: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A']
 const opposite = (team: Team): Team => team === 'teamA' ? 'teamB' : 'teamA'
@@ -7,7 +8,9 @@ const shift = (rank: Rank, delta: number): Rank =>
   ranks[Math.max(0, Math.min(ranks.length - 1, ranks.indexOf(rank) + delta))]
 
 export interface SettlementResult {
-  format?: 'independent' | 'upgrade'
+  format?: 'independent' | 'upgrade' | 'rotating'
+  playerPoints?: Record<PlayerId, number>
+  playerScores?: Record<PlayerId, number>
   pointsEarned?: number
   winnerTeam: Team
   levelUp: number
@@ -24,6 +27,8 @@ export const cloneSettlementResult = (result: SettlementResult): SettlementResul
   teamLevels: { ...result.teamLevels },
   aFailStreaks: { ...result.aFailStreaks },
   fullRank: [...result.fullRank],
+  ...(result.playerPoints ? { playerPoints: { ...result.playerPoints } } : {}),
+  ...(result.playerScores ? { playerScores: { ...result.playerScores } } : {}),
 })
 
 /** Existing progression contract, kept independently testable for compatibility callers. */
@@ -149,7 +154,9 @@ const settleConfiguredUpgrade = (
 
 /** Applies ranking, level progression, A-gate state and score projection as one pure operation. */
 export const settleMatchState = (state: MatchState): MatchSettlementOperation | null => {
-  const result = state.matchFormat?.kind === 'independent'
+  const result = state.matchFormat?.kind === 'rotating'
+    ? settleRotatingRound(state)
+    : state.matchFormat?.kind === 'independent'
     ? settleIndependentRound(state)
     : state.matchFormat?.kind === 'upgrade' && state.matchFormat.upgradeTarget !== undefined
     ? settleConfiguredUpgrade(state, state.teamLevels, state.aFailStreaks)
@@ -166,9 +173,10 @@ export const settleMatchState = (state: MatchState): MatchSettlementOperation | 
       teamLevels: { ...result.teamLevels },
       aFailStreaks: { ...result.aFailStreaks },
       lastRoundRank: [...result.fullRank],
+      ...(result.playerScores ? { playerScores: { ...result.playerScores } } : {}),
       scores: {
         ...state.scores,
-        [result.winnerTeam]: state.scores[result.winnerTeam] + Math.max(0, result.pointsEarned ?? result.levelUp),
+        [result.winnerTeam]: state.scores[result.winnerTeam] + (result.format === 'rotating' ? 0 : Math.max(0, result.pointsEarned ?? result.levelUp)),
       },
       settlement: cloneSettlementResult(result),
     },
@@ -176,18 +184,35 @@ export const settleMatchState = (state: MatchState): MatchSettlementOperation | 
 }
 
 /** Single-hand results never pass through the K/A progression gates. */
+const settleRotatingRound = (state: MatchState): SettlementResult | null => {
+  const base = settleIndependentRound(state)
+  if (!base) return null
+  const first = base.fullRank[0]
+  const matePlace = base.fullRank.findIndex(id => id !== first && state.players[id].team === state.players[first].team) + 1
+  const playerPoints = rotatingRoundPoints(state, first, matePlace)
+  const playerScores = { p1: 0, p2: 0, p3: 0, p4: 0 }
+  state.turnOrder.forEach(id => { playerScores[id] = (state.playerScores?.[id] ?? 0) + playerPoints[id] })
+  return { ...base, format: 'rotating', pointsEarned: playerPoints[first], playerPoints, playerScores, message: `转蛋${state.matchFormat?.rotatingScoring ?? 3}分制 · 积分按玩家累计` }
+}
+
 const settleIndependentRound = (state: MatchState): SettlementResult | null => {
   const [first, second, third] = state.finishedPlayers
   if (!first) return null
+  const individual = Boolean(state.matchFormat?.individualRanking)
+  if (individual && !third) return null
   const winnerTeam = state.players[first].team
   const sameTeam = (id: PlayerId | undefined): boolean => Boolean(id && state.players[id].team === winnerTeam)
   const pointsEarned = sameTeam(second) ? state.matchFormat!.doubleDown : sameTeam(third) ? 2 : third ? 1 : 0
   if (!pointsEarned) return null
+  const fullRank = [...state.finishedPlayers, ...state.turnOrder.filter(id => !state.finishedPlayers.includes(id))]
+  const playerPoints = { p1: 0, p2: 0, p3: 0, p4: 0 }
+  if (individual) fullRank.forEach((id, index) => { playerPoints[id] = 3 - index })
   return {
     format: 'independent', pointsEarned, winnerTeam, levelUp: 0,
     currentLevel: state.currentLevel, teamLevels: { ...state.teamLevels },
     aFailStreaks: { teamA: 0, teamB: 0 }, isGameWon: false,
-    fullRank: [...state.finishedPlayers, ...state.turnOrder.filter(id => !state.finishedPlayers.includes(id))],
-    message: `本局结束，胜方得 ${pointsEarned} 分。`,
+    fullRank,
+    ...(individual ? { playerPoints } : {}),
+    message: individual ? '本轮结束，个人按名次获得 3／2／1／0 分。' : `本局结束，胜方得 ${pointsEarned} 分。`,
   }
 }

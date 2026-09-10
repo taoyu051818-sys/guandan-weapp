@@ -1,6 +1,6 @@
 import { PlayType } from '../types/game'
 import type { Card, PlayAction, Suit } from '../types/game'
-import { canPlay, getFaceValue, getPlayInfo, type RuleProfile } from './rules'
+import { canPlay, getFaceValue, getPlayInfo, WILDCARD_VALUES, type RuleProfile } from './rules'
 
 const cardsKey = (cards: readonly Card[]): string =>
   cards.map(card => card.id).sort().join(',')
@@ -97,7 +97,7 @@ export const enumerateCandidateMoves = (hand: readonly Card[]): Card[][] => {
   const pairs: Array<{ cards: Card[]; targetValue: number }> = []
   const triples: Array<{ cards: Card[]; targetValue: number }> = []
   for (const value of CARD_VALUES) {
-    const group = [...(valueGroups.get(value) ?? []), ...(value <= 15 ? wildcards : [])]
+    const group = [...(valueGroups.get(value) ?? []), ...(WILDCARD_VALUES.includes(value) ? wildcards : [])]
     const groupPairs = combinations(group, 2)
     const groupTriples = combinations(group, 3)
     pairs.push(...groupPairs.map(cards => ({ cards, targetValue: value })))

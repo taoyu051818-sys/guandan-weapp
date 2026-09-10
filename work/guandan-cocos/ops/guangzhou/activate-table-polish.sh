@@ -21,12 +21,15 @@ chmod -R go-w "$release"
 cd "$release/work/guandan-windows-source"
 "$node" --check server/weapp-ws.js
 "$node" --check server/platform-server.js
-"$node" server/bot-turn-pacing.test.mjs
+"$node" server/game-stats.test.mjs
+"$node" server/friend-room-settings.test.mjs
+"$node" server/friend-room-observer.test.mjs
 "$node" server/game-session.test.mjs
 "$node" server/platform/matchmaking-service.test.mjs
 "$node" server/platform/profile-avatar.test.mjs
 "$node" server/platform/account-service.test.mjs
 "$node" server/platform/platform.test.mjs
+"$node" server/platform/friend-room-service.test.mjs
 
 # Refuse to interrupt a connected client or an unfinished live hand.
 if [[ $(ss -Htn state established '( sport = :33102 )' | wc -l) -gt 0 ]]; then

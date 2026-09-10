@@ -1,6 +1,6 @@
 import { classicStakeForMode } from './classic-stakes.js'
 import { calculateComprehensiveScore } from './rating.js'
-import { roomPlayerNicknames } from '../player-nicknames.js'
+import { generatedPlayerAvatar, roomPlayerNicknames } from '../player-nicknames.js'
 
 const seats = ['p1', 'p2', 'p3', 'p4']
 export const MATCH_BOT_FILL_DELAY_MS = 3_000
@@ -45,6 +45,7 @@ export class MatchBotFill {
   ensureAccount (state, match, seat, now, score) {
     const userId = `bot_${match.id}_${seat}`
     state.users[userId] ||= { id: userId, displayName: roomPlayerNicknames({ matchId: match.id })[seat], system: true, isBot: true, createdAt: now, updatedAt: now }
+    state.users[userId].avatarUrl ||= generatedPlayerAvatar(state.users[userId].displayName)
     state.wallets[userId] ||= { userId, balance: 100_000_000, currency: 'points', updatedAt: now, system: true }
     const rating = this.ensurePlayerRating(state, userId)
     if (Number.isFinite(score) && rating.games === 0) rating.eloOffset += score - calculateComprehensiveScore(rating)

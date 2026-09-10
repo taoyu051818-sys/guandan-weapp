@@ -1,6 +1,7 @@
 import { walletAvailability } from './commerce-service.js'
 import { canonicalJsonFingerprint, matchesJsonFingerprint } from './canonical-json.js'
 import { badRequest, conflict, forbidden, notFound } from './errors.js'
+import { publicTournamentStanding, rankTournamentEntries } from './tournament-standings.js'
 import {
   checkInFixedTournamentRun,
   createFixedTournamentRun,
@@ -25,44 +26,6 @@ const ensureTournamentCollections = (state) => {
 }
 
 export const isFixedTournament = (tournament) => tournament?.format === fixedTournamentFormat
-
-export const rankTournamentEntries = (state, tournamentId) => {
-  const standings = Object.values(state.tournamentStandings).filter(item => item.tournamentId === tournamentId)
-  const pointsByUser = Object.fromEntries(standings.map(item => [item.userId, item.points]))
-  standings.sort((left, right) => (
-    right.points - left.points ||
-    right.opponents.reduce((sum, id) => sum + (pointsByUser[id] || 0), 0) - left.opponents.reduce((sum, id) => sum + (pointsByUser[id] || 0), 0) ||
-    right.wins - left.wins ||
-    right.firstPlaces - left.firstPlaces ||
-    left.userId.localeCompare(right.userId)
-  ))
-  standings.forEach((standing, index) => {
-    standing.rank = index + 1
-    standing.opponentPoints = standing.opponents.reduce((sum, id) => sum + (pointsByUser[id] || 0), 0)
-  })
-  return standings
-}
-
-export const qualificationStatus = (tournament, standing, index) => {
-  if (tournament.status !== 'finished' || standing.played < Math.max(1, Number(tournament.roundsTotal) || 1)) return 'pending'
-  return index < Number(tournament.advanceCount || 0) ? 'qualified' : 'eliminated'
-}
-
-export const publicTournamentStanding = (state, tournament, standing, index) => {
-  const qualification = qualificationStatus(tournament, standing, index)
-  return {
-    userId: standing.userId,
-    displayName: state.users[standing.userId]?.displayName || '牌友',
-    played: standing.played,
-    wins: standing.wins,
-    firstPlaces: standing.firstPlaces,
-    points: standing.points,
-    opponentPoints: standing.opponentPoints,
-    rank: index + 1,
-    advanced: qualification === 'qualified',
-    qualificationStatus: qualification,
-  }
-}
 
 export const tournamentRunError = (error) => {
   if (!(error instanceof TournamentOrchestratorError)) throw error
@@ -142,6 +105,7 @@ export class TournamentService {
       const previous = state.enrollmentIdempotency[idempotencyId]
       if (previous) {
         if (!matchesJsonFingerprint(previous.fingerprint, request)) throw conflict('IDEMPOTENCY_CONFLICT', '同一个 Idempotency-Key 不能用于不同报名请求')
+        if (previous.cancelled) throw conflict('ENROLLMENT_CANCELLED', '该次报名已取消，请重新报名')
         return state.enrollments[previous.enrollmentId]
       }
       if (normalizedExpectedPoints !== null && tournament.entryPoints !== normalizedExpectedPoints) {
@@ -188,6 +152,38 @@ export class TournamentService {
         })
       }
       return enrollment
+    })
+  }
+
+  async withdraw (userId, tournamentId, idempotencyKey) {
+    const key = requireIdempotencyKey(idempotencyKey)
+    return this.store.transaction(state => {
+      ensureTournamentCollections(state)
+      const tournament = state.tournaments[tournamentId]
+      if (!tournament) throw notFound('TOURNAMENT_NOT_FOUND', '赛事不存在')
+      // Only the currently opened free fixed-16 format supports self-service withdrawal.
+      if (!isFixedTournament(tournament) || tournament.entryPoints !== 0) throw conflict('WITHDRAWAL_UNAVAILABLE', '该赛事不支持自助取消报名')
+      const request = { operation: 'withdraw', tournamentId }
+      const receiptId = `${userId}:withdraw:${key}`
+      const previous = state.enrollmentIdempotency[receiptId]
+      if (previous) {
+        if (!matchesJsonFingerprint(previous.fingerprint, request)) throw conflict('IDEMPOTENCY_CONFLICT', '同一个 Idempotency-Key 不能用于不同取消请求')
+        return previous.result
+      }
+      const run = state.tournamentRuns[tournamentId] || createFixedTournamentRun(tournament, this.now())
+      if (tournament.status !== 'open' || run.phase !== 'check-in') throw conflict('ROSTER_LOCKED', '名单已锁定，不能取消报名')
+      const enrollmentId = `${userId}:${tournamentId}`
+      delete state.enrollments[enrollmentId]
+      delete state.tournamentStandings[`${tournamentId}:${userId}`]
+      run.checkedInUserIds = run.checkedInUserIds.filter(id => id !== userId)
+      state.tournamentRuns[tournamentId] = run
+      // Old enroll retries cannot silently restore a withdrawn entry, even after re-enrollment.
+      for (const receipt of Object.values(state.enrollmentIdempotency)) {
+        if (receipt.enrollmentId === enrollmentId) receipt.cancelled = true
+      }
+      const result = tournamentStateView(state, tournament, userId, run)
+      state.enrollmentIdempotency[receiptId] = { fingerprint: fingerprint(request), result }
+      return result
     })
   }
 

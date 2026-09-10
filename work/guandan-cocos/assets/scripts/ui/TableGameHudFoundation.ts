@@ -1,5 +1,8 @@
+import { TABLE_BUTTON_HEIGHT } from './TableButtonMetrics'
+import { drawUiFrame } from './UiFrameStyle'
 import { Color, Graphics, Label, Node, UITransform, Vec2, Vec3 } from 'cc'
 import type { PlayerId } from '../core/generated'
+import type { HandLockDecision } from '../game/HandWorkspace'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
 import { createDefaultTableHudSeats, type TableHudSeatState } from './TableHudSeatViewGroup'
 import type { TableHudSeatPlace, TableHudViewport } from './TableHudLayoutPolicy'
@@ -10,7 +13,6 @@ export const TABLE_GAME_HUD_COUNTER_RANKS = ['大王', '小王', '2', 'A', 'K', 
 export type TableGameHudCounterRank = typeof TABLE_GAME_HUD_COUNTER_RANKS[number]
 export type TableGameHudSeatPlace = TableHudSeatPlace
 export type TableGameHudSuit = 'spade' | 'heart' | 'club' | 'diamond'
-export type TableGameHudLockAction = 'start' | 'cancel' | 'commit' | 'unlock'
 export type TableGameHudViewport = TableHudViewport
 export type TableGameHudSeatState = TableHudSeatState
 
@@ -28,11 +30,14 @@ export type TableGameHudState = Readonly<{
   seats: readonly TableGameHudSeatState[]
   availableSuits: readonly TableGameHudSuit[]
   selectedSuit: TableGameHudSuit | null
-  lockAction: TableGameHudLockAction
+  lockDecision: HandLockDecision
   arrangeRestoreAvailable: boolean
   handViewLabel?: string
   handToolsVisible?: boolean
-  chatEnabled?: boolean
+  arrangeVisible?: boolean
+  tributeInfo?: string
+  trusteeVisible?: boolean
+  trusteeActive?: boolean
 }>
 
 export type TableGameHudActions = Readonly<{
@@ -41,7 +46,7 @@ export type TableGameHudActions = Readonly<{
   onSuitSelect?: (suit: TableGameHudSuit | null) => void
   onHandLockAction?: () => void
   onArrange?: () => void
-  onChat?: () => void
+  onTrustee?: () => void
   onOwnAvatar?: () => void
   onSeatAvatar?: (playerId: PlayerId) => void
 }>
@@ -64,13 +69,12 @@ export type SuitButtonView = {
 
 export const BASE_COUNTER_WIDTH = 596
 export const BASE_COUNTER_OPEN_HEIGHT = 82
-export const BASE_COUNTER_CLOSED_HEIGHT = 42
+export const BASE_COUNTER_CLOSED_HEIGHT = TABLE_BUTTON_HEIGHT
 export const BASE_TOOLBAR_WIDTH = 420
-export const EXPANDED_BACK_SIZE = 60
 export const EXPANDED_ROUND_WIDTH = 240
 export const EXPANDED_ROUND_HEIGHT = 84
 export const EXPANDED_SUIT_BAR_WIDTH = 480
-export const EXPANDED_SUIT_BAR_HEIGHT = 68
+export const EXPANDED_SUIT_BAR_HEIGHT = TABLE_BUTTON_HEIGHT
 export const EXPANDED_TOOLBAR_WIDTH = 480
 export const EXPANDED_TOOLBAR_HEIGHT = 70
 export const SUITS: readonly TableGameHudSuit[] = ['spade', 'heart', 'club', 'diamond']
@@ -91,7 +95,7 @@ export const freshTableGameHudState = (): TableGameHudState => ({
   seats: createDefaultTableHudSeats(),
   availableSuits: [],
   selectedSuit: null,
-  lockAction: 'start',
+  lockDecision: { kind: 'unavailable', reason: 'empty-selection' },
   arrangeRestoreAvailable: false,
 })
 
@@ -164,12 +168,12 @@ export const createTableHudLabel = (
   return applyForegroundTextStyle(label, new Color(18, 38, 43, 255), resolvedFontSize >= 24 ? 3 : 2)
 }
 
-export const drawTableHudPanel = (graphics: Graphics, width: number, height: number, radius = 8, active = false): void => {
+export const drawTableHudPanel = (graphics: Graphics, width: number, height: number, active = false): void => {
   graphics.clear()
   graphics.fillColor = active ? new Color(25, 68, 78, 242) : new Color(10, 34, 48, 225)
   graphics.strokeColor = active ? new Color(245, 198, 77, 255) : new Color(101, 179, 194, 215)
   graphics.lineWidth = active ? 2.5 : 1.5
-  graphics.roundRect(-width / 2, -height / 2, width, height, radius)
+  drawUiFrame(graphics, -width / 2, -height / 2, width, height)
   graphics.fill()
   graphics.stroke()
 }
@@ -187,7 +191,7 @@ export const drawTableHudButton = (view: ButtonView | null, active: boolean, pre
       : new Color(17, 57, 69, 240)
   view.graphics.strokeColor = active ? new Color(255, 220, 104, 255) : new Color(101, 180, 192, 230)
   view.graphics.lineWidth = active ? 2.5 : 1.5
-  view.graphics.roundRect(-width / 2, -height / 2, width, height, height / 2)
+  drawUiFrame(view.graphics, -width / 2, -height / 2, width, height, 'control')
   view.graphics.fill()
   view.graphics.stroke()
 }

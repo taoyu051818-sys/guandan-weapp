@@ -17,13 +17,13 @@ export const ensureMatchBotMetadata = room => {
   const supplied = Array.isArray(room.botPlayerIds) ? room.botPlayerIds : []
   room.botUserIdsBySeat ||= {}
   const requiresSignedBindings = Boolean(room.ticketBound && room.entryKind === 'match')
-  room.botPlayerIds = playerIds.slice(1).filter(id => (
+  room.botPlayerIds = (room.entryKind === 'friend' ? playerIds : playerIds.slice(1)).filter(id => (
     supplied.includes(id) && (!requiresSignedBindings || typeof room.botUserIdsBySeat[id] === 'string')
   ))
   room.botPlayerIds.forEach(id => {
     if (room.seats) room.seats[id] = null
     if (room.resumeTokens) room.resumeTokens[id] = null
-    if (room.userIdsBySeat) room.userIdsBySeat[id] = requiresSignedBindings ? room.botUserIdsBySeat[id] : null
+    if (room.userIdsBySeat) room.userIdsBySeat[id] = room.ticketBound ? room.botUserIdsBySeat[id] || null : null
     if (room.ticketJtisBySeat) room.ticketJtisBySeat[id] = null
     if (room.ticketExpiresAtBySeat) room.ticketExpiresAtBySeat[id] = null
   })

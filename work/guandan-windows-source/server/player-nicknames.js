@@ -1,18 +1,15 @@
-import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { DEFAULT_PROFILES, stableDefaultProfile } from './default-profiles.js'
 
-// Versioned, fictional nickname database: no real personal data or remote service.
-const database = JSON.parse(readFileSync(new URL('./data/bot-nicknames.json', import.meta.url), 'utf8'))
-if (database.version !== 1 || database.names?.length !== 100 || new Set(database.names).size !== 100 || database.names.some(name => typeof name !== 'string' || [...name].length < 2 || [...name].length > 6)) {
-  throw new Error('机器人网名库必须包含 100 条不重复的有效网名')
-}
-export const BOT_NICKNAMES = Object.freeze([...database.names])
+// Imported display profiles only; runtime never calls the upstream QQ API.
+export const BOT_NICKNAMES = Object.freeze([...new Set(DEFAULT_PROFILES.map(p => p.displayName))])
+if (BOT_NICKNAMES.length < 8) throw new Error('机器人资料库至少需要8个不同昵称')
 
-/** Fictional display names only. Stable across reconnect/restart, not real identities. */
+/** Display names only. Stable across reconnect/restart, with bot identity retained separately. */
 export const generatedPlayerNickname = (identity, attempt = 0) => {
-  const offset = createHash('sha256').update(`nickname-pool-v1:${identity}`).digest().readUInt32BE(0)
-  return BOT_NICKNAMES[(offset + Math.max(0, Math.trunc(attempt))) % BOT_NICKNAMES.length]
+  return stableDefaultProfile(identity, attempt).displayName
 }
+
+export const generatedPlayerAvatar = name => DEFAULT_PROFILES.find(p => p.displayName === name)?.avatarUrl || ''
 
 export const roomPlayerNicknames = room => {
   room.botDisplayNames ||= {}

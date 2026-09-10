@@ -1,16 +1,12 @@
 import type { TableMatchCoordinatorDependencies } from './TableMatchPorts'
 export type { TableMatchCoordinatorDependencies } from './TableMatchPorts'
-import { Label, Node, Vec3, tween } from 'cc'
+import { Node, Vec3 } from 'cc'
 import type { PlayerId } from '../core/generated'
 import type { GameSnapshot } from '../game/GameManager'
-import type { HandInteractionMode } from '../game/HandInteractionState'
 import { TeammateHandProjector } from '../game/TeammateHandProjector'
 import type { LobbyNetworkResult, LobbySnapshot, NetworkMatchEnded, NetworkRoundEndedPacket, NetworkRoundPacket, NetworkStatePacket } from '../network/LobbyController'
 import { tableHintToast } from '../ui/TablePromptPolicy'
-import { TablePlayActionPolicy } from '../ui/TablePlayActionPolicy'
-import { TableSettlementView } from '../ui/TableSettlementView'
-import { projectMatchEndedPresentation } from './MatchEndedPresentation'
-import { projectSettlementContent } from './SettlementPresentation'
+import { TablePhasePresenter } from './TablePhasePresenter'
 import { TableNetworkEventBridge } from './TableNetworkEventBridge'
 import { projectTableViewer } from './TableSnapshotPresenter'
 import { TableProgressPresentation } from './TableProgressPresentation'
@@ -20,18 +16,17 @@ const PLAYER_IDS: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4']
 export class TableMatchCoordinator {
   private latest: GameSnapshot | null = null
   private lastPhase: GameSnapshot['phase'] | null = null
-  private lastTurn: PlayerId | null = null
   private readonly progress: TableProgressPresentation
   private lastPresentedHint = ''
   private suppressNextSettlementEffect = false
   private mounted = false
   private disposed = false
   private readonly networkEvents: TableNetworkEventBridge
-  private readonly settlementView = new TableSettlementView()
-  private readonly playActionPolicy = new TablePlayActionPolicy()
+  private readonly phasePresenter: TablePhasePresenter
   private readonly teammateHand = new TeammateHandProjector()
 
   public constructor (private readonly dependencies: TableMatchCoordinatorDependencies) {
+    this.phasePresenter = new TablePhasePresenter(dependencies)
     this.progress = new TableProgressPresentation({
       showToast: text => dependencies.overlays.showToast(text),
     })
@@ -57,7 +52,6 @@ export class TableMatchCoordinator {
     this.mounted = true
     this.dependencies.manager.node.on('guandan:state', this.render, this)
     this.dependencies.controls.nextRound?.on(Node.EventType.TOUCH_END, this.handleNextRound, this)
-    this.dependencies.controls.trustee?.on(Node.EventType.TOUCH_END, this.toggleTrustee, this)
     this.networkEvents.mount()
   }
 
@@ -65,11 +59,10 @@ export class TableMatchCoordinator {
     if (this.disposed) return
     this.disposed = true
     this.networkEvents.dispose()
-    this.settlementView.clear()
+    this.phasePresenter.clear()
     if (this.mounted) {
       this.dependencies.manager.node.off('guandan:state', this.render, this)
       this.dependencies.controls.nextRound?.off(Node.EventType.TOUCH_END, this.handleNextRound, this)
-      this.dependencies.controls.trustee?.off(Node.EventType.TOUCH_END, this.toggleTrustee, this)
     }
     this.mounted = false
     this.clearPresentationState()
@@ -78,15 +71,16 @@ export class TableMatchCoordinator {
   public readonly render = (snapshot: GameSnapshot): void => {
     if (this.disposed) return
     this.latest = snapshot
-    const { session, handInteraction, hand, effects, playArea, playerSeats, overlays, lobby, controls, hud } = this.dependencies
+    const { session, handInteraction, hand, effects, playArea, playerSeats, lobby, controls, hud } = this.dependencies
     const humanId = session.snapshot.myPlayerId ?? 'p1'
+    playArea.setSeatOrder(snapshot.state.turnOrder)
+    this.dependencies.layoutSeats(humanId)
     const ownHandProjection = handInteraction.submit(snapshot)
     const teammate = session.snapshot.isObserver ? null : this.teammateHand.project(snapshot, humanId, ownHandProjection.sortOrder)
     const handProjection = teammate?.hand ?? ownHandProjection
     hand.render(
       handProjection.hand, handProjection.playSelectedCardIds, handProjection.sortOrder, !session.snapshot.isObserver && handProjection.interactive,
       handProjection.displayCardIds, handProjection.groups, handProjection.lockedCardIds,
-      handProjection.lockDraftCardIds, handProjection.interactionMode,
       !teammate,
     )
     const entranceCompletion = hand.consumeEntranceCompletion()
@@ -115,7 +109,7 @@ export class TableMatchCoordinator {
       if (id !== humanId) seat.render(
         snapshot.state.players[id], snapshot.state.currentTurn === id, snapshot.state.players[humanId].team,
         false,
-        undefined, finishPlace,
+        finishPlace,
       )
     })
     this.syncSeatConnections(lobby.snapshot)
@@ -128,25 +122,19 @@ export class TableMatchCoordinator {
     const viewer = projectTableViewer(snapshot.state.players, humanId, teamLevels, snapshot.settlement?.winnerTeam ?? null)
     const matchEnded = lobby.snapshot.matchEnded ?? null
     if (controls.levelLabel) controls.levelLabel.string = viewer.levelLabel
-    this.renderTrustee(snapshot, humanId, matchEnded)
     const isPlaying = snapshot.phase === 'playing'
-    this.layoutActionControls(snapshot, humanId, humanFinished, handProjection.interactionMode)
+    this.phasePresenter.layoutActionControls(snapshot, humanId, humanFinished)
     hud.render(snapshot, humanId, handProjection, teammate?.view ?? null)
-    this.renderPhaseOverlay(snapshot, humanId, viewer.settlementTitle, matchEnded, isPlaying)
+    this.phasePresenter.renderPhaseOverlay(snapshot, humanId, viewer.settlementTitle, matchEnded, isPlaying)
     if (snapshot.phase !== this.lastPhase) {
       const previousPhase = this.lastPhase
       this.lastPhase = snapshot.phase
-      if (!isPlaying && controls.overlayLabel) {
-        controls.overlayLabel.node.setScale(new Vec3(0.82, 0.82, 1))
-        tween(controls.overlayLabel.node).to(0.24, { scale: Vec3.ONE }, { easing: 'backOut' }).start()
-      }
+      if (!isPlaying) this.phasePresenter.animateEntrance()
       if (snapshot.phase === 'settlement' && previousPhase !== 'settlement' && snapshot.settlement) {
         if (this.suppressNextSettlementEffect) this.suppressNextSettlementEffect = false
         else this.dependencies.audio.playEvent(viewer.settlementWon ? 'victory' : 'defeat')
       }
     }
-    if (snapshot.state.currentTurn !== this.lastTurn) this.lastTurn = snapshot.state.currentTurn
-    overlays.renderOwnChat()
   }
 
   public refresh (): void { if (this.latest && !this.disposed) this.render(this.latest) }
@@ -162,7 +150,7 @@ export class TableMatchCoordinator {
     this.clearPresentationState()
     turnClock.reset()
     effects.resetForRecovery(0)
-    handInteraction.cancelManualSelection(false)
+    handInteraction.clearSuitPreview(false)
     if (multiplayer) lobby.safeExit()
     else session.leaveToMenu()
     frontPages.showMenu()
@@ -213,7 +201,7 @@ export class TableMatchCoordinator {
   private applyNetworkMatchEnded (_ended: NetworkMatchEnded): void {
     this.dependencies.frontPages.handoffFriendRoomReservation()
     this.dependencies.turnClock.reset()
-    this.dependencies.handInteraction.cancelManualSelection(false)
+    this.dependencies.handInteraction.clearSuitPreview(false)
     this.refresh()
   }
 
@@ -243,12 +231,17 @@ export class TableMatchCoordinator {
     if (!packet.playerId) return
     const humanId = this.dependencies.session.snapshot.myPlayerId ?? 'p1'
     const name = packet.playerId === humanId ? '你' : this.latest?.state.players[packet.playerId].name ?? packet.playerId
-    this.dependencies.overlays.showToast(packet.enteredTrustee ? `${name}连续超时，已进入托管` : `${name}操作超时，服务器已自动处理`)
+    if (packet.enteredTrustee) this.dependencies.overlays.showToast(`${name}连续超时，已进入托管`)
     this.refresh()
   }
 
   private readonly handleNextRound = (): void => {
     const { lobby, session } = this.dependencies
+    if ((lobby.snapshot.matchEnded || this.latest?.settlement?.isGameWon) && this.dependencies.frontPages.isTournamentRoom?.(lobby.snapshot.roomId)) {
+      this.leaveTableToMenu()
+      this.dependencies.frontPages.showTournament()
+      return
+    }
     if (lobby.snapshot.matchEnded) {
       const rematch = lobby.snapshot.matchEnded.reason === 'single-round'
       this.leaveTableToMenu()
@@ -264,7 +257,7 @@ export class TableMatchCoordinator {
     }
   }
 
-  private readonly toggleTrustee = (): void => {
+  public readonly toggleTrustee = (): void => {
     const { session, lobby } = this.dependencies
     if (!session.snapshot.isMultiplayer) return
     const humanId = session.snapshot.myPlayerId ?? 'p1'
@@ -273,6 +266,7 @@ export class TableMatchCoordinator {
   }
 
   private renderLobby (snapshot: LobbySnapshot): void {
+    this.dependencies.renderDuplicateStatus?.()
     this.dependencies.frontPages.renderLobby(snapshot)
     this.syncSeatConnections(snapshot)
     // Metadata arrives before its private hand snapshot; never render hidden cards as the new viewpoint.
@@ -294,7 +288,6 @@ export class TableMatchCoordinator {
   private prepareRecoveryVisualBaseline (state: NetworkStatePacket['state'], phase: GameSnapshot['phase']): void {
     this.dependencies.effects.resetForRecovery(state.playArea.length)
     this.progress.seedRecovery(state)
-    this.lastTurn = state.currentTurn
     this.lastPhase = phase
   }
 
@@ -305,104 +298,15 @@ export class TableMatchCoordinator {
     if (toast) this.dependencies.overlays.showToast(toast)
   }
 
-  private renderTrustee (snapshot: GameSnapshot, humanId: PlayerId, matchEnded: unknown): void {
-    const button = this.dependencies.controls.trustee
-    if (!button) return
-    const trustee = this.dependencies.lobby.snapshot.trustees?.[humanId]
-    const label = button.getComponentInChildren(Label)
-    if (label) label.string = trustee ? '取消托管' : '托管'
-    button.active = Boolean(!this.dependencies.session.snapshot.isObserver && this.dependencies.session.snapshot.isMultiplayer && snapshot.phase !== 'settlement' && !matchEnded && !snapshot.state.finishedPlayers.includes(humanId))
-  }
-
-  private renderPhaseOverlay (
-    snapshot: GameSnapshot,
-    humanId: PlayerId,
-    settlementTitle: string | null,
-    matchEnded: LobbySnapshot['matchEnded'],
-    isPlaying: boolean,
-  ): void {
-    const overlay = this.dependencies.controls.overlayLabel
-    if (!overlay) return
-    if (snapshot.phase !== 'settlement') this.settlementView.clear()
-    overlay.node.active = Boolean(matchEnded || !isPlaying)
-    if (matchEnded && !snapshot.settlement) {
-      const presentation = projectMatchEndedPresentation(matchEnded, humanId)
-      overlay.string = `${presentation.title}\n${presentation.detail}`
-    } else if (snapshot.phase === 'tribute' && snapshot.tribute) {
-      const title = snapshot.tribute.isAntiTribute ? '抗贡成立' : snapshot.tribute.phase === 'tributing' ? '进贡阶段' : snapshot.tribute.phase === 'returning' ? '还贡阶段' : '贡还完成'
-      const actions = snapshot.tribute.actions.map(action => `${snapshot.state.players[action.from].name}至${snapshot.state.players[action.to].name}`).join('\n')
-      overlay.string = `${title}\n${actions}`
-    } else if (snapshot.phase === 'settlement' && snapshot.settlement) {
-      const { session, lobby } = this.dependencies
-      this.settlementView.render(overlay, projectSettlementContent(snapshot, humanId, settlementTitle,
-        session.snapshot.isMultiplayer, lobby.snapshot.roundReadyPlayerIds ?? [], matchEnded))
-      const button = this.dependencies.controls.nextRound
-      if (button?.active) {
-        button.setPosition(new Vec3(0, -172, 0))
-        if (button.parent) button.setSiblingIndex(button.parent.children.length - 1)
-      }
-    }
-  }
-
-  private layoutActionControls (snapshot: GameSnapshot, humanId: PlayerId, humanFinished: boolean, interactionMode: HandInteractionMode): void {
-    const { controls, turnClock, lobby, session, handInteraction, hud } = this.dependencies
-    const actionNodes = [controls.hint, controls.pass, controls.play, controls.confirmTribute, controls.finishTribute, controls.nextRound]
-    actionNodes.forEach(node => { if (node) node.active = false })
-    const controlsY = this.dependencies.controlsY()
-    turnClock.update({ snapshot, humanId, humanFinished, controlsY })
-    if (session.snapshot.isObserver) return
-    if (lobby.snapshot.matchEnded) {
-      this.showNextRoundButton(lobby.snapshot.matchEnded.reason === 'single-round' ? '再来一局 · 选择场次' : '本场结束 · 返回大厅', controlsY)
-      return
-    }
-    if (snapshot.actionPending) return
-    if (snapshot.phase === 'tribute') {
-      if (session.snapshot.isMultiplayer && (lobby.snapshot.deadlinePlayerId !== humanId || lobby.snapshot.trustees?.[humanId])) return
-      const ready = Boolean(snapshot.tribute?.isAntiTribute || snapshot.tribute?.phase === 'done')
-      const node = ready
-        ? (!session.snapshot.isMultiplayer || lobby.snapshot.deadlineAction === 'finishTribute' ? controls.finishTribute : null)
-        : handInteraction.canInteractWithCurrentHand() ? controls.confirmTribute : null
-      if (node) { node.active = true; node.setPosition(new Vec3(0, controlsY, 0)) }
-      return
-    }
-    if (snapshot.phase === 'settlement') {
-      const ready = lobby.snapshot.roundReadyPlayerIds?.includes(humanId) ?? false
-      const label = snapshot.settlement?.isGameWon
-        ? (session.snapshot.isMultiplayer ? '本场结束 · 返回大厅' : '重新开局')
-        : session.snapshot.isMultiplayer ? (ready ? '取消准备' : '准备下一局') : '下一局'
-      this.showNextRoundButton(label, controlsY)
-      return
-    }
-    if (session.snapshot.isMultiplayer && lobby.snapshot.trustees?.[humanId]) return
-    if (humanFinished || snapshot.state.currentTurn !== humanId) return
-    if (interactionMode === 'lock-create' || interactionMode === 'lock-unlock') return
-    const visible = this.playActionPolicy.resolve(snapshot.state, humanId).map(key => controls[key]).filter((node): node is Node => Boolean(node))
-    const startX = -126 * (visible.length - 1) / 2
-    visible.forEach((node, index) => {
-      node.active = true
-      if (hud.mounted) return
-      tween(node).stop().to(0.12, { position: new Vec3(startX + index * 126, controlsY, 0) }, { easing: 'quadOut' }).start()
-    })
-  }
-
-  private showNextRoundButton (text: string, controlsY: number): void {
-    const button = this.dependencies.controls.nextRound
-    if (!button) return
-    const label = button.getComponentInChildren(Label)
-    if (label) label.string = text
-    button.active = true
-    button.setPosition(new Vec3(0, controlsY, 0))
-  }
 
 
 
   private clearPresentationState (): void {
     this.teammateHand.reset()
-    this.settlementView.clear()
+    this.phasePresenter.clear()
     this.progress.reset()
     this.latest = null
     this.lastPhase = null
-    this.lastTurn = null
     this.lastPresentedHint = ''
     this.suppressNextSettlementEffect = false
   }

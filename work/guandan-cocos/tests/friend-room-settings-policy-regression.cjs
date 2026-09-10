@@ -29,7 +29,7 @@ assert.equal(fs.existsSync(policyMetaPath), true, 'the pure friend-room settings
 const policySource = fs.readFileSync(policyPath, 'utf8')
 assert.doesNotMatch(policySource, /from ['"]cc['"]/, 'the settings policy must remain executable without the Cocos runtime')
 
-const lobbyModels = compile(lobbyModelsPath)
+const lobbyModels = compile(lobbyModelsPath, { './DuplicateRoomModel': compile(path.join(projectRoot, 'assets/scripts/network/DuplicateRoomModel.ts')) })
 const format = compile(path.join(projectRoot, 'assets/scripts/core/generated/lib/matchFormat.ts'))
 const policy = compile(policyPath, { '../../network/LobbyModels': lobbyModels, '../../core/generated/lib/matchFormat': format })
 const {
@@ -50,6 +50,8 @@ assert.notEqual(firstDefault, secondDefault, 'each page instance must receive in
 assert.deepEqual(FRIEND_ROOM_MODES.map(({ id, label, available }) => ({ id, label, available })), [
   { id: 'rounds', label: '定局玩法', available: true },
   { id: 'upgrade', label: '传统升级', available: true },
+  { id: 'rotating', label: '转蛋', available: true },
+  { id: 'duplicate', label: '复式', available: true },
 ])
 assert.deepEqual(FRIEND_ROOM_SETTINGS_TABS, [
   { id: 'rules', label: '基础规则' },
@@ -71,8 +73,6 @@ assert.deepEqual(experienceRows.map(row => [row.id, row.label, row.options, row.
   ['total-time', '总时长', ['不限制', '20分钟', '30分钟', '60分钟'], '不限制'],
   ['spectator', '允许观战', ['禁止观战', '实时观战', '延迟观战'], '禁止观战'],
   ['auto-sort', '一键理牌', ['开启', '关闭'], '开启'],
-  ['interaction', '聊天', ['禁止聊天', '允许聊天'], '禁止聊天'],
-  ['voice', '聊天语音', ['允许语音', '禁止语音'], '允许语音'],
   ['counter', '记牌器', ['开启', '关闭'], '开启'],
   ['sort-order', '牌序', ['大牌在左', '小牌在左'], '大牌在左'],
 ])
@@ -87,7 +87,6 @@ for (const [id, selected] of [
   ['spectator', '延迟观战'],
   ['spectator-delay', '1局'],
   ['auto-sort', '关闭'],
-  ['interaction', '允许聊天'],
   ['sort-order', '小牌在左'],
 ]) settings = updateFriendRoomChoice(settings, id, selected)
 assert.deepEqual(settings, {
@@ -99,7 +98,6 @@ assert.deepEqual(settings, {
   totalTimeMinutes: 30,
   spectator: 'delayed-round',
   autoSort: false,
-  disableInteraction: false,
   sortOrder: 'asc',
 })
 assert.equal(updateFriendRoomChoice(settings, 'scoring', '无效值'), settings, 'unknown labels must not mutate the room contract')
@@ -118,6 +116,19 @@ fixed = policy.updateFriendRoomLevel(fixed, 12)
 assert.equal(fixed.levelRank, 'A')
 assert.match(describeFriendRoomRules(fixed), /固定打A/)
 const upgraded = policy.changeFriendRoomFormat(fixed, 'upgrade')
+const rotating = policy.changeFriendRoomFormat(upgraded, 'rotating')
+assert.equal(rotating.tributeEnabled, false)
+assert.equal(rotating.levelMode, 'fixed')
+assert.equal(rotating.scoring, 'double-3')
+assert.equal(rotating.rotatingScoring, 3)
+assert.equal(rotating.upgradeTarget, undefined)
+assert.equal(updateFriendRoomChoice(rotating, 'rotating-scoring', '6分制').rotatingScoring, 6)
+assert.equal(updateFriendRoomChoice(rotating, 'team-rotation', '顺时针轮换').teamRotation, 'clockwise')
+assert.ok(!friendRoomChoiceRows(rotating, 'rules').some(row => row.id === 'tribute' || row.id === 'scoring'))
+const backToRounds = policy.changeFriendRoomFormat(rotating, 'rounds')
+assert.equal(backToRounds.teamRotation, undefined)
+assert.equal(backToRounds.rotatingScoring, undefined)
+assert.doesNotThrow(() => format.normalizeRoomFormat(backToRounds))
 assert.equal(upgraded.levelRank, 2)
 assert.equal(upgraded.levelMode, 'fixed')
 assert.equal(upgraded.tributeEnabled, true)
@@ -128,7 +139,6 @@ assert.equal(updateFriendRoomChoice(upgraded, 'upgrade-target', '过6').upgradeT
 assert.equal(updateFriendRoomChoice(upgraded, 'upgrade-target', '过A翻山').upgradeTarget, 'A-reset')
 assert.equal(updateFriendRoomChoice(firstDefault, 'upgrade-target', '过6'), firstDefault)
 assert.equal(updateFriendRoomChoice(firstDefault, 'counter', '关闭').counterEnabled, false)
-assert.equal(updateFriendRoomChoice(firstDefault, 'voice', '禁止语音').disableVoice, true)
 assert.equal(policy.changeFriendRoomFormat(upgraded, 'rounds').tributeEnabled, false)
 
 process.stdout.write('friend room settings policy regression checks passed\n')

@@ -62,10 +62,10 @@ export class GameSession extends Component {
     this.commit()
   }
 
-  public recordRound (winner: Team, wasFirst: boolean, bombCount: number, recent?: Omit<RecentMatch, 'finishedAt' | 'winnerTeam'>): void {
+  public recordRound (winner: Team, wasFirst: boolean, bombCount: number, recent?: Omit<RecentMatch, 'finishedAt' | 'winnerTeam'>, actualTeam?: Team): void {
     if (this.snapshot.isObserver) return
     const previous = this.snapshot.playerStats
-    const myTeam: Team = this.snapshot.myPlayerId === 'p1' || this.snapshot.myPlayerId === 'p3' ? 'teamA' : 'teamB'
+    const myTeam: Team = actualTeam ?? (this.snapshot.myPlayerId === 'p1' || this.snapshot.myPlayerId === 'p3' ? 'teamA' : 'teamB')
     const didWin = winner === myTeam
     this.snapshot = {
       ...this.snapshot,

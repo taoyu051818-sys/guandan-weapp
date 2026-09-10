@@ -194,6 +194,9 @@ const getBasePlayInfo = (cards: Card[], profile: RuleProfile): PlayResolution | 
   return null;
 };
 
+/** Heart-level wildcards represent ordinary ranks/level only, never either joker. */
+export const WILDCARD_VALUES: readonly number[] = Object.freeze(Array.from({ length: 14 }, (_, index) => index + 2));
+
 export const getPlayInfos = (cards: Card[], profile: RuleProfile): PlayResolution[] => {
   if (cards.length === 0) return [];
 
@@ -208,6 +211,7 @@ export const getPlayInfos = (cards: Card[], profile: RuleProfile): PlayResolutio
   const validInfos = new Map<string, PlayResolution>();
 
   const tryAddInfo = (simulatedCards: Card[], wildcardUsages: WildcardUsage[]) => {
+    if (wildcardUsages.some(usage => !WILDCARD_VALUES.includes(usage.representedValue) || usage.representedSuit === 'joker')) return;
     const info = getBasePlayInfo(simulatedCards, profile);
     if (info) {
       const key = `${info.type}-${info.maxValue}`;
@@ -218,7 +222,6 @@ export const getPlayInfos = (cards: Card[], profile: RuleProfile): PlayResolutio
   };
 
   const suits: Suit[] = ['spade', 'heart', 'club', 'diamond'];
-  const allValues = [2,3,4,5,6,7,8,9,10,11,12,13,14,15]; // 2到级牌
   const naturalSuits = new Set(normalCards.map(card => card.suit).filter(suit => suit !== 'joker'));
   const flushSuit = naturalSuits.size === 1 ? Array.from(naturalSuits)[0] : null;
   // Suits affect only StraightFlush recognition. For each value assignment it
@@ -250,10 +253,10 @@ export const getPlayInfos = (cards: Card[], profile: RuleProfile): PlayResolutio
   };
 
   if (wildcards.length === 1) {
-    for (const value of allValues) tryValues([value]);
+    for (const value of WILDCARD_VALUES) tryValues([value]);
   } else if (wildcards.length === 2) {
-    for (const first of allValues) {
-      for (const second of allValues) tryValues([first, second]);
+    for (const first of WILDCARD_VALUES) {
+      for (const second of WILDCARD_VALUES) tryValues([first, second]);
     }
   }
 

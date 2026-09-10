@@ -6,6 +6,7 @@ import { blockTournamentAssignment } from './tournament-orchestrator.js'
 import { isFixedTournament, tournamentRunError } from './tournament-service.js'
 import { ensureCollections } from './state-collections.js'
 import { applyFriendRoomRoster } from './friend-room-roster.js'
+import { validateFriendPersonalScores } from './friend-room-personal-scores.js'
 
 /** Owns signed event ingestion and its single atomic transaction, never HTTP/WS transport. */
 export class SpectatorEventService {
@@ -151,7 +152,7 @@ export class SpectatorEventService {
         if (match.kind !== friendRoomKind) throw conflict('FRIEND_SEAT_EVENT_REQUIRED', '只有好友房可以释放固定席位')
         if (!['matching', 'matched'].includes(match.status) && !(match.status === 'playing' && event.playerId === 'observer')) throw conflict('FRIEND_SEAT_LOCKED', '好友房已经开始或结束，不能释放席位')
         leavingParticipant = match.participants.find(participant => (
-          (participant.seat === event.playerId || (match.roomSettings?.spectator !== 'off' && match.status !== 'playing')) &&
+          (participant.seat === event.playerId || ((match.roomSettings?.spectator !== 'off' || match.roomSettings?.format === 'duplicate') && match.status !== 'playing')) &&
           participant.userId === event.userId
         ))
         leavingParticipantWasActive = Boolean(leavingParticipant && ['matching', 'matched', 'playing'].includes(leavingParticipant.status))
@@ -173,6 +174,7 @@ export class SpectatorEventService {
         }
         const configuredRounds = Number(match.roomSettings?.rounds)
         const totalTimeMinutes = Number(match.roomSettings?.totalTimeMinutes)
+        validateFriendPersonalScores(match.roomSettings, event)
         const scoreWinner = event.scores.teamA === event.scores.teamB
           ? null
           : (event.scores.teamA > event.scores.teamB ? 'teamA' : 'teamB')
@@ -196,6 +198,7 @@ export class SpectatorEventService {
           roundsPlayed: event.roundsPlayed,
           endedAt: event.endedAt,
           winnerTeam: event.winnerTeam,
+          ...(event.playerScores ? { playerScores: structuredClone(event.playerScores) } : {}),
         }
       }
       if (feed.abortedAt) throw conflict('SPECTATOR_FEED_ABORTED', '已终止牌桌不能继续写入观战事件')

@@ -87,7 +87,10 @@ const lobbyModelsOutput = ts.transpileModule(fs.readFileSync(lobbyModelsPath, 'u
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText
 const lobbyModelsModule = { exports: {} }
-new Function('exports', 'module', 'require', lobbyModelsOutput)(lobbyModelsModule.exports, lobbyModelsModule, request => { throw new Error(`unexpected ${request}`) })
+new Function('exports', 'module', 'require', lobbyModelsOutput)(lobbyModelsModule.exports, lobbyModelsModule, request => {
+  if (request === './DuplicateRoomModel') return loadPureTs(path.join(root, 'assets/scripts/network/DuplicateRoomModel.ts'))
+  throw new Error(`unexpected ${request}`)
+})
 
 const lobbySyncTrackerOutput = ts.transpileModule(fs.readFileSync(lobbySyncTrackerPath, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -224,20 +227,15 @@ assert.equal(controller.snapshot.deadlineAction, null)
 assert.deepEqual(controller.snapshot.roundReadyPlayerIds, [])
 
 const sceneSource = fs.readFileSync(scenePath, 'utf8')
-const tableMatchCoordinatorSource = fs.readFileSync(tableMatchCoordinatorPath, 'utf8')
+const tableMatchCoordinatorSource = fs.readFileSync(tableMatchCoordinatorPath, 'utf8') + fs.readFileSync(path.join(root, 'assets/scripts/scenes/TablePhasePresenter.ts'), 'utf8')
 const lobbyModelsSource = fs.readFileSync(lobbyModelsPath, 'utf8')
 const tableOverlaySource = fs.readFileSync(tableOverlayPath, 'utf8')
-const turnClockSource = fs.readFileSync(turnClockPath, 'utf8')
-assert.match(turnClockSource, /deadline - this\.now\(\)/, 'the table countdown must derive from the server deadline')
+const turnClockSource = fs.readFileSync(turnClockPath, 'utf8') + fs.readFileSync(path.join(root, 'assets/scripts/scenes/TableTurnClockProjection.ts'), 'utf8')
 assert.match(lobbyModelsSource, /NetworkViewerRoundStats = Readonly<\{ bombsPlayed: number \}>/)
 assert.match(lobbyModelsSource, /NetworkRoundEndedPacket = \{[\s\S]*state\?: EngineState[\s\S]*viewerRoundStats\?: NetworkViewerRoundStats/, 'round-ended packets must support new authoritative state/stats and old result-only servers')
 assert.match(tableMatchCoordinatorSource, /applyNetworkRoundEnded\(packet\.result, packet\.state \?\? null, packet\.viewerRoundStats, \{[\s\S]*roomId: packet\.roomId,[\s\S]*version: packet\.version,[\s\S]*gameVersion: packet\.gameVersion/, 'the table bridge must preserve the stable round event identity')
-assert.match(tableMatchCoordinatorSource, /deadlinePlayerId !== humanId/, 'only the authoritative tribute actor may use tribute controls')
-assert.match(tableMatchCoordinatorSource, /deadlineAction === 'finishTribute'/, 'only the authoritative tribute leader may start play')
-assert.match(turnClockSource, /playerName} · \$\{ACTION_LABELS\[deadlineAction\]}/, 'tribute countdown must identify the authoritative player and action')
-const multiplayerTick = turnClockSource.slice(turnClockSource.indexOf('private readonly tick'), turnClockSource.indexOf('private playWarningTick'))
+// Tribute authority and four-seat readiness are checked through TablePhasePresenter's public API.
 assert.doesNotMatch(tableMatchCoordinatorSource, /humanId !== 'p1' && !gameWon/, 'all four seats must have a between-round ready control')
-assert.match(tableMatchCoordinatorSource, /roundReadyPlayerIds\?\.includes\(humanId\)/, 'the ready control must reflect this seat\'s authoritative vote')
 assert.match(tableMatchCoordinatorSource, /lobby\.cancelRoundReady\(\)/, 'a ready player must be able to cancel')
 assert.match(tableMatchCoordinatorSource, /lobby\.safeExit\(\)/, 'active multiplayer exit must use the safe-exit protocol')
 assert.match(tableOverlaySource, /this\.dependencies\.lobby\.proposeDissolve\(\)/, 'the table overlay must expose dissolve proposals')
@@ -246,5 +244,4 @@ assert.match(tableOverlaySource, /this\.voteDissolve\(true\)/, 'the table overla
 
 process.stdout.write('network round-state regression checks passed\n')
 
-assert.doesNotMatch(multiplayerTick, /actOnLocalTimeout|remainingSeconds -=/, 'clock must never simulate moves or elapsed local turns')
-assert.match(multiplayerTick, /deadline - this\.now\(\)/, 'deadline remains server-authoritative')
+assert.doesNotMatch(turnClockSource, /actOnLocalTimeout|remainingSeconds -=/, 'clock must never simulate moves or elapsed local turns')

@@ -190,7 +190,7 @@ export class MatchmakingService {
       if (match.status === 'playing') { state.activeMatchByUser[userId] = match.id; return this.view(match, userId) }
       if (match.status !== 'matched') throw conflict('TOURNAMENT_ASSIGNMENT_CORRUPT', '赛事牌桌生命周期状态不一致')
       if (participant.status !== 'matched' || participant.expiresAt <= now) {
-        const issued = this.gameTickets.issue({ userId, matchId: match.id, roomId: match.roomId, seat: expectedSeat, entryAttemptId: this.ensureParticipantEntryAttemptId(participant) })
+        const issued = this.gameTickets.issue({ userId, matchId: match.id, matchMode: match.mode, roomId: match.roomId, seat: expectedSeat, entryAttemptId: this.ensureParticipantEntryAttemptId(participant) })
         Object.assign(participant, { status: 'matched', ...issued, reissuedAt: now })
         delete participant.cancelledAt
         match.entryDeadlineAt = Math.min(...match.participants.map(item => Number(item.expiresAt)).filter(Number.isFinite))
@@ -218,7 +218,7 @@ export class MatchmakingService {
       match.status = 'matched'; match.matchedAt = now; match.roomId = this.createRoomId(state)
       assignment.userIds.forEach((assignedUserId, index) => {
         const assignedParticipant = match.participants.find(item => item.userId === assignedUserId)
-        const issued = this.gameTickets.issue({ userId: assignedUserId, matchId: match.id, roomId: match.roomId, seat: seats[index], entryAttemptId: this.ensureParticipantEntryAttemptId(assignedParticipant) })
+        const issued = this.gameTickets.issue({ userId: assignedUserId, matchId: match.id, matchMode: match.mode, roomId: match.roomId, seat: seats[index], entryAttemptId: this.ensureParticipantEntryAttemptId(assignedParticipant) })
         Object.assign(assignedParticipant, { status: 'matched', seat: seats[index], ...issued })
       })
       match.entryDeadlineAt = Math.min(...match.participants.map(item => item.expiresAt))

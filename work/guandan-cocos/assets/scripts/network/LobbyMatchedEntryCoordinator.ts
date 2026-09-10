@@ -107,7 +107,7 @@ export class LobbyMatchedEntryCoordinator {
     if (!entry || !this.dependencies.connected() || this.inFlight || this.rejectExpired()) return
     this.inFlight = true
     this.attempts += 1
-    const payload = { roomId: entry.roomId, gameTicket: entry.gameTicket, entryAttemptId: entry.entryAttemptId }
+    const payload = { roomId: entry.roomId, gameTicket: entry.gameTicket, entryAttemptId: entry.entryAttemptId, hostName: entry.displayName ?? '牌友' }
     const expectedSeat = entry.seat === 'observer' ? undefined : entry.seat
     const requestId = entry.ticketPurpose === 'rejoin'
       ? this.dependencies.begin('joinRoom', 'roomRejoined', entry.roomId, payload, expectedSeat)

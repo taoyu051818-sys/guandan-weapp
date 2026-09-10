@@ -3,6 +3,7 @@ import { createPlatformRuntime } from '../platform-server.js'
 import { GameTicketService, GameTicketVerifier } from './crypto.js'
 import { GameResultReporter } from './result-reporter.js'
 import { SpectatorEventReporter } from './spectator-event-reporter.js'
+import { formatForNewRoom } from '../match-format-policy.js'
 
 const accessSecret = 'tournament-access-secret-with-at-least-thirty-two-characters'
 const ticketSecret = 'tournament-ticket-secret-with-at-least-thirty-two-characters'
@@ -55,6 +56,7 @@ const baseUrl = await listen(runtime)
 
 try {
   assert.equal((await call(baseUrl, `/api/v1/tournaments/${tournamentId}/state`)).status, 401, '赛事状态必须登录后读取')
+  assert.equal((await call(baseUrl, `/api/v1/tournaments/${tournamentId}/withdraw`, { method: 'POST' })).status, 401)
 
   const players = []
   for (let index = 1; index <= 16; index += 1) {
@@ -75,6 +77,15 @@ try {
     const checkedIn = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/check-in`, { method: 'POST', token: player.token })
     assert.equal(checkedIn.status, 200)
     assert.equal(checkedIn.payload.data.checkedInCount, index)
+    if (index === 1) {
+      const withdrawal = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/withdraw`, { method: 'POST', token: player.token, headers: { 'idempotency-key': 'withdraw-first' } })
+      assert.equal(withdrawal.status, 200)
+      assert.equal(withdrawal.payload.data.checkedInCount, 0)
+      assert.equal(withdrawal.payload.data.viewerEntry.enrolled, false)
+      assert.equal((await call(baseUrl, `/api/v1/tournaments/${tournamentId}/check-in`, { method: 'POST', token: player.token })).status, 403)
+      await call(baseUrl, `/api/v1/tournaments/${tournamentId}/enroll`, { method: 'POST', token: player.token, body: { expectedEntryPoints: 0 }, headers: { 'idempotency-key': 're-enroll-first' } })
+      assert.equal((await call(baseUrl, `/api/v1/tournaments/${tournamentId}/check-in`, { method: 'POST', token: player.token })).payload.data.checkedInCount, 1)
+    }
     if (index < 16) {
       assert.equal(checkedIn.payload.data.phase, 'check-in')
       assert.equal(checkedIn.payload.data.roundNumber, 0)
@@ -85,6 +96,9 @@ try {
   }
 
   const duplicateCheckIn = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/check-in`, { method: 'POST', token: players[0].token })
+  const lockedWithdrawal = await call(baseUrl, `/api/v1/tournaments/${tournamentId}/withdraw`, { method: 'POST', token: players[0].token, headers: { 'idempotency-key': 'withdraw-after-lock' } })
+  assert.equal(lockedWithdrawal.status, 409)
+  assert.equal(lockedWithdrawal.payload.error.code, 'ROSTER_LOCKED')
   assert.equal(duplicateCheckIn.payload.data.checkedInCount, 16, '重复检录必须幂等')
 
   const unassignedJoin = await call(baseUrl, '/api/v1/match/join', {
@@ -154,6 +168,9 @@ try {
         assert.match(view.entryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
         const claims = fixedTicketVerifier.inspect(view.gameTicket)
         assert.equal(claims.roomKind, 'match')
+        assert.equal(claims.matchMode, queueId, '固定赛事签名票据必须传递单副赛制，不能退回传统升级')
+        assert.equal(formatForNewRoom({ entryKind: claims.roomKind, matchMode: claims.matchMode }).kind, 'independent')
+        assert.equal(formatForNewRoom({ entryKind: claims.roomKind, matchMode: claims.matchMode }).individualRanking, true)
         assert.equal(claims.purpose, 'entry')
         assert.equal(claims.entryAttemptId, view.entryAttemptId, '固定赛票据必须绑定平台持久的原席位 attempt')
       }
@@ -206,6 +223,7 @@ try {
         assert.equal(recovered.payload.data.match.roomId, original.roomId)
         assert.equal(recovered.payload.data.match.seat, original.seat)
         assert.notEqual(recovered.payload.data.match.gameTicket, original.gameTicket, '门票过期后必须签发新票')
+        assert.equal(fixedTicketVerifier.inspect(recovered.payload.data.match.gameTicket).matchMode, queueId, '重签不能丢失赛事赛制')
         assert.ok(recovered.payload.data.match.expiresAt > original.expiresAt)
         assert.equal(recovered.payload.data.match.entryAttemptId, original.entryAttemptId, '固定 assignment 重签必须保留稳定 attempt')
         assert.equal(
@@ -279,6 +297,12 @@ try {
   assert.equal(standings.payload.data.viewerStanding.userId, players[15].userId)
 
   const snapshot = await runtime.store.read(state => state)
+  for (const standing of standings.payload.data.standings) {
+    const persisted = snapshot.tournamentStandings[`${tournamentId}:${standing.userId}`]
+    assert.equal(persisted.rank, standing.rank, 'settlement must persist projected ranks within its transaction')
+    assert.equal(persisted.opponentPoints, standing.opponentPoints)
+    assert.equal(persisted.advanced, standing.advanced, 'qualification must be durable, not a side effect of reading standings')
+  }
   assert.equal(Object.keys(snapshot.tournamentPlayerRoundResults).length, 48, '每名玩家每轮只能有一条赛事结果')
   assert.equal(snapshot.tournamentRuns[tournamentId].rounds.flatMap(round => round.assignments).filter(item => item.status === 'completed').length, 12)
 } finally {

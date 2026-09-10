@@ -21,6 +21,7 @@ export class FriendRoomViewReceiver {
     const current = this.dependencies.snapshot()
     if (!this.dependencies.acceptsRoom(message.roomId) || !['player', 'observer'].includes(message.roomRole ?? '') || !['p1', 'p2', 'p3', 'p4'].includes(message.myPlayerId)) return
     const switched = current.roomRole !== message.roomRole || current.myPlayerId !== message.myPlayerId
+      || current.duplicate?.watching !== message.duplicate?.watching || current.duplicate?.mySeat !== message.duplicate?.mySeat
     if (switched || current.observerWaiting && !message.observerWaiting) this.dependencies.reset()
     this.dependencies.applySnapshot(message, 'reconnect')
   }

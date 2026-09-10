@@ -37,6 +37,7 @@ const normalizeMatchRecoveryEntry = (
     roomId,
     seat: source.seat as Extract<MatchRecoveryEntry, { roomKind: 'match' }>['seat'],
     roomKind: 'match',
+    ...(source.queueId === undefined ? {} : { queueId: requireNonEmptyString(source.queueId, '恢复匹配玩法') }),
     ticketPurpose: source.ticketPurpose,
     gameEndpoint: normalizeGameEndpoint(source.gameEndpoint, endpointPolicy),
     gameTicket,

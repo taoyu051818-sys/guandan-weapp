@@ -109,7 +109,7 @@ function verifyLockAndBottomSelection () {
   assert.deepEqual(group.cardIds, ['locked-6', 'locked-7', 'locked-8', 'locked-9', 'locked-10'])
   assert.deepEqual(grouping.getStackSelectionForBottomCard('locked-10'), group.cardIds, 'the fully visible bottom card must select the whole stack')
   assert.deepEqual(grouping.getStackSelectionForBottomCard('locked-6'), [], 'a covered stack strip must not impersonate the bottom-card action')
-  assert.deepEqual(grouping.getPlaySelectionForCard('locked-6'), group.cardIds, 'every visible member of an explicit lock must select the complete combination')
+  assert.deepEqual(grouping.getPlaySelectionForCard('locked-6'), grouping.getGroupForCard('locked-6').cardIds, 'every locked member selects its entire group')
 
   const copy = grouping.getGroupForCard('locked-8')
   assert.equal(copy.id, groupId)
@@ -132,8 +132,9 @@ function verifyTableIntegration () {
 
   assert.match(scene, /onSuitSelect: suit => this\.tableHandInteraction\?\.handleSuitIntent\(suit\)/, 'the table HUD must forward suit intent to the hand interaction owner')
   assert.match(handInteraction, /availableSuits: this\.workspace\.straightFlushAvailability/, 'the four-suit HUD must receive authoritative availability')
-  assert.match(suitHandler, /workspace\.selectStraightFlush\(suit/, 'pressing a lit suit must delegate its exact candidate to the hand transaction')
-  assert.match(workspace, /suggestion\.cardIds\.forEach\(cardId => createDraft\.selectedCardIds\.add\(cardId\)\)/, 'one suit press must select all five cards in the lock draft')
+  assert.match(suitHandler, /workspace\.straightFlushCardIds\(suit/, 'pressing a lit suit obtains its exact candidate')
+  assert.match(suitHandler, /ruleAuthority\.replaceSelectedCards\(ids\)/, 'suit shortcuts use the same visible selection')
+  assert.doesNotMatch(workspace, /lockDraft/, 'the workspace cannot own a hidden second selection')
   assert.doesNotMatch(suitHandler, /\.arrange/, 'suit controls must not reorder the whole hand')
   assert.match(
     handInteraction,

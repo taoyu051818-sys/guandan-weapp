@@ -10,6 +10,7 @@ const normalizeUserProfile = (value: unknown, context: string): UserProfile => {
     displayName: requireNonEmptyString(user.displayName, '用户昵称'),
     comprehensiveScore: nonNegativeNumber(user.comprehensiveScore, '综合分'),
     avatarUrl: typeof user.avatarUrl === 'string' && user.avatarUrl.trim() ? user.avatarUrl : undefined,
+    ...(['generated', 'saved'].includes(String(user.profileSource)) ? { profileSource: user.profileSource as 'generated' | 'saved' } : {}),
   }
 }
 
@@ -73,16 +74,18 @@ export class HttpAuthGateway implements AuthGateway {
 
   public signOut (): void { this.client.signOut() }
 
-  public async updateProfile (profile: Pick<UserProfile, 'displayName' | 'avatarUrl'>): Promise<UserProfile> {
+  public async updateProfile (profile: Pick<UserProfile, 'displayName' | 'avatarUrl'> & { avatarDataUri?: string }): Promise<UserProfile> {
     // wx.request has no portable PATCH support; the server keeps PATCH for web clients too.
     const payload = requireRecord(await this.client.request<unknown>('/api/v1/profile', 'POST', profile), '资料保存响应')
     return normalizeUserProfile(payload.user, '用户信息')
   }
 
   public async getAvatarImage (expectedAvatar?: string): Promise<string | null> {
-    const payload = requireRecord(await this.client.request<unknown>('/api/v1/profile/avatar'), '头像响应')
+    // Supplied WeChat URLs are draft previews; GET still reads the persisted own avatar.
+    const payload = requireRecord(await this.client.request<unknown>('/api/v1/profile/avatar', expectedAvatar ? 'POST' : 'GET',
+      expectedAvatar ? { avatarUrl: expectedAvatar } : undefined), '头像响应')
     if (expectedAvatar && payload.avatarUrl !== expectedAvatar) return null
-    return typeof payload.dataUri === 'string' && /^data:image\/(png|jpeg);base64,/.test(payload.dataUri) ? payload.dataUri : null
+    return typeof payload.dataUri === 'string' && /^data:image\/(png|jpeg|gif);base64,/.test(payload.dataUri) ? payload.dataUri : null
   }
 }
 

@@ -61,3 +61,34 @@ assert.equal(rosterState.spectatorFeeds[event.matchId].events[0].friendRoster, u
 await friend.service.accept(event.eventId, { ...event, friendRoster: roster })
 await assert.rejects(friend.service.accept(event.eventId, { ...event, friendRoster: { ...roster, p1: 'u0' } }), error => error.code === 'SPECTATOR_EVENT_ID_CONFLICT')
 console.log('Friend observer roster admission is atomic, idempotent and absent from public feeds')
+
+const rotating = fixture()
+await rotating.store.transaction(state => {
+  Object.assign(state.matches[event.matchId], { kind: 'friend-room', status: 'playing', startedAt: 1_100_000,
+    roomSettings: { format: 'rotating', rotatingScoring: 6, rounds: 2, spectator: 'off' } })
+})
+const rotatingEnd = { ...event, type: 'match-ended', roundSequence: 2, reason: 'round-limit', roundsPlayed: 2,
+  endedAt: event.at, winnerTeam: null, scores: { teamA: 0, teamB: 0 }, playerScores: { p1: 12, p2: 0, p3: 12, p4: 0 } }
+await assert.rejects(rotating.service.accept(event.eventId, { ...rotatingEnd, playerScores: { p1: 13, p2: -1, p3: 12, p4: 0 } }), error => error.code === 'FRIEND_PERSONAL_SCORE_MISMATCH')
+await assert.rejects(rotating.service.accept(event.eventId, { ...rotatingEnd, playerScores: undefined }), error => error.code === 'FRIEND_PERSONAL_SCORE_MISMATCH')
+await rotating.service.accept(event.eventId, rotatingEnd)
+assert.deepEqual(await rotating.store.read(state => state.matches[event.matchId].friendMatchEnd.playerScores), rotatingEnd.playerScores)
+await rotating.service.accept(event.eventId, rotatingEnd)
+console.log('Rotating personal scores: signed-format validation, bounds, persistence and idempotency passed')
+
+const friendBots = fixture()
+await friendBots.store.transaction(s => {
+  Object.assign(s.matches[event.matchId], { kind: 'friend-room', status: 'matching', roomSettings: { spectator: 'off' },
+    participants: [{ userId: 'host', seat: 'p1', status: 'matching' }] })
+})
+const botRoster = { p1: 'host', ...Object.fromEntries([2, 3, 4].map(i => [`p${i}`, `friendbot_${String(i).repeat(24)}`])) }
+await assert.rejects(friendBots.service.accept(event.eventId, { ...event, friendRoster: { ...botRoster, p2: 'uninvited-human' } }), /授权/)
+await assert.rejects(friendBots.service.accept(event.eventId, { ...event, friendRoster: { ...botRoster, p1: botRoster.p2, p2: 'host' } }), /不能覆盖/)
+assert.equal(await friendBots.store.read(s => s.matches[event.matchId].participants.length), 1, 'rejections cannot leave partial bot participants')
+await friendBots.service.accept(event.eventId, { ...event, friendRoster: botRoster })
+await friendBots.service.accept(event.eventId, { ...event, friendRoster: botRoster })
+assert.equal(await friendBots.store.read(s => s.matches[event.matchId].participants.filter(p => p.isBot).length), 3)
+assert.deepEqual(await friendBots.store.read(s => s.users), {}, 'signed bot admission does not generate platform users')
+await assert.rejects(friendBots.service.accept('spectate:match-1:2', { ...event, eventId: 'spectate:match-1:2', sequence: 2,
+  friendRoster: { ...botRoster, p3: botRoster.p4, p4: botRoster.p3 } }), /不能修改/)
+console.log('Signed friend bots: authorized roster only, immutable live seats, atomic admission, idempotency and no fabricated accounts')

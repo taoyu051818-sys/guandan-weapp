@@ -7,6 +7,8 @@ import {
   formatComprehensiveScore,
 } from './rating.js'
 import { findAvailableAccountId, normalizeAccountId } from './storage.js'
+import { randomDefaultProfile } from '../default-profiles.js'
+import { isUploadedAvatar, validateAvatarUpload } from './profile-upload.js'
 
 const normalizeText = (value, fallback, maxLength) => {
   const text = typeof value === 'string' ? value.trim() : ''
@@ -120,6 +122,7 @@ export class AccountService {
       accountId: user.accountId,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl || '',
+      ...(user.profileCustomizedAt ? { profileSource: 'saved' } : user.defaultProfileId ? { profileSource: 'generated' } : {}),
       comprehensiveScore: formatComprehensiveScore(calculateComprehensiveScore(rating)),
       createdAt: user.createdAt,
     }
@@ -137,7 +140,7 @@ export class AccountService {
         const existing = state.users[existingId]
         this.ensureUserAccountId(state, existing)
         // Login refresh authenticates identity; it must not overwrite a saved profile.
-        if (!existing.profileCustomizedAt) {
+        if (!existing.profileCustomizedAt && !existing.defaultProfileId) {
           existing.displayName = safeName
           if (typeof avatarUrl === 'string') existing.avatarUrl = avatarUrl.trim().slice(0, 500)
         }
@@ -148,12 +151,15 @@ export class AccountService {
       }
       const id = `usr_${this.createId()}`
       const accountId = this.allocateAccountId(state, id)
+      const initial = randomDefaultProfile()
+      const hasName = typeof displayName === 'string' && displayName.trim() && !['陵水玩家', '陵水牌友', '微信用户'].includes(displayName.trim())
       const created = {
         id,
         accountId,
         externalId: safeExternalId,
-        displayName: safeName,
-        avatarUrl: typeof avatarUrl === 'string' ? avatarUrl.trim().slice(0, 500) : '',
+        displayName: hasName ? safeName : initial.displayName,
+        avatarUrl: typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim().slice(0, 500) : initial.avatarUrl,
+        defaultProfileId: initial.id,
         createdAt: now,
         updatedAt: now,
       }
@@ -207,19 +213,27 @@ export class AccountService {
     })
   }
 
-  async updateProfile (userId, { displayName, avatarUrl } = {}) {
+  async updateProfile (userId, { displayName, avatarUrl, avatarDataUri } = {}) {
+    const upload = avatarDataUri === undefined ? null : validateAvatarUpload(avatarDataUri)
     const now = this.now()
     return this.store.transaction(state => {
       ensureAccountCollections(state)
       const user = state.users[userId]
       if (!user) throw notFound('USER_NOT_FOUND', '用户不存在')
+      if (!upload && isUploadedAvatar(avatarUrl) && avatarUrl !== user.avatarUrl) throw badRequest('INVALID_AVATAR', '请上传自己的头像')
       if (displayName !== undefined) user.displayName = normalizeNickname(displayName, user.displayName)
       if (avatarUrl !== undefined) user.avatarUrl = normalizeText(avatarUrl, '', 500)
-      if (displayName !== undefined || avatarUrl !== undefined) user.profileCustomizedAt = now || 1
+      if (upload) { user.avatarUrl = upload.avatarUrl; user.avatarImageData = upload.dataUri }
+      else if (avatarUrl !== undefined && !isUploadedAvatar(avatarUrl)) delete user.avatarImageData
+      if (displayName !== undefined || avatarUrl !== undefined || upload) user.profileCustomizedAt = now || 1
       user.updatedAt = now
       return this.publicUser(user, this.ensurePlayerRating(state, userId))
     })
   }
-}
 
+  async getUploadedAvatarImage (avatarUrl) {
+    if (!isUploadedAvatar(avatarUrl)) return null
+    return this.store.read(state => Object.values(state.users).find(user => user.avatarUrl === avatarUrl)?.avatarImageData || null)
+  }
+}
 export { emptyStats }

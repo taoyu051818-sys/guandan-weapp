@@ -1,6 +1,6 @@
 # NiuMa 女声报牌、牌局流程与背景音乐接入
 
-从 MIT 仓库 `niuma-wj/client-cocos` 的固定提交 `f9d037feaef5a80867fd97c8dd39b9a7486fbeca` 保留女声及流程音效 48 个 MP3 + 1 个 OGG，以及 1 条 MP3 背景音乐。2026-09-07 按用户要求取消男声：40 个 NiuMa 男声与 licensed/single_5_male.mp3 已移出 assets，导入脚本和切换控件删除。历史哈希清单保留并标记 runtimeAllowed=false。临时恢复副本在 /tmp/guandan-retired-male-dMUrhV（系统可能清理）。未清理历史构建快照，发布时必须重新构建。运行时继续使用语义键，不允许场景直接引用文件名。
+从 MIT 仓库 `niuma-wj/client-cocos` 的固定提交 `f9d037feaef5a80867fd97c8dd39b9a7486fbeca` 保留女声及流程音效 48 个 MP3，以及 1 条 MP3 背景音乐。2026-09-07 按用户要求取消男声：40 个 NiuMa 男声与 licensed/single_5_male.mp3 已移出 assets，导入脚本和切换控件删除。历史哈希清单保留并标记 runtimeAllowed=false。临时恢复副本在 /tmp/guandan-retired-male-dMUrhV（系统可能清理）。未清理历史构建快照，发布时必须重新构建。运行时继续使用语义键，不允许场景直接引用文件名。
 
 ## 已接入
 
@@ -10,18 +10,11 @@
 - 钢板：新增独立合成女声 tts/steel_plate，详见 third_party/licenses/tts-steel-plate.json。只在 PlayType.Plate 播报，不用“飞机”代替；尚待真机听感验收。
 - 牌型：三张、顺子、三带二、三连对、同花顺、炸弹、王炸。
 - 流程：三种“不要”轮换、倒计时 `0–5` 精确选择、本局开始、胜利、失败。
-- 快捷语：仅接入 Female 的上游 `phrase02`，按钮/服务端白名单为原声确切文案“你的牌打得太好啦”。
+- 快捷语：2026-09-09 按用户要求全部退役，面板、网络消息、座位气泡和音频均不进入运行时。
 - 背景音乐：上游 `assets/GuanDan/Audio/bg.mp3` 独立导入为 `music/niuma/table_theme`；使用单独循环声道，遵循会话中的音乐开关/音量配置（玩家设置页已退役），不受音效开关干扰。
 - 原有授权发牌声、爆破声和生成式兜底音效继续保留；新增人声作为独立报牌层播放。
 
-快捷语的含义不是按文件编号猜测。固定提交中的 `GuanDanPlayer.ts` 与 `SeatPanel.ts` 都依次定义同一组显示文案，`AudioControl.playPhrase` 再把零基索引加一并根据声线加载 `Phrase/Female/phraseNN` 或 `Phrase/Male/phraseNN`。脚本会同时验证三处旧代码，任何文案或路由变化都会终止导入。
-
-| 上游索引 | 上游原句 | 当前中性文案 | 资源键 | 决策 |
-| --- | --- | --- | --- | --- |
-| 1 | 快点儿吧，等到花儿都谢了 | 请尽快出牌 | — | 文本不一一对应且带催促反讽，排除运行映射 |
-| 2 | 你的牌打得太好啦 | 你的牌打得太好啦 | `niuma/chat_nice_play` | 仅女声接入；男声退役 |
-
-“请尽快出牌”“配合得好”“大家加油”“谢谢”“再来一局”在这 9 条上游语音中没有逐字一致的安全对应项，因此继续无声降级，不用相近编号或大致语义硬配。
+原有快捷语映射为历史审计信息。唯一曾使用的女声 `phrase02` 已移至仓库根目录 `asset-library/retired-audio/quick-chat/`，原哈希与来源记录见该目录的 `manifest.json`；导入脚本不再导入此音频。
 
 ## 明确排除
 

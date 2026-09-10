@@ -21,7 +21,10 @@ const loadPure = (name, dependencies = {}) => {
 }
 
 const policy = loadPure('../effects/NetworkEffectSyncPolicy')
-const models = loadPure('LobbyModels')
+const models = loadPure('LobbyModels', { './DuplicateRoomModel': loadPure('DuplicateRoomModel') })
+const { normalizeDuplicateRoom } = loadPure('DuplicateRoomModel')
+assert.equal(normalizeDuplicateRoom({ phase: 'lobby', slots: Array(8).fill(null) }), null)
+assert.equal(normalizeDuplicateRoom({ phase: 'lobby', slots: [] }), null)
 const sync = loadPure('LobbySyncTracker', { '../effects/NetworkEffectSyncPolicy': policy })
 const { LobbyMessageRouter } = loadPure('LobbyMessageRouter', {
   './LobbyModels': models,
@@ -88,14 +91,11 @@ function verifyMessageRouter () {
   assert.equal(emitted.filter(item => item[0] === 'guandan:round-ended').length, 1, 'round events require gameVersion and dedupe repeated delivery')
 
   const roomEventCount = emitted.length
-  listeners.get('chat')({ playerId: 'p2', text: 'missing room' })
-  listeners.get('chat')({ roomId: '999999', playerId: 'p2', text: 'wrong room' })
   listeners.get('hostLeft')({})
   listeners.get('roomDissolved')({ roomId: 'wrong-room' })
   listeners.get('roomKicked')({ roomId: '654321' })
   assert.equal(emitted.length, roomEventCount, 'every live room-domain event must carry the accepted current room id')
-  listeners.get('chat')({ roomId: '123456', playerId: 'p2', text: 'hello' })
-  assert.deepEqual(emitted.at(-1), ['guandan:chat', { playerId: 'p2', text: 'hello' }])
+  assert.equal(listeners.has('chat'), false, 'retired quick chat has no network listener')
 }
 
 function verifyCommandSender () {
@@ -109,10 +109,10 @@ function verifyCommandSender () {
     reportError: message => errors.push(message),
   })
   sender.roomIntent('play', { cardIds: ['card-1'] })
-  sender.roomIntent('chat', { text: 'hello' })
+  sender.roomIntent('setTrustee', {})
   assert.deepEqual(sent, [
     { type: 'play', payload: { roomId: '123456', cardIds: ['card-1'], expectedVersion: 8 } },
-    { type: 'chat', payload: { roomId: '123456', text: 'hello' } },
+    { type: 'setTrustee', payload: { roomId: '123456' } },
   ])
   snapshot.gameStartPending = true
   assert.equal(sender.roomIntent('play'), null)

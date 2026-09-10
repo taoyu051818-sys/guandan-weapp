@@ -73,8 +73,8 @@
 - `TableMatchCoordinator` 独占 `GameManager` 快照监听、牌桌网络桥、recovery baseline、下一局/托管意图和短期牌桌桥接状态；出完/十张阈值展示游标由 `TableProgressPresentation` 独占；业务真相仍分别属于 `GameManager`、`LobbyController` 与 `GameSession`。
 - `TableNetworkEventBridge` 独占牌桌所需的 Lobby 事件注册、转发和成对解绑；它不缓存快照，也不改变 `LobbyController` 的服务端权威状态。
 - `StartupCoordinator` 独占资源启动状态机，`SceneBackdropController` 独占背景加载、切换和销毁。
-- `TableOverlayController` 独占结束提示、离桌确认、系统通知、解散投票倒计时和快捷语节点及其监听生命周期。
-- `TableTurnClockController` 独占联机 deadline 投影（默认回合时长 20 秒，服从房间设置）、最后 5 秒音效、操作区位置和 HUD 计时状态。
+- `TableOverlayController` 独占结束提示、离桌确认、系统通知、解散投票倒计时及其监听生命周期；快捷语已退役。
+- `TableTurnClockProjection` 纯计算联机 deadline、相对席位和显隐（默认回合时长 20 秒，服从房间设置）；`TableTurnClockController` 每次刷新统一采样状态/时间并驱动文字、HUD 与最后 5 秒音效，reset/dispose 立即清空显示。
 - `TableHudSeatViewGroup` 独占四个座位节点、默认头像注入、座位快照投影、布局和销毁；它不判定座次、回合或牌数。
 - `TableHudTurnTimerView` 独占回合计时节点、圆环/秒数绘制、鸡图资源替换和销毁；倒计时权威数据仍由 `TableTurnClockController` 投影。
 - `EffectController` 只组合 Cocos 渲染器、资源、节点池和总清理；`EffectActionPresentationCoordinator` 独占联机 action-count 去重、展示票据与本地飞牌起点，`EffectPlaybackCoordinator` 独占可见动效队列、异步准备代际和播放 handle 生命周期。
@@ -84,7 +84,7 @@
 - `LobbyController` 保留 Cocos 生命周期、房间身份和公开命令门面；resume 凭证写入失败必须投影为可观察错误，但不能阻止当前牌局。`LobbyCommandSender` 独占命令版本注入与发送失败归一化，`LobbyConnectionEventCoordinator` 固定连接、断线、匹配入桌与本地恢复的调用顺序，`LobbyMessageRouter` 独占服务端消息过滤、快照投影和领域事件转发：直播房间消息必须携带当前六位 roomId，metadata 必须携带非负安全整数 version，state/round 还必须携带 gameVersion；仅入桌 adapter 可兼容缺失版本的旧快照。`LobbyModels` 提供模型工厂，`LobbySyncTracker` 独占版本与特效游标，`LobbyEntryAttemptTracker` 独占 128-bit 入桌幂等键，`LobbyMatchedEntryCoordinator` 管理平台票据的跨连接重试、超时和恢复轮换，`LobbyResumeConnectionWatchdog` 限制本地 resume token 的连接恢复时长与总失败次数。
 - `GameManager` 是 Cocos 联机组件适配器，转发 UI/网络意图并投影权威快照，不直接调用领域 `transition`。`LocalMatchController` 只在 `tests/support/local-match` 中推进测试牌局；正式客户端不能引用该目录。
 - `GameManager` 的 phase、等级、积分、排名、贡还和结算只保存在一个 canonical projection 中；兼容旧 Scene API 的 getter 只能读取该投影，不能重新成为可写状态。
-- `LocalHandSelectionController` 和 `NetworkActionController` 分别拥有选牌和网络待确认生命周期；测试夹具的 AI 调度与事件控制器不进入运行包；`NetworkMatchSnapshotController` 单点消费联机快照，负责 canonical phase/贡还/结算投影、`roundId + revision` 门禁和每局统计去重，旧 result-only 包通过服务端 room/version/gameVersion 事件身份去重。`HandGrouping` 只编排分组命令、事务历史和 revision，状态克隆、等价比较、权威快照归一化与显示排序集中在 `HandGroupingState`。
+- `LocalHandSelectionController` 和 `NetworkActionController` 分别拥有选牌和网络待确认生命周期；测试夹具的 AI 调度与事件控制器不进入运行包；`NetworkMatchSnapshotController` 单点消费联机快照，负责 canonical phase/贡还/结算投影、`roundId + revision` 门禁和每局统计去重，旧 result-only 包通过服务端 room/version/gameVersion 事件身份去重。`HandGrouping` 只编排分组命令、原子变更和 revision，状态克隆、等价比较、权威快照归一化与显示排序集中在 `HandGroupingState`；undo/redo 历史已退役，一键恢复使用 `HandWorkspace` 基准快照。
 - `HandArrangement.ts` 只保留稳定导出门面；`HandArrangementModel` 独占基础牌序、配置和公共类型，`HandDisplayOrdering` 独占展示列与组内牌序，`HandGroupSuggestions` 独占百搭分配、牌型候选发现和冲突选择。三者均为无 `cc` 的纯模块，候选发现不得反向读取展示状态。
 - shared-core 用一次 `resolvePlayForContext` 同时完成多解百搭的合法性判断与落账；提示、诊断、状态机和 AI 共享这份解释。`MatchState.roundMeta` 保存贡还/抗贡来源并显式注入 AI，结算 state、operation 和 event payload 之间不共享可变引用。`ai/engine.ts` 只持有实例状态和装配依赖，`ai/decisionRunner.ts` 独占单局门禁顺序，`ai/policyOverrides.ts` 适配 hard/medium/master 策略，`ai/fallbackDecision.ts` 处理常规跟牌、领牌与随机人性化；记牌、checkpoint 校验、规则查询 LRU 和辅助决策分别集中在 `runtimeIntel.ts`、`checkpoint.ts`、`ruleMemo.ts`、`decisionSupport.ts`。
 - `TableHudLayoutPolicy`、`FriendRoomSettingsPolicy`、`NetworkEffectSyncPolicy`、手牌策略等模块保持无 `cc` 运行时依赖，便于纯测试。
@@ -125,14 +125,15 @@ core/generated
 | 自动测试牌局 `MatchState` | 包外 `tests/support/local-match/LocalMatchController`，只通过原子 `transition` 写入 | 仅自动回归使用；无产品入口、不被运行时导入 |
 | 规则选牌和待确认网络动作 | `LocalHandSelectionController` / `NetworkActionController` | `GameManager` 只组合、转发和发布结果；不持有本地 AI 或超时自动出牌状态 |
 | 联机真实牌局 | 服务端 `game-session` 持有 canonical `MatchState` | `LobbyController` 接收按席位脱敏的 `ViewerMatchState`，`GameManager` 不在本地推进联机规则 |
-| 联机牌局客户端投影和结算统计去重 | `NetworkMatchSnapshotController` | canonical `MatchState.phase/tribute/settlement` 优先于旧拆包字段；相同 room/round 或旧包的相同服务端事件身份只记录一次当前座位战绩 |
+| 联机牌局客户端投影和结算统计去重 | `NetworkMatchSnapshotController` / `RoundViewState` | 只读阶段投影验证完整性，GameManager 接收时复制并深冻结；canonical `MatchState.phase/tribute/settlement` 优先于旧拆包字段；相同 room/round 或旧包的相同服务端事件身份只记录一次当前座位战绩 |
 | 房间身份、成员、准备、托管、倒计时元数据 | `LobbyController.snapshot`，数据源为服务端 | 页面和牌桌只读投影并发送意图 |
 | 服务端版本去重、房间事件去重、特效同步游标 | `LobbySyncTracker` | `LobbyController` 仅委托并发布数据包 |
 | 偏好设置、本地战绩、当前页面与席位身份 | `GameSession`；持久化数据先经 `GameSessionModel.restoreSessionSnapshot` 按 schema 迁移和校验 | 页面、音频和牌桌订阅会话事件；炸弹数只统计当前座位的公开出牌历史，`StraightFlush` 是否计入由当前 `RuleProfile` 决定 |
 | 规则出牌/贡牌选择 | `LocalHandSelectionController`，通过 `GameManager` 暴露意图 | 按当前 `MatchState + RuleProfile` 诊断，不保存展示分组 |
-| 锁牌草稿与理牌复原事务 | `HandWorkspace`；锁牌使用 `idle/create/unlock`，理牌使用 `point-stacked/smart-arranged`，二者都是独立判别状态并受 `roundId` 代际保护 | `TableHandInteractionController` 互斥投影规则选择与锁牌草稿；锁变化只失效旧布局基线，不回滚当前锁；新轮次/离桌完整重置 |
-| 玩家提示候选与游标 | shared-core `hints/handHintPolicy` 纯排序合法动作；Cocos `HandHintProtectionProjector` 将当前不重叠显示组投影成通用 cardId 保护组；`LocalHandSelectionController` 独占签名和游标 | UI/理牌状态不进入规则内核；锁组有完整替代时禁止部分拆分；提示不发送网络命令，正式出牌仍经权威 transition |
-| 手牌展示牌列、组合来源与锁定归属 | `HandGrouping`；`HandGroupingHistory` 独占有界 undo/redo；每个组显式保存 `origin: rank/auto/manual`、`locked` 和全局 `layoutMode` | 普通模式只按实体点数归列和有效点数排序，智能模式才自动提升大牌型；显式锁组无论当前布局模式都作为完整 `DisplayUnit` 进入左侧锁定区，区内以当前 `RuleProfile` 的共享规则强度稳定排序，解锁后重新进入当前布局规则。列内固定 40px 步长，普通牌与大小王一致且不压缩；操作区保持上层固定位置，不修改规则手牌。锁牌成员只能通过 `createLockedGroup`、解锁或整组移动改变，禁止重新引入可绕过合法性检查的通用 `createGroup` / `moveCard` API |
+| 锁牌与理牌复原事务 | `HandWorkspace`；`HandLockDecision` 由当前选牌派生为 `lock/unlock/unavailable(reason)`，不持有第二份选牌或草稿；理牌使用 `point-stacked/smart-arranged`，受 `roundId` 代际保护 | HUD 直接消费共享决定；执行时通过同一决定函数重新校验；锁变化只失效旧布局基线，不回滚当前锁；新轮次/离桌完整重置 |
+| 手牌操作资格 | `HandInteractionState.resolveHandInteraction` 纯函数派生模式；`HandInteractionPolicy.resolveHandCapabilities` 统一选牌、分组、理牌、出牌及提示的公共条件 | 控制器与渲染使用同一策略，不保存第二份可变交互状态。非自己回合可预选/分组，贡还等待时可理牌，贡还选牌另验参与人和服务端截止对象。上一局名次不阻止下一局贡还 |
+| 玩家提示候选与游标 | shared-core `hints/handHintPolicy` 纯排序合法动作；Cocos `HandHintProtectionProjector` 将当前不重叠显示组投影成通用 cardId 保护组；`LocalHandSelectionController` 独占签名和游标 | UI/理牌状态不进入规则内核；客户端提示过滤所有部分拆锁候选，无候选时提示恢复锁组；提示不发送网络命令，正式出牌仍经权威 transition |
+| 手牌展示牌列、组合来源与锁定归属 | `HandGrouping`；一键恢复由 `HandWorkspace` 独占基准快照，不保留无入口的 undo/redo 历史；每个组显式保存 `origin: rank/auto/manual`、`locked` 和全局 `layoutMode` | 普通模式只按实体点数归列和有效点数排序，智能模式才自动提升大牌型；显式锁组无论当前布局模式都作为完整 `DisplayUnit` 进入左侧锁定区，区内以当前 `RuleProfile` 的共享规则强度稳定排序，解锁后重新进入当前布局规则。列内固定 40px 步长，普通牌与大小王一致且不压缩；操作区保持上层固定位置，不修改规则手牌。锁牌成员只能通过 `createLockedGroup`、解锁或整组移动改变，禁止重新引入可绕过合法性检查的通用 `createGroup` / `moveCard` API |
 | 堆叠布局、选中与锁定视觉 | `HandController` / `CardView`，只消费 `displayCardIds + selectedCardIds + lockedCardIds` | 命中区高度与牌面几何分离；选中/锁定不改 scale 或 sibling order |
 | 玩家资料与钱包页面投影 | `FrontPagePlayerState`、`FrontPageWalletState`；线上数据源为平台服务 | 各页面域共享同一投影，不各自缓存一份余额 |
 | 页面路由和当前模态层 | `PageRouter` / `FrontPageController` | 页面域请求打开/关闭，不自行保留旧页面节点 |
@@ -140,8 +141,8 @@ core/generated
 | 启动下载、预加载、初始化和 ready 门闩 | `StartupCoordinator` | `GameScene` 注入初始化和响应式布局回调 |
 | 背景纹理缓存和切换 revision | `SceneBackdropController` | 页面/牌桌只选择 `lobby` 或 `table` 模式 |
 | 结束提示、离桌/通知弹窗、解散投票倒计时和快捷语 | `TableOverlayController` | `GameScene` 只注入牌桌动作并调用公开交互入口 |
-| 牌桌回合剩余时间、计时文案和 HUD 座位投影 | `TableTurnClockController`；联机 deadline 数据源仍是 `LobbyController.snapshot` | `GameScene` 只提交当前快照和布局上下文；无 deadline 时隐藏计时，不产生本地超时动作 |
-| 最新牌局快照、阶段衔接与 recovery 视觉基线 | `TableMatchCoordinator`；完成者/十张阈值/贡还游标由 `TableProgressPresentation` 持有（均为短期展示状态） | 监听 `GameManager` 与 `TableNetworkEventBridge`，投影到手牌、出牌区、座位、HUD、弹层、音效和动效；不推进规则 |
+| 牌桌回合剩余时间、计时文案和 HUD 座位投影 | `TableTurnClockProjection` 纯函数计算，`TableTurnClockController` 管理 tick/文案；联机 deadline 数据源仍是 `LobbyController.snapshot` | `GameScene` 只提交当前快照和布局上下文；无 deadline 时隐藏计时，不产生本地超时动作，不从节点 active 反推计时资格 |
+| 最新牌局快照、阶段衔接与 recovery 视觉基线 | `TableMatchCoordinator`；操作区/结算显示交给 `TablePhasePresenter`，完成者/十张阈值/贡还游标由 `TableProgressPresentation` 持有（均为短期展示状态） | 监听 `GameManager` 与 `TableNetworkEventBridge`，投影到手牌、出牌区、座位、HUD、弹层、音效和动效；不推进规则 |
 | 动效 action-count 游标、展示票据、可见队列和异步准备代际 | `EffectActionPresentationCoordinator` / `EffectPlaybackCoordinator` | `EffectController` 只提供渲染、音频、震动和资源依赖；recovery/destroy 统一取消旧代际，迟到准备不得恢复展示或发声 |
 | 节点位置、按钮可见性和短时提示 | 对应 UI 控制器或页面域 | 只能是上述业务状态的展示，不成为业务真相 |
 

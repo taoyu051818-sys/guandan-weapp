@@ -27,7 +27,7 @@ export const coastalButton = (ui: RuntimeUiFactory, text: string, x: number, y: 
   const node = ui.panel('CoastalButton', x, y, width, height, {
     fill: primary ? new Color(250, 207, 100) : new Color(32, 81, 104, 250),
     stroke: primary ? new Color(255, 237, 176) : new Color(107, 156, 173),
-    lineWidth: 1, radius: height / 2,
+    lineWidth: 1, frame: 'control',
   })
   coastalText(ui, text, 0, 0, width - 24, height - 8, 25, {
     parent: node, bold: true, color: primary ? new Color(75, 53, 26) : new Color(229, 245, 248),

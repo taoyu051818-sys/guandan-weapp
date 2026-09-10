@@ -1,3 +1,4 @@
+import { drawUiFrame } from './UiFrameStyle'
 import { BlockInputEvents, Color, Graphics, Label, Node, Sprite, SpriteFrame, Texture2D, Tween, UIOpacity, UITransform, Vec3, tween } from 'cc'
 import type { TableViewport } from './ScreenAdapter'
 import { applyForegroundTextStyle, RUNTIME_MIN_TEXT_SIZE } from './RuntimeUiFactory'
@@ -257,7 +258,7 @@ export class StartupLoadingOverlay {
     const track = this.trackGraphics
     track.clear()
     track.fillColor = new Color(255, 255, 255, 50)
-    track.roundRect(-this.progressWidth / 2, -this.progressHeight / 2, this.progressWidth, this.progressHeight, this.progressHeight / 2)
+    drawUiFrame(track, -this.progressWidth / 2, -this.progressHeight / 2, this.progressWidth, this.progressHeight, 'progress')
     track.fill()
 
     const fill = this.fillGraphics
@@ -265,7 +266,7 @@ export class StartupLoadingOverlay {
     if (this.progress <= 0) return
     const width = Math.max(this.progressHeight, this.progressWidth * this.progress)
     fill.fillColor = new Color(244, 188, 62, 255)
-    fill.roundRect(-this.progressWidth / 2, -this.progressHeight / 2, width, this.progressHeight, this.progressHeight / 2)
+    drawUiFrame(fill, -this.progressWidth / 2, -this.progressHeight / 2, width, this.progressHeight, 'progress')
     fill.fill()
   }
 
@@ -275,7 +276,7 @@ export class StartupLoadingOverlay {
     graphics.fillColor = new Color(13, 28, 30, 230)
     graphics.strokeColor = new Color(232, 191, 93, 255)
     graphics.lineWidth = 2
-    graphics.roundRect(-78, -21, 156, 42, 5)
+    drawUiFrame(graphics, -78, -21, 156, 42, 'control')
     graphics.fill()
     graphics.stroke()
   }
