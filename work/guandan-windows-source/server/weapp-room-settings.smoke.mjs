@@ -6,12 +6,6 @@ import { join } from 'node:path'
 import { once } from 'node:events'
 import { sendProtocolCommand } from './weapp-smoke-protocol.mjs'
 
-// These suites own child servers and timers. Static TLA imports run siblings
-// concurrently, competing for startup time and ports on smaller CI runners.
-for (const suite of ['./weapp-rotating.smoke.mjs', './duplicate-room-runtime.test.mjs', './duplicate-room-ws.test.mjs']) {
-  await import(suite)
-}
-
 const port = 39108
 const stateDir = mkdtempSync(join(tmpdir(), 'guandan-room-settings-'))
 const stateFile = join(stateDir, 'rooms.json')
