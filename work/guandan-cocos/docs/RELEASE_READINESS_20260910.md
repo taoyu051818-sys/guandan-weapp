@@ -30,12 +30,23 @@ CI 客户端与服务端统一使用 Node 22；CI 增加限时与手动触发入
 从已提交的干净工作区构建 shared-core、Web 与微信包，完成正式配置核验后执行：
 
 ```sh
+# Creator 构建完成后，Web 正式包须显式提供既有公开业务端点。
+GUANDAN_PLATFORM_ENDPOINT=https://api.yutechhn.cn/guandan \
+GUANDAN_LOBBY_ENDPOINT=wss://api.yutechhn.cn/guandan/weapp \
+pnpm --dir work/guandan-cocos finalize:web-build
+GUANDAN_PLATFORM_ENDPOINT=https://api.yutechhn.cn/guandan \
+GUANDAN_LOBBY_ENDPOINT=wss://api.yutechhn.cn/guandan/weapp \
+pnpm --dir work/guandan-cocos verify:web-build
+pnpm --dir work/guandan-cocos finalize:wechat-build
+pnpm --dir work/guandan-cocos verify:wechat-build
 node scripts/release-manifest.mjs create 20260910-rc1
 node scripts/release-manifest.mjs verify release-artifacts/20260910-rc1/manifest.json
 ```
 
 清单记录源码 commit/tree、三个产物目录内每个文件的大小和 SHA-256。任何源码未提交、包文件变化、空产物或符号链接均不能通过核验。
 清单与构建日志保存在包外 `release-artifacts`，不提交生成包或机器日志。哈希清单不能证明可复现构建，也不能替代构建日志、CI 与人工签收。
+
+首轮 GitHub 检查发现转蛋 smoke 的服务启动失败；旧脚本丢弃子进程日志，不能准确回溯底层启动原因。本轮将带副作用的三个模式测试改为顺序加载，转蛋使用临时端口、隔离环境，并保留有界启动日志和失败清理；规则断言不减少。不要用“本地通过”掩盖远程失败，应以候选提交重新运行的 CI 为准。
 
 ## 本地演练边界
 

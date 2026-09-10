@@ -1,18 +1,30 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { once } from 'node:events'
+import { createServer } from 'node:net'
 import { sendProtocolCommand } from './weapp-smoke-protocol.mjs'
 const { representativeLegalMoves, variantAward } = createRequire(import.meta.url)('../../../shared-core/dist')
-const port = 39219
-const child = spawn(process.execPath, ['server/weapp-ws.js'], { cwd: process.cwd(), stdio: 'ignore', env: {
-  ...process.env, NODE_ENV: 'test', WEAPP_WS_PORT: String(port), WEAPP_TEST_RANDOM_SEED: '0x77665544',
+const probe = createServer()
+await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve))
+const port = probe.address().port
+await new Promise(resolve => probe.close(resolve))
+const child = spawn(process.execPath, ['server/weapp-ws.js'], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'], env: {
+  PATH: process.env.PATH, NODE_ENV: 'test', WEAPP_HOST: '127.0.0.1', WEAPP_WS_PORT: String(port), WEAPP_TEST_RANDOM_SEED: '0x77665544',
 } })
+let logs = '', spawnError = null
+const capture = bytes => { logs = (logs + bytes).slice(-12000) }
+child.stdout.on('data', capture); child.stderr.on('data', capture)
+child.on('error', error => { spawnError = error; capture(error.message) })
+const closed = new Promise(resolve => child.once('close', resolve))
 const clients = []
 let requestId = 80000
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const connect = async () => {
+  let lastError
   for (let attempt = 0; attempt < 80; attempt++) {
+    if (spawnError || child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(`rotating test server exited (${child.exitCode}/${child.signalCode}): ${logs}`)
+    }
     try {
       const socket = new WebSocket(`ws://127.0.0.1:${port}/weapp`)
       await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }) })
@@ -30,9 +42,9 @@ const connect = async () => {
       socket.addEventListener('message', ({ data }) => { const packet = JSON.parse(data); packets.push(packet); if (packet.state) client.latest = packet; waiters.forEach(check => check(packet)) })
       clients.push(client)
       return client
-    } catch { await delay(50) }
+    } catch (error) { lastError = error; await delay(50) }
   }
-  throw new Error('rotating test server did not start')
+  throw new Error(`rotating test server did not start: ${lastError?.message || lastError?.type}; ${logs}`)
 }
 const command = async (client, type, payload, response = 'actionAccepted') => {
   const id = ++requestId
@@ -114,5 +126,8 @@ try {
   console.log('Rotating WebSocket regression passed: 3/6 scores, two rounds, both rotations, private hands, rejoin, terminal totals')
 } finally {
   clients.forEach(client => client.socket.close())
-  if (child.exitCode === null && child.signalCode === null) { const exit = once(child, 'exit'); child.kill('SIGTERM'); await exit }
+  if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
+  const timer = setTimeout(() => child.kill('SIGKILL'), 5000)
+  await closed
+  clearTimeout(timer)
 }
