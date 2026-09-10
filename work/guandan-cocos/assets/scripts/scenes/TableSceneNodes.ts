@@ -1,3 +1,4 @@
+import { TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT, tableButtonWidth } from '../ui/TableButtonMetrics'
 import { Label, Node, UITransform, Vec3 } from 'cc'
 import { HandController } from '../ui/HandController'
 import { PlayAreaController } from '../ui/PlayAreaController'
@@ -19,7 +20,6 @@ export type TableSceneNodes = {
   confirmTributeButton: Node | null
   finishTributeButton: Node | null
   nextRoundButton: Node | null
-  trusteeButton: Node | null
   skipEffectButton: Node | null
   playerSeats: Map<string, PlayerSeatController>
 }
@@ -61,15 +61,13 @@ export function buildTableSceneNodes (root: Node, ui: RuntimeUiFactory, nodes: T
   nodes.countdownLabel.node.getComponent(UITransform)?.setContentSize(100, 38)
   nodes.countdownLabel.node.active = false
   nodes.overlayLabel ??= ui.label('Overlay', 0, 42, 30)
-  nodes.passButton ??= ui.button('PassButton', '不要', -185, 112, 54, 28)
-  nodes.hintButton ??= ui.button('HintButton', '提示', -62, 112, 54, 28)
-  nodes.playButton ??= ui.button('PlayButton', '出牌', 70, 128, 58, 28)
-  nodes.confirmTributeButton ??= ui.button('ConfirmTributeButton', '确认贡牌', 0)
-  nodes.finishTributeButton ??= ui.button('FinishTributeButton', '开始本局', 0)
-  nodes.nextRoundButton ??= ui.button('NextRoundButton', '下一局', 0)
-  nodes.trusteeButton ??= ui.button('TrusteeButton', '托管', 535, 112, 44, 18)
-  nodes.trusteeButton.active = false
-  nodes.skipEffectButton ??= ui.button('SkipEffectButton', '跳过动画', 0, 132, 42, 18)
+  nodes.passButton ??= ui.button('PassButton', '不要', 0, tableButtonWidth('不要', false), TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT)
+  nodes.hintButton ??= ui.button('HintButton', '提示', 0, tableButtonWidth('提示', false), TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT)
+  nodes.playButton ??= ui.button('PlayButton', '出牌', 0, tableButtonWidth('出牌', true), TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT)
+  nodes.confirmTributeButton ??= ui.button('ConfirmTributeButton', '确认贡牌', 0, tableButtonWidth('确认贡牌', false), TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT)
+  nodes.finishTributeButton ??= ui.button('FinishTributeButton', '开始本局', 0, tableButtonWidth('开始本局', false), TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT)
+  nodes.nextRoundButton ??= ui.button('NextRoundButton', '下一局', 0, tableButtonWidth('本场结束 · 返回大厅', false), TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT)
+  nodes.skipEffectButton ??= ui.button('SkipEffectButton', '跳过动画', 0, tableButtonWidth('跳过动画', false), TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT)
   nodes.skipEffectButton.active = false
 
   return {
@@ -78,7 +76,7 @@ export function buildTableSceneNodes (root: Node, ui: RuntimeUiFactory, nodes: T
     levelLabel: nodes.levelLabel, countdownLabel: nodes.countdownLabel,
     playButton: nodes.playButton, passButton: nodes.passButton, hintButton: nodes.hintButton,
     confirmTributeButton: nodes.confirmTributeButton, finishTributeButton: nodes.finishTributeButton,
-    nextRoundButton: nodes.nextRoundButton, trusteeButton: nodes.trusteeButton,
+    nextRoundButton: nodes.nextRoundButton,
     skipEffectButton: nodes.skipEffectButton, playerSeats: nodes.playerSeats,
   }
 }

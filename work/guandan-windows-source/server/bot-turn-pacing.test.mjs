@@ -10,6 +10,12 @@ assert.equal(isDeliberatePlay(hand, [hand[0]]), true)
 assert.equal(isDeliberatePlay(hand, [hand[4]]), false)
 assert.equal(isDeliberatePlay(hand, []), false)
 assert.notEqual(botOpeningDelay(650, () => 0), botOpeningDelay(650, () => 1))
+for (const base of [500, 650, 1000]) {
+  assert.equal(botOpeningDelay(base, () => 0), 500)
+  assert.equal(botOpeningDelay(base, () => 0.5), 1000)
+  assert.equal(botOpeningDelay(base, () => 1), 1500)
+}
+assert.equal(botOpeningDelay(10, () => 1), 30, 'explicit accelerated test clocks remain supported')
 let time = 1_650, choices = 0
 const room = { roomId: '123456', state: { revision: 1, playArea: [], players: { p2: { hand } } },
   botTurnStartedAt: 1_000, turnDeadlineAt: 21_000 }
@@ -43,7 +49,7 @@ const clocks = createTurnClock({
 time = 10_000
 clocks.armTurnDeadline(timedRoom)
 assert.equal(timedRoom.turnDeadlineAt, 30_000, 'bot seats retain the same public 20s turn budget')
-assert.ok(timer.delay >= 487 && timer.delay <= 975)
+assert.ok(timer.delay >= 500 && timer.delay <= 1500)
 timedRoom.pendingBotPlay = { at: 12_800 }
 time = 11_000
 clocks.restoreTurnDeadline(timedRoom)
@@ -61,13 +67,13 @@ for (let i = 0; i < 200; i++) {
   const name = generatedPlayerNickname(identity)
   assert.equal(name, generatedPlayerNickname(identity))
   assert.doesNotMatch(name, /机器人|大师|真人|官方|系统/)
-  assert.ok([...name].length >= 2 && [...name].length <= 6)
+  assert.ok([...name].length >= 1 && [...name].length <= 24)
   names.add(name)
   assert.equal(new Set(Object.values(roomPlayerNicknames({ matchId: String(i) }))).size, 4)
 }
-assert.equal(BOT_NICKNAMES.length, 100)
-assert.equal(new Set(BOT_NICKNAMES).size, 100)
-assert.ok(names.size > 75, 'identity hashing should use the full curated pool')
+assert.ok(BOT_NICKNAMES.length >= 8 && BOT_NICKNAMES.length <= 50)
+assert.equal(new Set(BOT_NICKNAMES).size, BOT_NICKNAMES.length)
+assert.ok(names.size >= BOT_NICKNAMES.length * 0.8, 'identity hashing should use the imported pool')
 assert.ok([...names].every(name => BOT_NICKNAMES.includes(name)))
 const namedRoom = { matchId: 'durable-nickname' }
 const allocated = roomPlayerNicknames(namedRoom)

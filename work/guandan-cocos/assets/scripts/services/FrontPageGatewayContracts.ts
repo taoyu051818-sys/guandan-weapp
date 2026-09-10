@@ -54,6 +54,7 @@ export type CreatedFriendRoomEntry = FriendRoomEntry & {
 export interface FriendRoomGateway {
   create(roomSettings: FriendRoomSettings): Promise<CreatedFriendRoomEntry>
   join(inviteText: string): Promise<FriendRoomEntry>
+  joinRoomNumber(roomId: string): Promise<FriendRoomEntry>
   cancel(matchId: string): Promise<void>
 }
 
@@ -77,6 +78,7 @@ type FriendRecoveryInvitation =
 export type MatchRecoveryEntry =
   | Readonly<MatchRecoveryBase & {
     roomKind: 'match'
+    queueId?: string
     seat: 'p1' | 'p2' | 'p3' | 'p4'
     roomExpiresAt?: never
     roomSettings?: never
@@ -112,11 +114,11 @@ export interface WalletGateway {
   getWallet(): Promise<WalletSnapshot>
 }
 
-export type UserProfile = { id: string, accountId: string, displayName: string, comprehensiveScore: number, avatarUrl?: string }
+export type UserProfile = { id: string, accountId: string, displayName: string, comprehensiveScore: number, avatarUrl?: string, profileSource?: 'generated' | 'saved' }
 
 export interface AuthGateway {
   getProfile(): Promise<UserProfile>
-  updateProfile(profile: Pick<UserProfile, 'displayName' | 'avatarUrl'>): Promise<UserProfile>
+  updateProfile(profile: Pick<UserProfile, 'displayName' | 'avatarUrl'> & { avatarDataUri?: string }): Promise<UserProfile>
   getAvatarImage(expectedAvatar?: string): Promise<string | null>
   signOut(): void
 }
@@ -224,6 +226,7 @@ export interface TournamentGateway {
   listTournaments(): Promise<TournamentSummary[]>
   enroll(tournamentId: string, expectedEntryPoints?: number): Promise<TournamentSummary>
   checkIn(tournamentId: string): Promise<TournamentState>
+  withdraw(tournamentId: string): Promise<TournamentState>
   getState(tournamentId: string): Promise<TournamentState>
   getStandings(tournamentId: string): Promise<TournamentStandings>
 }
@@ -351,6 +354,7 @@ export interface MerchantGateway {
 
 export type FrontPageGateways = {
   configured: boolean
+  tournaments?: TournamentGateway
   auth: AuthGateway
   matchmaking: MatchmakingGateway
   friendRooms: FriendRoomGateway

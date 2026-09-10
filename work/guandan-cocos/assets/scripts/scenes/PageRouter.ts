@@ -4,6 +4,7 @@ import { RuntimeUiFactory } from '../ui/RuntimeUiFactory'
 export type FrontPageId =
   | 'menu' | 'online' | 'classic-rooms' | 'friend-room-settings' | 'matching'
   | 'shop' | 'product' | 'lobby'
+  | 'tournament-center'
   | 'player-center' | 'season-tasks' | 'replay-list' | 'replay-detail'
 
 /** Owns the lifetime of the single front-page tree shown above the backdrop. */

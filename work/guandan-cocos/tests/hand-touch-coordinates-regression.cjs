@@ -49,7 +49,8 @@ cc.Graphics = class {
   fill () { this.commands.push(['fill']) }
   stroke () { this.commands.push(['stroke']) }
 }
-cc.Label = class { static HorizontalAlign = { CENTER: 1 }; static VerticalAlign = { CENTER: 1 } }
+cc.LabelOutline = class {}
+cc.Label = class { static Overflow = { NONE: 0 }; static HorizontalAlign = { CENTER: 1 }; static VerticalAlign = { CENTER: 1 } }
 cc.Node = class {
   constructor (name) { this.name = name; this.children = []; this.components = []; this.isValid = true }
   set parent (node) { node.children.push(this) }
@@ -64,15 +65,27 @@ assert.deepEqual(marker.commands[0], ['move', 5, 56])
 assert.ok(marker.commands.some(command => command.join() === 'line,38,23'))
 assert.ok(!marker.commands.some(command => command[0] === 'rect'), 'level marker must not tint the full card')
 assert.equal(visual.levelBadge.children[0].components.find(component => component instanceof cc.Label).string, '级')
+const badgeText = visual.levelBadge.children[0]
+assert.equal(badgeText.components.find(component => component instanceof cc.Label).fontSize, 23)
+assert.equal(badgeText.components.find(component => component instanceof cc.Label).isBold, true)
+assert.equal(badgeText.components.find(component => component instanceof cc.LabelOutline).width, 1.2)
 visual.selectionOverlay = new cc.Graphics()
-for (const covered of [false, true]) {
-  visual.stackCovered = covered
-  visual.hitAreaHeight = covered ? 40 : 114
+const fullSelectionWash = [['rect', -38, -56, 76, 112, 8], ['fill']]
+const unselectedNeighbour = new CardView()
+unselectedNeighbour.selectionOverlay = new cc.Graphics()
+unselectedNeighbour.bind({ id: 'neighbour', selected: false, interactive: false })
+for (const [step, index, size] of [[0, 0, 1], [40, 0, 4], [40, 1, 4], [40, 3, 4], [24, 1, 6]]) {
+  visual.configureStackHitArea(step, index, size)
+  const hitHeight = visual.hitAreaHeight
+  const hitOffsetY = visual.hitAreaOffsetY
   visual.bind({ id: 'level', levelCard: true, selected: true, interactive: false })
   assert.equal(visual.levelBadge.active, true)
-  assert.equal(visual.selectionOverlay.commands.filter(command => command[0] === 'fill').length, 1)
-  assert.equal(visual.selectionOverlay.commands.filter(command => command[0] === 'stroke').length, 0)
-  assert.equal(visual.selectionOverlay.commands[0][4], covered ? 40 : 112)
+  assert.deepEqual(visual.selectionOverlay.commands, fullSelectionWash, 'flat, top, middle and bottom cards use the same full-face wash')
+  assert.deepEqual([visual.hitAreaHeight, visual.hitAreaOffsetY], [hitHeight, hitOffsetY], 'selection must not expand or move the hit area')
+  visual.configureStackHitArea(32, 1, 4)
+  assert.equal(visual.hitAreaHeight, 32)
+  assert.deepEqual(visual.selectionOverlay.commands, fullSelectionWash, 'reflow while selected must not clip the wash to the new exposure')
+  assert.deepEqual(unselectedNeighbour.selectionOverlay.commands, [], 'selecting a stacked card must not darken an unselected neighbour')
   visual.bind({ id: 'normal', levelCard: false, selected: false, interactive: false })
   assert.equal(visual.levelBadge.active, false, 'reused card must clear the level corner')
   assert.deepEqual(visual.selectionOverlay.commands, [], 'deselect must clear the dark wash')

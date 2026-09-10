@@ -15,6 +15,7 @@ const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A']
 const acceptedFields = new Set([
   'mode',
   'format', 'levelMode', 'levelRank', 'tributeEnabled', 'upgradeTarget',
+  'teamRotation', 'rotatingScoring',
   'counterEnabled', 'disableVoice',
   'rounds', 'roundCount', 'gameCount', 'customRoundCount',
   'scoring', 'doubleDownScore', 'doubleDownPoints',
@@ -90,7 +91,7 @@ export const normalizeFriendRoomSettings = (value, { strict = false } = {}) => {
     ? DEFAULT_FRIEND_ROOM_SETTINGS.scoring
     : (own(source, 'scoring') ? scoringRaw : (scoringAliases[scoringRaw] || scoringRaw))
   const scoring = normalizedOrDefault(
-    SCORING_MODES.has(mappedScoring),
+    SCORING_MODES.has(mappedScoring) && !(['rotating', 'duplicate'].includes(formatSettings?.format) && mappedScoring !== 'double-3'),
     mappedScoring,
     DEFAULT_FRIEND_ROOM_SETTINGS.scoring,
     strict,

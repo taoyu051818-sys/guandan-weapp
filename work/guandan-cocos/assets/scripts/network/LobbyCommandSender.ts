@@ -15,8 +15,9 @@ export class LobbyCommandSender {
 
   public roomIntent (type: string, payload: Record<string, unknown> = {}): number | null {
     const snapshot = this.dependencies.snapshot()
-    const hostAction = snapshot.isRoomHost && ['startGame', 'kickMember', 'addBot', 'removeBot'].includes(type)
-    if (snapshot.roomRole === 'observer' && !hostAction && !['sitDown', 'standUp', 'watchPlayer'].includes(type)) {
+    const hostAction = snapshot.isRoomHost && ['startGame', 'kickMember', 'addBot', 'removeBot', 'fillBots'].includes(type)
+    if (snapshot.roomRole === 'observer' && !hostAction && !['sitDown', 'standUp', 'watchPlayer', 'watchTable'].includes(type)
+      && !(snapshot.duplicate?.mySeat && ['readyNextRound', 'cancelRoundReady'].includes(type))) {
       this.dependencies.reportError('观战中不能准备或操作手牌')
       return null
     }

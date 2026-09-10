@@ -7,7 +7,7 @@ import {
   type RuleProfile,
 } from '../core/generated'
 import type { HandGroupingSnapshot } from './HandGrouping'
-import { canSelectPlayingHand } from './HandInteractionPolicy'
+import { resolveHandCapabilities } from './HandInteractionPolicy'
 import type { HandWorkspace } from './HandWorkspace'
 
 const classifyGroup = (
@@ -69,8 +69,6 @@ export const requestTableHandHint = (
   workspace: HandWorkspace,
   submit: (groups: readonly HintProtectedGroup[]) => void,
 ): void => {
-  if (!snapshot || snapshot.phase !== 'playing' || settings.trustee || snapshot.state.currentTurn !== humanId ||
-    !canSelectPlayingHand(snapshot.state, humanId, snapshot.actionPending)) return
-  if (workspace.isManualSelectionActive) workspace.cancelManualSelection()
+  if (!snapshot || !resolveHandCapabilities(snapshot, humanId, settings).canHint) return
   submit(projectHintProtectedGroups(snapshot.state.players[humanId].hand, workspace.snapshot.groups, settings.ruleProfile))
 }

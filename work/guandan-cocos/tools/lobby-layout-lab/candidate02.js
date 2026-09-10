@@ -45,8 +45,8 @@ export function drawCandidate02(api, a, inset, bottom, state) {
   const name = state === 'long' ? '陵水海岸的快乐掼蛋玩家' : '陵水玩家'
   // One shared translucent backing, not separate nickname/points capsules.
   // Decorative only: preserve the existing positions and hit targets.
-  panel(94 + inset, 35, 180, 58, '#102c3d66', '', 5, 0)
-  panel(32 + inset, 35, 44, 44, '#132f35ba', '#fae9b4', 6, 1)
+  panel(94 + inset, 35, 180, 58, '#102c3d66', '', 'tag', 0)
+  panel(32 + inset, 35, 44, 44, '#132f35ba', '#fae9b4', 'control', 1)
   image('avatar', 32 + inset,35,40,40)
   // No pill backgrounds: name and points form two simple left-aligned rows.
   const shownName = [...name].length > 5 ? [...name].slice(0,4).join('')+'…' : name
@@ -61,7 +61,7 @@ export function drawCandidate02(api, a, inset, bottom, state) {
   region('points','积分信息',118+inset,48,114,20,'information')
   for (const key of ['classic','friend']) {
     const r = layout[key], footer = key === 'classic' ? 54*a.cardScale : 48*a.cardScale
-    panel(r.x+r.w/2,r.y+r.h/2,r.w,r.h,'#fffbed','#ead69b',6,2)
+    panel(r.x+r.w/2,r.y+r.h/2,r.w,r.h,'#fffbed','#ead69b','control',2)
     ctx.save(); ctx.beginPath(); ctx.roundRect(r.x+2,r.y+2,r.w-4,r.h-4,4); ctx.clip()
     art(key,r.x+2,r.y+2,r.w-4,r.h-footer-2); ctx.restore()
     text(key === 'classic' ? '经典掼蛋' : '好友房',r.x+r.w/2,r.y+r.h-footer+18*a.cardScale,24*a.cardScale,r.w-16)
@@ -69,7 +69,7 @@ export function drawCandidate02(api, a, inset, bottom, state) {
     mark(key,key === 'classic' ? '经典掼蛋' : '好友房',r)
   }
   const t = layout.tournament
-  panel(t.x+t.w/2,t.y+t.h/2,t.w,t.h,'#eaf1ecf5','#becfc7',6,1)
+  panel(t.x+t.w/2,t.y+t.h/2,t.w,t.h,'#eaf1ecf5','#becfc7','control',1)
   ctx.save(); ctx.beginPath(); ctx.roundRect(t.x+t.w-66*a.cardScale,t.y+5,61*a.cardScale,t.h-10,5);ctx.clip()
   art('tournament',t.x+t.w-66*a.cardScale,t.y+5,61*a.cardScale,t.h-10);ctx.restore()
   text('赛事',t.x+40*a.cardScale,t.y+25*a.cardScale,21*a.cardScale,70*a.cardScale)
@@ -83,8 +83,8 @@ export function drawCandidate02(api, a, inset, bottom, state) {
   const q=layout.quick, busy=state==='loading'
   const title=busy?'正在恢复':state==='resume'?'继续牌局':'快速开始'
   const subtitle=busy?'正在确认牌局状态':state==='resume'?'返回尚未结束的牌局':'随机级牌 · 单局对战'
-  panel(q.x+q.w/2,q.y+q.h/2,q.w,q.h,'#efbb4f','#fff0b9',7,2)
-  panel(q.x+q.w/2,q.y+q.h/2,q.w-7,q.h-7,'','#b1864166',5,1)
+  panel(q.x+q.w/2,q.y+q.h/2,q.w,q.h,'#efbb4f','#fff0b9','panel',2)
+  panel(q.x+q.w/2,q.y+q.h/2,q.w-7,q.h-7,'','#b1864166','control',1)
   text(title,q.x+q.w/2,q.y+16,23,q.w-16,'#65421c')
   label(subtitle,q.x+q.w/2,q.y+34,12,q.w-16,'#694f2d','',0,false)
   mark('quick',title,q,busy)

@@ -3,10 +3,15 @@ const path = require('node:path')
 const { loadTs } = require('./support/load-typescript-module.cjs')
 const root = path.resolve(__dirname, '../assets/scripts')
 const { ProfileSaveCoordinator } = loadTs(path.join(root, 'services/ProfileSaveCoordinator.ts'))
+let nativeAccept, pickedImage = null
 const { ProfileEditorModal } = loadTs(path.join(root, 'scenes/front-pages/ProfileEditorModal.ts'), {
-  cc: { game: { on () {}, off () {} }, Game: { EVENT_HIDE: 'hide' } },
+  cc: { game: { on () {}, off () {} }, Game: { EVENT_HIDE: 'hide' }, Tween: { stopAllByTarget () {} },
+    Vec3: { ONE: {} }, UITransform: class {}, view: { getVisibleSize: () => ({ width: 874, height: 402 }) } },
   '../../services/ProfileSaveCoordinator': { ProfileSaveCoordinator },
-  '../../services/WechatProfileProvider': {}, '../../ui/ProfileAvatar': {}, '../../ui/RuntimeUiFactory': {},
+  '../../services/ProfileImagePicker': { pickProfileImage: async () => pickedImage },
+  '../../services/WechatProfileProvider': { mountWechatProfileButton: (_api, _rect, accept) => {
+    nativeAccept = accept; return Object.assign(() => {}, { hide () {}, show () {} })
+  } }, '../../ui/ProfileAvatar': {}, '../../ui/RuntimeUiFactory': {},
 })
 const flush = () => new Promise(resolve => setImmediate(resolve))
 const initial = () => ({ id: 'user-a', accountId: 'account-a', displayName: 'original', avatarUrl: '', comprehensiveScore: 300 })
@@ -22,7 +27,7 @@ const harness = () => {
   const editor = new ProfileEditorModal({}, {}, auth, p => published.push(p))
   // The real show/close/save methods run; rendering alone is replaced by inert Cocos node doubles.
   editor.render = function () {
-    this.root = { isValid: true, destroy () { this.isValid = false } }
+    this.root = { isValid: true, destroy () { this.isValid = false }, getChildByName () { return null } }
     this.input = { string: this.draft?.displayName ?? '' }; this.status = { string: '' }
   }
   const open = async name => { await editor.show({ ...stored }); editor.input.string = name }
@@ -32,6 +37,34 @@ const harness = () => {
 }
 
 async function main () {
+  {
+    const h = harness(); await h.open('upload-name')
+    pickedImage = 'data:image/jpeg;base64,AAAA'
+    await h.editor.pickAvatar()
+    assert.equal(h.writes.length, 0, 'selecting a photo only edits the draft')
+    assert.equal(h.editor.draft.avatarUrl, pickedImage)
+    const saved = h.editor.save(); await flush()
+    assert.equal(h.writes[0].change.avatarDataUri, pickedImage)
+    assert.equal(h.writes[0].change.avatarUrl, undefined, 'original path is not submitted as an external URL')
+    h.writes[0].resolve(); await saved
+    const cancelled = harness(); await cancelled.open('cancel'); await cancelled.editor.pickAvatar(); cancelled.editor.close()
+    assert.equal(cancelled.writes.length, 0, 'cancel does not upload')
+    pickedImage = null
+  }
+  {
+    const h = harness(); await h.open('old')
+    global.wx = { getWindowInfo: () => ({ windowWidth: 874, windowHeight: 402 }) }
+    h.editor.requestWechat({ setScale () {}, getComponent: () => ({ getBoundingBoxToWorld: () => ({ x: 0, y: 0, width: 240, height: 40 }) }) })
+    nativeAccept({ displayName: '微信已授权', avatarUrl: 'https://wx.qlogo.cn/mmopen/test/132' })
+    await flush()
+    assert.equal(h.writes.length, 1, 'native authorization immediately saves without a second user action')
+    assert.equal(h.editor.busy, true)
+    assert.equal(h.writes[0].change.displayName, '微信已授权')
+    h.writes[0].resolve(); await flush()
+    assert.equal(h.editor.open, false)
+    assert.equal(h.published[0].displayName, '微信已授权')
+    delete global.wx
+  }
   {
     const h = harness(); await h.open('closed-save')
     const save = h.editor.save(); await flush(); h.editor.close(); h.writes[0].resolve(); await save

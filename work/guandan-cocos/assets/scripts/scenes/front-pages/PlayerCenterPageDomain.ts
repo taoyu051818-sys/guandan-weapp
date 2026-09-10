@@ -14,6 +14,8 @@ const settle = <T>(promise: Promise<T>): Promise<Settled<T>> => promise.then(
 
 export type PlayerCenterPageDependencies = {
   editProfile: () => void
+  showFriendRanking?: () => void
+  profileLoaded?: (dashboard: PlayerDashboard) => void
   router: PageRouter
   gateways: FrontPageGateways
   player: FrontPagePlayerState
@@ -52,13 +54,14 @@ export class PlayerCenterPageDomain {
     this.dependencies.player.updateDashboard(dashboardResult.value)
     const walletStatus = walletResult.status === 'fulfilled' ? '' : ' · 积分暂时无法同步'
     this.render(dashboardResult.value, `${this.dependencies.gateways.configured ? '已同步平台数据' : '开发演示数据'}${walletStatus}`)
+    this.dependencies.profileLoaded?.(dashboardResult.value)
   }
 
   private render (dashboard: PlayerDashboard | null, status: string): void {
     this.dashboardView = { dashboard, status }
     const page = this.dependencies.router.open('player-center')
     const panel = page.panel('PlayerCenterSurface', 0, 0, 760, 540, {
-      fill: new Color(17, 52, 72, 247), stroke: new Color(109, 160, 181), lineWidth: 1, radius: 26,
+      fill: new Color(17, 52, 72, 247), stroke: new Color(109, 160, 181), lineWidth: 1, frame: 'panel',
     })
     const ui = new RuntimeUiFactory(panel)
     coastalText(ui, '个人中心', 0, 218, 650, 52, 36, { bold: true })
@@ -73,7 +76,8 @@ export class PlayerCenterPageDomain {
     }
     coastalButton(ui, '赛季任务', -150, -62, 270, 58, () => { void this.showSeasonTasks() })
     coastalButton(ui, '我的对局', 150, -62, 270, 58, this.dependencies.showReplayList)
-    coastalButton(ui, '修改昵称和头像', 0, -132, 330, 58, this.dependencies.editProfile, true)
+    coastalButton(ui, '修改昵称和头像', -170, -132, 310, 58, this.dependencies.editProfile, true)
+    coastalButton(ui, '好友综合分排行', 170, -132, 310, 58, () => this.dependencies.showFriendRanking?.())
     coastalButton(ui, '返回大厅', 0, -208, 230, 56, this.dependencies.showMenu)
   }
 
@@ -106,7 +110,11 @@ export class PlayerCenterPageDomain {
   }
 
   public reflow (): void {
-    if (this.dependencies.router.current === 'player-center') this.render(this.dashboardView.dashboard, this.dashboardView.status)
+    if (this.dependencies.router.current === 'player-center') {
+      const dashboard = this.dashboardView.dashboard
+      const profile = this.dependencies.player.profile
+      this.render(dashboard && profile ? { ...dashboard, user: { ...profile } } : dashboard, this.dashboardView.status)
+    }
     else if (this.dependencies.router.current === 'season-tasks') this.renderSeasonTasks(this.taskView.taskList, this.taskView.status)
   }
 

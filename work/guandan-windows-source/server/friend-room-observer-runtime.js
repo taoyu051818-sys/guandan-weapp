@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { FRIEND_SEATS, supportsRoomObservers, roomMember, memberForToken, moveRoomMember, friendMemberMetadata } from './friend-room-members.js'
 import { FriendRoomObserverBuffer } from './friend-room-observer-buffer.js'
+import { canConfigureRoomBots } from './friend-room-bots.js'
 
 export const FRIEND_VIEW_COMMANDS = ['standUp', 'sitDown', 'watchPlayer']
 
@@ -21,7 +22,8 @@ export const createFriendRoomObserverRuntime = d => {
       memberPlayerIds: FRIEND_SEATS.filter(id => room.resumeTokens[id] || room.botPlayerIds?.includes(id)),
       lobbyReadyPlayerIds: room.state ? [] : FRIEND_SEATS.filter(id => room.lobbyReady[id]),
       lobbyReadyRequired: true, entryKind: 'friend', gameStartPending: Boolean(room.pendingGameStartEvent),
-      capabilities: { canUseBots: !room.ticketBound, canKickMembers: true, requiresLobbyReady: true },
+      capabilities: { canUseBots: canConfigureRoomBots(room), canKickMembers: true, requiresLobbyReady: true },
+      botPlayerIds: [...(room.botPlayerIds || [])],
       observerWaiting: !member.seat && Boolean(room.state) && !snapshot,
       viewRevision: ++revision,
     }

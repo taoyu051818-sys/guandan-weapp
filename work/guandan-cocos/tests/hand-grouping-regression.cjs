@@ -10,7 +10,6 @@ const displayOrderingPath = path.join(projectRoot, 'assets/scripts/game/HandDisp
 const groupSuggestionsPath = path.join(projectRoot, 'assets/scripts/game/HandGroupSuggestions.ts')
 const groupingPath = path.join(projectRoot, 'assets/scripts/game/HandGrouping.ts')
 const groupingStatePath = path.join(projectRoot, 'assets/scripts/game/HandGroupingState.ts')
-const groupingHistoryPath = path.join(projectRoot, 'assets/scripts/game/HandGroupingHistory.ts')
 const workspacePath = path.join(projectRoot, 'assets/scripts/game/HandWorkspace.ts')
 const stackLayoutPath = path.join(projectRoot, 'assets/scripts/game/HandStackLayout.ts')
 
@@ -37,7 +36,6 @@ const {
   suggestHandGroups,
 } = require(arrangementPath)
 const { HandGrouping } = require(groupingPath)
-const { HandGroupingHistory } = require(groupingHistoryPath)
 const { HandWorkspace } = require(workspacePath)
 const { createHandStackLayout, handStackRise, STACK_EXPOSURE_HEIGHT } = require(stackLayoutPath)
 const { handDisplayZone } = require(displayOrderingPath)
@@ -385,11 +383,8 @@ function verifyWorkspaceTransactionBoundary () {
   assert.deepEqual(workspace.snapshot.groups.map(group => group.kind), ['rank-stack'], 'restore must recover the complete pre-arrangement stack state')
   assert.equal(workspace.snapshot.layoutMode, 'point-stacked')
 
-  workspace.beginManualSelection()
-  assert.equal(workspace.toggleManualCard('workspace-9-spade'), 'selected')
-  assert.equal(workspace.toggleManualCard('workspace-9-heart'), 'selected')
-  assert.equal(workspace.canLockSelection(classicRuleProfile), true, 'cards in a default rank stack must remain selectable for a legal lock')
-  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.deepEqual(workspace.getLockDecision(classicRuleProfile, ['workspace-9-spade', 'workspace-9-heart']), { kind: 'lock' })
+  assert.equal(workspace.applySelectionLock(['workspace-9-spade', 'workspace-9-heart'], classicRuleProfile), true)
   const locked = workspace.snapshot.groups.find(group => group.cardIds.includes('workspace-9-spade'))
   assert.ok(locked)
   assert.notEqual(locked.kind, 'rank-stack')
@@ -408,10 +403,8 @@ function verifyWorkspaceTransactionBoundary () {
   workspace.toggleArrangement({ direction: 'asc', allowAceLowStraight: true })
   assert.deepEqual(workspace.snapshot.groups.find(group => group.id === locked.id), lockedSnapshot)
 
-  workspace.beginManualSelection()
-  assert.equal(workspace.toggleManualCard('workspace-9-spade'), 'unlock-selected', 'an explicit lock must enter whole-group unlock selection')
-  assert.equal(workspace.canLockSelection(classicRuleProfile), false)
-  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.deepEqual(workspace.getLockDecision(classicRuleProfile, locked.cardIds), { kind: 'unlock' })
+  assert.equal(workspace.applySelectionLock(locked.cardIds, classicRuleProfile), true)
   assert.equal(workspace.snapshot.displayCardIds[0], 'workspace-A', 'unlocking must return released cards to point-stacked rank order')
 }
 
@@ -453,10 +446,7 @@ function verifyLockChangesStayIndependentFromArrangementRestore () {
   workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
   assert.equal(workspace.snapshot.layoutMode, 'smart-arranged')
 
-  workspace.beginManualSelection()
-  workspace.toggleManualCard('independent-Q-a')
-  workspace.toggleManualCard('independent-Q-b')
-  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.equal(workspace.applySelectionLock(['independent-Q-a', 'independent-Q-b'], classicRuleProfile), true)
   const lockedPair = workspace.snapshot.groups.find(group => group.cardIds.includes('independent-Q-a'))
   assert.ok(lockedPair?.locked, 'a lock created during smart arrangement must persist independently')
 
@@ -508,10 +498,7 @@ function verifyRankStacksReconcileAndUnlock () {
   assert.equal(qStacks[0].id, originalRankStack.id, 'reconciling a rank lane should preserve its stable group id')
   idSetEquals(qStacks[0].cardIds, ['merge-Q-a', 'merge-Q-b', 'merge-Q-c', 'merge-Q-d'])
 
-  workspace.beginManualSelection()
-  workspace.toggleManualCard('merge-Q-a')
-  workspace.toggleManualCard('merge-Q-b')
-  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.equal(workspace.applySelectionLock(['merge-Q-a', 'merge-Q-b'], classicRuleProfile), true)
   const lockedPair = workspace.snapshot.groups.find(group => group.locked && group.cardIds.includes('merge-Q-a'))
   assert.ok(lockedPair)
   const unlockedPairStack = workspace.snapshot.groups.find(group =>
@@ -519,9 +506,7 @@ function verifyRankStacksReconcileAndUnlock () {
   )
   assert.ok(unlockedPairStack, 'locking part of a rank lane must restack the remaining same-rank cards')
   idSetEquals(unlockedPairStack.cardIds, ['merge-Q-c', 'merge-Q-d'])
-  workspace.beginManualSelection()
-  assert.equal(workspace.toggleManualCard('merge-Q-a'), 'unlock-selected')
-  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.equal(workspace.applySelectionLock(['merge-Q-a', 'merge-Q-b'], classicRuleProfile), true)
 
   qStacks = workspace.snapshot.groups.filter(group =>
     group.origin === 'rank' && group.cardIds.some(cardId => cardId.startsWith('merge-Q-')),
@@ -593,14 +578,13 @@ function verifySmartUnlockReprojectsTheLayout () {
     autoSort: true,
     ruleProfile: classicRuleProfile,
   })
-  assert.equal(workspace.selectStraightFlush('heart'), true)
-  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  const flushIds = workspace.straightFlushCardIds('heart')
+  assert.equal(flushIds.length, 5)
+  assert.equal(workspace.applySelectionLock(flushIds, classicRuleProfile), true)
   assert.equal(workspace.lockedCardIds.length, 5)
   workspace.toggleArrangement({ direction: 'desc', allowAceLowStraight: true })
 
-  workspace.beginManualSelection()
-  assert.equal(workspace.toggleManualCard('unlock-smart-3'), 'unlock-selected')
-  assert.equal(workspace.commitManualSelection(classicRuleProfile), true)
+  assert.equal(workspace.applySelectionLock(flushIds, classicRuleProfile), true)
   const snapshot = workspace.snapshot
   assert.equal(snapshot.layoutMode, 'smart-arranged')
   assert.equal(workspace.lockedCardIds.length, 0, 'unlocking must remove persistent lock ownership')
@@ -773,30 +757,22 @@ function verifyGroupingLifecycle () {
   grouping.moveGroup(second, first)
   assert.deepEqual(grouping.getSnapshot().groups.map(group => group.id), [second, first], 'whole groups may be reordered without changing locked membership')
 
-  assert.equal(grouping.undo(), true)
-  assert.deepEqual(grouping.getSnapshot().groups.map(group => group.id), [first, second])
-  assert.equal(grouping.redo(), true)
-  assert.deepEqual(grouping.getSnapshot().groups.map(group => group.id), [second, first])
 
   assert.equal(grouping.splitGroup(second), true)
   assert.equal(grouping.getSnapshot().groups.some(group => group.id === second), false, 'split must return every group card to the ungrouped lane')
   assert.equal(grouping.restoreDefault(), true)
   assert.equal(grouping.getSnapshot().groups.length, 0)
   assert.deepEqual(grouping.getSnapshot().ungroupedCardIds, ['a', 'b', 'c', 'd', 'e', 'f'])
-  assert.equal(grouping.undo(), true, 'restore-default itself must be undoable')
   assert.deepEqual(ruleHand.map(item => item.id), originalRuleOrder, 'manual grouping must never reorder rule-layer cards')
 
   grouping.restoreDefault()
   const serverGroup = grouping.createLockedGroup(['a', 'b'], classicRuleProfile)
   grouping.syncAuthoritativeHand(ruleHand.filter(item => item.id !== 'b'))
   let snapshot = grouping.getSnapshot()
-  assert.equal(snapshot.canUndo, false, 'an authoritative hand update must invalidate old undo history')
-  assert.equal(snapshot.canRedo, false)
   assert.equal(snapshot.displayCardIds.includes('b'), false, 'a played cardId must disappear from every presentation lane')
   assert.equal(snapshot.groups.some(group => group.id === serverGroup), false, 'a changed manual lock must release every survivor')
   assert.equal(snapshot.ungroupedCardIds.includes('a') && snapshot.ungroupedCardIds.includes('c'), true)
   assert.equal(grouping.isCardLocked('a'), false)
-  assert.equal(grouping.undo(), false, 'undo must never resurrect a card removed by the server')
 
   grouping.replaceHandFromServer(ruleHand.filter(item => !['b', 'c'].includes(item.id)).concat(card('new-card', 3, 'diamond')))
   snapshot = grouping.getSnapshot()
@@ -806,28 +782,6 @@ function verifyGroupingLifecycle () {
   idSetEquals(snapshot.displayCardIds, snapshot.handCardIds)
 }
 
-function verifyBoundedGroupingHistory () {
-  const history = new HandGroupingHistory(2, value => ({ ...value }))
-  let current = { value: 0 }
-  history.record(current)
-  current = { value: 1 }
-  history.record(current)
-  current = { value: 2 }
-  history.record(current)
-  current = { value: 3 }
-  current = history.undo(current)
-  assert.deepEqual(current, { value: 2 })
-  current = history.undo(current)
-  assert.deepEqual(current, { value: 1 }, 'history must retain only its configured number of prior states')
-  assert.equal(history.undo(current), null)
-  current = history.redo(current)
-  assert.deepEqual(current, { value: 2 })
-  history.record(current)
-  assert.equal(history.canRedo, false, 'recording a new branch must retire stale redo states')
-  history.clear()
-  assert.equal(history.canUndo, false)
-  assert.equal(history.canRedo, false)
-}
 
 function verifyAutoGrouping () {
   const hand = [
@@ -1020,9 +974,9 @@ function verifyCompactGroupGeometry () {
   const snapshot = grouping.getSnapshot()
   const before = JSON.stringify(snapshot)
   const input = {
-    hand, grouping: snapshot, mode: 'play', playSelectedCardIds: ['l1'], lockDraftCardIds: [],
+    hand, grouping: snapshot, mode: 'play', playSelectedCardIds: ['l1'],
     sortOrder: 'desc', interactive: true, lockedCardIds: [], availableSuits: [], selectedSuit: null,
-    lockAction: 'lock', arrangeRestoreAvailable: true,
+    lockDecision: { kind: 'lock' }, arrangeRestoreAvailable: true,
   }
   const projected = projectHandRenderModel(input)
   assert.equal(projected.groups.find(group => group.cardIds.includes('l1')).zone, 0, 'live renderer receives semantic zones, not just sorted ids')
@@ -1089,7 +1043,6 @@ function verifyArchitectureBoundary () {
     groupSuggestionsPath,
     groupingPath,
     groupingStatePath,
-    groupingHistoryPath,
     workspacePath,
     stackLayoutPath,
   ]) {
@@ -1103,7 +1056,6 @@ function verifyArchitectureBoundary () {
   assert.doesNotMatch(displayOrderingSource, /HandGroupSuggestions|suggestHandGroups/, 'display ordering must not discover semantic group candidates')
   assert.doesNotMatch(groupSuggestionsSource, /HandDisplayOrdering|sortHandDisplayUnits/, 'candidate discovery must not depend on presentation ordering')
   assert.match(groupingSource, /syncAuthoritativeHand/)
-  assert.match(groupingSource, /HandGroupingHistory/, 'bounded undo and redo ownership must remain outside the grouping domain class')
   assert.match(groupingSource, /normalizeHandGroupingState/, 'the grouping aggregate must delegate snapshot normalization to its state boundary')
   assert.doesNotMatch(groupingSource, /private normalizeState \(/, 'snapshot normalization must not grow back into the grouping aggregate')
   assert.doesNotMatch(groupingSource, /public createGroup \(/, 'arbitrary unchecked group creation must not remain public')
@@ -1120,20 +1072,20 @@ function verifyRuntimeIntegration () {
   assert.match(sceneSource, /new TableHandInteractionController\(\{/, 'the table scene must compose one hand interaction owner')
   assert.match(matchCoordinatorSource, /handInteraction\.submit\(snapshot\)/, 'the live-match coordinator must project snapshots through the hand interaction owner')
   assert.match(interactionSource, /private readonly workspace: HandWorkspace/, 'the hand interaction owner must exclusively hold the presentation workspace')
-  assert.match(interactionSource, /private readonly interaction = new HandInteractionStateMachine\(\)/, 'one explicit state machine must own the active hand input mode')
+  assert.doesNotMatch(interactionSource, /HandInteractionStateMachine|private readonly interaction/, 'derived input state must not have a second mutable lifecycle')
   assert.match(interactionSource, /this\.workspace\.syncAuthoritativeHand\(hand, \{[\s\S]*levelRank: snapshot\.state\.currentLevel/, 'an authoritative hand update must pass the current level into the hand workspace')
   assert.doesNotMatch(interactionSource, /from 'cc'/, 'the hand interaction owner must remain independently testable without Cocos')
   assert.match(workspaceSource, /this\.grouping\.autoGroup/, 'the hand workspace must own smart grouping')
   assert.match(workspaceSource, /this\.grouping\.stackMatchingRanks\(\)/, 'default table presentation must stack repeated ranks')
-  assert.match(workspaceSource, /this\.grouping\.createLockedGroup\(selected, ruleProfile\)/, 'the hand workspace must own legal manual locking with an explicit profile')
+  assert.match(workspaceSource, /this\.grouping\.createLockedGroup\(cardIds, ruleProfile\)/, 'the workspace locks current selected IDs using the rule profile')
   assert.doesNotMatch(turnClockSource, /handStackRise/, 'the countdown layer must not react to presentation-only hand height')
   assert.match(turnClockSource, /const countdownY = update\.controlsY \+ 47/, 'the countdown must remain fixed above the action row')
   assert.doesNotMatch(sceneSource, /Math\.max\(0, this\.handStackRise - 32\)/, 'table controls must not move to avoid card stacks')
-  assert.match(workspaceSource, /private lockDraft: HandLockDraft = \{ mode: 'idle' \}/, 'manual grouping must own one discriminated presentation transaction')
-  assert.match(interactionSource, /mode === 'play' \|\| mode === 'tribute'[\s\S]*this\.dependencies\.ruleAuthority\.toggleCard\(cardId\)/, 'only play and tribute modes may route taps to the rule selection')
+  assert.doesNotMatch(workspaceSource, /lockDraft|beginManualSelection/, 'no hidden draft selection may remain')
+  assert.match(interactionSource, /resolveHandCapabilities\(snapshot, humanId, settings\)\.canSelect[\s\S]*this\.dependencies\.ruleAuthority\.toggleCard\(cardId\)/, 'the common capability policy must gate card taps')
   assert.match(interactionSource, /playSelectionForCard\(cardId\)[\s\S]*ruleAuthority\.replaceSelectedCards/, 'an eligible stack member must route through atomic rule selection')
-  assert.match(interactionSource, /interactive: this\.interaction\.isLocking \|\| this\.canInteract/, 'only an explicit lock mode may keep the hand interactive outside the local turn')
-  assert.doesNotMatch(interactionSource, /const selected = \[\.\.\.\(this\.dependencies\.ruleAuthority\.selectedCardIds/, 'manual grouping must not reuse the play-selection set')
+  assert.match(interactionSource, /interactive: capabilities\.canSelect/, 'rendering must use the same eligibility policy as input')
+  assert.match(interactionSource, /Array\.from\(this\.dependencies\.ruleAuthority\.selectedCardIds\)/, 'locking uses the visible selection')
   assert.doesNotMatch(sceneSource, /toggleArrangePanel|ArrangeMenu|arrangeNodes|groupEditMode|activeHandGroupId/, 'retired hidden grouping controls must not remain in the live scene')
   assert.match(handSource, /displayCardIds\?: readonly string\[\]/, 'HandController must accept the presentation order without mutating rule cards')
   assert.match(handSource, /createHandStackLayout/, 'arranged groups must use the downward cascade layout')
@@ -1150,7 +1102,7 @@ function verifyRuntimeIntegration () {
   assert.match(handSource, /locked: lockedIds\.has\(card\.id\)/, 'each card view must receive its persistent lock state')
 }
 
-// Lock creation plus canonical positioning is one undoable action, in both entry routes.
+// Lock creation and positioning are one revision; only explicit baselines restore it.
 for (const mode of ['manual', 'suggestion']) {
   const grouping = new HandGrouping([card('a', 3), card('b', 3, 'heart'), card('c', 8), card('d', 10)])
   const before = grouping.getSnapshot()
@@ -1161,11 +1113,9 @@ for (const mode of ['manual', 'suggestion']) {
   const after = grouping.getSnapshot()
   assert.equal(after.revision - before.revision, 1, mode + ': creation must record only one transaction')
   assert.equal(after.groups.filter(group => group.locked).length, 1)
-  assert.equal(grouping.undo(), true)
-  assert.deepEqual(grouping.getSnapshot().displayCardIds, before.displayCardIds)
-  assert.deepEqual(grouping.getSnapshot().groups, before.groups, 'one undo must remove the new lock')
-  assert.equal(grouping.undo(), false, 'no hidden second history record')
-  assert.equal(grouping.redo(), true)
+  assert.equal(grouping.restoreSnapshot(before), true)
+  assert.deepEqual(grouping.getSnapshot().groups, before.groups)
+  assert.equal(grouping.restoreSnapshot(after), true)
   assert.deepEqual(grouping.getSnapshot().groups, after.groups)
   assert.deepEqual(grouping.getSnapshot().displayCardIds, after.displayCardIds)
 }
@@ -1184,7 +1134,6 @@ verifySmartArrangementRecomputesAfterAuthorityChange()
 verifySmartUnlockReprojectsTheLayout()
 verifySuggestions()
 verifyGroupingLifecycle()
-verifyBoundedGroupingHistory()
 verifyAutoGrouping()
 verifyLockedGroupsSurviveArrangement()
 verifyDownwardStackLayout()

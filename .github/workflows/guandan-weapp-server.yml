@@ -1,13 +1,15 @@
 name: Guandan WeApp Server
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'shared-core/**'
       - 'work/guandan-windows-source/server/**'
       - 'work/guandan-windows-source/package.json'
       - '.gitignore'
-      - 'scripts/check-repository-boundaries.mjs'
+      - 'scripts/**'
+      - 'asset-library/**'
       - '.github/workflows/guandan-weapp-server.yml'
   push:
     branches: [main]
@@ -16,7 +18,8 @@ on:
       - 'work/guandan-windows-source/server/**'
       - 'work/guandan-windows-source/package.json'
       - '.gitignore'
-      - 'scripts/check-repository-boundaries.mjs'
+      - 'scripts/**'
+      - 'asset-library/**'
       - '.github/workflows/guandan-weapp-server.yml'
 
 permissions:
@@ -25,6 +28,7 @@ permissions:
 jobs:
   authoritative-game-server:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: work/guandan-windows-source
@@ -46,3 +50,9 @@ jobs:
         run: npm run check:weapp-server
       - name: Build shared core and run full platform/game regressions
         run: npm run test:server
+      - name: Verify artifact inventory and isolated storage restore
+        run: |
+          node ../../scripts/release-manifest.test.mjs
+          node ../../scripts/restore-drill.mjs
+      - name: Exercise bounded local room concurrency (not production capacity)
+        run: node ../../scripts/local-room-load.mjs 4 16

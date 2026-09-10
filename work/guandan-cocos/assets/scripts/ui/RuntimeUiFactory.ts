@@ -1,4 +1,5 @@
 import { Color, EditBox, Graphics, Label, Node, Sprite, SpriteFrame, Texture2D, UIOpacity, UITransform, Vec3, tween } from 'cc'
+import { drawUiFrame, type UiFrameKind } from './UiFrameStyle'
 import { loadGameAsset } from '../services/GameAssetLoader'
 
 export type RuntimeTextInputOptions = {
@@ -14,7 +15,8 @@ export type RuntimePanelStyle = {
   fill?: Color
   stroke?: Color
   lineWidth?: number
-  radius?: number
+  frame?: UiFrameKind
+  frameScale?: number
 }
 
 export type RuntimeLabelStyle = {
@@ -103,7 +105,7 @@ export class RuntimeUiFactory {
     container.addComponent(UITransform).setContentSize(width, height)
     const graphics = container.addComponent(Graphics)
     graphics.fillColor = new Color(4, 9, 10, 158)
-    graphics.roundRect(-width / 2, -height / 2, width, height, Math.min(height / 2, 18))
+    drawUiFrame(graphics, -width / 2, -height / 2, width, height, 'tag')
     graphics.fill()
 
     const textNode = new Node('MenuLabel')
@@ -159,7 +161,7 @@ export class RuntimeUiFactory {
     graphics.fillColor = style.fill ?? new Color(17, 49, 36, 220)
     graphics.strokeColor = style.stroke ?? new Color(229, 199, 104, 220)
     graphics.lineWidth = style.lineWidth ?? 2
-    graphics.roundRect(-width / 2, -height / 2, width, height, style.radius ?? 8)
+    drawUiFrame(graphics, -width / 2, -height / 2, width, height, style.frame ?? 'panel', style.frameScale)
     graphics.fill()
     if ((style.lineWidth ?? 2) > 0) graphics.stroke()
     return node
@@ -195,7 +197,7 @@ export class RuntimeUiFactory {
       fill: new Color(255, 248, 220, 245),
       stroke: new Color(255, 220, 113, 255),
       lineWidth: 3,
-      radius: 8,
+      frame: 'panel',
     })
     this.image(`${name}Artwork`, assetPath, 0, 0, width, height, node)
     const opacity = node.addComponent(UIOpacity)
@@ -235,7 +237,7 @@ export class RuntimeUiFactory {
         : pressed ? (style.pressedFill ?? new Color(96, 68, 28, 245)) : (style.fill ?? new Color(74, 50, 21, 235))
       graphics.strokeColor = style.stroke ?? new Color(218, 179, 79, 255)
       graphics.lineWidth = style.lineWidth ?? 2
-      graphics.roundRect(-halfWidth, -halfHeight, width, height, style.radius ?? halfHeight)
+      drawUiFrame(graphics, -halfWidth, -halfHeight, width, height, style.frame ?? 'control', style.frameScale)
       graphics.fill()
       if ((style.lineWidth ?? 2) > 0) graphics.stroke()
     }
@@ -277,32 +279,6 @@ export class RuntimeUiFactory {
     return node
   }
 
-  public quickChatButton (text: string, x: number, y: number): Node {
-    const node = new Node('QuickChat')
-    node.parent = this.root
-    node.setPosition(new Vec3(x, y, 0))
-    node.addComponent(UITransform).setContentSize(380, 42)
-    const graphics = node.addComponent(Graphics)
-    graphics.fillColor = new Color(20, 42, 39, 245)
-    graphics.strokeColor = new Color(188, 143, 57, 220)
-    graphics.lineWidth = 1
-    graphics.roundRect(-190, -21, 380, 42, 21)
-    graphics.fill()
-    graphics.stroke()
-    const textNode = new Node('QuickChatText')
-    textNode.parent = node
-    textNode.addComponent(UITransform).setContentSize(360, 38)
-    const label = textNode.addComponent(Label)
-    label.fontSize = RUNTIME_MIN_BUTTON_TEXT_SIZE
-    label.lineHeight = RUNTIME_MIN_BUTTON_TEXT_SIZE + 6
-    label.horizontalAlign = Label.HorizontalAlign.CENTER
-    label.verticalAlign = Label.VerticalAlign.CENTER
-    label.string = text
-    label.color = new Color(245, 239, 215)
-    applyForegroundTextStyle(label, new Color(24, 37, 34, 255), 2)
-    return node
-  }
-
   public formInput (name: string, placeholderText: string, x: number, y: number, options: RuntimeTextInputOptions = {}): EditBox {
     const width = options.width ?? 330
     const height = options.height ?? 50
@@ -314,7 +290,7 @@ export class RuntimeUiFactory {
     graphics.fillColor = new Color(12, 29, 32, 235)
     graphics.strokeColor = new Color(188, 143, 57, 220)
     graphics.lineWidth = 2
-    graphics.roundRect(-width / 2, -height / 2, width, height, 12)
+    drawUiFrame(graphics, -width / 2, -height / 2, width, height, 'control')
     graphics.fill()
     graphics.stroke()
 
@@ -359,20 +335,4 @@ export class RuntimeUiFactory {
     return edit
   }
 
-  public roomCodeInput (x: number, y: number): Node {
-    const edit = this.formInput('RoomCodeInput', '输入六位房间号', x, y, {
-      maxLength: 6,
-      inputMode: EditBox.InputMode.NUMERIC,
-    })
-    return edit.node.parent ?? edit.node
-  }
-
-  public friendRoomInviteInput (x: number, y: number, initialValue = ''): EditBox {
-    return this.formInput('FriendRoomInviteInput', '粘贴完整邀请口令', x, y, {
-      width: 520,
-      maxLength: 160,
-      inputMode: EditBox.InputMode.ANY,
-      initialValue,
-    })
-  }
 }

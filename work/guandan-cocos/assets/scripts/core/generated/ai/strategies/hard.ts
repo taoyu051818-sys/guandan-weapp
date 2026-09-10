@@ -69,7 +69,7 @@ export const hardTacticalOverride = (args: HardArgs, deps: HardDeps): Card[] | n
   };
 
   const chooseLeadBy2Ply = (plays: Card[][]): Card[] | null => {
-    const order: PlayerId[] = ['p1', 'p2', 'p3', 'p4'];
+    const order: readonly PlayerId[] = aiContext?.turnOrder ?? ['p1', 'p2', 'p3', 'p4'];
     const myIndex = order.indexOf(myPlayerId);
     const nextPlayerId = order[(myIndex + 1) % 4];
     const enemyHand = players[nextPlayerId].hand;

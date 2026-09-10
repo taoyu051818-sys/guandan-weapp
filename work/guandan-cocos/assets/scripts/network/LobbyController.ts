@@ -216,7 +216,6 @@ export class LobbyController extends Component {
   public tribute (cardId: string): number | null { return this.sendRoomIntent('tribute', { cardId }) }
   public returnTribute (cardId: string): number | null { return this.sendRoomIntent('returnTribute', { cardId }) }
   public finishTribute (): number | null { return this.sendRoomIntent('finishTribute') }
-  public chat (text: string): number | null { return this.sendRoomIntent('chat', { text }) }
   public leaveRoom (): void { this.exitRoom('leaveRoom') }
   public safeExit (): void { this.exitRoom('safeExit') }
   public recoverActiveMatch (): void {
@@ -260,7 +259,7 @@ export class LobbyController extends Component {
     this.clientListenerDisposers.push(this.client.on(type, listener))
   }
 
-  private sendRoomIntent (type: string, payload: Record<string, unknown> = {}): number | null {
+  public sendRoomIntent (type: string, payload: Record<string, unknown> = {}): number | null {
     return this.commands.roomIntent(type, payload)
   }
 

@@ -1,4 +1,5 @@
 import { memberIsHost, roomMember } from './friend-room-members.js'
+import { canConfigureRoomBots, setFriendBotIdentity } from './friend-room-bots.js'
 export const LOBBY_COMMAND_TYPES = [
   'startGame', 'setLobbyReady', 'cancelLobbyReady', 'kickMember', 'addBot', 'removeBot',
 ]
@@ -131,15 +132,16 @@ export const createLobbyCommandHandler = dependencies => async context => {
   }
   const room = rooms.get(String(payload.roomId || connection.roomId || ''))
   if (!room || !memberIsHost(room, connection.id)) return reply('error', { message: '只有房主可以设置机器人' })
-  if (room.ticketBound) return reply('error', { message: '平台票据房不允许设置机器人' })
+  if (!canConfigureRoomBots(room)) return reply('error', { message: '匹配房不允许手动设置机器人' })
   if (room.state) return reply('error', { message: '对局开始后不能设置机器人' })
   const targetPlayerId = String(payload.playerId || '')
   if (!ids.includes(targetPlayerId) || memberIsHost(room, room.seats[targetPlayerId])) return reply('error', { message: '只能设置空闲的其他席位' })
   ensureLobbyMetadata(room)
   const botIndex = room.botPlayerIds.indexOf(targetPlayerId)
   if (type === 'addBot') {
-    if (room.seats[targetPlayerId] || room.friendMembers?.some(member => member.seat === targetPlayerId)) return reply('error', { message: '该席位已有玩家' })
     if (botIndex >= 0) return reply('error', { message: '该席位已经是机器人' })
+    if (room.seats[targetPlayerId] || room.ticketBound && (room.resumeTokens[targetPlayerId] || room.userIdsBySeat[targetPlayerId]) || room.friendMembers?.some(member => member.seat === targetPlayerId)) return reply('error', { message: '该席位已有玩家（含离线保留席位）' })
+    setFriendBotIdentity(room, targetPlayerId, true)
     room.botPlayerIds.push(targetPlayerId)
     room.botPlayerIds.sort((left, right) => ids.indexOf(left) - ids.indexOf(right))
     ensureBotMetadata(room)
@@ -147,6 +149,7 @@ export const createLobbyCommandHandler = dependencies => async context => {
   } else {
     if (botIndex < 0) return reply('error', { message: '该席位不是机器人' })
     room.botPlayerIds.splice(botIndex, 1)
+    setFriendBotIdentity(room, targetPlayerId, false)
     room.lobbyReady[targetPlayerId] = false
   }
   room.version += 1

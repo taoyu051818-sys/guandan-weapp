@@ -156,7 +156,7 @@ try {
   const ticketBotId = nextRequestId++
   const ticketBotError = waitFor(ticketHost, 'error', packet => packet.requestId === ticketBotId)
   send(ticketHost, 'addBot', { roomId: ticketRoomId, playerId: 'p2' }, ticketBotId)
-  assert.match((await ticketBotError).message, /票据房不允许/)
+  assert.match((await ticketBotError).message, /匹配房不允许/)
   const ticketLeaveId = nextRequestId++
   const ticketLeftPromise = waitFor(ticketHost, 'roomLeft', packet => packet.requestId === ticketLeaveId)
   send(ticketHost, 'leaveRoom', { roomId: ticketRoomId }, ticketLeaveId)

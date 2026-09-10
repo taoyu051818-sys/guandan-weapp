@@ -1,17 +1,19 @@
 import { ImageAsset, Node, Sprite, SpriteFrame, Texture2D, UITransform, Vec3 } from 'cc'
 import type { AuthGateway, UserProfile } from '../services/FrontPageGatewayContracts'
 import { loadGameAsset } from '../services/GameAssetLoader'
+import { DEFAULT_PROFILE_CATALOG } from '../services/DefaultProfileCatalog'
 
 export const PROFILE_AVATARS = ['ui/common/default-avatar/texture', 'ui/lobby/shop-float-chick/texture'] as const
 const cache = new Map<string, Promise<SpriteFrame | null>>()
 
-/** Remote pixels arrive through the authenticated platform API, never an arbitrary CDN URL. */
+/** Saved and draft WeChat pixels use the authenticated allowlisted proxy, never direct CDN requests. */
 export function profileAvatarFrame (profile: UserProfile | null | undefined, auth: AuthGateway): Promise<SpriteFrame | null> {
   const avatar = profile?.avatarUrl || ''
   const key = `${profile?.id ?? ''}:${avatar}`
   const cached = cache.get(key)
   if (cached) return cached
-  const local = avatar.startsWith('asset:') ? avatar.slice(6) : avatar ? null : PROFILE_AVATARS[0]
+  const bundled = DEFAULT_PROFILE_CATALOG.find(p => p.avatarUrl === avatar)?.asset
+  const local = bundled || (avatar.startsWith('asset:') ? avatar.slice(6) : avatar ? null : PROFILE_AVATARS[0])
   const promise = new Promise<SpriteFrame | null>(resolve => {
     const finish = (texture: Texture2D | null): void => {
       if (!texture) { cache.delete(key); resolve(null); return }
@@ -20,11 +22,11 @@ export function profileAvatarFrame (profile: UserProfile | null | undefined, aut
       resolve(frame)
     }
     if (local) {
-      loadGameAsset(PROFILE_AVATARS.includes(local as typeof PROFILE_AVATARS[number]) ? local : PROFILE_AVATARS[0], Texture2D,
+      loadGameAsset(bundled || (PROFILE_AVATARS.includes(local as typeof PROFILE_AVATARS[number]) ? local : PROFILE_AVATARS[0]), Texture2D,
         (error, texture) => finish(error ? null : texture))
       return
     }
-    void auth.getAvatarImage(avatar).then(dataUri => {
+    void (avatar.startsWith('data:image/jpeg;base64,') ? Promise.resolve(avatar) : auth.getAvatarImage(avatar)).then(dataUri => {
       if (!dataUri) { finish(null); return }
       const image = new Image()
       const timeout = setTimeout(() => { image.onload = null; image.onerror = null; finish(null) }, 8000)

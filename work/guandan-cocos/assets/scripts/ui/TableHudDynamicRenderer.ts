@@ -1,3 +1,5 @@
+import { TABLE_BUTTON_HEIGHT } from './TableButtonMetrics'
+import { drawUiFrame } from './UiFrameStyle'
 import { Color, type Graphics, type Label, type Node, type Sprite, Vec3 } from 'cc'
 import { renderSuitAvailability } from './TableHudSuitAvailability'
 import {
@@ -39,7 +41,7 @@ export const renderTableHudCounter = (input: TableHudCounterRenderInput): void =
   const expanded = state.counterExpanded
   const height = expanded ? BASE_COUNTER_OPEN_HEIGHT : BASE_COUNTER_CLOSED_HEIGHT
   configureTransform(panel, BASE_COUNTER_WIDTH, height)
-  drawTableHudPanel(graphics, BASE_COUNTER_WIDTH, height, 8)
+  drawTableHudPanel(graphics, BASE_COUNTER_WIDTH, height)
   title.node.setPosition(new Vec3(-264, expanded ? 18 : 0, 1))
   toggleLabel.node.setPosition(new Vec3(270, 0, 1))
   toggleLabel.string = expanded ? '收起' : '展开'
@@ -103,11 +105,11 @@ export const renderTableHudSuits = (input: TableHudSuitRenderInput): void => {
   const barSize = nodeContentSize(input.bar, 382, 54)
   const expandedMetrics = barSize.width > 382
   graphics.clear()
-  graphics.fillColor = new Color(8, 33, 43, 232)
-  graphics.strokeColor = new Color(93, 173, 187, 230)
+  graphics.fillColor = new Color(220, 239, 255, 246)
+  graphics.strokeColor = new Color(126, 179, 218, 240)
   graphics.lineWidth = 1.75
-  if (expandedMetrics) graphics.roundRect(-116, -29, 326, 58, 18)
-  else graphics.roundRect(-82, -23, 244, 46, 12)
+  if (expandedMetrics) drawUiFrame(graphics, -116, -TABLE_BUTTON_HEIGHT / 2, 326, TABLE_BUTTON_HEIGHT, 'control')
+  else drawUiFrame(graphics, -82, -23, 244, 46, 'control')
   graphics.fill()
   graphics.stroke()
 
@@ -120,7 +122,7 @@ export const renderTableHudSuits = (input: TableHudSuitRenderInput): void => {
     const redSuit = suit === 'heart' || suit === 'diamond'
     const x = expandedMetrics ? -66 + index * 70 : -48 + index * 58
     if (available) {
-      const accent = selected ? new Color(255, 218, 80, 255) : redSuit ? new Color(255, 104, 102, 245) : new Color(94, 231, 214, 245)
+      const accent = selected ? new Color(139, 95, 16, 255) : redSuit ? new Color(179, 48, 56, 255) : new Color(20, 102, 94, 255)
       graphics.strokeColor = accent
       graphics.lineWidth = selected ? 5 : 3.5
       const underlineHalfWidth = expandedMetrics ? (selected ? 22 : 18) : (selected ? 18 : 14)

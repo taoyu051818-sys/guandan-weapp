@@ -76,7 +76,7 @@ try {
 
 const { PlatformApiClient, PlatformApiError } = runtimeModule.exports
 const { createHttpGateways } = retiredPlatform
-assert.deepEqual(Object.keys(runtimeModule.exports.createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'retirement' })).sort(), ['configured', 'auth', 'matchmaking', 'friendRooms', 'matchRecovery', 'wallet', 'playerCenter', 'seasons', 'replays'].sort(), 'the shipped factory must only expose active player services')
+assert.deepEqual(Object.keys(runtimeModule.exports.createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'retirement' })).sort(), ['configured', 'auth', 'matchmaking', 'friendRooms', 'matchRecovery', 'wallet', 'playerCenter', 'seasons', 'replays', 'tournaments'].sort(), 'the shipped factory must only expose active player services')
 const { DevelopmentTournamentGateway } = developmentModule.exports
 const ok = data => ({ status: 200, body: { ok: true, data, error: null } })
 const errorResponse = (status, code, message, details, retryable) => ({
@@ -193,6 +193,7 @@ class FakeTransport {
     ] })
     if (url.pathname === '/api/v1/tournaments/t1/enroll') return ok({ enrollment: { tournamentId: 't1' } })
     if (url.pathname === '/api/v1/tournaments/t16/check-in') return ok(validTournamentState())
+    if (url.pathname === '/api/v1/tournaments/t16/withdraw') return ok(validTournamentState({ phase: 'check-in', viewerEntry: { enrolled: false, checkedIn: false, rosterLocked: false }, assignment: null }))
     if (url.pathname === '/api/v1/tournaments/t16/state') return ok(validTournamentState({
       assignment: { assignmentId: 'tpa-roster-r1-t1', round: 1, table: 1, status: 'pending' },
     }))
@@ -332,6 +333,11 @@ const testBasicGateways = async () => {
   const checkInRequest = transport.requests.find(request => request.url.endsWith('/api/v1/tournaments/t16/check-in'))
   assert.equal(checkInRequest.method, 'POST')
   assert.equal(checkInRequest.body, undefined)
+  assert.equal((await gateways.tournaments.withdraw('t16')).viewerEntry.enrolled, false)
+  const withdrawRequest = transport.requests.find(request => request.url.endsWith('/api/v1/tournaments/t16/withdraw'))
+  assert.equal(withdrawRequest.method, 'POST')
+  assert.match(withdrawRequest.headers['Idempotency-Key'], /^withdraw-/)
+  await assert.rejects(gateways.tournaments.withdraw(' '), /不能为空/)
   const refreshedState = await gateways.tournaments.getState('t16')
   assert.equal(refreshedState.assignment.roundNumber, 1, 'wire round/table aliases must normalize to the public roundNumber/tableNumber contract')
   assert.equal(refreshedState.assignment.tableNumber, 1)
@@ -701,7 +707,7 @@ const testMatchRecoveryGateway = async () => {
     const recoveryAttemptId = input.body.recoveryAttemptId
     return ok({ entry: {
       entryAttemptId: recoveryAttemptId, recoveryAttemptId, matchId: 'recover-match', roomId: '787878', seat: 'p3',
-      roomKind: 'match', ticketPurpose: 'rejoin', gameEndpoint: 'wss://game.example/weapp',
+      roomKind: 'match', queueId: 'lingshui_16_cup', ticketPurpose: 'rejoin', gameEndpoint: 'wss://game.example/weapp',
       gameTicket: `ticket-${recoveryAttemptId}`, joinToken: `ticket-${recoveryAttemptId}`, expiresAt: Date.now() + 60_000,
     } })
   } }
@@ -709,6 +715,7 @@ const testMatchRecoveryGateway = async () => {
     baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only',
   }, transport)
   const first = await gateways.matchRecovery.recover()
+  assert.equal(first.queueId, 'lingshui_16_cup', 'cold recovery preserves tournament navigation')
   const duplicate = await gateways.matchRecovery.recover()
   assert.match(first.recoveryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
   assert.equal(duplicate.recoveryAttemptId, first.recoveryAttemptId, 'HTTP retry and subsequent WS entry must share one recovery attempt')
@@ -858,6 +865,7 @@ const testWechatRecoveryRandomness = async () => {
 const testFriendRoomGateway = async () => {
   const calls = []
   let createCalls = 0
+  let numberCalls = 0
   const gateways = createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'd', accessToken: 'token', gameEndpointPolicy: 'secure-only' }, {
     request: async input => {
       const route = new URL(input.url).pathname
@@ -867,7 +875,8 @@ const testFriendRoomGateway = async () => {
         if (createCalls === 1) throw new Error('response lost after friend room commit')
         return ok({ entry: validFriendEntry(input.body.entryAttemptId) })
       }
-      if (route === '/api/v1/friend-rooms/join') return ok({ entry: validFriendEntry(input.body.entryAttemptId, {
+      if (route === '/api/v1/friend-rooms/join-by-number' && ++numberCalls === 1) throw new Error('numeric entry response lost')
+      if (route === '/api/v1/friend-rooms/join' || route === '/api/v1/friend-rooms/join-by-number') return ok({ entry: validFriendEntry(input.body.entryAttemptId, {
         seat: 'p3', inviteCode: undefined, invitePayload: undefined, inviteText: undefined,
       }) })
       if (route === '/api/v1/match/cancel') return ok({ match: { matchId: input.body.matchId, status: 'cancelled' } })
@@ -891,6 +900,18 @@ const testFriendRoomGateway = async () => {
   })
   assert.match(joinCall.body.entryAttemptId, /^[A-Za-z0-9_-]{22,128}$/)
   await assert.rejects(gateways.friendRooms.join('123456'), error => error instanceof PlatformApiError && error.code === 'INVALID_FRIEND_ROOM_INVITE')
+  const beforeInvalidNumber = calls.length
+  for (const value of ['12345', 'abc456', '123456.token']) await assert.rejects(gateways.friendRooms.joinRoomNumber(value), error => error.code === 'INVALID_ROOM_NUMBER')
+  assert.equal(calls.length, beforeInvalidNumber)
+  await assert.rejects(gateways.friendRooms.joinRoomNumber(' 123456 '), error => error.retryable)
+  const numbered = await gateways.friendRooms.joinRoomNumber(' 123456 ')
+  const numberRequests = calls.filter(call => call.route.endsWith('/join-by-number'))
+  assert.equal(numberRequests[0].body.entryAttemptId, numberRequests[1].body.entryAttemptId, 'lost numeric entry response must reuse the same attempt')
+  assert.equal(numbered.seat, 'p3')
+  assert.equal(calls.at(-1).route, '/api/v1/friend-rooms/join-by-number')
+  assert.deepEqual(Object.keys(calls.at(-1).body).sort(), ['entryAttemptId', 'roomId'])
+  assert.equal(calls.at(-1).body.roomId, '123456')
+  await assert.rejects(gateways.friendRooms.joinRoomNumber('654321'), error => error.code === 'MALFORMED_RESPONSE' && /房间号不一致/.test(error.message))
   assert.equal(calls.filter(call => call.route.endsWith('/join')).length, 1, 'a six-digit display id alone must never reach the authenticated join endpoint')
 
   await gateways.friendRooms.cancel(created.matchId)

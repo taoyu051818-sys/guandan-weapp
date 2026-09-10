@@ -23,6 +23,7 @@ export type TableLayoutAuditBridgeDependencies = Readonly<{
   handNode: () => Node | null
   playArea: () => PlayAreaController | null
   humanId: () => PlayerId
+  seatOrder?: () => readonly PlayerId[]
   hudRoot: () => Node | null
   auxiliaryNodes: () => readonly TableLayoutAuditNode[]
 }>
@@ -188,7 +189,7 @@ export class TableLayoutAuditBridge {
   private collectPlayRegions (): TableLayoutRegion[] {
     const playArea = this.dependencies.playArea()
     if (!playArea?.node.activeInHierarchy) return []
-    const players: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4']
+    const players: readonly PlayerId[] = this.dependencies.seatOrder?.() ?? ['p1', 'p2', 'p3', 'p4']
     const labels = ['我方出牌区', '右家出牌区', '对家出牌区', '左家出牌区']
     const humanId = this.dependencies.humanId()
     const humanIndex = players.indexOf(humanId)

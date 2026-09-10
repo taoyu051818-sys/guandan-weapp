@@ -17,7 +17,6 @@ const gameScenePath = path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts
 const tableMatchCoordinatorPath = path.join(projectRoot, 'assets/scripts/scenes/TableMatchCoordinator.ts')
 const tableHandInteractionControllerPath = path.join(projectRoot, 'assets/scripts/scenes/TableHandInteractionController.ts')
 const tableOverlayControllerPath = path.join(projectRoot, 'assets/scripts/scenes/TableOverlayController.ts')
-const tableTurnClockControllerPath = path.join(projectRoot, 'assets/scripts/scenes/TableTurnClockController.ts')
 const playerSeatPath = path.join(projectRoot, 'assets/scripts/ui/PlayerSeatController.ts')
 const lobbyControllerPath = path.join(projectRoot, 'assets/scripts/network/LobbyController.ts')
 const lobbyMessageRouterPath = path.join(projectRoot, 'assets/scripts/network/LobbyMessageRouter.ts')
@@ -43,7 +42,9 @@ function loadPureTs (filePath) {
   const errors = (result.diagnostics ?? []).filter(diagnostic => diagnostic.category === ts.DiagnosticCategory.Error)
   assert.deepEqual(errors, [], `failed to transpile ${filePath}`)
   const module = { exports: {} }
-  new Function('exports', 'module', 'require', '__filename', '__dirname', result.outputText)(module.exports, module, require, filePath, path.dirname(filePath))
+  const localRequire = specifier => specifier.startsWith('.')
+    ? loadPureTs(path.resolve(path.dirname(filePath), `${specifier}.ts`)) : require(specifier)
+  new Function('exports', 'module', 'require', '__filename', '__dirname', result.outputText)(module.exports, module, localRequire, filePath, path.dirname(filePath))
   return module.exports
 }
 
@@ -55,10 +56,9 @@ function verifySourceConversions () {
   const cardView = readUtf8(cardViewPath)
   const stackLayout = readUtf8(handStackLayoutPath)
   const gameScene = readUtf8(gameScenePath)
-  const tableMatchCoordinator = readUtf8(tableMatchCoordinatorPath)
+  const tableMatchCoordinator = readUtf8(tableMatchCoordinatorPath) + fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TablePhasePresenter.ts'), 'utf8')
   const tableHandInteractionController = readUtf8(tableHandInteractionControllerPath)
   const tableOverlayController = readUtf8(tableOverlayControllerPath)
-  const tableTurnClockController = readUtf8(tableTurnClockControllerPath)
   const playerSeat = readUtf8(playerSeatPath)
   const lobbyController = readUtf8(lobbyControllerPath)
   const lobbyMessageRouter = readUtf8(lobbyMessageRouterPath)
@@ -97,11 +97,11 @@ function verifySourceConversions () {
     'authoritative recovery snapshots must clear choices from an earlier turn',
   )
   assert.match(localHandSelectionController, /canSelectPlayingHand\(context\.state, context\.humanId, context\.actionPending\)/, 'the selection controller must use the shared playing-hand policy')
-  assert.match(tableHandInteractionController, /canSelectPlayingHand\(snapshot\.state, humanId, snapshot\.actionPending\)/, 'the hand interaction owner must use the same playing-hand policy')
+  assert.match(tableHandInteractionController, /resolveHandCapabilities\(snapshot, humanId, settings\)/, 'the hand interaction owner must use the shared capability policy')
   assert.match(localHandSelectionController, /diagnosePlay\(cards, context\.state\.lastValidPlay, context\.state\.ruleProfile\)/, 'selection feedback must use the shared authoritative play diagnosis and explicit profile')
   assert.match(gameManager, /diagnosePlay\(cards, this\.state\.lastValidPlay, this\.ruleProfile\)/, 'submission must repeat authoritative diagnosis before local or network dispatch')
   assert.match(gameManager, /if \(!validation\.canPlay\) return this\.emitSnapshot\(playValidationHint\(validation\)\)/, 'both local and network submissions must stop before sending an invalid selection')
-  assert.match(gameManager, /playValidation,\s*phase:/, 'GameManager snapshots must expose the current play validation to presentation')
+  assert.match(gameManager, /playValidation,\s*\.\.\.this\.projection/, 'GameManager snapshots must expose the current play validation to presentation')
   assert.match(tableMatchCoordinator, /const visible = this\.playActionPolicy\.resolve\(snapshot\.state, humanId\)/, 'turn actions must depend on the complete authoritative hand response policy, not the selected cards')
   assert.match(gameScene, /this\.hintButton\?\.on\(Node\.EventType\.TOUCH_END, this\.tableHandInteraction\.handleHint, this\.tableHandInteraction\)/, 'the hint button must route through the hand coordinator so locks are visible to the policy')
   assert.match(gameScene, /this\.hintButton\?\.off\(Node\.EventType\.TOUCH_END, this\.tableHandInteraction\.handleHint, this\.tableHandInteraction\)/, 'scene teardown must release the exact hint controller binding')
@@ -115,7 +115,9 @@ function verifySourceConversions () {
   assert.doesNotMatch(cardView, /selectionOverlay\.(stroke|strokeColor|lineWidth)/, 'selection must not draw an enclosing outline')
   assert.match(cardView, /locked\?: boolean/, 'card presentation must expose an independent persistent lock state')
   assert.match(cardView, /CardLockOverlay[\s\S]*new Color\(48, 205, 226, 255\)/, 'locked cards retain their independent cool-colour overlay')
-  assert.match(cardView, /if \(this\.stackCovered\)[\s\S]*this\.hitAreaHeight[\s\S]*selectionOverlay\.roundRect/, 'selected covered cards must paint the full exposed strip')
+  const selectionVisual = cardView.slice(cardView.indexOf('private redrawSelectionOverlay'), cardView.indexOf('private redrawLockOverlay'))
+  assert.match(selectionVisual, /selectionOverlay\.roundRect\(-38, -56, 76, 112, 8\)/, 'every selected card must darken its entire face')
+  assert.doesNotMatch(selectionVisual, /stackCovered|hitAreaHeight/, 'stack exposure and hit areas must not clip selection feedback')
   assert.match(cardView, /configureStackHitArea[\s\S]*refreshStateVisuals\(\)/, 'changing stack exposure must redraw selection and lock overlays')
   assert.match(stackLayout, /export const STACK_EXPOSURE_HEIGHT = 40/, 'every rank lane must use one fixed point-sized exposure')
   assert.match(stackLayout, /return STACK_EXPOSURE_HEIGHT/, 'large stacks must not compress their per-card exposure')
@@ -138,11 +140,10 @@ function verifySourceConversions () {
   assert.match(handController, /lockedCardIds\?: readonly string\[\][\s\S]*locked: lockedIds\.has\(card\.id\)/, 'the optional lock projection must reach every card presentation')
   assert.doesNotMatch(handController, /node\.setScale|scale:\s*(?:selected|locked)/, 'selection and lock projection must not alter card-node scale')
   assert.match(cardView, /Math\.max\(1, Math\.min\(visibleWidth, spacing\)\)/, 'narrow-screen hit targets must not overlap their fan spacing')
-  assert.match(tableTurnClockController, /roomStatus === 'ready'/, 'multiplayer countdown and actions must wait for room recovery')
-  assert.match(tableTurnClockController, /reset \(\): void[\s\S]*this\.remainingSeconds = DEFAULT_TURN_SECONDS[\s\S]*this\.snapshot = null/, 'leaving the table clears the authoritative clock projection')
+  // Recovery visibility and reset clearing are covered by the public turn-clock behavior suite.
   assert.match(gameScene, /this\.tableTurnClock\?\.reset\(\)/, 'the composition root must reset its countdown owner on table exit')
   assert.match(tableMatchCoordinator, /if \(controls\.hintLabel\) controls\.hintLabel\.node\.active = false/, 'persistent engine hint chrome must remain retired')
-  assert.match(tableOverlayController, /this\.ownChatLabel\.node\.setPosition\(new Vec3\([\s\S]*-viewport\.halfWidth \+ viewport\.safeLeft \+ 220,[\s\S]*viewport\.halfHeight - viewport\.safeTop - 235/, 'the visible local quick-chat echo must stay in the upper-left table lane, clear of the hand and actions')
+  assert.doesNotMatch(tableOverlayController, /ownChatLabel|quickChatPanel/, 'retired chat must not cover the hand')
   assert.match(tableOverlayController, /const safeTop = viewport\.halfHeight - viewport\.safeTop - 158[\s\S]*const safeBottom = -viewport\.halfHeight \+ viewport\.safeBottom \+ 260[\s\S]*Math\.min\(560, safeWidth - 32\)/, 'short-lived table feedback must be constrained to its central safe corridor')
   assert.doesNotMatch(gameScene, /statusLaneWidth|statusLaneY/, 'retired persistent side status rails must not continue reserving or overlapping space')
   const connectivityStart = tableMatchCoordinator.indexOf('private syncSeatConnections')
@@ -168,7 +169,7 @@ function verifySourceConversions () {
 
 function verifyTurnInteractionLifecycle () {
   const { canSelectPlayingHand } = loadPureTs(handInteractionPolicyPath)
-  const { HandInteractionStateMachine } = loadPureTs(handInteractionStatePath)
+  const { resolveHandInteraction } = loadPureTs(handInteractionStatePath)
   const state = (currentTurn, finishedPlayers = []) => ({ currentTurn, finishedPlayers })
 
   assert.equal(canSelectPlayingHand(state('p1'), 'p1', false), true, 'the local hand must be interactive on its turn')
@@ -178,14 +179,17 @@ function verifyTurnInteractionLifecycle () {
   assert.equal(canSelectPlayingHand(state('p1'), 'p1', false), true, 'a rejected or completed intent must release the temporary lock')
   assert.equal(canSelectPlayingHand(state('p1', ['p1']), 'p1', false), false, 'a player who has finished must not keep selecting cards')
 
-  const machine = new HandInteractionStateMachine()
-  const context = overrides => ({ phase: 'playing', isCurrentTurn: true, actionPending: false, trustee: false, finished: false, ...overrides })
-  assert.equal(machine.sync(context({})).mode, 'play')
-  assert.equal(machine.sync(context({ isCurrentTurn: false })).mode, 'play', 'off-turn preselection uses the same visible selection mode')
-  assert.equal(machine.startLock(), true, 'the lock control may explicitly enter grouping off-turn')
-  assert.equal(machine.state.mode, 'lock-create')
-  assert.equal(machine.sync(context({ isCurrentTurn: false, actionPending: true })).mode, 'blocked', 'a pending intent must retire lock mode')
-  assert.equal(machine.startLock(), false)
+  const context = overrides => Object.freeze({ phase: 'playing', actionPending: false, trustee: false, finished: false, ...overrides })
+  const idle = context({})
+  assert.deepEqual(resolveHandInteraction(idle), { mode: 'play', blockReason: null })
+  for (const [overrides, reason] of [
+    [{ actionPending: true }, 'pending'], [{ trustee: true }, 'trustee'],
+    [{ finished: true }, 'finished'], [{ phase: 'settlement' }, 'settlement'],
+  ]) {
+    assert.deepEqual(resolveHandInteraction(context(overrides)), { mode: 'blocked', blockReason: reason })
+    assert.deepEqual(resolveHandInteraction(idle), { mode: 'play', blockReason: null }, 'projection has no stale blocked state to reset')
+  }
+  assert.deepEqual(resolveHandInteraction(context({ phase: 'tribute' })), { mode: 'tribute', blockReason: null })
 }
 
 function verifyOffTurnGroupingIsolation () {
@@ -195,14 +199,10 @@ function verifyOffTurnGroupingIsolation () {
   assert.notEqual(handlerStart, -1, 'the card-toggle handler must exist')
   assert.notEqual(handlerEnd, -1, 'the card-toggle handler must remain bounded')
   const handler = handInteraction.slice(handlerStart, handlerEnd)
-  assert.match(handler, /const mode = this\.interaction\.state\.mode[\s\S]*mode === 'play' \|\| mode === 'tribute'/, 'card taps must route through the exclusive interaction mode')
-  assert.match(handler, /mode !== 'lock-create' && mode !== 'lock-unlock'\) return/, 'blocked off-turn taps must not start a lock draft implicitly')
-  assert.match(handler, /if \(!this\.canInteract\(snapshot, humanId, settings\)\) return[\s\S]*ruleAuthority\.toggleCard\(cardId\)/, 'only the authoritative action path may reach normal rule selection')
-  assert.match(handInteraction, /this\.interaction\.startLock\(\)/, 'only the explicit lock action may enter lock-create mode')
-  assert.match(handInteraction, /clearCurrentTurnRuleSelection[\s\S]*canSelectPlayingHand\(snapshot\.state, humanId, snapshot\.actionPending\)[\s\S]*ruleAuthority\.clearRuleSelection\(\)/, 'switching modes may clear rule selection only while the local player can legally act')
-  assert.match(handInteraction, /!this\.interaction\.isLocking && this\.workspace\.isManualSelectionActive[\s\S]*workspace\.cancelManualSelection\(\)/, 'phase and authority changes must retire lock drafts through the state machine')
+  assert.match(handler, /resolveHandCapabilities\(snapshot, humanId, settings\)\.canSelect[\s\S]*ruleAuthority\.toggleCard\(cardId\)/, 'the shared eligibility decision must gate normal rule selection')
+  assert.doesNotMatch(handler, /this\.interaction/, 'card taps must not maintain derived state')
   const coordinator = readUtf8(tableMatchCoordinatorPath)
-  assert.match(coordinator, /interactionMode === 'lock-create' \|\| interactionMode === 'lock-unlock'\) return/, 'play, pass and hint controls must be hidden while the lock transaction is active')
+  assert.doesNotMatch(coordinator, /lock-create|lock-unlock/, 'lock actions cannot hide ordinary play/pass/hint controls')
 }
 
 function verifySelectionSnapshotSemantics () {

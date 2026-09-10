@@ -29,37 +29,19 @@ assert.match(handInteraction, /this\.workspace\.syncAuthoritativeHand\(hand, \{[
 assert.match(handWorkspace, /if \(signature === this\.authoritativeSignature\) return false[\s\S]*const smartArrangementActive[\s\S]*if \(options\.autoSort \|\| smartArrangementActive\) this\.grouping\.arrange/, 'point sorting and smart-layout reprojection must run once behind the authoritative hand signature guard')
 assert.match(tableMatchCoordinator, /if \(packet\.effectSync\.mode === 'recovery'\)[\s\S]*handInteraction\.invalidateAuthoritativeHand\(\)/, 'a recovered table snapshot must be treated as a fresh authoritative hand')
 
-const friendSettings = game.slice(game.indexOf('private activeFriendRoomSettings'), game.indexOf('private playChatPulseFor'))
+const friendSettings = game.slice(game.indexOf('private activeFriendRoomSettings'), game.indexOf('private activeFriendRoomSettings') + 900)
 assert.match(friendSettings, /lobby\.lobbyReadyRequired !== true/, 'ticket matchmaking rooms must not inherit friend-room presentation restrictions')
 assert.doesNotMatch(friendSettings, /scoreVisibility|PlayerPoints|shouldHideFriendRoomScore|setTableHudSeatScoresVisible/, 'score visibility must not leak into a level-only table HUD')
 
 const tableHud = tableHudPresenter.slice(tableHudPresenter.indexOf('public render'), tableHudPresenter.indexOf('public update'))
 assert.match(tableHud, /projectTableViewer\(snapshot\.state\.players, humanId, teamLevels/, 'the table summary must use the shared viewer-relative team projection')
 assert.match(tableHud, /`我方 \$\{String\(viewer\.viewerLevel\)\}级 · 对方 \$\{String\(viewer\.opponentLevel\)\}级`/, 'upgrade tables retain viewer-relative team levels')
-assert.match(tableHud, /matchFormat\?\.kind === 'independent'[\s\S]*随机级牌/, 'independent hands must not imply cumulative upgrades')
+assert.match(tableHud, /projectTableModeLabel\(snapshot\.state, humanId, lobby\?\.roomSettings\?\.scoreVisibility === 'hidden'/, 'the HUD delegates mode and score visibility to the snapshot projection')
+const snapshotPresenter = fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/TableSnapshotPresenter.ts'), 'utf8')
+assert.match(snapshotPresenter, /matchFormat\?\.kind === 'independent'[\s\S]*随机级牌/, 'independent hands must not imply cumulative upgrades')
 assert.doesNotMatch(tableHud, /snapshot\.scores|scoreLabel|teamScore|比分/, 'the live table must not duplicate levels with a score display')
 
-const chat = tableOverlays.slice(tableOverlays.indexOf('public toggleQuickChatPanel'), tableOverlays.indexOf('private createModalShade'))
-const firstInteractionGuard = chat.indexOf('this.dependencies.isInteractionDisabled()')
-assert.ok(firstInteractionGuard >= 0 && firstInteractionGuard < chat.indexOf('QUICK_CHAT_PHRASES.forEach'), 'disabled rooms must not open the quick-chat panel')
-const sendChat = chat.slice(chat.indexOf('private sendQuickChat'), chat.indexOf('private readonly toggleQuickChatMute'))
-const sendInteractionGuard = sendChat.indexOf('this.dependencies.isInteractionDisabled()')
-const localChatMutation = sendChat.indexOf('this.dependencies.chat.send')
-const localVoicePlayback = sendChat.indexOf('this.dependencies.playVoice')
-assert.ok(sendInteractionGuard >= 0, 'the phrase handler must recheck the immutable room policy')
-assert.ok(localChatMutation > sendInteractionGuard && localVoicePlayback > localChatMutation, 'interaction policy must run before local bubble creation and voice playback')
-
-console.log('friend-room runtime settings regression checks passed')
-const voiceCallback = game.match(/playVoice: voice => (\{ if \(!this\.activeFriendRoomSettings\(\)\?\.disableVoice\)[^\n]+\})/)
-assert.ok(voiceCallback, 'all incoming and outgoing quick-chat voice callbacks must obey room policy')
-const calls = []
-const context = { activeFriendRoomSettings: () => ({ disableVoice: true }), audio: { playVoice: voice => calls.push(voice) } }
-const runVoice = new Function('voice', voiceCallback[1])
-runVoice.call(context, 'chat-thanks')
-assert.deepEqual(calls, [])
-context.activeFriendRoomSettings = () => null
-runVoice.call(context, 'chat-thanks')
-assert.deepEqual(calls, ['chat-thanks'], 'leaving a restricted room restores normal voice policy')
+assert.doesNotMatch(tableOverlays, /toggleQuickChatPanel|sendQuickChat|QUICK_CHAT_PHRASES/, 'quick chat is fully retired')
 assert.match(tableHudPresenter, /counterEnabled: !\(multiplayer && lobby\?\.lobbyReadyRequired === true && lobby\.roomSettings\?\.counterEnabled === false\)/)
 const counterRenderer = fs.readFileSync(path.join(projectRoot, 'assets/scripts/ui/TableHudDynamicRenderer.ts'), 'utf8')
 assert.match(counterRenderer, /panel\.active = state\.counterEnabled !== false[\s\S]*if \(!panel\.active\) return/)

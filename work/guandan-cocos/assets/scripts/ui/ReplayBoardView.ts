@@ -1,3 +1,4 @@
+import { drawUiFrame } from './UiFrameStyle'
 import { Color, Graphics, Label, Node, UITransform, Vec3 } from 'cc'
 import type { ReplaySeatAction, ReplaySeatId, ReplayTimelineState } from '../replay/ReplayTimeline'
 import { applyForegroundTextStyle, RUNTIME_MIN_TEXT_SIZE, RuntimeUiFactory } from './RuntimeUiFactory'
@@ -66,7 +67,7 @@ const createPanel = (parent: Node, name: string, x: number, y: number, width: nu
   graphics.fillColor = active ? new Color(72, 59, 25, 242) : new Color(15, 42, 41, 232)
   graphics.strokeColor = active ? new Color(246, 204, 91, 255) : new Color(133, 176, 148, 210)
   graphics.lineWidth = active ? 3 : 2
-  graphics.roundRect(-width / 2, -height / 2, width, height, 12)
+  drawUiFrame(graphics, -width / 2, -height / 2, width, height)
   graphics.fill()
   graphics.stroke()
   return node
@@ -163,7 +164,7 @@ export const renderReplayBoard = (
     surface.fillColor = new Color(19, 75, 62, 235)
     surface.strokeColor = new Color(218, 179, 79, 230)
     surface.lineWidth = 3
-    surface.roundRect(-395, -165, 790, 330, 30)
+    drawUiFrame(surface, -395, -165, 790, 330)
     surface.fill()
     surface.stroke()
     surface.strokeColor = new Color(130, 197, 158, 80)

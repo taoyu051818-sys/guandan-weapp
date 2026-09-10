@@ -2,13 +2,9 @@ import { Color, Vec3, type Label } from 'cc'
 import type { PlayerId } from '../core/generated'
 import type { GameSnapshot } from '../game/GameManager'
 import type { LobbySnapshot, NetworkDeadlineAction } from '../network/LobbyController'
-import type { TableGameHud, TableGameHudSeatPlace, TableGameHudState } from '../ui/TableGameHud'
-
-export type TableTurnClockProjection = Pick<
-  TableGameHudState,
-  'turnVisible' | 'turnSeconds' | 'turnDurationSeconds' | 'turnPlace'
->
-
+import type { TableGameHud } from '../ui/TableGameHud'
+import { projectTurnClock, type TableTurnClockProjection } from './TableTurnClockProjection'
+export type { TableTurnClockProjection } from './TableTurnClockProjection'
 export interface TableTurnClockControllerDependencies {
   label: Label
   tableHud: () => TableGameHud | null
@@ -27,9 +23,6 @@ export interface TableTurnClockUpdate {
   controlsY: number
 }
 
-const DEFAULT_TURN_SECONDS = 20
-const PLAYER_ORDER: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4']
-const PLAYER_PLACES: readonly TableGameHudSeatPlace[] = ['bottom', 'right', 'top', 'left']
 const ACTION_LABELS: Readonly<Record<Exclude<NetworkDeadlineAction, 'play'>, string>> = {
   tribute: '进贡',
   returnTribute: '还贡',
@@ -38,7 +31,7 @@ const ACTION_LABELS: Readonly<Record<Exclude<NetworkDeadlineAction, 'play'>, str
 
 /** Owns the table turn clock state, server-deadline projection and tick lifecycle. */
 export class TableTurnClockController {
-  private remainingSeconds = DEFAULT_TURN_SECONDS
+  private remainingSeconds = 0
   private snapshot: GameSnapshot | null = null
   private humanId: PlayerId = 'p1'
   private disposed = false
@@ -51,122 +44,60 @@ export class TableTurnClockController {
     if (this.disposed) return
     this.snapshot = update.snapshot
     this.humanId = update.humanId
-    const multiplayer = this.dependencies.isMultiplayer()
-    const lobby = this.dependencies.lobbySnapshot()
-    const networkReady = lobby?.roomStatus === 'ready'
-    const networkDeadlineAvailable = Boolean(
-      multiplayer &&
-      networkReady &&
-      !lobby?.matchEnded &&
-      !update.snapshot.actionPending &&
-      (update.snapshot.phase === 'playing' || update.snapshot.phase === 'tribute') &&
-      lobby?.turnDeadlineAt &&
-      lobby.deadlinePlayerId &&
-      lobby.deadlineAction,
-    )
-    const available = networkDeadlineAvailable
-    this.dependencies.label.node.active = available
-    if (!available) {
-      this.syncHud()
-      return
-    }
-
-    this.remainingSeconds = Math.max(0, Math.ceil((lobby!.turnDeadlineAt! - this.now()) / 1000))
-
     const countdownY = update.controlsY + 47
     this.dependencies.label.node.setPosition(new Vec3(0, countdownY, 0))
-    this.refreshLabel()
+    this.renderClock(false)
   }
 
   project (snapshot: GameSnapshot, humanId: PlayerId): TableTurnClockProjection {
-    const multiplayer = this.dependencies.isMultiplayer()
-    const lobby = this.dependencies.lobbySnapshot()
-    const networkClockVisible = Boolean(
-      multiplayer &&
-      lobby?.roomStatus === 'ready' &&
-      !lobby.matchEnded &&
-      !snapshot.actionPending &&
-      lobby.turnDeadlineAt &&
-      lobby.deadlinePlayerId &&
-      lobby.deadlineAction &&
-      this.dependencies.label.node.active,
-    )
-    const turnVisible = networkClockVisible
-    return {
-      turnVisible,
-      turnSeconds: turnVisible ? (this.dependencies.label.node.active ? this.remainingSeconds : this.durationSeconds()) : 0,
-      turnDurationSeconds: this.durationSeconds(),
-      turnPlace: this.turnPlace(snapshot, humanId),
-    }
+    return projectTurnClock(snapshot, humanId, this.dependencies.lobbySnapshot(),
+      !this.disposed && this.snapshot !== null && this.dependencies.isMultiplayer(), this.now())
   }
 
   reset (): void {
     if (this.disposed) return
-    this.remainingSeconds = DEFAULT_TURN_SECONDS
+    this.remainingSeconds = 0
     this.snapshot = null
     this.dependencies.label.node.active = false
+    this.dependencies.label.string = ''
+    this.dependencies.tableHud()?.update({ turnVisible: false, turnSeconds: 0 })
   }
 
   dispose (): void {
     if (this.disposed) return
+    this.reset()
     this.disposed = true
     this.dependencies.unschedule(this.tick)
-    this.dependencies.label.node.active = false
-    this.snapshot = null
   }
 
   private readonly tick = (): void => {
-    if (this.disposed || !this.dependencies.label.node.active || this.remainingSeconds <= 0) return
-    const deadline = this.dependencies.lobbySnapshot()?.turnDeadlineAt
-    if (!this.dependencies.isMultiplayer() || !deadline) {
-      this.dependencies.label.node.active = false
-      this.syncHud()
-      return
-    }
-    const previous = this.remainingSeconds
-    this.remainingSeconds = Math.max(0, Math.ceil((deadline - this.now()) / 1000))
-    if (this.remainingSeconds !== previous) this.playWarningTick()
-    this.refreshLabel()
+    this.renderClock(true)
   }
 
-  private playWarningTick (): void {
-    if (this.remainingSeconds > 0 && this.remainingSeconds <= 5) {
+  private renderClock (warn: boolean): void {
+    if (this.disposed || !this.snapshot) return
+    // One lobby/time sample drives both the label and HUD, even across a deadline boundary.
+    const lobby = this.dependencies.lobbySnapshot()
+    const clock = projectTurnClock(this.snapshot, this.humanId, lobby,
+      this.dependencies.isMultiplayer(), this.now())
+    const label = this.dependencies.label
+    label.node.active = clock.turnVisible
+    const previous = this.remainingSeconds
+    this.remainingSeconds = clock.turnSeconds
+    if (warn && clock.turnVisible && this.remainingSeconds !== previous
+      && this.remainingSeconds > 0 && this.remainingSeconds <= 5) {
       this.dependencies.playCountdown(this.remainingSeconds)
     }
-  }
-
-  private refreshLabel (): void {
-    const label = this.dependencies.label
-    const lobby = this.dependencies.lobbySnapshot()
     const deadlinePlayerId = lobby?.deadlinePlayerId
     const deadlineAction = lobby?.deadlineAction
-    if (this.dependencies.isMultiplayer() && deadlinePlayerId && deadlineAction && deadlineAction !== 'play') {
-      const playerName = this.snapshot?.state.players[deadlinePlayerId].name ?? deadlinePlayerId
+    if (!clock.turnVisible) label.string = ''
+    else if (deadlinePlayerId && deadlineAction && deadlineAction !== 'play') {
+      const playerName = this.snapshot.state.players[deadlinePlayerId]?.name ?? deadlinePlayerId
       label.string = `${playerName} · ${ACTION_LABELS[deadlineAction]} ${this.remainingSeconds}s`
     } else label.string = `${this.remainingSeconds}s`
     label.color = this.remainingSeconds <= 5 ? new Color(255, 126, 96) : new Color(245, 224, 156)
-    this.syncHud()
+    this.dependencies.tableHud()?.update(clock)
   }
-
-  private syncHud (): void {
-    if (!this.snapshot) return
-    this.dependencies.tableHud()?.update(this.project(this.snapshot, this.humanId))
-  }
-
-  private durationSeconds (): number {
-    return this.dependencies.isMultiplayer()
-      ? (this.dependencies.lobbySnapshot()?.roomSettings?.turnSeconds ?? DEFAULT_TURN_SECONDS)
-      : DEFAULT_TURN_SECONDS
-  }
-
-  private turnPlace (snapshot: GameSnapshot, humanId: PlayerId): TableGameHudSeatPlace {
-    const deadlinePlayerId = this.dependencies.lobbySnapshot()?.deadlinePlayerId
-    const activePlayerId = this.dependencies.isMultiplayer() && deadlinePlayerId
-      ? deadlinePlayerId
-      : snapshot.state.currentTurn
-    return PLAYER_PLACES[(PLAYER_ORDER.indexOf(activePlayerId) - PLAYER_ORDER.indexOf(humanId) + 4) % 4]
-  }
-
   private now (): number {
     return this.dependencies.now?.() ?? Date.now()
   }

@@ -16,12 +16,26 @@ function compile(file, deps = {}) {
 const policy = compile('assets/scripts/ui/LobbyMotionPolicy.ts')
 const { stepLobbyMotion, LOBBY_MOTION } = policy
 const clock = { elapsed: 0 }
-for (let i = 0; i < 29; i++) assert.equal(stepLobbyMotion(clock, .1, true), -1)
+assert.equal(LOBBY_MOTION.delay, 1)
+assert.equal(LOBBY_MOTION.repeatDelay, 1)
+for (let i = 0; i < 9; i++) assert.equal(stepLobbyMotion(clock, .1, true), -1)
 assert.ok(stepLobbyMotion(clock, .15, true) >= 0)
 let seen = new Set()
-clock.elapsed = 3
+clock.elapsed = LOBBY_MOTION.delay
 for (let i = 0; i < 67; i++) seen.add(stepLobbyMotion(clock, 1/60, true))
 assert.equal(seen.size, 17, 'all 16 frames and rest are sampled')
+const duration = LOBBY_MOTION.frames / LOBBY_MOTION.fps
+for (let cycle = 0; cycle < 4; cycle++) {
+  const start = LOBBY_MOTION.delay + cycle * (duration + 1)
+  clock.elapsed = start + .001
+  assert.equal(stepLobbyMotion(clock, 0, true), 0, 'each repeat starts at first frame')
+  clock.elapsed = start + duration - .001
+  assert.equal(stepLobbyMotion(clock, 0, true), 15, 'last frame is never cut off')
+  for (const pause of [.001, .5, .999]) {
+    clock.elapsed = start + duration + pause
+    assert.equal(stepLobbyMotion(clock, 0, true), -1, 'one full second of rest after each flash')
+  }
+}
 assert.equal(stepLobbyMotion(clock, .1, false), -1)
 assert.equal(clock.elapsed, 0, 'modal/reduced/off/recovery reset quiet delay')
 assert.equal(stepLobbyMotion(clock, 120, true), -1)
@@ -45,6 +59,7 @@ const game = { on: (e, cb, owner) => events.set(e, [cb, owner]), off: e => event
 let callback, cancels = 0
 const { attachLobbyAmbientMotion } = compile('assets/scripts/ui/LobbyAmbientMotion.ts', {
   cc: { _decorator:{ ccclass: () => Type => Type }, Component, Node, Graphics, Sprite, SpriteFrame, UITransform, UIOpacity: class {}, Color: Shape, Rect: Shape, Size: Shape, Texture2D: class {}, game, Game:{ EVENT_HIDE:'hide', EVENT_SHOW:'show' } },
+  './UiFrameStyle': compile('assets/scripts/ui/UiFrameStyle.ts', {}),
   './LobbyMotionPolicy': policy,
   '../services/GameAssetLoader': { loadGameAsset: (asset, type, cb) => { assert.ok(asset.endsWith('/texture')); callback = cb; return () => cancels++ } },
 })
@@ -59,15 +74,15 @@ assert.equal(state.elapsed,0,'wait for optional asset without blocking button')
 callback(null,{width:384,height:96})
 assert.equal(component.frames.length,16)
 const owned = [...component.frames]
-state.elapsed=3.4; component.update(1/60)
+state.elapsed=LOBBY_MOTION.delay+.4; component.update(1/60)
 assert.equal(component.star.enabled,true)
 assert.ok(component.rim.opacity <=55)
 allowed=false; component.update(1/60)
 assert.equal(component.star.enabled,false)
 assert.equal(component.rim.opacity,0)
-allowed=true; state.elapsed=3.4; button.scale.x=.96; component.update(1/60)
+allowed=true; state.elapsed=LOBBY_MOTION.delay+.4; button.scale.x=.96; component.update(1/60)
 assert.equal(component.star.enabled,false,'press takes priority')
-button.scale.x=1; state.elapsed=3.4; component.update(1/60)
+button.scale.x=1; state.elapsed=LOBBY_MOTION.delay+.4; component.update(1/60)
 component.motionPreference={matches:true}; component.update(1/60)
 assert.equal(component.star.enabled,false,'OS reduced motion also suppresses decoration')
 component.motionPreference.matches=false

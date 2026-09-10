@@ -11,7 +11,7 @@ const frame = (ui: RuntimeUiFactory, screen: ScreenAdapter, title: string, subti
   const size = screen.safeSize()
   const width = Math.min(1060, size.x - 64)
   const height = Math.min(530, size.y - 42)
-  ui.panel('FeatureSurface', 0, 0, width, height, { fill: new Color(17, 52, 72, 247), stroke: new Color(109, 160, 181), lineWidth: 1, radius: 26 })
+  ui.panel('FeatureSurface', 0, 0, width, height, { fill: new Color(17, 52, 72, 247), stroke: new Color(109, 160, 181), lineWidth: 1, frame: 'panel' })
   coastalText(ui, title, 0, height / 2 - 48, width - 270, 52, 34, { bold: true })
   coastalText(ui, subtitle, 0, height / 2 - 92, width - 64, 38, 21, { color: new Color(168, 204, 218) })
   coastalButton(ui, backLabel, 0, -height / 2 + 45, 210, 56, back)
@@ -27,7 +27,7 @@ export const renderShopPreview = (ui: RuntimeUiFactory, screen: ScreenAdapter, p
   const cardHeight = Math.min(286, height - 208)
   items.forEach((product, index) => {
     const card = ui.panel(`PreviewProduct-${product.id}`, (index - 1) * (cardWidth + gap), -5, cardWidth, cardHeight, {
-      fill: new Color(226, 242, 245), stroke: new Color(251, 249, 226), lineWidth: 1, radius: 18,
+      fill: new Color(226, 242, 245), stroke: new Color(251, 249, 226), lineWidth: 1, frame: 'panel',
     })
     drawProduct(card, product.id, cardHeight * .19)
     coastalText(ui, product.name, 0, -cardHeight * .17, cardWidth - 20, 38, 27, { parent: card, color: ink, bold: true })

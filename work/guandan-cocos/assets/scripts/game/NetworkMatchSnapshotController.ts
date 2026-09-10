@@ -1,7 +1,7 @@
 import type { EngineState, MatchState, PlayerId, SettlementResult, TributeState } from '../core/generated'
 import type { NetworkViewerRoundStats } from '../network/LobbyModels'
 import { countPlayerBombs, type RoundRecord, type SessionPhase } from './RoundRecord'
-import { mergeGameManagerProjection, projectAuthoritativeState, type GameManagerProjection } from './GameManagerProjection'
+import { mergeGameManagerProjection, projectAuthoritativeState, type GameManagerProjection, type GameManagerProjectionPatch } from './GameManagerProjection'
 
 export type NetworkMatchSnapshotPorts = Readonly<{
   getState: () => EngineState
@@ -62,7 +62,7 @@ export class NetworkMatchSnapshotController {
           ...current.scores,
           [result.winnerTeam]: current.scores[result.winnerTeam] + Math.max(0, result.levelUp),
         }
-    const patch: Partial<GameManagerProjection> = {
+    const patch: GameManagerProjectionPatch = {
       phase: 'settlement',
       teamLevels: result.teamLevels,
       aFailStreaks: result.aFailStreaks,
@@ -100,7 +100,7 @@ export class NetworkMatchSnapshotController {
 
   private commit (
     state: EngineState,
-    fallback: Partial<GameManagerProjection>,
+    fallback: GameManagerProjectionPatch,
   ): GameManagerProjection | null {
     const result = projectAuthoritativeState(this.ports.getProjection(), state, fallback)
     if (!result.accepted) return null
@@ -108,7 +108,7 @@ export class NetworkMatchSnapshotController {
   }
 
   /** Legacy result-only packets explicitly advance lifecycle after adapting their last playing snapshot. */
-  private commitLegacyRoundEnd (state: EngineState, patch: Partial<GameManagerProjection>): GameManagerProjection | null {
+  private commitLegacyRoundEnd (state: EngineState, patch: GameManagerProjectionPatch): GameManagerProjection | null {
     const adapted = projectAuthoritativeState(this.ports.getProjection(), state)
     if (!adapted.accepted) return null
     return this.commitProjection(state, mergeGameManagerProjection(adapted.projection, patch))

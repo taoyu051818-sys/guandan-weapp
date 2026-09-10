@@ -52,7 +52,7 @@ assert.equal(errors.length, 5)
 for (const type of ['startGame', 'kickMember', 'addBot', 'removeBot']) assert.equal(sender.roomIntent(type), 1, 'standing host retains room management authority')
 snapshot = { ...snapshot, isRoomHost: false }
 for (const type of ['startGame', 'kickMember', 'addBot', 'removeBot']) assert.equal(sender.roomIntent(type), null, 'ordinary observers cannot manage the room')
-assert.match(fs.readFileSync(path.join(base, 'ui/TableGameHud.ts'), 'utf8'), /chatButton\.node\.active = this\.state\.chatEnabled !== false/)
+assert.match(fs.readFileSync(path.join(base, 'ui/TableGameHud.ts'), 'utf8'), /trusteeButton\.node\.active = this\.state\.trusteeVisible === true/)
 let config = settings.createDefaultFriendRoomSettings()
 config = settings.updateFriendRoomChoice(config, 'spectator', '延迟观战')
 for (const [text, mode] of [['15秒', 'delay-15'], ['30秒', 'delay-30'], ['60秒', 'delay-60'], ['1局', 'delayed-round']]) {

@@ -73,3 +73,24 @@ await assert.rejects(
 )
 
 console.log('game result service tests passed')
+
+// Private-room bots are signed roster participants, not fabricated platform accounts.
+const practice = createEmptyPlatformState()
+practice.users.u1 = structuredClone(state.users.u1)
+practice.wallets.u1 = structuredClone(state.wallets.u1)
+const practiceRoster = { p1: 'u1', ...Object.fromEntries([2, 3, 4].map(i => [`p${i}`, `friendbot_${String(i).repeat(24)}`])) }
+practice.matches.practice = { id: 'practice', kind: 'friend-room', mode: 'friend-room', roomId: '123456', status: 'playing',
+  participants: Object.entries(practiceRoster).map(([seat, userId]) => ({ seat, userId, status: 'playing', isBot: seat !== 'p1' })) }
+const practiceStore = new MemoryPlatformStore(practice)
+const practiceResults = new GameResultService({ store: practiceStore, now: () => now, createId: () => 'practice-ledger',
+  ensurePlayerRating: (draft, userId) => draft.playerRatings[userId] ||= createInitialRating(userId) })
+const practiceEvent = { ...event, eventId: 'practice-result', matchId: 'practice', userIdsBySeat: practiceRoster, finalSpectatorSequence: undefined }
+await practiceResults.accept(practiceEvent.eventId, practiceEvent)
+assert.equal((await practiceResults.accept(practiceEvent.eventId, practiceEvent)).duplicate, true)
+const practiceAfter = await practiceStore.read(s => s)
+for (const collection of ['users', 'wallets', 'playerRatings', 'userStats', 'matchHistoryByUser']) {
+  assert.deepEqual(Object.keys(practiceAfter[collection]), ['u1'], `${collection} must not acquire bot accounts`)
+}
+assert.equal(practiceAfter.matches.practice.status, 'completed')
+assert.equal(practiceAfter.ledgerEntries.length, 1)
+console.log('Private-room bot upgrade results settle once without bot accounts, wallets or ranking entries')

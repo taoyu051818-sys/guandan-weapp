@@ -1,16 +1,18 @@
-import type { Card, EngineState, MatchState, PlayerId, Rank, SettlementResult, Team, TributeState } from '../core/generated'
+import type { Card, EngineState, MatchState, PlayerId, Rank, Team, TributeState } from '../core/generated'
+import { normalizeRoundViewPhase, type RoundViewPhase, type RoundViewPhasePatch } from './RoundViewState'
+import { snapshotData } from '../services/DataSnapshot'
 
-export type GameManagerProjection = Readonly<{
+type Progress = Readonly<{
   roundId: number | null
   revision: number | null
-  phase: 'playing' | 'tribute' | 'settlement'
   teamLevels: Record<Team, Rank>
   aFailStreaks: Record<Team, number>
   scores: Record<Team, number>
   lastRoundRank: PlayerId[]
-  tribute: TributeState | null
-  settlement: SettlementResult | null
 }>
+
+export type GameManagerProjection = Progress & RoundViewPhase
+export type GameManagerProjectionPatch = Partial<Progress> & RoundViewPhasePatch
 
 export const createGameManagerProjection = (): GameManagerProjection => ({
   roundId: null,
@@ -26,18 +28,20 @@ export const createGameManagerProjection = (): GameManagerProjection => ({
 
 export const mergeGameManagerProjection = (
   current: GameManagerProjection,
-  patch: Partial<GameManagerProjection>,
-): GameManagerProjection => ({
-  roundId: patch.roundId === undefined ? current.roundId : patch.roundId,
-  revision: patch.revision === undefined ? current.revision : patch.revision,
-  phase: patch.phase ?? current.phase,
-  teamLevels: { ...(patch.teamLevels ?? current.teamLevels) },
-  aFailStreaks: { ...(patch.aFailStreaks ?? current.aFailStreaks) },
-  scores: { ...(patch.scores ?? current.scores) },
-  lastRoundRank: [...(patch.lastRoundRank ?? current.lastRoundRank)],
-  tribute: patch.tribute === undefined ? current.tribute : patch.tribute,
-  settlement: patch.settlement === undefined ? current.settlement : patch.settlement,
-})
+  patch: GameManagerProjectionPatch,
+): GameManagerProjection => {
+  const lifecycle = normalizeRoundViewPhase({ ...current, ...patch })
+  if (!lifecycle) throw new Error('Incomplete round lifecycle projection')
+  return snapshotData({
+    ...lifecycle,
+    roundId: patch.roundId === undefined ? current.roundId : patch.roundId,
+    revision: patch.revision === undefined ? current.revision : patch.revision,
+    teamLevels: { ...(patch.teamLevels ?? current.teamLevels) },
+    aFailStreaks: { ...(patch.aFailStreaks ?? current.aFailStreaks) },
+    scores: { ...(patch.scores ?? current.scores) },
+    lastRoundRank: [...(patch.lastRoundRank ?? current.lastRoundRank)],
+  }) as GameManagerProjection
+}
 
 export const authoritativeProgress = (
   current: GameManagerProjection,
@@ -111,7 +115,7 @@ export const projectCanonicalTribute = (
 export const projectAuthoritativeState = (
   current: GameManagerProjection,
   state: EngineState,
-  fallback: Partial<GameManagerProjection> = {},
+  fallback: GameManagerProjectionPatch = {},
 ): AuthoritativeProjectionResult => {
   const version = canonicalVersion(state)
   const phase = canonicalPhase(state)
@@ -123,7 +127,7 @@ export const projectAuthoritativeState = (
   if (staleRound || staleRevision || staleLifecycle) return { accepted: false, projection: current }
 
   const match = state as Partial<MatchState>
-  const canonicalLifecycle: Partial<GameManagerProjection> = phase
+  const canonicalLifecycle: GameManagerProjectionPatch = phase
     ? {
         phase,
         tribute: phase === 'tribute'
@@ -132,14 +136,12 @@ export const projectAuthoritativeState = (
         settlement: phase === 'settlement' ? match.settlement ?? fallback.settlement ?? null : null,
       }
     : {}
-  return {
-    accepted: true,
-    projection: mergeGameManagerProjection(current, {
-      ...fallback,
-      ...authoritativeProgress(current, state),
-      roundId: version.roundId ?? current.roundId,
-      revision: version.revision ?? current.revision,
-      ...canonicalLifecycle,
-    }),
+  const patch: GameManagerProjectionPatch = {
+    ...fallback, ...authoritativeProgress(current, state),
+    roundId: version.roundId ?? current.roundId,
+    revision: version.revision ?? current.revision,
+    ...canonicalLifecycle,
   }
+  if (!normalizeRoundViewPhase({ ...current, ...patch })) return { accepted: false, projection: current }
+  return { accepted: true, projection: mergeGameManagerProjection(current, patch) }
 }

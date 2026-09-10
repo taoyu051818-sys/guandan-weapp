@@ -4,7 +4,7 @@ const { resolvePlay, isBombResolution } = createRequire(import.meta.url)('../../
 /** Cosmetic pacing uses a separate RNG, never the shuffle/AI random stream. */
 const unit = random => Math.max(0, Math.min(1, Number(random()) || 0))
 export const botOpeningDelay = (baseMs, random = Math.random) =>
-  Math.round(Math.min(1_000, Math.max(10, baseMs) * (0.75 + unit(random) * 0.75)))
+  Math.round((500 + unit(random) * 1_000) * Math.min(1, Math.max(10, baseMs) / 500))
 
 export const isDeliberatePlay = (hand, cards, ruleProfile) => {
   if (!cards?.length) return false

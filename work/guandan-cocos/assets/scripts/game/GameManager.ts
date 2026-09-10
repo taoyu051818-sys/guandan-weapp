@@ -7,19 +7,17 @@ import { LocalHandSelectionController, playValidationHint } from './LocalHandSel
 import { NetworkMatchSnapshotController } from './NetworkMatchSnapshotController'
 import { NetworkActionController } from './NetworkActionController'
 import { createGameManagerProjection, type GameManagerProjection } from './GameManagerProjection'
+import { ownRoundState, type RoundViewPhase } from './RoundViewState'
 
-export type GameSnapshot = {
-  state: EngineState
-  selectedCardIds: string[]
+export type GameSnapshot = Readonly<{
+  state: Readonly<EngineState>
+  selectedCardIds: readonly string[]
   actionPending: boolean
   hint: string
   playValidation: PlayValidation
-  phase: 'playing' | 'tribute' | 'settlement'
-  teamLevels: Record<Team, Rank>
-  scores: Record<Team, number>
-  tribute: TributeState | null
-  settlement: SettlementResult | null
-}
+  teamLevels: Readonly<Record<Team, Rank>>
+  scores: Readonly<Record<Team, number>>
+}> & RoundViewPhase
 
 export { playValidationHint } from './LocalHandSelectionController'
 
@@ -36,7 +34,8 @@ export class GameManager extends Component {
 
   @property(LobbyController)
   public lobby: LobbyController | null = null
-  public state!: EngineState
+  private currentState!: EngineState
+  public get state (): Readonly<EngineState> { return this.currentState }
   private projection: GameManagerProjection = createGameManagerProjection()
   private readonly selection = new LocalHandSelectionController()
   private networkActions: NetworkActionController | null = null
@@ -45,7 +44,7 @@ export class GameManager extends Component {
     getProjection: () => this.projection,
     getRoomId: () => this.session?.snapshot.roomId ?? null,
     getHumanId: () => this.humanId,
-    commit: (state, projection) => { this.state = state; this.projection = projection },
+    commit: (state, projection) => { this.currentState = ownRoundState(state); this.projection = projection },
     clearSelection: () => this.selection.clear(),
     cancelPendingAction: () => this.networkActionController.cancel(),
     setSessionPhase: phase => {
@@ -59,7 +58,7 @@ export class GameManager extends Component {
         currentLevel: settlement.currentLevel,
         teamLevels: settlement.teamLevels,
         scores,
-      })
+      }, this.state.players[this.session.snapshot.myPlayerId ?? 'p1'].team)
     },
     publishHint: hint => this.emitSnapshot(hint),
   })
@@ -177,11 +176,7 @@ export class GameManager extends Component {
       actionPending: this.actionPending,
       hint,
       playValidation,
-      phase: this.phase,
-      teamLevels: this.teamLevels,
-      scores: this.scores,
-      tribute: this.tribute,
-      settlement: this.settlement,
+      ...this.projection,
     } satisfies GameSnapshot)
   }
 

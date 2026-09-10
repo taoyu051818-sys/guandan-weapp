@@ -398,19 +398,6 @@
       "sourcePath": "assets/GuanDan/Audio/lose.mp3",
       "bytes": 39314,
       "sha256": "85227be41a2526aad3570f991c177873988b81e2c06e4e7772f9800d01f6916b"
-    },
-    {
-      "label": "快捷语：称赞出牌（女声）",
-      "key": "niuma/chat_nice_play",
-      "file": "chat_nice_play.ogg",
-      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase02.ogg",
-      "sourcePhraseIndex": 2,
-      "sourceText": "你的牌打得太好啦",
-      "runtimePhraseId": "nice-play",
-      "runtimeText": "你的牌打得太好啦",
-      "decision": "语义一致且表达友好；运行时文案与原声逐字一致。",
-      "bytes": 25562,
-      "sha256": "c6e0be0998e28be6a47eb85f2284d05809b6fdde008646acc805b99062ea266c"
     }
   ],
   "excluded": [

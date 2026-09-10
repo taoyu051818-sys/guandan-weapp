@@ -1,6 +1,7 @@
 import { normalizeFriendRoomSettings, spectatorPolicyFor } from './friend-room-settings.js'
 import { stateForViewer, tributeForViewer } from './game-session-projection.js'
 import { registerRoomMember, friendMemberMetadata } from './friend-room-members.js'
+import { canConfigureRoomBots } from './friend-room-bots.js'
 
 export const phaseForRoom = room => room.matchEnded || room.roundResult || room.state?.phase === 'settled'
   ? 'settlement'
@@ -34,7 +35,7 @@ export const createRoomPublisher = ({
       entryKind: room.entryKind,
       gameStartPending: Boolean(room.pendingGameStartEvent),
       capabilities: {
-        canUseBots: !room.ticketBound,
+        canUseBots: canConfigureRoomBots(room),
         canKickMembers: isFriendRoom(room),
         requiresLobbyReady: isFriendRoom(room),
       },

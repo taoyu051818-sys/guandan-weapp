@@ -113,405 +113,252 @@ const createHarness = (settingsOverrides = {}) => {
   return { authority, controller, state }
 }
 
-function verifyProjectionAndRuleSelection () {
-  const hand = [
-    card('pair-spade', 9, 'spade'), card('pair-heart', 9, 'heart'),
-    card('pair-five-spade', 5, 'spade'), card('pair-five-heart', 5, 'heart'),
-    card('loose-A', 'A', 'club'),
-  ]
-  const { authority, controller } = createHarness()
-  const view = controller.submit(snapshot(hand))
-  assert.equal(view.sortOrder, 'desc')
-  assert.equal(view.interactive, true)
-  assert.equal(view.groups.length, 2, 'each repeated physical rank must use one default stack projection')
-  const stack = view.groups.find(group => group.cardIds.includes('pair-spade'))
-  const secondStack = view.groups.find(group => group.cardIds.includes('pair-five-spade'))
-  assert.ok(stack && secondStack)
-  const bottomCardId = stack.cardIds.at(-1)
-  const secondBottomCardId = secondStack.cardIds.at(-1)
 
-  controller.handleCardToggle(bottomCardId)
-  assert.deepEqual(authority.replaceCalls.at(-1), stack.cardIds, 'the visible stack bottom must select the whole stack atomically')
-  controller.handleCardToggle(secondBottomCardId)
-  assert.deepEqual(new Set(authority.replaceCalls.at(-1)), new Set(stack.cardIds.concat(secondStack.cardIds)), 'a second point stack must extend rather than replace the current rule selection')
-  controller.handleCardToggle(bottomCardId)
-  assert.deepEqual(new Set(authority.replaceCalls.at(-1)), new Set(secondStack.cardIds), 'pressing one selected stack again must remove only that stack')
-  controller.handleCardToggle(secondBottomCardId)
-  assert.deepEqual(authority.replaceCalls.at(-1), [], 'clearing the final selected stack must leave an empty rule selection')
-  controller.handleCardToggle('loose-A')
-  assert.deepEqual(authority.toggleCalls, ['loose-A'], 'an ordinary current-turn tap must stay in the rule authority')
+function fixture (hand, settings = {}) {
+  const harness = createHarness(settings)
+  harness.current = snapshot(hand)
+  harness.view = () => harness.controller.submit({ ...harness.current, selectedCardIds: [...harness.authority.selectedCardIds] })
+  harness.view()
+  return harness
 }
 
-function verifyOffTurnGroupingAndBlocking () {
-  const hand = [card('five-a', 5, 'spade'), card('five-b', 5, 'heart'), card('loose', 'K', 'club')]
-  const { authority, controller, state } = createHarness()
-  let current = snapshot(hand, { state: { currentTurn: 'p2' } })
-  let view = controller.submit(current)
-  assert.equal(view.interactive, true, 'off-turn cards support preselection without starting a lock draft')
-  controller.handleCardToggle('five-a')
-  assert.equal(controller.submit(current).lockAction, 'start', 'an off-turn card tap must not silently start locking')
-  controller.handleLockAction()
-  assert.equal(controller.submit(current).interactionMode, 'lock-create')
-  controller.handleCardToggle('five-a')
-  controller.handleCardToggle('five-b')
-  view = controller.submit(current)
-  assert.deepEqual(view.lockDraftCardIds, ['five-a', 'five-b'])
-  assert.equal(view.lockAction, 'commit')
-  assert.deepEqual(authority.toggleCalls, ['five-a'], 'only the preselection tap, not locking taps, reaches rule selection')
-  assert.equal(authority.clearCalls, 1, 'entering locking retires the off-turn preselection')
-  controller.handleLockAction()
-  view = controller.submit(current)
-  const lockedPair = view.groups.find(group => group.kind === 'manual')
-  assert.equal(view.lockAction, 'start')
-  assert.equal(lockedPair?.locked, true, 'a recognized pair must commit as one explicit locked group')
-  assert.deepEqual(new Set(view.lockedCardIds), new Set(['five-a', 'five-b']))
-
-  controller.handleLockAction()
-  controller.handleCardToggle('five-a')
-  view = controller.submit(current)
-  assert.equal(state.toasts.at(-1), '已选中锁牌组合，点击“解锁”拆分')
-  assert.equal(view.lockAction, 'unlock')
-  assert.deepEqual(new Set(view.lockDraftCardIds), new Set(['five-a', 'five-b']))
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start')
-  assert.deepEqual(view.lockedCardIds, [], 'unlock must remove persistent group ownership')
-
-  controller.handleLockAction()
-  controller.handleCardToggle('loose')
-  assert.equal(controller.submit(current).lockAction, 'cancel')
-  controller.handleLockAction()
-  assert.equal(controller.submit(current).lockAction, 'start', 'an invalid one-card lock draft must cancel cleanly')
-
-  state.settings.trustee = true
-  view = controller.submit(current)
-  assert.equal(view.interactive, false, 'trustee mode must block both rule and grouping input')
-  const callCount = authority.toggleCalls.length
-  controller.handleCardToggle('loose')
-  assert.equal(authority.toggleCalls.length, callCount)
-
-  state.settings.trustee = false
-  current = snapshot(hand, { actionPending: true, state: { currentTurn: 'p2' } })
-  assert.equal(controller.submit(current).interactive, false, 'an in-flight action must block off-turn grouping')
-  current = snapshot(hand, { state: { currentTurn: 'p2', finishedPlayers: ['p1'] } })
-  assert.equal(controller.submit(current).interactive, false, 'a finished hand must not re-enter grouping')
-}
-
-function verifyLockActionsRevalidateCurrentState () {
-  const hand = [card('guard-nine-a', 9, 'spade'), card('guard-nine-b', 9, 'heart'), card('guard-loose', 4)]
-  const { controller, state } = createHarness()
-  let current = snapshot(hand, { state: { currentTurn: 'p2' } })
-  const beginPairDraft = () => {
-    controller.submit(current)
-    controller.handleLockAction()
-    controller.handleCardToggle('guard-nine-a')
-    controller.handleCardToggle('guard-nine-b')
-    assert.equal(controller.submit(current).lockAction, 'commit')
+// Decision queries are read-only, reject invalid combinations with an explicit reason,
+// and mutations always revalidate against the latest hand instead of an old decision.
+{
+  const { HandWorkspace } = require('../assets/scripts/game/HandWorkspace.ts')
+  const workspace = new HandWorkspace()
+  const hand = [card('a', 8), card('b', 8, 'heart'), card('c', 9)]
+  const options = { roundId: 1, levelRank: 2, direction: 'desc', autoSort: true, ruleProfile: classicRuleProfile }
+  workspace.syncAuthoritativeHand(hand, options)
+  const reject = (ids, reason) => {
+    const before = JSON.stringify(workspace.snapshot)
+    assert.deepEqual(workspace.getLockDecision(classicRuleProfile, ids), { kind: 'unavailable', reason })
+    assert.equal(workspace.applySelectionLock(ids, classicRuleProfile), false)
+    assert.equal(JSON.stringify(workspace.snapshot), before, 'unavailable decisions must not change grouping')
   }
-  const selectLockedPair = () => {
-    controller.submit(current)
-    controller.handleLockAction()
-    controller.handleCardToggle('guard-nine-a')
-    assert.equal(controller.submit(current).lockAction, 'unlock')
+  reject([], 'empty-selection')
+  reject(['a', 'a'], 'stale-selection')
+  reject(['a', 'gone'], 'stale-selection')
+  reject(['a'], 'invalid-combination')
+  reject(['a', 'c'], 'invalid-combination')
+  const beforeQuery = JSON.stringify(workspace.snapshot)
+  assert.deepEqual(workspace.getLockDecision(classicRuleProfile, ['a', 'b']), { kind: 'lock' })
+  assert.equal(JSON.stringify(workspace.snapshot), beforeQuery)
+  workspace.applySelectionLock(['a', 'b'], classicRuleProfile)
+  reject(['a'], 'partial-lock')
+  reject(['a', 'b', 'c'], 'mixed-selection')
+  assert.deepEqual(workspace.getLockDecision(classicRuleProfile, ['a', 'b']), { kind: 'unlock' })
+  workspace.syncAuthoritativeHand([hand[0], hand[2]], options)
+  reject(['a', 'b'], 'stale-selection')
+}
+
+// Rendering and every command must agree on the common policy, including off-turn
+// preparation and tribute carrying the previous round's finishing order.
+for (const phase of ['playing', 'tribute', 'settlement']) {
+  for (const currentTurn of ['p1', 'p2']) for (const actionPending of [false, true]) {
+    for (const trustee of [false, true]) for (const finished of [false, true]) {
+      const h = fixture([card('a', 8), card('b', 8, 'heart')], { trustee, multiplayer: true, deadlinePlayerId: 'p1' })
+      h.current = snapshot([card('a', 8), card('b', 8, 'heart')], {
+        phase, actionPending, state: { currentTurn, finishedPlayers: finished ? ['p1'] : [] },
+        tribute: { phase: 'tributing', isAntiTribute: false, actions: [{ from: 'p1', to: 'p2' }] },
+      })
+      const available = !actionPending && !trustee && phase !== 'settlement' && (phase !== 'playing' || !finished)
+      const canGroup = available && phase === 'playing'
+      const canSubmit = canGroup && currentTurn === 'p1'
+      const label = JSON.stringify({ phase, currentTurn, actionPending, trustee, finished })
+      const view = h.view()
+      assert.equal(view.interactive, available, label)
+      assert.equal(h.controller.canInteractWithCurrentHand(), available, label)
+      h.controller.handleCardToggle('a', true)
+      assert.equal(h.authority.selectedCardIds.has('a'), available, label)
+      h.authority.replaceSelectedCards(['a', 'b'])
+      h.current.playValidation = { canPlay: true, code: 'valid' }
+      assert.deepEqual(h.view().lockDecision, canGroup ? { kind: 'lock' } : { kind: 'unavailable', reason: 'interaction-blocked' }, label)
+      h.controller.handleLockAction()
+      assert.equal(h.view().lockedCardIds.length, canGroup ? 2 : 0, label)
+      h.controller.handleHint()
+      h.controller.playSelected()
+      assert.equal(h.authority.hintCalls.length, canSubmit ? 1 : 0, label)
+      assert.equal(h.authority.playCalls, canSubmit ? 1 : 0, label)
+      assert.equal(h.controller.handleArrangeIntent() !== null, available, label)
+    }
   }
-  controller.submit(current)
-
-  state.settings.trustee = true
-  controller.submit(current)
-  controller.handleLockAction()
-  let view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'trustee mode must not start a lock draft')
-  assert.equal(state.toasts.at(-1), '当前阶段不能锁牌')
-
-  state.settings.trustee = false
-  beginPairDraft()
-
-  current = snapshot(hand, { actionPending: true, state: { currentTurn: 'p2' } })
-  controller.submit(current)
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'an in-flight action must retire rather than commit an existing lock draft')
-  assert.deepEqual(view.lockedCardIds, [])
-
-  current = snapshot(hand, { state: { currentTurn: 'p2' } })
-  beginPairDraft()
-  state.settings.trustee = true
-  controller.submit(current)
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'trustee mode must retire rather than commit an existing lock draft')
-  assert.deepEqual(view.lockedCardIds, [])
-
-  state.settings.trustee = false
-  beginPairDraft()
-  current = snapshot(hand, { state: { currentTurn: 'p2', finishedPlayers: ['p1'] } })
-  controller.submit(current)
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'a finished player must retire rather than commit an existing lock draft')
-  assert.deepEqual(view.lockedCardIds, [])
-
-  current = snapshot(hand, { state: { currentTurn: 'p2' } })
-  beginPairDraft()
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.deepEqual(new Set(view.lockedCardIds), new Set(['guard-nine-a', 'guard-nine-b']))
-
-  selectLockedPair()
-
-  state.settings.trustee = true
-  controller.submit(current)
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'trustee mode must retire the unlock draft without changing its group')
-  assert.deepEqual(new Set(view.lockedCardIds), new Set(['guard-nine-a', 'guard-nine-b']))
-
-  state.settings.trustee = false
-  selectLockedPair()
-  current = snapshot(hand, { actionPending: true, state: { currentTurn: 'p2' } })
-  controller.submit(current)
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'an in-flight action must retire the unlock draft without changing its group')
-  assert.deepEqual(new Set(view.lockedCardIds), new Set(['guard-nine-a', 'guard-nine-b']))
-
-  current = snapshot(hand, { state: { currentTurn: 'p2' } })
-  selectLockedPair()
-  current = snapshot(hand, { state: { currentTurn: 'p2', finishedPlayers: ['p1'] } })
-  controller.submit(current)
-  controller.handleLockAction()
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'a finished player must retire the unlock draft without changing its group')
-  assert.deepEqual(new Set(view.lockedCardIds), new Set(['guard-nine-a', 'guard-nine-b']))
-
-  current = snapshot(hand, { state: { currentTurn: 'p2' } })
-  selectLockedPair()
-  controller.handleLockAction()
-  assert.deepEqual(controller.submit(current).lockedCardIds, [], 'unlock must still succeed after the grouping window becomes legal again')
 }
 
-function verifyStraightFlushAndLockedArrangement () {
-  const straightFlush = [6, 7, 8, 9, 10].map(rank => card(`club-${rank}`, rank, 'club'))
-  const hand = straightFlush.concat(card('loose-Q', 'Q', 'spade'), card('loose-4', 4, 'diamond'))
-  const { authority, controller, state } = createHarness()
-  const current = snapshot(hand)
-  authority.selectedCardIds.add('loose-Q')
-  let view = controller.submit(current)
-  assert.deepEqual(view.availableSuits, ['club'])
-
-  controller.handleSuitIntent('club')
-  view = controller.submit(current)
-  assert.equal(authority.clearCalls, 1, 'current-turn grouping must clear only the live rule selection')
-  assert.deepEqual(view.lockDraftCardIds, straightFlush.map(item => item.id))
-  assert.equal(view.selectedSuit, 'club')
-  assert.equal(view.lockAction, 'commit')
-  controller.handleLockAction()
-  view = controller.submit(current)
-  const locked = view.groups.find(group => group.kind === 'straight-flush')
-  assert.ok(locked, 'the selected suit candidate must commit as one straight-flush group')
-  assert.equal(locked.locked, true)
-  const lockedCopy = JSON.parse(JSON.stringify(locked))
-
-  assert.equal(controller.handleArrangeIntent(), 'arranged')
-  view = controller.submit(current)
-  assert.deepEqual(view.groups.find(group => group.id === locked.id), { ...lockedCopy, zone: 0, badge: { label: '同花顺', tone: 'purple' } }, 'one-key arrangement adds presentation metadata and preserves explicit locks')
-  assert.equal(view.arrangeRestoreAvailable, true)
-  assert.equal(controller.handleArrangeIntent(), 'restored')
-  view = controller.submit(current)
-  assert.deepEqual(view.groups.find(group => group.id === locked.id), lockedCopy, 'restore must recover locked and loose baseline state')
-  assert.equal(view.arrangeRestoreAvailable, false)
-
-  controller.handleSuitIntent('spade')
-  assert.equal(state.toasts.at(-1), '当前花色没有可组成的同花顺')
-  assert.equal(controller.submit(current).lockAction, 'start')
+// The preview helper must never clear the rule selection, and live settings must
+// be rechecked without waiting for another snapshot/render.
+{
+  const h = fixture([3, 4, 5, 6, 7].map(rank => card(`preview-${rank}`, rank, 'club')))
+  h.controller.handleSuitIntent('club')
+  assert.equal(h.view().selectedSuit, 'club')
+  const selected = [...h.authority.selectedCardIds]
+  h.controller.clearSuitPreview(false)
+  assert.equal(h.view().selectedSuit, null)
+  assert.deepEqual([...h.authority.selectedCardIds], selected)
+  h.state.settings.trustee = true
+  h.controller.handleCardToggle('preview-3', false)
+  h.controller.handleLockAction()
+  h.controller.handleHint()
+  h.controller.playSelected()
+  assert.equal(h.controller.handleArrangeIntent(), null)
+  assert.deepEqual([...h.authority.selectedCardIds], selected)
+  assert.equal(h.authority.playCalls, 0)
+  assert.equal(h.authority.hintCalls.length, 0)
+  assert.deepEqual(h.view().lockedCardIds, [])
 }
 
-function verifyPhaseAndAuthoritativeBoundaries () {
-  const initialHand = [card('a', 3), card('b', 4), card('c', 5)]
-  const { authority, controller, state } = createHarness({ sortOrder: 'asc', autoSort: false })
-  let current = snapshot(initialHand, { state: { currentTurn: 'p2' } })
-  let view = controller.submit(current)
-  assert.deepEqual(view.displayCardIds, ['a', 'b', 'c'], 'disabled auto-sort must preserve the authoritative hand order')
-  assert.equal(controller.handleArrangeIntent(), null)
-  assert.equal(state.toasts.at(-1), '本好友房已关闭一键理牌')
-  assert.deepEqual(controller.submit(current).displayCardIds, ['a', 'b', 'c'])
-  const autoSorted = createHarness({ sortOrder: 'asc', autoSort: true }).controller.submit(snapshot(initialHand))
-  assert.deepEqual(autoSorted.displayCardIds, ['a', 'b', 'c'], 'friend-room auto-sort and direction must reach the workspace transaction')
-  controller.handleLockAction()
-  controller.handleCardToggle('a')
-  assert.equal(controller.submit(current).lockAction, 'cancel')
-
-  const changedHand = [card('c', 5), card('d', 6)]
-  current = snapshot(changedHand, { state: { currentTurn: 'p2' } })
-  view = controller.submit(current)
-  assert.equal(view.lockAction, 'start', 'a changed authoritative hand must clear the lock draft')
-  assert.deepEqual(view.displayCardIds, ['c', 'd'])
-
-  controller.handleLockAction()
-  controller.handleCardToggle('c')
-  current = snapshot(changedHand, { phase: 'settlement', state: { currentTurn: 'p2' } })
-  assert.equal(controller.submit(current).lockAction, 'start', 'leaving playing phase must retire the lock draft')
-
-  const tribute = {
-    isDoubleDown: false,
-    isAntiTribute: false,
-    phase: 'tributing',
-    actions: [{ from: 'p1', to: 'p2', card: null, returnCard: null }],
+// Tribute selection has an additional participant/deadline gate. Arrangement does
+// not: it must work while waiting, with anti-tribute, and after a tribute action.
+for (const phase of ['tributing', 'returning']) {
+  for (const multiplayer of [false, true]) for (const deadlinePlayerId of ['p1', 'p2', null]) {
+    for (const status of ['own', 'other', 'completed', 'anti', 'done', 'missing']) {
+      const h = fixture([card('tribute', 9)], { multiplayer, deadlinePlayerId })
+      const action = phase === 'tributing' ? { from: 'p1', to: 'p2' } : { from: 'p2', to: 'p1' }
+      if (status === 'other') { action.from = 'p2'; action.to = 'p3' }
+      if (status === 'completed') action[phase === 'tributing' ? 'card' : 'returnCard'] = card('sent', 8)
+      h.current = snapshot([card('tribute', 9)], {
+        phase: 'tribute', state: { finishedPlayers: ['p1', 'p2', 'p3', 'p4'] },
+        tribute: status === 'missing' ? null : { phase: status === 'done' ? 'done' : phase, isAntiTribute: status === 'anti', actions: [action] },
+      })
+      const canSelect = status === 'own' && (!multiplayer || deadlinePlayerId === 'p1')
+      const label = JSON.stringify({ phase, multiplayer, deadlinePlayerId, status })
+      assert.equal(h.view().interactionMode, 'tribute', label)
+      assert.equal(h.view().interactive, canSelect, label)
+      h.controller.handleCardToggle('tribute', true)
+      assert.equal(h.authority.selectedCardIds.has('tribute'), canSelect, label)
+      assert.notEqual(h.controller.handleArrangeIntent(), null, label)
+    }
   }
-  const tributeHand = [card('tribute-nine-a', 9, 'spade'), card('tribute-nine-b', 9, 'heart'), card('tribute-loose', 4)]
-  current = snapshot(tributeHand, { phase: 'tribute', tribute })
-  assert.equal(controller.submit(current).interactive, true)
-  const replaceCount = authority.replaceCalls.length
-  controller.handleCardToggle('tribute-nine-a')
-  assert.equal(authority.toggleCalls.at(-1), 'tribute-nine-a', 'tribute selection must continue through the rule authority one card at a time')
-  assert.equal(authority.replaceCalls.length, replaceCount, 'a repeated-rank tribute card must not select its whole presentation stack')
+}
 
-  const returning = {
-    isDoubleDown: false,
-    isAntiTribute: false,
-    phase: 'returning',
-    actions: [{ from: 'p2', to: 'p1', card: card('received-tribute', 'A'), returnCard: null }],
+// The visible selection is the only selection: select -> lock -> restore.
+for (const currentTurn of ['p1', 'p2']) {
+  const h = fixture([card('nine-a', 9), card('nine-b', 9, 'heart'), card('loose', 4)])
+  h.current.state.currentTurn = currentTurn
+  h.view()
+  h.controller.handleLockAction()
+  assert.match(h.state.toasts.at(-1), /请先选择/)
+  assert.equal(h.view().interactionMode, 'play', 'empty lock cannot enter a hidden editing mode')
+  h.controller.handleCardToggle('nine-a')
+  assert.deepEqual(h.view().lockDecision, { kind: 'unavailable', reason: 'invalid-combination' }, 'one card cannot lock')
+  h.controller.handleLockAction()
+  assert.deepEqual([...h.authority.selectedCardIds], ['nine-a'], 'invalid input remains selected for correction')
+  h.controller.handleCardToggle('nine-b', true)
+  assert.deepEqual(h.view().lockDecision, { kind: 'lock' })
+  h.controller.handleLockAction()
+  assert.equal(h.authority.clearCalls, 0, 'locking must not clear the selected cards')
+  assert.deepEqual(new Set(h.view().lockedCardIds), new Set(['nine-a', 'nine-b']))
+  assert.deepEqual(h.view().lockDecision, { kind: 'unlock' }, 'the same selected group can immediately be restored')
+  for (const id of ['nine-a', 'nine-b']) {
+    h.controller.handleCardToggle(id, false)
+    assert.equal(h.authority.selectedCardIds.size, 0, 'every locked member cancels the whole group')
+    h.controller.handleCardToggle(id, true)
+    assert.equal(h.authority.selectedCardIds.size, 2, 'every locked member selects the whole group')
+    h.controller.handleCardToggle(id, true)
+    assert.equal(h.authority.selectedCardIds.size, 2, 'repeated drag target does not toggle it off')
   }
-  current = snapshot(tributeHand, { phase: 'tribute', tribute: returning })
-  assert.equal(controller.submit(current).interactive, true)
-  controller.handleCardToggle('tribute-nine-b')
-  assert.equal(authority.toggleCalls.at(-1), 'tribute-nine-b', 'return selection must also toggle exactly one repeated-rank card')
-  assert.equal(authority.replaceCalls.length, replaceCount, 'return selection must never route through whole-stack replacement')
-
-  state.settings.multiplayer = true
-  state.settings.deadlinePlayerId = 'p2'
-  assert.equal(controller.submit(current).interactive, false, 'multiplayer tribute must honor the authoritative deadline player')
-
-  controller.resetForTableExit()
-  const toggleCount = authority.toggleCalls.length
-  controller.handleCardToggle('d')
-  assert.equal(authority.toggleCalls.length, toggleCount, 'table exit must make retained hand callbacks inert')
+  h.controller.handleCardToggle('loose', true)
+  assert.deepEqual(h.view().lockDecision, { kind: 'unavailable', reason: 'mixed-selection' }, 'mixing a lock and loose cards cannot silently relock/split')
+  h.controller.handleLockAction()
+  assert.equal(h.view().lockedCardIds.length, 2)
+  h.controller.handleCardToggle('loose', false)
+  h.controller.handleLockAction()
+  assert.deepEqual(h.view().lockedCardIds, [])
+  h.controller.handleCardToggle('nine-a', false)
+  assert.deepEqual([...h.authority.selectedCardIds], ['nine-b'], 'restored upper card becomes individually selectable')
 }
 
-function verifyPlayFeedbackBoundary () {
-  const hand = [card('single', 8)]
-  const { authority, controller, state } = createHarness()
-  authority.selectedCardIds.add('single')
-  controller.submit(snapshot(hand, {
-    selectedCardIds: ['single'],
-    playValidation: { code: 'not-high-enough', canPlay: false, resolution: null, requiredType: null },
-  }))
-  controller.playSelected()
-  assert.deepEqual(state.toasts, ['validation:not-high-enough'])
-  assert.deepEqual(state.captured, [['single']])
-  assert.equal(authority.playCalls, 1, 'submission must stay delegated to the validating rule authority')
-
-  state.toasts.length = 0
-  controller.submit(snapshot(hand, {
-    selectedCardIds: ['single'],
-    playValidation: { code: 'valid', canPlay: true, resolution: null, requiredType: null },
-  }))
-  controller.playSelected()
-  assert.deepEqual(state.toasts, [], 'valid submissions need no duplicate presentation message')
-  assert.equal(authority.playCalls, 2)
+// Both manual and suit shortcuts share rule selection, and keep normal actions visible.
+for (const smart of [false, true]) {
+  const hand = [3, 4, 5, 6, 7].map(rank => card('flush-' + rank, rank, 'club'))
+  const h = fixture(hand.concat(card('loose', 'A')))
+  if (smart) h.controller.handleArrangeIntent()
+  h.controller.handleSuitIntent('club')
+  assert.equal(h.authority.selectedCardIds.size, 5)
+  assert.equal(h.view().playSelectedCardIds.length, 5)
+  assert.deepEqual(h.view().lockDecision, { kind: 'lock' })
+  assert.equal(h.view().interactionMode, 'play')
+  h.controller.handleLockAction()
+  const group = h.view().groups.find(g => g.locked)
+  assert.ok(group)
+  assert.deepEqual(h.view().lockDecision, { kind: 'unlock' })
+  h.controller.handleArrangeIntent()
+  assert.equal(h.view().lockedCardIds.length, 5, 'arrange/restore cannot retire explicit locks')
+  for (const id of group.cardIds) {
+    h.controller.handleCardToggle(id, false)
+    assert.equal(h.authority.selectedCardIds.size, 0)
+  }
+  for (const id of group.cardIds) {
+    h.controller.handleCardToggle(id, true)
+    assert.equal(h.authority.selectedCardIds.size, 5)
+  }
+  h.controller.handleHint()
+  assert.ok(h.authority.hintCalls.at(-1).some(g => g.kind === 'locked' && g.cardIds.length === 5))
+  h.current.playValidation = { canPlay: true, code: 'valid' }
+  h.view()
+  h.controller.playSelected()
+  assert.equal(h.authority.playCalls, 1, 'a selected locked group is playable without an extra confirmation mode')
+  h.controller.handleLockAction()
+  assert.equal(h.view().lockedCardIds.length, 0)
 }
 
-function verifyExclusiveLockMode () {
-  const hand = [card('lock-a', 6), card('lock-b', 6, 'heart'), card('loose-a', 'A')]
-  const { authority, controller, state } = createHarness()
-  const current = snapshot(hand)
-  controller.submit(current)
-  controller.handleLockAction()
-  controller.handleCardToggle('lock-a')
-  controller.handleCardToggle('lock-b')
-  let view = controller.submit(current)
-  assert.equal(view.interactionMode, 'lock-create')
-  assert.deepEqual(new Set(view.lockDraftCardIds), new Set(['lock-a', 'lock-b']))
-  assert.deepEqual(view.playSelectedCardIds, [], 'a lock draft must never masquerade as a playable selection')
-
-  controller.handleHint()
-  controller.playSelected()
-  assert.equal(controller.handleArrangeIntent(), null)
-  assert.equal(authority.hintCalls.length, 0, 'hint must not silently replace an active lock draft')
-  assert.equal(authority.playCalls, 0, 'play must not submit the hidden rule selection while locking')
-  assert.deepEqual(state.toasts.slice(-3), ['请先完成或取消锁牌', '请先完成或取消锁牌', '请先完成或取消锁牌'])
-  view = controller.submit(current)
-  assert.deepEqual(new Set(view.lockDraftCardIds), new Set(['lock-a', 'lock-b']), 'blocked commands must preserve the draft')
-
-  controller.cancelManualSelection()
-  view = controller.submit(current)
-  assert.equal(view.interactionMode, 'play')
-  assert.deepEqual(view.lockDraftCardIds, [])
+// Loose smart stacks keep their per-card cancellation behavior.
+{
+  const h = fixture([3, 4, 5, 6, 7].map(rank => card('loose-' + rank, rank, 'club')))
+  h.controller.handleArrangeIntent()
+  const group = h.view().groups[0]
+  h.controller.handleCardToggle(group.cardIds.at(-1), true)
+  h.controller.handleCardToggle(group.cardIds[0], false)
+  assert.equal(h.authority.selectedCardIds.size, 4)
 }
 
-function verifyHintProtectionProjection () {
-  const hand = [card('locked-eight-a', 8), card('locked-eight-b', 8, 'heart'), card('loose-nine', 9)]
-  const { authority, controller } = createHarness()
-  let current = snapshot(hand, { state: { currentTurn: 'p2' } })
-  controller.submit(current)
-  controller.handleLockAction()
-  controller.handleCardToggle('locked-eight-a')
-  controller.handleCardToggle('locked-eight-b')
-  controller.handleLockAction()
-
-  current = snapshot(hand)
-  controller.submit(current)
-  controller.handleHint()
-  assert.equal(authority.hintCalls.length, 1)
-  assert.deepEqual(authority.hintCalls[0], [{
-    id: authority.hintCalls[0][0].id,
-    kind: 'locked',
-    cardIds: ['locked-eight-a', 'locked-eight-b'],
-  }], 'manual locks must reach the rule hint boundary as hard-protected card ids')
-
-  const pairHarness = createHarness()
-  pairHarness.controller.submit(snapshot(hand))
-  pairHarness.controller.handleHint()
-  assert.equal(pairHarness.authority.hintCalls[0].some(group =>
-    group.kind === 'pair' && group.cardIds.includes('locked-eight-a') && group.cardIds.includes('locked-eight-b')), true,
-  'an unlocked point stack must be classified as a pair rather than a UI lane')
-
-  const rankedHand = [
-    card('pair-5a', 5), card('pair-5b', 5, 'heart'),
-    card('triple-7a', 7), card('triple-7b', 7, 'heart'), card('triple-7c', 7, 'club'),
-    card('bomb-10a', 10), card('bomb-10b', 10, 'heart'), card('bomb-10c', 10, 'club'), card('bomb-10d', 10, 'diamond'),
-  ]
-  const rankedHarness = createHarness()
-  rankedHarness.controller.submit(snapshot(rankedHand))
-  rankedHarness.controller.handleHint()
-  const kinds = rankedHarness.authority.hintCalls[0].map(group => group.kind).sort()
-  assert.deepEqual(kinds, ['bomb', 'pair', 'triple'], 'rank stacks must project their actual pair, triple and bomb protection levels')
+// Revalidate phase/pending/trustee guards at commit time, not just button projection.
+for (const blocked of ['pending', 'trustee', 'finished', 'settlement', 'tribute']) {
+  const h = fixture([card('a', 8), card('b', 8, 'heart')])
+  h.authority.replaceSelectedCards(['a', 'b'])
+  h.view()
+  if (blocked === 'pending') h.current.actionPending = true
+  if (blocked === 'trustee') h.state.settings.trustee = true
+  if (blocked === 'finished') h.current.state.finishedPlayers = ['p1']
+  if (blocked === 'settlement' || blocked === 'tribute') h.current.phase = blocked
+  h.view()
+  h.controller.handleLockAction()
+  assert.equal(h.view().lockedCardIds.length, 0, blocked)
+  assert.deepEqual(h.view().lockDecision, { kind: 'unavailable', reason: 'interaction-blocked' })
 }
 
-function verifyRoundBoundaryRetiresLocks () {
-  const hand = [card('reused-nine-a', 9, 'spade'), card('reused-nine-b', 9, 'heart'), card('loose', 4)]
-  const { controller } = createHarness()
-  let current = snapshot(hand, { state: { roundId: 7, currentTurn: 'p2' } })
-  controller.submit(current)
-  controller.handleLockAction()
-  controller.handleCardToggle('reused-nine-a')
-  controller.handleCardToggle('reused-nine-b')
-  controller.handleLockAction()
-  assert.deepEqual(new Set(controller.submit(current).lockedCardIds), new Set(['reused-nine-a', 'reused-nine-b']))
-
-  current = snapshot(hand, { state: { roundId: 8, currentTurn: 'p2' } })
-  const nextRound = controller.submit(current)
-  assert.deepEqual(nextRound.lockedCardIds, [], 'reused deck ids must not carry a manual lock into the next round')
-  const rankStack = nextRound.groups.find(group => group.cardIds.includes('reused-nine-a'))
-  assert.equal(rankStack?.origin, 'rank')
-  assert.equal(rankStack?.locked, false)
-  controller.handleArrangeIntent()
-  assert.equal(controller.submit(current).arrangeRestoreAvailable, true)
-  controller.resetForRound()
-  const restartedFixture = controller.submit(current)
-  assert.equal(restartedFixture.arrangeRestoreAvailable, false, 'explicit fixture reset must retire smart layout even when round and physical ids are reused')
-  assert.ok(restartedFixture.groups.every(group => group.zone === undefined), 'the next fixture must start with ordinary point geometry')
+// Partial/stale authoritative hands, round resets, and room tools.
+{
+  const h = fixture([card('a', 8), card('b', 8, 'heart')])
+  h.authority.replaceSelectedCards(['a', 'b'])
+  h.view()
+  h.controller.handleLockAction()
+  h.current.state.roundId = 2
+  assert.equal(h.view().lockedCardIds.length, 0, 'deck IDs reused next round do not retain locks')
+  h.current.state.players.p1.hand = [card('a', 8)]
+  h.view()
+  h.controller.handleLockAction()
+  assert.equal(h.view().lockedCardIds.length, 0, 'stale selected IDs cannot lock')
+  h.state.settings.autoSort = false
+  assert.equal(h.controller.handleArrangeIntent(), null)
+  h.controller.resetForRound()
+  assert.equal(h.view().arrangeRestoreAvailable, false)
 }
 
-verifyProjectionAndRuleSelection()
-verifyOffTurnGroupingAndBlocking()
-verifyLockActionsRevalidateCurrentState()
-verifyStraightFlushAndLockedArrangement()
-verifyPhaseAndAuthoritativeBoundaries()
-verifyPlayFeedbackBoundary()
-verifyExclusiveLockMode()
-verifyHintProtectionProjection()
-verifyRoundBoundaryRetiresLocks()
+// More than one whole locked group may be restored together.
+{
+  const h = fixture([card('a', 8), card('b', 8, 'heart'), card('c', 9), card('d', 9, 'heart')])
+  for (const ids of [['a', 'b'], ['c', 'd']]) {
+    h.authority.replaceSelectedCards(ids)
+    h.view()
+    h.controller.handleLockAction()
+  }
+  h.authority.replaceSelectedCards(['a', 'b', 'c', 'd'])
+  assert.deepEqual(h.view().lockDecision, { kind: 'unlock' })
+  h.controller.handleLockAction()
+  assert.equal(h.view().lockedCardIds.length, 0)
+}
+
 function verifyFinishedTeammateView () {
   const { TeammateHandProjector } = require('../assets/scripts/game/TeammateHandProjector.ts')
   const projector = new TeammateHandProjector()
@@ -566,3 +413,15 @@ function verifyFinishedTeammateView () {
 }
 verifyFinishedTeammateView()
 process.stdout.write('table hand interaction controller regression checks passed\n')
+
+for (const phase of ['tributing', 'returning']) {
+  const { controller, authority } = createHarness({ multiplayer: true, deadlinePlayerId: 'p2' })
+  const hand = [card('tribute-a', 7, 'spade'), card('tribute-b', 7, 'heart'), card('tribute-c', 7, 'club'), card('tribute-d', 4)]
+  const current = snapshot(hand, { phase: 'tribute', tribute: { phase, isAntiTribute: false, actions: [{ from: 'p1', to: 'p2' }] } })
+  controller.submit(current)
+  assert.notEqual(controller.handleArrangeIntent(), null, 'tribute arrangement is allowed even while another player owes tribute')
+  assert.equal(controller.submit(current).interactionMode, 'tribute', 'arranging must not enter lock/play mode')
+  assert.equal(authority.toggleCalls.length, 0, 'arranging does not submit tribute or change rule selection')
+  controller.submit({ ...current, actionPending: true })
+  assert.equal(controller.handleArrangeIntent(), null, 'pending tribute still guards layout operations')
+}

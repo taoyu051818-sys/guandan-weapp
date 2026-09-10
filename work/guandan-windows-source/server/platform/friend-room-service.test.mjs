@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { FriendRoomService } from './friend-room-service.js'
+import { FriendRoomNumberLimiter } from './friend-room-number-limiter.js'
 import { createEmptyPlatformState, MemoryPlatformStore } from './storage.js'
 
 const state = createEmptyPlatformState()
@@ -55,4 +56,48 @@ assert.equal(observerRecovery.ticketPurpose, 'rejoin')
 for (let i = 6; i < 12; i++) await joinObserverRoom(i)
 await assert.rejects(joinObserverRoom(12), /上限|已满/, 'room membership stays bounded')
 
-console.log('friend room service tests passed')
+// Numeric entry shares admission rules without weakening native invitation validation.
+let numberNow = 1000
+const numberState = createEmptyPlatformState()
+for (let i = 0; i < 9; i++) numberState.users[`n${i}`] = { id: `n${i}` }
+const numberStore = new MemoryPlatformStore(numberState)
+const numberRooms = new FriendRoomService({
+  store: numberStore, gameTickets, now: () => numberNow, createId: () => 'number-room',
+  createInviteCode: () => 'C'.repeat(24), createRoomId: () => '012345', friendRoomTtlMs: 60_000,
+})
+const numericRoom = await numberRooms.create('n0', { entryAttemptId: 'number-host-create-000001', roomSettings: settings })
+const numberRequest = i => ({ entryAttemptId: `number-guest-entry-00000${i}`, roomId: numericRoom.roomId })
+const first = await numberRooms.joinByNumber('n1', numberRequest(1))
+assert.equal(first.seat, 'p2')
+assert.equal(first.roomId, '012345', 'leading zero remains part of room identity')
+for (const key of ['inviteCode', 'inviteText', 'invitePayload']) assert.equal(key in first, false)
+assert.deepEqual(await numberRooms.joinByNumber('n1', numberRequest(1)), first, 'retry is idempotent')
+await assert.rejects(numberRooms.join('n2', numberRequest(2)), error => error.status === 404, 'native invitation endpoint still requires a valid credential')
+await assert.rejects(numberRooms.join('n1', { ...numberRequest(1), inviteCode: numericRoom.inviteCode }), error => error.code === 'IDEMPOTENCY_CONFLICT', 'do not reuse an attempt across entry methods')
+await numberStore.transaction(draft => { draft.matches[numericRoom.matchId].bannedUserIds = ['n5'] })
+await assert.rejects(numberRooms.joinByNumber('n5', numberRequest(5)), error => error.code === 'FRIEND_ROOM_BANNED')
+assert.equal((await numberRooms.joinByNumber('n2', numberRequest(2))).seat, 'p3')
+assert.equal((await numberRooms.joinByNumber('n3', numberRequest(3))).seat, 'p4')
+await assert.rejects(numberRooms.joinByNumber('n4', numberRequest(4)), error => error.code === 'FRIEND_ROOM_FULL')
+await numberStore.transaction(draft => { draft.matches[numericRoom.matchId].status = 'playing' })
+await assert.rejects(numberRooms.joinByNumber('n4', numberRequest(4)), error => error.code === 'FRIEND_ROOM_ALREADY_STARTED')
+await numberStore.transaction(draft => { draft.matches[numericRoom.matchId].roomSettings.spectator = 'live' })
+assert.equal((await numberRooms.joinByNumber('n4', numberRequest(4))).seat, 'observer')
+await numberStore.transaction(draft => { draft.matches[numericRoom.matchId].status = 'cancelled' })
+await assert.rejects(numberRooms.joinByNumber('n6', numberRequest(6)), error => error.code === 'FRIEND_ROOM_UNAVAILABLE')
+await numberStore.transaction(draft => { draft.matches[numericRoom.matchId].status = 'matching' })
+numberNow += 61_000
+await assert.rejects(numberRooms.joinByNumber('n6', numberRequest(6)), error => error.code === 'FRIEND_ROOM_UNAVAILABLE', 'expired rooms cannot be entered by number')
+for (let i = 0; i < 6; i++) await assert.rejects(numberRooms.joinByNumber('n7', { ...numberRequest(7), roomId: '987654' }), error => error.code === 'FRIEND_ROOM_UNAVAILABLE')
+await assert.rejects(numberRooms.joinByNumber('n7', numberRequest(7)), error => error.status === 429)
+numberNow += 60_000
+await assert.rejects(numberRooms.joinByNumber('n7', numberRequest(7)), error => error.code === 'FRIEND_ROOM_UNAVAILABLE', 'rate limit expires after one minute')
+const bounded = new FriendRoomNumberLimiter(() => numberNow)
+for (let i = 0; i < 10_000; i++) bounded.consume(`user-${i}`)
+assert.throws(() => bounded.consume('overflow'), error => error.status === 429)
+assert.equal(bounded.windows.size, 10_000, 'lookup limiter memory is bounded')
+numberNow += 60_000
+bounded.consume('overflow')
+assert.equal(bounded.windows.size, 1)
+
+console.log('friend room service, numeric admission and throttling tests passed')

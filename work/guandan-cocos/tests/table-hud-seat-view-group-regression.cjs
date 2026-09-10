@@ -98,6 +98,7 @@ const errors = (result.diagnostics ?? []).filter(diagnostic => diagnostic.catego
 assert.deepEqual(errors, [], 'TableHudSeatViewGroup must transpile')
 const moduleRecord = { exports: {} }
 const localRequire = request => {
+  if (request === './UiFrameStyle') return require('./support/load-typescript-module.cjs').loadTs(path.join(projectRoot, 'assets/scripts/ui/UiFrameStyle.ts'))
   if (request === 'cc') return cc
   if (request === './RuntimeUiFactory') return { applyForegroundTextStyle: label => label }
   if (request === './TableHudLayoutPolicy') return layoutPolicy
@@ -119,12 +120,12 @@ group.render([
   { place: 'top', name: '队友', status: '剩10张', active: true },
 ])
 group.mount(parentA)
-for (const place of ['left', 'right']) {
+for (const place of ['left', 'right', 'top']) {
   const seat = findNode(parentA, `Seat-${place}`)
   const avatar = findNode(seat, 'DefaultAvatar')
   const name = findNode(seat, 'PlayerName')
   const rank = findNode(seat, 'PlayerRank')
-  assert.equal(name.position.x, avatar.position.x, 'side names must be centered under their avatar')
+  assert.equal(name.position.x, avatar.position.x, 'other players’ names must be centered under their avatar')
   assert.ok(name.position.y < avatar.position.y - 36, 'name must clear the lower edge of the avatar')
   assert.ok(rank.position.y < name.position.y, 'remaining-card status belongs below the name')
   assert.equal(name.getComponent(MockLabel).fontSize, 22, 'seat names use the smaller reviewed font')

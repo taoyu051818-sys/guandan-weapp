@@ -1,3 +1,4 @@
+import { tributeInfoText } from '../ui/TableTributeInfoView'
 import { Graphics, type Label, Node, Sprite, SpriteFrame, Texture2D, UITransform } from 'cc'
 import type { PlayerId, Rank } from '../core/generated'
 import type { GameSnapshot } from '../game/GameManager'
@@ -17,15 +18,15 @@ import {
   type TableGameHudViewport,
 } from '../ui/TableGameHud'
 import type { TableHandProjection } from './TableHandInteractionController'
-import { projectTableSeatStatus, projectTableViewer } from './TableSnapshotPresenter'
+import { projectTableModeLabel, projectTableSeatStatus, projectTableViewer } from './TableSnapshotPresenter'
+import { duplicateTableLabel } from './DuplicateTablePresentation'
+import { defaultProfileFrame } from '../services/DefaultProfileFrames'
 import type { TableTurnClockProjection } from './TableTurnClockController'
 import type { UserProfile } from '../services/FrontPageGatewayContracts'
-
 const TABLE_TIMER_ART_ASSET = 'ui/table/chicken-timer-frame/texture'
 const DEFAULT_AVATAR_ART_ASSET = 'ui/common/default-avatar/texture'
 const PLAYER_ORDER: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4']
 const PLAYER_PLACES: readonly TableGameHudSeatPlace[] = ['bottom', 'right', 'top', 'left']
-
 export type TableHudPresenterDependencies = Readonly<{
   root: Node
   actions: TableGameHudActions
@@ -35,13 +36,11 @@ export type TableHudPresenterDependencies = Readonly<{
   ownProfile?: () => UserProfile | null
   ownAvatarFrame?: () => Promise<SpriteFrame | null>
 }>
-
 export type TableHudMountOptions = Readonly<{
   turnActionNodes: readonly (Node | null | undefined)[]
   legacyLabels: readonly (Label | null | undefined)[]
   legacySeatNodes: readonly Node[]
 }>
-
 export type TableMatchControls = Readonly<{
   hint: Node | null
   pass: Node | null
@@ -49,7 +48,6 @@ export type TableMatchControls = Readonly<{
   confirmTribute: Node | null
   finishTribute: Node | null
   nextRound: Node | null
-  trustee: Node | null
   hintLabel: Label | null
   phaseLabel: Label | null
   levelLabel: Label | null
@@ -66,7 +64,6 @@ export class TableHudPresenter {
   private ownAvatarKey = ''
 
   public constructor (private readonly dependencies: TableHudPresenterDependencies) {}
-
   public get hud (): TableGameHud | null { return this.tableHud }
   public get node (): Node | null { return this.tableHud?.node ?? null }
   public get mounted (): boolean { return Boolean(this.tableHud) }
@@ -108,7 +105,8 @@ export class TableHudPresenter {
       turnDurationSeconds: 20,
       turnPlace: 'bottom' as const,
     }
-    const humanIndex = PLAYER_ORDER.indexOf(humanId)
+    const seatOrder = snapshot.state.turnOrder
+    const humanIndex = seatOrder.indexOf(humanId)
     const lobby = this.dependencies.lobbySnapshot()
     const observing = lobby?.roomRole === 'observer'
     const own = this.dependencies.ownProfile?.()
@@ -125,7 +123,7 @@ export class TableHudPresenter {
     const ranking = snapshot.settlement?.fullRank ?? snapshot.state.finishedPlayers
     const multiplayer = Boolean(this.dependencies.isMultiplayer() && lobby?.roomId)
     const members = new Set([...(lobby?.members ?? PLAYER_ORDER), ...(lobby?.botPlayerIds ?? [])])
-    const seats = PLAYER_ORDER.map((id, index) => {
+    const seats = seatOrder.map((id, index) => {
       const player = snapshot.state.players[id]
       const finishPlace = ranking.indexOf(id) + 1
       return {
@@ -133,16 +131,15 @@ export class TableHudPresenter {
         place: PLAYER_PLACES[(index - humanIndex + 4) % 4],
         name: id === humanId && !observing ? `${own?.displayName || player.name}（我）` : player.name,
         status: projectTableSeatStatus(player.hand.length, id === humanId, finishPlace),
-        avatarText: player.name,
+        avatarFrame: player.isAI ? defaultProfileFrame(player.name) : undefined,
         active: snapshot.phase === 'playing' && snapshot.state.currentTurn === id,
         offline: multiplayer && !members.has(id),
       }
     })
     this.tableHud.render({
       matchLabel: `本局打 ${String(snapshot.state.currentLevel)}`,
-      levelLabel: snapshot.state.matchFormat?.kind === 'independent'
-        ? `${snapshot.state.matchFormat.levelMode === 'random' ? '随机级牌' : '固定级牌'} · ${lobby?.entryKind === 'match' ? '单局' : '定局玩法'}`
-        : `我方 ${String(viewer.viewerLevel)}级 · 对方 ${String(viewer.opponentLevel)}级`,
+      levelLabel: duplicateTableLabel(lobby?.duplicate) ?? projectTableModeLabel(snapshot.state, humanId, lobby?.roomSettings?.scoreVisibility === 'hidden', lobby?.entryKind === 'match')
+        ?? `我方 ${String(viewer.viewerLevel)}级 · 对方 ${String(viewer.opponentLevel)}级`,
       ...turnClock,
       counterExpanded: this.counterExpanded,
       counterEnabled: !(multiplayer && lobby?.lobbyReadyRequired === true && lobby.roomSettings?.counterEnabled === false),
@@ -157,10 +154,13 @@ export class TableHudPresenter {
       seats,
       availableSuits: hand.availableSuits,
       selectedSuit: hand.selectedSuit,
-      lockAction: hand.lockAction,
+      lockDecision: hand.lockDecision,
       arrangeRestoreAvailable: hand.arrangeRestoreAvailable,
       handToolsVisible: !observing && snapshot.phase === 'playing' && !snapshot.state.finishedPlayers.includes(humanId),
-      chatEnabled: !observing,
+      arrangeVisible: !observing && !teammate && (snapshot.phase === 'tribute' || (snapshot.phase === 'playing' && !snapshot.state.finishedPlayers.includes(humanId))) && !snapshot.actionPending && !lobby?.trustees?.[humanId],
+      tributeInfo: tributeInfoText(snapshot.tribute, snapshot.state.players, snapshot.phase),
+      trusteeVisible: !observing && multiplayer && snapshot.phase !== 'settlement' && !lobby?.matchEnded && !snapshot.state.finishedPlayers.includes(humanId),
+      trusteeActive: Boolean(lobby?.trustees?.[humanId]),
       handViewLabel: observing ? `${snapshot.state.players[humanId].name}的手牌 · ${lobby?.roomSettings?.spectator === 'live' ? '实时观战' : '延迟观战'} · 点头像切换` : teammate ? (teammate.available ? '队友视角 · 仅观看' : '队友手牌暂不可用') : '',
     })
   }

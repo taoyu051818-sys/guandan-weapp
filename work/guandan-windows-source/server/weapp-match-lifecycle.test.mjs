@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createWeAppMatchLifecycle } from './weapp-match-lifecycle.js'
+import { formatForNewRoom } from './match-format-policy.js'
 import './bot-turn-pacing.test.mjs'
 
 const playerIds = ['p1', 'p2', 'p3', 'p4']
@@ -41,6 +42,11 @@ const lifecycle = createWeAppMatchLifecycle({
   isBotPlayer: () => false,
   botPolicyForRoom: () => { throw new Error('not used') },
   existingBotPolicyForRoom: () => null,
+  dispatchMatchIntentImpl: state => ({
+    ok: true,
+    state: { ...state, phase: 'settled', revision: (state.revision ?? 0) + 1, settlement: nextSettlement },
+    events: [{ type: 'ROUND_SETTLED', settlement: nextSettlement }],
+  }),
   shuffleRandom: Math.random,
   persistRuntimeState: () => {},
   commitRuntimeState: async () => {},
@@ -101,10 +107,21 @@ lifecycle.removeRoom(room.roomId)
 assert.equal(timers.size, 0, 'removing a room must clear every owned timer')
 assert.equal(cancelled.length >= 4, true)
 
+let nextSettlement
+const settleThroughAction = (target, result) => {
+  nextSettlement = result
+  ensureLiveMetadata(target)
+  target.version ??= 1
+  target.state = {
+    ...target.state, scores: target.scores, lastRoundRank: [],
+    teamLevels: { teamA: 2, teamB: 2 }, aFailStreaks: { teamA: 0, teamB: 0 },
+  }
+  lifecycle.applyPlayerAction(target, { type: 'PASS', playerId: 'p1' })
+}
 room.roundSequence = 3
 room.scores = { teamA: 8, teamB: 3 }
 room.matchEnded = null
-lifecycle.consumeRoundSettlement(room, { isGameWon: false, winnerTeam: 'teamA' })
+settleThroughAction(room, { isGameWon: false, winnerTeam: 'teamA' })
 assert.equal(room.roundSequence, 4)
 assert.deepEqual(room.matchEnded, {
   reason: 'round-limit',
@@ -117,18 +134,24 @@ assert.deepEqual(room.matchEnded, {
 assert.deepEqual(room.roundReady, { p1: false, p2: false, p3: false, p4: false })
 const quickRoom = { ...room, roomId: '345678', entryKind: 'match', matchEnded: null, roundSequence: 0,
   state: { matchFormat: { kind: 'independent' } }, scores: { teamA: 0, teamB: 1 } }
-lifecycle.consumeRoundSettlement(quickRoom, { isGameWon: false, winnerTeam: 'teamB' })
+settleThroughAction(quickRoom, { isGameWon: false, winnerTeam: 'teamB' })
 assert.equal(quickRoom.matchEnded.reason, 'single-round')
 assert.equal(quickRoom.matchEnded.configuredRounds, 1)
 assert.equal(quickRoom.matchEnded.winnerTeam, 'teamB')
 assert.equal(quickRoom.turnDeadlineAt, null)
 assert.deepEqual(quickRoom.roundReady, { p1: false, p2: false, p3: false, p4: false })
+const tournamentRoom = { ...quickRoom, roomId: '654321', matchMode: 'lingshui_16_cup', matchEnded: null, roundSequence: 0 }
+tournamentRoom.state = { matchFormat: formatForNewRoom(tournamentRoom) }
+settleThroughAction(tournamentRoom, { isGameWon: false, winnerTeam: 'teamA' })
+assert.equal(tournamentRoom.matchEnded.reason, 'single-round', '赛事每桌一副结束，不等待过 A')
+assert.equal(tournamentRoom.matchEnded.roundsPlayed, 1)
+assert.equal(tournamentRoom.matchEnded.configuredRounds, 1)
 const upgradeRoom = { ...room, roomId: '456789', roomSettings: { ...room.roomSettings, format: 'upgrade', totalTimeMinutes: 0 }, totalDeadlineAt: null, matchEnded: null, roundSequence: 32 }
-lifecycle.consumeRoundSettlement(upgradeRoom, { isGameWon: false, winnerTeam: 'teamA' })
+settleThroughAction(upgradeRoom, { isGameWon: false, winnerTeam: 'teamA' })
 assert.equal(upgradeRoom.matchEnded, null, '升级房第33局仍不触发定局终局')
 lifecycle.dispose()
 
-const runDeadlineFailureCase = async ({ bot = false, dispatchMatchIntentImpl, persistFailures = 0 } = {}) => {
+const runDeadlineFailureCase = async ({ bot = false, trustee = false, dispatchMatchIntentImpl, persistFailures = 0 } = {}) => {
   const persistenceCase = persistFailures > 0
   let failureCalls = 0
   const caseTimers = new Map()
@@ -192,7 +215,7 @@ const runDeadlineFailureCase = async ({ bot = false, dispatchMatchIntentImpl, pe
     },
     roomSettings: { rounds: 4, turnSeconds: 40, trusteeSeconds: 15, totalTimeMinutes: 0 },
     botPlayerIds: bot ? ['p1'] : [],
-    trustees: Object.fromEntries(playerIds.map(id => [id, null])),
+    trustees: Object.fromEntries(playerIds.map(id => [id, trustee && id === 'p1' ? { reason: 'manual', since: clock } : null])),
     consecutiveTimeouts: Object.fromEntries(playerIds.map(id => [id, 0])),
     seats: Object.fromEntries(playerIds.map(id => [id, null])),
     teamLevels: { teamA: 2, teamB: 2 },
@@ -204,11 +227,11 @@ const runDeadlineFailureCase = async ({ bot = false, dispatchMatchIntentImpl, pe
   try { await [...caseTimers.values()][0].callback() } catch (error) {
     if (!/persistence failure/.test(error.message)) throw error
   }
-  await Promise.resolve()
+  await new Promise(resolve => setImmediate(resolve))
   assert.equal(caseRoom.turnDeadlineAt, deadline, '首次异常必须保留同一权威 deadline')
   assert.equal([...caseTimers.values()][0].delay, 10, '首次异常必须按退避基数重试')
   await [...caseTimers.values()][0].callback()
-  await Promise.resolve()
+  await new Promise(resolve => setImmediate(resolve))
   assert.equal(failureCalls, 2)
   if (!persistenceCase) {
     assert.deepEqual(closed, [['automated-deadline-failed', 'roomDissolved', 'dissolved']], '内部隔离原因与平台协议原因必须明确分离')
@@ -220,6 +243,7 @@ const runDeadlineFailureCase = async ({ bot = false, dispatchMatchIntentImpl, pe
 }
 
 await runDeadlineFailureCase({ bot: true })
+await runDeadlineFailureCase({ trustee: true }) // A trustee must use the bot policy, never the default PASS branch.
 await runDeadlineFailureCase({ dispatchMatchIntentImpl: () => { throw new Error('injected rule failure') } })
 const durableRetry = await runDeadlineFailureCase({
   dispatchMatchIntentImpl: state => ({

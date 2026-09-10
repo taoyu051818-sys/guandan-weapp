@@ -115,7 +115,7 @@ const effectSyncPolicy = loadPureTs(effectSyncPolicyPath)
 const lobbyEntryAttempt = loadPureTs(lobbyEntryAttemptPath)
 const lobbyCleanupTracker = loadPureTs(lobbyCleanupTrackerPath)
 const lobbyMatchedEntryCoordinator = loadPureTs(lobbyMatchedEntryCoordinatorPath)
-const lobbyModels = loadPureTs(lobbyModelsPath)
+const lobbyModels = loadPureTs(lobbyModelsPath, { './DuplicateRoomModel': loadPureTs(path.join(projectRoot, 'assets/scripts/network/DuplicateRoomModel.ts')) })
 const lobbyResumeConnectionWatchdog = loadPureTs(lobbyResumeConnectionWatchdogPath)
 const lobbySyncTracker = loadPureTs(lobbySyncTrackerPath, {
   '../effects/NetworkEffectSyncPolicy': effectSyncPolicy,
@@ -755,6 +755,7 @@ async function verifyPlatformRecoveryCoordinator () {
   const confirmed = []
   const abandoned = []
   const restoredFriendRooms = []
+  const restoredMatchOrigins = []
   let recoveries = 0
   const recoveryAttemptId = 'coordinatorRecovery_Q7mN4vX9kLp'
   const lobby = {
@@ -780,7 +781,7 @@ async function verifyPlatformRecoveryCoordinator () {
         }
         return {
           entryAttemptId: recoveryAttemptId, recoveryAttemptId, matchId: 'match-coordinator', roomId: '686868', seat: 'p4',
-          roomKind: 'match', ticketPurpose: 'rejoin', gameEndpoint: 'wss://game.example/weapp',
+          roomKind: 'match', queueId: 'lingshui_16_cup', ticketPurpose: 'rejoin', gameEndpoint: 'wss://game.example/weapp',
           gameTicket: 'coordinator-ticket', joinToken: 'coordinator-ticket', expiresAt: Date.now() + 60_000,
         }
       },
@@ -788,6 +789,7 @@ async function verifyPlatformRecoveryCoordinator () {
       abandon: attemptId => { abandoned.push(attemptId) },
     },
     lobby, enterLobby: () => undefined, restoreFriendRoom: entry => restoredFriendRooms.push(entry), showRecoveryAvailable: () => undefined,
+    restoreMatchOrigin: entry => restoredMatchOrigins.push(entry),
     showNotice: () => undefined, isDisposed: () => false,
   })
   coordinator.start()
@@ -795,6 +797,7 @@ async function verifyPlatformRecoveryCoordinator () {
   assert.equal(recoveries, 1)
   assert.equal(entered[0].entryAttemptId, recoveryAttemptId)
   assert.equal(entered[0].ticketPurpose, 'rejoin')
+  assert.equal(restoredMatchOrigins[0].queueId, 'lingshui_16_cup')
   events.emit('guandan:room-entry-confirmed', { recoveryAttemptId })
   assert.deepEqual(confirmed, [recoveryAttemptId])
   events.emit('guandan:platform-recovery-required', { abandonAttemptId: recoveryAttemptId })

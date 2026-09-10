@@ -12,6 +12,29 @@ const ranked = (level: Rank, rank: PlayerId[], format: MatchFormat = independent
 }
 
 describe('independent level matches', () => {
+  it('plays out third place for individual tournaments instead of inventing it by seat order', () => {
+    const tournament = { ...independent, individualRanking: true }
+    const state = ranked(7, ['p1'], tournament)
+    const card = (rank: number) => createDeck(7).find(c => c.rank === rank && c.suit === 'spade')!
+    state.players.p1.hand = []
+    state.players.p2.hand = [card(4)]
+    state.players.p3.hand = [card(5)]
+    state.players.p4.hand = [card(6)]
+    state.currentTurn = 'p3'
+    const second = transition(state, { type: 'PLAY_CARDS', playerId: 'p3', cardIds: [state.players.p3.hand[0].id], roundId: state.roundId, expectedRevision: state.revision })
+    expect(second.ok).toBe(true)
+    if (!second.ok) throw new Error(second.reason)
+    expect(second.state.phase).toBe('playing')
+    expect(second.state.currentTurn).toBe('p4')
+    expect(settleMatchState(second.state)).toBeNull()
+    const third = transition(second.state, { type: 'PLAY_CARDS', playerId: 'p4', cardIds: [second.state.players.p4.hand[0].id], roundId: second.state.roundId, expectedRevision: second.state.revision })
+    expect(third.ok).toBe(true)
+    if (!third.ok) throw new Error(third.reason)
+    expect(third.state.phase).toBe('settled')
+    expect(third.state.settlement?.fullRank).toEqual(['p1', 'p3', 'p4', 'p2'])
+    expect(third.state.settlement?.playerPoints).toEqual({ p1: 3, p3: 2, p4: 1, p2: 0 })
+    expect(settleMatchState(ranked(7, ['p1', 'p3']))).not.toBeNull()
+  })
   it('validates explicit friend-room gates without migrating historical matches', () => {
     for (const upgradeTarget of [6, 10, 'A', 'A-reset']) {
       expect(roomMatchFormat(normalizeRoomFormat({ format: 'upgrade', upgradeTarget })!).upgradeTarget).toBe(upgradeTarget)

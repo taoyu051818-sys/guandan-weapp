@@ -1,0 +1,20 @@
+{
+  "retiredAt": "2026-09-09",
+  "reason": "用户要求删除快捷语及对应功能",
+  "runtimeAllowed": false,
+  "assets": [
+    {
+      "label": "快捷语：称赞出牌（女声）",
+      "key": "niuma/chat_nice_play",
+      "file": "chat_nice_play.ogg",
+      "sourcePath": "assets/GuanDan/Audio/Phrase/Female/phrase02.ogg",
+      "sourcePhraseIndex": 2,
+      "sourceText": "你的牌打得太好啦",
+      "runtimePhraseId": "nice-play",
+      "runtimeText": "你的牌打得太好啦",
+      "decision": "语义一致且表达友好；运行时文案与原声逐字一致。",
+      "bytes": 25562,
+      "sha256": "c6e0be0998e28be6a47eb85f2284d05809b6fdde008646acc805b99062ea266c"
+    }
+  ]
+}

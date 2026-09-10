@@ -1,3 +1,4 @@
+import { drawUiFrame } from '/shared/UiFrameStyle.js'
 import { resolveLobbyLayout, LOBBY_LAYOUT_BASELINE } from '/shared/LobbyLayoutPolicy.js'
 import { resolveSafeHorizontalLane } from '/shared/SafeAreaLayout.js'
 import { auditTableLayoutOverlaps } from '/shared/TableLayoutOverlapAudit.js'
@@ -56,6 +57,12 @@ fields.forEach(([key, label, min, max, step, unit]) => {
 })
 function panel(x, y, w, h, fill, stroke = '', radius = 6, line = 1) {
   ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, radius)
+  if (fill) { ctx.fillStyle = fill; ctx.fill() }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = line; ctx.stroke() }
+}
+// Only the active candidate shares the runtime frame theme; keep the historical baseline intact.
+function framePanel(x, y, w, h, fill, stroke = '', kind = 'control', line = 1) {
+  ctx.beginPath(); drawUiFrame(ctx, x - w / 2, y - h / 2, w, h, kind)
   if (fill) { ctx.fillStyle = fill; ctx.fill() }
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = line; ctx.stroke() }
 }
@@ -136,7 +143,7 @@ function render() {
   const cover = Math.max(W / images.background.width, H / images.background.height)
   image('background', W / 2, H / 2, images.background.width * cover, images.background.height * cover)
   if (isV2()) {
-    drawCandidate02({ ctx, images, panel, label, image, region }, adjustments, inset*SCALE, bottomInset*SCALE, $('state').value)
+    drawCandidate02({ ctx, images, panel: framePanel, label, image, region }, adjustments, inset*SCALE, bottomInset*SCALE, $('state').value)
   } else {
   drawProfile(frame, layout)
   const [tx, ty] = point(layout.titleX, layout.titleY)

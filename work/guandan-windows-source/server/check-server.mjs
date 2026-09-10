@@ -122,7 +122,8 @@ const lineBudgets = {
   'platform/state-collections.js': 25,
   'platform/account-service.js': 240,
   'platform/commerce-service.js': 140,
-  'platform/tournament-service.js': 270,
+  'platform/tournament-service.js': 245,
+  'platform/tournament-standings.js': 55,
   'platform/friend-room-service.js': 460,
   'platform/spectator-domain.js': 300,
   'platform/merchant-service.js': 220,
@@ -133,7 +134,8 @@ const lineBudgets = {
   'weapp-room-metadata.js': 145,
   'weapp-room-expiry.js': 75,
   'weapp-room-expiry-jobs.js': 50,
-  'weapp-match-lifecycle.js': 520,
+  'weapp-match-lifecycle.js': 480,
+  'weapp-room-action-executor.js': 100,
   'weapp-game-start-coordinator.js': 320,
   'weapp-runtime-recovery.js': 130,
   'weapp-operation-scheduler.js': 70,
@@ -145,7 +147,7 @@ const lineBudgets = {
   'weapp-room-exit.js': 125,
   'weapp-entry-command-handler.js': 350,
   'weapp-lobby-command-handler.js': 180,
-  'weapp-game-command-handler.js': 245,
+  'weapp-game-command-handler.js': 190,
 }
 for (const [localPath, budget] of Object.entries(lineBudgets)) {
   const file = join(serverDir, localPath)

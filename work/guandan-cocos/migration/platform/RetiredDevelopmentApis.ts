@@ -65,6 +65,7 @@ export const SAMPLE_MERCHANT_CONSOLE = snapshotData<MerchantConsole>({
 
 
 export class DevelopmentTournamentGateway implements TournamentGateway {
+  public async withdraw (_tournamentId: string): Promise<TournamentState> { throw new FeatureInDevelopmentError('取消赛事报名') }
   public async listTournaments (): Promise<TournamentSummary[]> { return copyData<TournamentSummary[]>(SAMPLE_TOURNAMENTS) }
   public async enroll (_tournamentId: string, _expectedEntryPoints?: number): Promise<TournamentSummary> { throw new FeatureInDevelopmentError('赛事报名') }
   public async checkIn (tournamentId: string): Promise<TournamentState> { return this.getState(tournamentId) }

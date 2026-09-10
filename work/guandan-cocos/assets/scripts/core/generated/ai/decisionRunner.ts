@@ -105,7 +105,7 @@ export const createDecisionRunner = ({
       }
       runtimeContext.ruleProfile = engineRuleProfile;
       const myHandCount = hand.length;
-      const order: PlayerId[] = ['p1', 'p2', 'p3', 'p4'];
+      const order: readonly PlayerId[] = aiContext?.turnOrder ?? ['p1', 'p2', 'p3', 'p4'];
       const myIndex = order.indexOf(myPlayerId);
       const nextPlayerId = order[(myIndex + 1) % 4];
       const teammateId = support.getTeammateId(players, myPlayerId, myTeam);

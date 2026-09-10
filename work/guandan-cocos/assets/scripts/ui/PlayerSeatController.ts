@@ -1,3 +1,4 @@
+import { drawUiFrame } from './UiFrameStyle'
 import { _decorator, Color, Component, Graphics, Label, Node, Tween, UITransform, Vec3, tween } from 'cc'
 import type { Player, Team } from '../core/generated'
 import { applyForegroundTextStyle } from './RuntimeUiFactory'
@@ -9,15 +10,12 @@ const { ccclass } = _decorator
 export class PlayerSeatController extends Component {
   private label: Label | null = null
   private graphics: Graphics | null = null
-  private chatLabel: Label | null = null
-  private chatBubble: Node | null = null
   private connectionStatus: Node | null = null
   private connectionStatusGraphics: Graphics | null = null
   private connectionStatusLabel: Label | null = null
   private offline = false
   private connectionStatusToken = 0
   private turnActive = false
-  private previousChat = ''
 
   protected onLoad (): void {
     const transform = this.getComponent(UITransform) ?? this.addComponent(UITransform)
@@ -48,32 +46,9 @@ export class PlayerSeatController extends Component {
     applyForegroundTextStyle(this.connectionStatusLabel, new Color(20, 34, 34, 255), 2)
     connectionStatus.active = false
     this.connectionStatus = connectionStatus
-    const bubble = new Node('ChatBubble')
-    bubble.parent = this.node
-    bubble.setPosition(new Vec3(0, 64, 0))
-    bubble.addComponent(UITransform).setContentSize(280, 48)
-    const bubbleGraphics = bubble.addComponent(Graphics)
-    bubbleGraphics.fillColor = new Color(249, 245, 232, 250)
-    bubbleGraphics.strokeColor = new Color(188, 143, 57, 255)
-    bubbleGraphics.lineWidth = 2
-    bubbleGraphics.roundRect(-140, -24, 280, 48, 14)
-    bubbleGraphics.fill()
-    bubbleGraphics.stroke()
-    const chatText = new Node('ChatText')
-    chatText.parent = bubble
-    chatText.addComponent(UITransform).setContentSize(260, 42)
-    this.chatLabel = chatText.addComponent(Label)
-    this.chatLabel.fontSize = 20
-    this.chatLabel.lineHeight = 26
-    this.chatLabel.horizontalAlign = Label.HorizontalAlign.CENTER
-    this.chatLabel.verticalAlign = Label.VerticalAlign.CENTER
-    this.chatLabel.color = new Color(43, 48, 49)
-    applyForegroundTextStyle(this.chatLabel, new Color(255, 249, 229, 255), 2)
-    bubble.active = false
-    this.chatBubble = bubble
   }
 
-  public render (player: Player, isTurn: boolean, viewerTeam: Team, showHand = false, chat?: string, finishPlace = 0): void {
+  public render (player: Player, isTurn: boolean, viewerTeam: Team, showHand = false, finishPlace = 0): void {
     const graphic = this.graphics!
     const handCount = player.hand.length
     const danger = !finishPlace && handCount > 0 && handCount <= 2
@@ -81,7 +56,7 @@ export class PlayerSeatController extends Component {
     graphic.fillColor = isTurn ? new Color(85, 62, 24, 245) : new Color(22, 34, 39, 230)
     graphic.strokeColor = isTurn ? new Color(239, 201, 90, 255) : danger ? new Color(226, 84, 64, 255) : new Color(101, 123, 129, 220)
     graphic.lineWidth = isTurn || danger ? 3 : 1
-    graphic.roundRect(-88, -30, 176, 60, 15)
+    drawUiFrame(graphic, -88, -30, 176, 60)
     graphic.fill()
     graphic.stroke()
     const team = player.team === viewerTeam ? '我方' : '对方'
@@ -104,15 +79,6 @@ export class PlayerSeatController extends Component {
           tween().to(0.65, { scale: new Vec3(1.035, 1.035, 1) }, { easing: 'sineInOut' }).to(0.65, { scale: Vec3.ONE }, { easing: 'sineInOut' }),
         ).start()
       }
-    }
-    if (this.chatLabel) {
-      this.chatLabel.string = chat ?? ''
-      if (this.chatBubble) this.chatBubble.active = Boolean(chat)
-      if (chat && chat !== this.previousChat && this.chatBubble) {
-        this.chatBubble.setScale(new Vec3(0.72, 0.72, 1))
-        tween(this.chatBubble).to(0.18, { scale: Vec3.ONE }, { easing: 'backOut' }).start()
-      }
-      this.previousChat = chat ?? ''
     }
   }
 
@@ -147,7 +113,7 @@ export class PlayerSeatController extends Component {
     graphic.fillColor = fillColor
     graphic.strokeColor = textColor
     graphic.lineWidth = 1
-    graphic.roundRect(-32, -12, 64, 24, 8)
+    drawUiFrame(graphic, -32, -12, 64, 24, 'tag')
     graphic.fill()
     graphic.stroke()
     this.connectionStatusLabel.string = text
@@ -155,10 +121,6 @@ export class PlayerSeatController extends Component {
     this.connectionStatus.active = true
   }
 
-  /** Keeps the top teammate's chat bubble in its own lane, clear of HUD and played cards. */
-  public setChatBubbleAbove (above: boolean): void {
-    this.chatBubble?.setPosition(above ? new Vec3(0, 64, 0) : new Vec3(-70, -66, 0))
-  }
 
   /** Hidden opponents play from a stable point beside their avatar panel. */
   public getPlayOriginWorldPosition (): Vec3 {

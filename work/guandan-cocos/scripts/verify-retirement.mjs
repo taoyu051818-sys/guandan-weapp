@@ -22,7 +22,7 @@ const forbidden = [
   'HttpSpectatorGateway', 'HttpTournamentGateway', 'DevelopmentTournamentGateway',
   'DevelopmentSpectatorGateway', 'DevelopmentMerchantGateway', 'SAMPLE_TOURNAMENTS',
   'SAMPLE_SPECTATOR_MATCHES', 'SAMPLE_MERCHANT_CONSOLE', '快速开始·人机测试',
-  '/api/v1/merchants', '/api/v1/spectate', '/api/v1/tournaments',
+  '/api/v1/merchants', '/api/v1/spectate',
 ]
 const rejectMarkers = (text, context) => {
   for (const marker of forbidden) assert.ok(!text.includes(marker), `${context}: retired runtime marker ${marker}`)
@@ -49,7 +49,7 @@ for (const asset of manifest.retiredAudio) {
   assert.equal(createHash('sha256').update(bytes).digest('hex'), asset.sha256, `archive changed: ${asset.archivePath}`)
   assert.ok(catalog.archived.some(item => item.key === asset.key), `import catalog would restore ${asset.key}`)
 }
-assert.match(read('assets/scripts/scenes/FrontPageController.ts'), /showCompetition: \(\) => this\.host\.showToast\('筹备中'\)/)
+assert.match(read('assets/scripts/scenes/FrontPageController.ts'), /showCompetition: \(\) => this\.tournamentPage\.open\(\)/)
 assert.match(read('assets/scripts/scenes/front-pages/FriendRoomSettingsPolicy.ts'), /实时观战|延迟观战/)
 assert.match(read('assets/scripts/services/platform/factory.ts'), /new HttpReplayGateway/)
 assert.doesNotMatch(read('assets/scripts/scenes/FrontPageController.ts'), /EffectLab|effectLab/)

@@ -50,6 +50,10 @@ export class FriendRoomPlatformFlow {
     await this.run('joining', () => this.dependencies.gateway.join(normalized), normalized)
   }
 
+  public async joinRoomNumber (roomId: string): Promise<void> {
+    await this.run('joining', () => this.dependencies.gateway.joinRoomNumber(roomId.trim()))
+  }
+
   public leave (): void { this.clearAndCompensate() }
 
   public handleRoomClosed (): void { this.clearAndCompensate() }

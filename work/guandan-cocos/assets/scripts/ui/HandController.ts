@@ -1,6 +1,5 @@
 import { _decorator, Component, instantiate, Node, Prefab, Tween, UITransform, Vec2, Vec3, tween } from 'cc'
 import type { Card } from '../core/generated'
-import type { HandInteractionMode } from '../game/HandInteractionState'
 import type { CardBlastReactionTarget } from '../effects/CardBlastReaction'
 import { HandDragSelectionPolicy, sampleHandDragSegment } from '../game/HandDragSelectionPolicy'
 import { createHandStackLayout, type HandStackGroup } from '../game/HandStackLayout'
@@ -95,8 +94,6 @@ export class HandController extends Component {
     displayCardIds?: readonly string[],
     stackGroups: readonly HandStackGroup[] = [],
     lockedCardIds?: readonly string[],
-    lockDraftCardIds: readonly string[] = [],
-    interactionMode: HandInteractionMode = 'play',
     animateEntrance = true,
   ): number {
     const fallback = [...hand].sort((a, b) => sortOrder === 'desc' ? b.value - a.value : a.value - b.value)
@@ -116,12 +113,9 @@ export class HandController extends Component {
     const slotByCard = new Map(layout.slots.map(slot => [slot.cardId, slot]))
     const badgeByGroup = new Map(stackGroups.map(group => [group.id, group.badge]))
     const playSelectedIds = new Set(playSelectedCardIds)
-    const lockDraftIds = new Set(lockDraftCardIds)
     const inferredLockedCardIds = stackGroups.flatMap(group => group.locked ? group.cardIds : [])
     const lockedIds = new Set(lockedCardIds ?? inferredLockedCardIds)
-    this.selectedCardIds = interactionMode === 'lock-create' || interactionMode === 'lock-unlock'
-      ? lockDraftIds
-      : playSelectedIds
+    this.selectedCardIds = playSelectedIds
     this.interactive = interactive
     if (!interactive) {
       this.cancelLongPressSelection()
@@ -147,7 +141,6 @@ export class HandController extends Component {
         id: card.id,
         ...mapCardToPresentation(card),
         selected,
-        lockDraft: lockDraftIds.has(card.id),
         locked: lockedIds.has(card.id),
         interactive,
         groupBadge: slot?.stackId && slot.stackIndex === slot.stackSize - 1 ? badgeByGroup.get(slot.stackId) : undefined,
@@ -272,6 +265,6 @@ export class HandController extends Component {
     if (!this.cards.has(cardId) || this.selectedCardIds.has(cardId) === selected) return
     if (selected) this.selectedCardIds.add(cardId)
     else this.selectedCardIds.delete(cardId)
-    this.node.emit('guandan:card-toggle', cardId)
+    this.node.emit('guandan:card-toggle', cardId, selected)
   }
 }

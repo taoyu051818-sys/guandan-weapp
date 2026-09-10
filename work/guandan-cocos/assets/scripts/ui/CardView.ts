@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, EventTouch, Graphics, Label, Node, Sprite, SpriteFrame, Tween, UIOpacity, UITransform, Vec2, Vec3, tween } from 'cc'
+import { _decorator, Color, Component, EventTouch, Graphics, Label, LabelOutline, Node, Sprite, SpriteFrame, Tween, UIOpacity, UITransform, Vec2, Vec3, tween } from 'cc'
 import { getCachedClassicCardFrames, requestClassicCardFrames } from './ClassicCardFrameStore'
 import { CLASSIC_CARD_JOKER_GEOMETRY, CLASSIC_CARD_LAYER_GEOMETRY } from './ClassicCardGeometry'
 import type { ClassicCardLayer } from './ClassicCardGeometry'
@@ -7,7 +7,7 @@ import type { ClassicCardPlan, ClassicCardSuit } from './CardSkinResolver'
 import type { HandGroupBadge } from '../game/HandStackLayout'
 import { HandGroupBadgeView } from './HandGroupBadgeView'
 
-export type CardPresentation = { id: string, rank: string, suit: ClassicCardSuit, red: boolean, levelCard: boolean, selected: boolean, lockDraft?: boolean, locked?: boolean, interactive?: boolean, groupBadge?: HandGroupBadge }
+export type CardPresentation = { id: string, rank: string, suit: ClassicCardSuit, red: boolean, levelCard: boolean, selected: boolean, locked?: boolean, interactive?: boolean, groupBadge?: HandGroupBadge }
 
 export const HAND_CARD_TOUCH_START = 'guandan:hand-card-touch-start'
 export const HAND_CARD_TOUCH_MOVE = 'guandan:hand-card-touch-move'
@@ -32,7 +32,6 @@ export class CardView extends Component {
   private inputBound = false
   private surface: Graphics | null = null
   private selectionOverlay: Graphics | null = null
-  private lockDraftOverlay: Graphics | null = null
   private lockOverlay: Graphics | null = null
   private levelBadge: Node | null = null
   private groupBadge: HandGroupBadgeView | null = null
@@ -81,13 +80,11 @@ export class CardView extends Component {
     this.createClassicVisuals(visualRoot)
     this.createLevelBadge(visualRoot)
     this.createSelectionOverlay(visualRoot)
-    this.createLockDraftOverlay(visualRoot)
     this.createLockOverlay(visualRoot)
     if (this.card) {
       this.applyCard(++this.artworkRequestId)
       this.setLevelBadge(this.card.levelCard)
       this.applySelectionVisual(this.card.selected)
-      this.applyLockDraftVisual(Boolean(this.card.lockDraft))
       this.applyLockVisual(Boolean(this.card.locked))
     }
     this.syncInputBinding()
@@ -114,7 +111,6 @@ export class CardView extends Component {
     this.applyCard(requestId)
     this.setLevelBadge(card.levelCard)
     this.applySelectionVisual(card.selected)
-    this.applyLockDraftVisual(Boolean(card.lockDraft))
     this.applyLockVisual(Boolean(card.locked))
     this.syncInputBinding()
     this.updateGroupBadge()
@@ -225,15 +221,6 @@ export class CardView extends Component {
     this.redrawLockOverlay(false)
   }
 
-  private createLockDraftOverlay (parent: Node): void {
-    const node = new Node('CardLockDraftOverlay')
-    node.parent = parent
-    node.setPosition(new Vec3(0, 0, 9))
-    node.addComponent(UITransform).setContentSize(86, 122)
-    this.lockDraftOverlay = node.addComponent(Graphics)
-    this.redrawLockDraftOverlay(false)
-  }
-
   private createLevelBadge (parent: Node): void {
     const node = new Node('CardLevelBadge')
     node.parent = parent
@@ -249,12 +236,17 @@ export class CardView extends Component {
     graphics.fill()
     const text = new Node('LevelBadgeText')
     text.parent = node
-    text.setPosition(new Vec3(28, 46, 1))
-    text.addComponent(UITransform).setContentSize(18, 20)
+    text.setPosition(new Vec3(27, 43, 1))
+    text.addComponent(UITransform).setContentSize(28, 30)
     const label = text.addComponent(Label)
     label.string = '级'
-    label.fontSize = 15
-    label.lineHeight = 18
+    label.fontSize = 23
+    label.lineHeight = 28
+    label.isBold = true
+    label.overflow = Label.Overflow.NONE
+    const outline = text.addComponent(LabelOutline)
+    outline.color = new Color(24, 92, 74, 255)
+    outline.width = 1.2
     label.horizontalAlign = Label.HorizontalAlign.CENTER
     label.verticalAlign = Label.VerticalAlign.CENTER
     label.color = new Color(255, 255, 255, 255)
@@ -376,16 +368,8 @@ export class CardView extends Component {
     if (!this.selectionOverlay) return
     this.selectionOverlay.clear()
     if (!selected) return
-    // Selection uses the existing hand lift plus a neutral wash, never a gold outline.
+    // Darken the whole face; stack hit/exposure geometry must not clip selection feedback.
     this.selectionOverlay.fillColor = new Color(8, 18, 24, 82)
-    if (this.stackCovered) {
-      const height = Math.max(6, Math.min(112, this.hitAreaHeight))
-      const y = 56 - height
-      const radius = Math.min(8, height / 2)
-      this.selectionOverlay.roundRect(-38, y, 76, height, radius)
-      this.selectionOverlay.fill()
-      return
-    }
     this.selectionOverlay.roundRect(-38, -56, 76, 112, 8)
     this.selectionOverlay.fill()
   }
@@ -419,21 +403,7 @@ export class CardView extends Component {
     this.lockOverlay.stroke()
   }
 
-  private redrawLockDraftOverlay (active: boolean): void {
-    if (!this.lockDraftOverlay) return
-    this.lockDraftOverlay.clear()
-    if (!active) return
-    const height = this.stackCovered ? Math.max(6, Math.min(112, this.hitAreaHeight)) : 112
-    const y = this.stackCovered ? 56 - height : -56
-    const inset = this.stackCovered ? 2 : 0
-    this.lockDraftOverlay.fillColor = new Color(38, 170, 220, 52)
-    this.lockDraftOverlay.roundRect(-38 + inset, y + inset, 76 - inset * 2, Math.max(2, height - inset * 2), 7)
-    this.lockDraftOverlay.fill()
-    this.lockDraftOverlay.strokeColor = new Color(110, 229, 255, 255)
-    this.lockDraftOverlay.lineWidth = 4
-    this.lockDraftOverlay.roundRect(-38 + inset, y + inset, 76 - inset * 2, Math.max(2, height - inset * 2), 7)
-    this.lockDraftOverlay.stroke()
-  }
+
 
   private setLevelBadge (isLevelCard: boolean): void {
     if (this.levelBadge) this.levelBadge.active = isLevelCard
@@ -448,13 +418,10 @@ export class CardView extends Component {
     this.redrawLockOverlay(locked)
   }
 
-  private applyLockDraftVisual (active: boolean): void {
-    this.redrawLockDraftOverlay(active)
-  }
+
 
   private refreshStateVisuals (): void {
     this.applySelectionVisual(Boolean(this.card?.selected))
-    this.applyLockDraftVisual(Boolean(this.card?.lockDraft))
     this.applyLockVisual(Boolean(this.card?.locked))
   }
 

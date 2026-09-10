@@ -58,17 +58,6 @@ const entries = [
   { label: '本局开始', key: 'niuma/game_start', file: 'game_start.mp3', sourcePath: `${audioRoot}/gamestart.mp3` },
   { label: '胜利', key: 'niuma/victory', file: 'victory.mp3', sourcePath: `${audioRoot}/win.mp3` },
   { label: '失败', key: 'niuma/defeat', file: 'defeat.mp3', sourcePath: `${audioRoot}/lose.mp3` },
-  {
-    label: '快捷语：称赞出牌（女声）',
-    key: 'niuma/chat_nice_play',
-    file: 'chat_nice_play.ogg',
-    sourcePath: `${femalePhrase}/phrase02.ogg`,
-    sourcePhraseIndex: 2,
-    sourceText: sourcePhraseTexts[1],
-    runtimePhraseId: 'nice-play',
-    runtimeText: sourcePhraseTexts[1],
-    decision: '语义一致且表达友好；运行时文案与原声逐字一致。',
-  },
 ]
 
 const excluded = [

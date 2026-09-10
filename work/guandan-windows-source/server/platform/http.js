@@ -1,6 +1,7 @@
 import { PlatformError, badRequest, notFound } from './errors.js'
 import { verifyGameResultSignature, verifySpectatorEventSignature } from './crypto.js'
 import { readProfileAvatar, validateProfilePatch } from './profile-avatar.js'
+import { isUploadedAvatar } from './profile-upload.js'
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
 const success = (data) => ({ ok: true, data, error: null })
@@ -77,10 +78,12 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
       validateProfilePatch(body)
       return writeJson(response, 200, success({ user: await service.updateProfile(user.id, body) }), corsOrigin)
     }
-    if (method === 'GET' && route === '/api/v1/profile/avatar') {
+    if ((method === 'GET' || method === 'POST') && route === '/api/v1/profile/avatar') {
       const user = await requireUser()
-      const profile = await service.getProfile(user.id)
-      return writeJson(response, 200, success({ avatarUrl: profile.avatarUrl || '', dataUri: await readProfileAvatar(profile.avatarUrl) }), corsOrigin)
+      const profile = method === 'POST' ? (await readBody(request)).body : await service.getProfile(user.id)
+      if (method === 'POST') validateProfilePatch(profile)
+      const dataUri = isUploadedAvatar(profile.avatarUrl) ? await service.getUploadedAvatarImage(profile.avatarUrl) : await readProfileAvatar(profile.avatarUrl)
+      return writeJson(response, 200, success({ avatarUrl: profile.avatarUrl || '', dataUri }), corsOrigin)
     }
     if (method === 'GET' && route === '/api/v1/me/dashboard') {
       const user = await requireUser()
@@ -121,6 +124,11 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
       const { body } = await readBody(request)
       const enrollment = await service.enrollTournament(user.id, decodeURIComponent(enrollmentMatch[1]), request.headers['idempotency-key'], body)
       return writeJson(response, 200, success({ enrollment }), corsOrigin)
+    }
+    const withdrawalMatch = method === 'POST' && route.match(/^\/api\/v1\/tournaments\/([^/]+)\/withdraw$/)
+    if (withdrawalMatch) {
+      const user = await requireUser()
+      return writeJson(response, 200, success(await service.withdrawTournament(user.id, decodeURIComponent(withdrawalMatch[1]), request.headers['idempotency-key'])), corsOrigin)
     }
     const checkInMatch = method === 'POST' && route.match(/^\/api\/v1\/tournaments\/([^/]+)\/check-in$/)
     if (checkInMatch) {
@@ -197,6 +205,11 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
       const user = await requireUser()
       const { body } = await readBody(request)
       return writeJson(response, 200, success({ entry: await service.joinFriendRoom(user.id, body) }), corsOrigin)
+    }
+    if (method === 'POST' && route === '/api/v1/friend-rooms/join-by-number') {
+      const user = await requireUser()
+      const { body } = await readBody(request)
+      return writeJson(response, 200, success({ entry: await service.joinFriendRoomByNumber(user.id, body) }), corsOrigin)
     }
     if (method === 'POST' && route === '/api/v1/match/join') {
       const user = await requireUser()

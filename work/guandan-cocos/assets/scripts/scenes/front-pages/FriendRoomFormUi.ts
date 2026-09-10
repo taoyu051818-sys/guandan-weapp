@@ -1,6 +1,13 @@
 import { Color, Mask, Node, ScrollView, UITransform, Vec3 } from 'cc'
 import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 
+/** Keep the secondary join and primary create actions in one responsive footer. */
+export const friendRoomEntryActions = (ui: RuntimeUiFactory, x: number, y: number, width: number, join: () => void, create: () => void): void => {
+  const actionWidth = Math.min(240, (width - 36) / 2)
+  friendFormAction(ui, '加入房间', x - actionWidth / 2 - 9, y, actionWidth, 52, 22, new Color(44, 132, 77), join)
+  friendFormAction(ui, '创建房间', x + actionWidth / 2 + 9, y, actionWidth, 52, 22, new Color(223, 164, 47), create)
+}
+
 /** Fixed viewport keeps scrollable rules outside the persistent action area. */
 export const createFriendFormScroll = (parent: Node, x: number, top: number, bottom: number, width: number, contentHeight: number): ScrollView => {
   const height = Math.max(90, top - bottom)
@@ -27,7 +34,7 @@ export const friendFormAction = (ui: RuntimeUiFactory, text: string, x: number, 
     fill,
     pressedFill: new Color(Math.max(0, fill.r - 28), Math.max(0, fill.g - 28), Math.max(0, fill.b - 28), fill.a),
     stroke: new Color(255, 235, 151, 255), textColor: new Color(255, 252, 224),
-    textOutlineColor: new Color(43, 58, 37, 255), textOutlineWidth: 3, radius: 7,
+    textOutlineColor: new Color(43, 58, 37, 255), textOutlineWidth: 3, frame: 'control',
   })
   node.setPosition(new Vec3(x, y, 0))
   node.on(Node.EventType.TOUCH_END, action)

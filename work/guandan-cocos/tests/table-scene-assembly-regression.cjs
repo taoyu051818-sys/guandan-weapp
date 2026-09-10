@@ -25,7 +25,7 @@ class Label {
 }
 class HandController {}
 class PlayAreaController { layout (viewport) { this.viewport = viewport } }
-class PlayerSeatController { setChatBubbleAbove (above) { this.above = above } }
+class PlayerSeatController {}
 const mocks = {
   cc: { Node, Vec3, Label, UITransform },
   '../ui/HandController': { HandController },
@@ -43,6 +43,7 @@ function load (relative) {
   }, module, module.exports)
   return module.exports
 }
+mocks['../ui/TableButtonMetrics'] = load('assets/scripts/ui/TableButtonMetrics.ts')
 const { buildTableSceneNodes } = load('assets/scripts/scenes/TableSceneNodes.ts')
 const { layoutTableNodes, layoutTableSeats } = load('assets/scripts/scenes/TableSceneLayout.ts')
 const scene = new Node('scene')
@@ -69,10 +70,10 @@ assert.equal(nodes.playerSeats.size, 4)
 const allocationCount = created
 buildTableSceneNodes(scene, ui, nodes)
 assert.equal(created, allocationCount, 'repeated initialization must not duplicate nodes')
-assert.equal(nodes.playButton.fontSize, 28)
-assert.equal(nodes.passButton.fontSize, 28)
-assert.equal(nodes.playButton.getComponent(UITransform).width, 128)
-assert.equal(nodes.passButton.getComponent(UITransform).width, 112)
+assert.equal(nodes.playButton.fontSize, 28 * 1.2)
+assert.equal(nodes.passButton.fontSize, 28 * 1.2)
+assert.equal(nodes.playButton.getComponent(UITransform).width, 128 * 1.2)
+assert.equal(nodes.passButton.getComponent(UITransform).width, 112 * 1.2)
 assert.equal(nodes.skipEffectButton.active, false)
 
 for (const viewport of [
@@ -101,7 +102,6 @@ for (const viewport of [
     assert.equal(nodes.playerSeats.get(humanId).node.position.y, screen.safeBottomY(90))
     const teammateId = ['p1', 'p2', 'p3', 'p4'][(['p1', 'p2', 'p3', 'p4'].indexOf(humanId) + 2) % 4]
     assert.equal(nodes.playerSeats.get(teammateId).node.position.x, -220)
-    assert.equal(nodes.playerSeats.get(teammateId).above, false)
   }
 }
 const sceneSource = fs.readFileSync(path.join(root, 'assets/scripts/scenes/GameScene.ts'), 'utf8')

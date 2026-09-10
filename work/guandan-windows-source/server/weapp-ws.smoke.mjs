@@ -401,40 +401,10 @@ try {
   send(replayProbe, 'rejoinRoom', { roomId, myPlayerId: 'p2', resumeToken: previousResumeToken }, replayRequestId)
   assert.match((await replayErrorPromise).message, /凭证无效/, '轮换前的恢复凭证必须立即失效')
 
-  const arbitraryChatRequestId = nextRequestId++
-  const arbitraryChatErrorPromise = message(sockets[2], 'error', packet => packet.requestId === arbitraryChatRequestId)
-  send(sockets[2], 'chat', { roomId, text: '集成测试消息' }, arbitraryChatRequestId)
-  assert.match((await arbitraryChatErrorPromise).message, /固定快捷语/)
-
-  const obsoleteCopyRequestId = nextRequestId++
-  const obsoleteCopyErrorPromise = message(sockets[2], 'error', packet => packet.requestId === obsoleteCopyRequestId)
-  send(sockets[2], 'chat', { roomId, text: '这手打得漂亮' }, obsoleteCopyRequestId)
-  assert.match((await obsoleteCopyErrorPromise).message, /固定快捷语/, '旧短文案不能与新原声形成文本不一致')
-
-  const chatRequestId = nextRequestId++
-  const chatAcceptedPromise = message(sockets[2], 'actionAccepted', packet => packet.requestId === chatRequestId)
-  const receivedChatPromise = message(sockets[0], 'chat')
-  send(sockets[2], 'chat', { roomId, text: '你的牌打得太好啦' }, chatRequestId)
-  const [chatAccepted, receivedChat] = await Promise.all([chatAcceptedPromise, receivedChatPromise])
-  assert.equal(chatAccepted.requestType, 'chat')
-  assert.equal(receivedChat.text, '你的牌打得太好啦')
-  assert.equal(receivedChat.roomId, roomId)
-  assert.equal(typeof receivedChat.version, 'number')
-
-  const throttledChatRequestId = nextRequestId++
-  const throttledChatErrorPromise = message(sockets[2], 'error', packet => packet.requestId === throttledChatRequestId)
-  send(sockets[2], 'chat', { roomId, text: '谢谢' }, throttledChatRequestId)
-  const throttledChat = await throttledChatErrorPromise
-  assert.match(throttledChat.message, /频繁/)
-  assert.ok(throttledChat.retryAfterMs > 0 && throttledChat.retryAfterMs <= 1200)
-
-  await delay(1250)
-  const repeatedChatRequestId = nextRequestId++
-  const repeatedChatErrorPromise = message(sockets[2], 'error', packet => packet.requestId === repeatedChatRequestId)
-  send(sockets[2], 'chat', { roomId, text: '你的牌打得太好啦' }, repeatedChatRequestId)
-  const repeatedChat = await repeatedChatErrorPromise
-  assert.match(repeatedChat.message, /冷却/)
-  assert.ok(repeatedChat.retryAfterMs > 6000 && repeatedChat.retryAfterMs <= 8000)
+  const retiredChatRequestId = nextRequestId++
+  const retiredChatError = message(sockets[2], 'error', packet => packet.requestId === retiredChatRequestId)
+  send(sockets[2], 'chat', { roomId, text: '谢谢' }, retiredChatRequestId)
+  assert.match((await retiredChatError).message, /未知|不支持/)
 
   const memberLeftPromise = message(sockets[0], 'roomMembers', packet => packet.roomId === roomId && !packet.memberPlayerIds.includes('p2'))
   send(replacement, 'leaveRoom', { roomId, expectedVersion: 0 })

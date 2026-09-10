@@ -29,6 +29,8 @@ import type {
 
 export interface EngineState {
   matchFormat?: MatchFormat
+  playerScores?: Record<PlayerId, number>
+  pairingCard?: Pick<Card, 'suit' | 'rank'>
   currentLevel: Rank
   ruleProfile: RuleProfile
   players: Record<PlayerId, Player>
@@ -101,6 +103,7 @@ export interface PrepareNextRoundCommand extends VersionedCommand {
   type: 'PREPARE_NEXT_ROUND'
   dealtHands: Record<PlayerId, Card[]>
   nextLevel?: Rank
+  pairingIndex?: number
 }
 
 export interface SelectTributeCardCommand extends VersionedCommand {
@@ -219,6 +222,7 @@ export const createMatchState = (input: CreateMatchStateInput): MatchState => ({
 /** Two teammates taking the first two places ends the round; otherwise third place does. */
 export const isRoundOver = (state: EngineState): boolean => {
   if (state.finishedPlayers.length >= 3) return true
+  if (state.matchFormat?.kind === 'independent' && state.matchFormat.individualRanking) return false
   if (state.finishedPlayers.length < 2) return false
   const [first, second] = state.finishedPlayers
   return state.players[first].team === state.players[second].team

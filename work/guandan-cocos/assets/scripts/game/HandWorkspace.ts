@@ -10,9 +10,15 @@ import type {
   StraightFlushSuitAvailability,
 } from './HandArrangement'
 
-export type HandWorkspaceCardToggle = 'selected' | 'deselected' | 'unlock-selected' | 'locked' | 'unknown'
 export type HandWorkspaceArrangementResult = 'arranged' | 'restored' | 'fallback-restored'
-export type HandWorkspaceLockAction = 'start' | 'cancel' | 'commit' | 'unlock'
+export type HandLockUnavailableReason =
+  | 'empty-selection' | 'stale-selection' | 'invalid-combination'
+  | 'partial-lock' | 'mixed-selection' | 'interaction-blocked'
+
+/** One presentation decision shared by the toolbar, feedback and mutation validation. */
+export type HandLockDecision =
+  | Readonly<{ kind: 'lock' | 'unlock' }>
+  | Readonly<{ kind: 'unavailable', reason: HandLockUnavailableReason }>
 
 export interface HandWorkspaceSyncOptions {
   roundId: number
@@ -26,11 +32,6 @@ export interface HandWorkspaceArrangementOptions {
   direction: HandSortDirection
   allowAceLowStraight: boolean
 }
-
-type HandLockDraft =
-  | Readonly<{ mode: 'idle' }>
-  | { mode: 'create', selectedCardIds: Set<string>, selectedSuit: StraightFlushSuit | null }
-  | Readonly<{ mode: 'unlock', groupId: string, cardIds: readonly string[] }>
 
 type HandArrangementState =
   | Readonly<{ mode: 'point-stacked' }>
@@ -46,18 +47,8 @@ export class HandWorkspace {
   private authoritativeSignature = ''
   private authorityRoundId: number | null = null
   private arrangementState: HandArrangementState = { mode: 'point-stacked' }
-  private lockDraft: HandLockDraft = { mode: 'idle' }
 
   public get snapshot (): HandGroupingSnapshot { return this.grouping.getSnapshot() }
-  public get isManualSelectionActive (): boolean { return this.lockDraft.mode !== 'idle' }
-  public get selectedCardIds (): string[] {
-    if (this.lockDraft.mode === 'create') return Array.from(this.lockDraft.selectedCardIds)
-    if (this.lockDraft.mode === 'unlock') return this.lockDraft.cardIds.slice()
-    return []
-  }
-  public get selectedSuit (): StraightFlushSuit | null {
-    return this.lockDraft.mode === 'create' ? this.lockDraft.selectedSuit : null
-  }
   public get lockedCardIds (): string[] {
     return this.snapshot.groups.filter(group => group.locked).flatMap(group => group.cardIds)
   }
@@ -68,7 +59,6 @@ export class HandWorkspace {
     if (this.authorityRoundId !== null && this.authorityRoundId !== options.roundId) {
       this.grouping.reset()
       this.arrangementState = { mode: 'point-stacked' }
-      this.cancelManualSelection()
     }
     this.authorityRoundId = options.roundId
     const profileSignature = `${Number(options.ruleProfile.allowA2345Straight)}${Number(options.ruleProfile.straightFlushAsBomb)}${Number(options.ruleProfile.enableTripleWithPair)}`
@@ -86,7 +76,6 @@ export class HandWorkspace {
     if (smartArrangementActive) {
       this.arrangementState = { mode: 'smart-arranged', baseline: null }
     }
-    this.cancelManualSelection()
     this.grouping.syncAuthoritativeHand(hand, {
       levelRank: options.levelRank,
       ruleProfile: options.ruleProfile,
@@ -107,7 +96,6 @@ export class HandWorkspace {
     this.authoritativeSignature = ''
     this.authorityRoundId = null
     this.arrangementState = { mode: 'point-stacked' }
-    this.cancelManualSelection()
     this.grouping.reset()
   }
 
@@ -115,95 +103,43 @@ export class HandWorkspace {
     this.resetForRound()
   }
 
-  public beginManualSelection (): void {
-    this.lockDraft = { mode: 'create', selectedCardIds: new Set<string>(), selectedSuit: null }
-  }
-
-  public cancelManualSelection (): void {
-    this.lockDraft = { mode: 'idle' }
-  }
-
-  public toggleManualCard (cardId: string): HandWorkspaceCardToggle {
-    if (this.lockDraft.mode === 'idle') this.beginManualSelection()
-    if (!this.snapshot.handCardIds.includes(cardId)) {
-      if (this.lockDraft.mode === 'create') this.lockDraft.selectedCardIds.delete(cardId)
-      return 'unknown'
+  /** One selection drives both the button and its mutation. No separate lock-edit mode. */
+  public getLockDecision (ruleProfile: RuleProfile, cardIds: readonly string[] = []): HandLockDecision {
+    if (!cardIds.length) return { kind: 'unavailable', reason: 'empty-selection' }
+    const selected = new Set(cardIds)
+    const snapshot = this.snapshot
+    if (selected.size !== cardIds.length || cardIds.some(id => !snapshot.handCardIds.includes(id))) {
+      return { kind: 'unavailable', reason: 'stale-selection' }
     }
-    const group = this.grouping.getGroupForCard(cardId)
-    if (group?.locked) {
-      if (this.lockDraft.mode === 'create' && this.lockDraft.selectedCardIds.size > 0) return 'locked'
-      if (this.lockDraft.mode === 'unlock' && this.lockDraft.groupId === group.id) {
-        this.beginManualSelection()
-        return 'deselected'
-      }
-      this.lockDraft = { mode: 'unlock', groupId: group.id, cardIds: group.cardIds.slice() }
-      return 'unlock-selected'
+    const locked = snapshot.groups.filter(group => group.locked && group.cardIds.some(id => selected.has(id)))
+    if (locked.length) {
+      const members = locked.flatMap(group => group.cardIds)
+      if (!members.every(id => selected.has(id))) return { kind: 'unavailable', reason: 'partial-lock' }
+      return members.length === selected.size ? { kind: 'unlock' } : { kind: 'unavailable', reason: 'mixed-selection' }
     }
-    if (this.lockDraft.mode === 'unlock') this.beginManualSelection()
-    if (this.lockDraft.mode !== 'create') return 'unknown'
-    if (this.lockDraft.selectedCardIds.has(cardId)) {
-      this.lockDraft.selectedCardIds.delete(cardId)
-      this.lockDraft.selectedSuit = null
-      return 'deselected'
-    }
-    this.lockDraft.selectedCardIds.add(cardId)
-    this.lockDraft.selectedSuit = null
-    return 'selected'
+    return this.grouping.canCreateLockedGroup(cardIds, ruleProfile)
+      ? { kind: 'lock' } : { kind: 'unavailable', reason: 'invalid-combination' }
   }
 
-  public canLockSelection (ruleProfile: RuleProfile): boolean {
-    return this.lockDraft.mode === 'create' && this.grouping.canCreateLockedGroup(this.selectedCardIds, ruleProfile)
-  }
-
-  public lockAction (ruleProfile: RuleProfile): HandWorkspaceLockAction {
-    if (this.lockDraft.mode === 'idle') return 'start'
-    if (this.lockDraft.mode === 'unlock') return 'unlock'
-    return this.canLockSelection(ruleProfile) ? 'commit' : 'cancel'
-  }
-
-  public commitManualSelection (
-    ruleProfile: RuleProfile,
-    options: Partial<Pick<HandSuggestionOptions, 'allowAceLowStraight'>> = {},
-  ): boolean {
-    if (this.lockDraft.mode === 'unlock') {
-      const changed = this.grouping.splitGroup(this.lockDraft.groupId)
-      this.reprojectAfterLockChange(changed, ruleProfile, options)
-      this.cancelManualSelection()
-      return changed
+  public applySelectionLock (cardIds: readonly string[], ruleProfile: RuleProfile): boolean {
+    const decision = this.getLockDecision(ruleProfile, cardIds)
+    if (decision.kind === 'unavailable') return false
+    if (decision.kind === 'unlock') {
+      const selected = new Set(cardIds)
+      this.snapshot.groups.filter(group => group.locked && group.cardIds.every(id => selected.has(id)))
+        .forEach(group => this.grouping.splitGroup(group.id))
+    } else {
+      this.grouping.createLockedGroup(cardIds, ruleProfile)
     }
-    if (!this.canLockSelection(ruleProfile)) return false
-    const selected = this.selectedCardIds
-    const suit = this.lockDraft.mode === 'create' ? this.lockDraft.selectedSuit : null
-    const suitSuggestion = suit
-      ? this.grouping.selectStraightFlush(suit, options)
-      : null
-    const createDraft = this.lockDraft.mode === 'create' ? this.lockDraft : null
-    const exactSuitSuggestion = Boolean(suitSuggestion &&
-      suitSuggestion.cardIds.length === selected.length &&
-      createDraft &&
-      suitSuggestion.cardIds.every(cardId => createDraft.selectedCardIds.has(cardId)))
-    if (suitSuggestion && exactSuitSuggestion) this.grouping.applySuggestion(suitSuggestion)
-    else this.grouping.createLockedGroup(selected, ruleProfile)
-    this.reprojectAfterLockChange(true, ruleProfile, options)
-    this.cancelManualSelection()
+    this.reprojectAfterLockChange(true, ruleProfile, {})
     return true
   }
 
-  public selectStraightFlush (
+  public straightFlushCardIds (
     suit: StraightFlushSuit,
     options: Partial<Pick<HandSuggestionOptions, 'allowAceLowStraight'>> = {},
-  ): boolean {
-    const suggestion = this.grouping.selectStraightFlush(suit, options)
-    if (!suggestion) {
-      this.cancelManualSelection()
-      return false
-    }
-    this.beginManualSelection()
-    const createDraft = this.lockDraft.mode === 'create' ? this.lockDraft : null
-    if (!createDraft) return false
-    suggestion.cardIds.forEach(cardId => createDraft.selectedCardIds.add(cardId))
-    createDraft.selectedSuit = suit
-    return true
+  ): string[] {
+    return this.grouping.selectStraightFlush(suit, options)?.cardIds.slice() ?? []
   }
 
   public straightFlushAvailability (
@@ -217,7 +153,6 @@ export class HandWorkspace {
   }
 
   public toggleArrangement (options: HandWorkspaceArrangementOptions): HandWorkspaceArrangementResult {
-    this.cancelManualSelection()
     if (this.arrangementState.mode === 'smart-arranged') {
       const restored = this.arrangementState.baseline
         ? this.grouping.restoreSnapshot(this.arrangementState.baseline)

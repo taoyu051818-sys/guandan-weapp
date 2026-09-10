@@ -1,4 +1,6 @@
 import { badRequest, serviceUnavailable } from './errors.js'
+import { defaultAvatarImage, isDefaultAvatar } from '../default-profiles.js'
+import { isUploadedAvatar, validateAvatarUpload } from './profile-upload.js'
 
 const allowedHosts = new Set(['thirdwx.qlogo.cn', 'wx.qlogo.cn'])
 const allowedAssets = new Set(['asset:ui/common/default-avatar/texture', 'asset:ui/lobby/shop-float-chick/texture'])
@@ -11,7 +13,9 @@ export function validateProfilePatch (body) {
     || Array.from(body.displayName.trim()).length > 24 || /[\u0000-\u001f\u007f]/.test(body.displayName))) {
     throw badRequest('INVALID_NICKNAME', '昵称应为1—24字，不含换行或控制字符')
   }
-  if (body.avatarUrl !== undefined && body.avatarUrl !== '' && !allowedAssets.has(body.avatarUrl)) validateAvatarUrl(body.avatarUrl)
+  if (body.avatarDataUri !== undefined) validateAvatarUpload(body.avatarDataUri)
+  if (body.avatarUrl !== undefined && body.avatarUrl !== '' && !allowedAssets.has(body.avatarUrl)
+    && !isDefaultAvatar(body.avatarUrl) && !isUploadedAvatar(body.avatarUrl)) validateAvatarUrl(body.avatarUrl)
 }
 
 function validateAvatarUrl (value) {
@@ -24,9 +28,10 @@ function validateAvatarUrl (value) {
   return url.href
 }
 
-/** Authenticated own-avatar proxy: no arbitrary URL query, redirects, cookies or file paths. */
+/** Authenticated saved/draft avatar proxy: only approved WeChat hosts; no redirects, cookies or file paths. */
 export async function readProfileAvatar (avatarUrl, fetchImage = fetch) {
   if (!avatarUrl || allowedAssets.has(avatarUrl)) return null
+  if (isDefaultAvatar(avatarUrl)) return defaultAvatarImage(avatarUrl)
   const url = validateAvatarUrl(avatarUrl)
   const existing = cache.get(url)
   if (fetchImage === fetch && existing && existing.expiresAt > Date.now()) return existing.dataUri

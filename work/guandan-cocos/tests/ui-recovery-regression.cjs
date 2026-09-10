@@ -35,7 +35,7 @@ for (const viewport of [
   assert.ok(toolbarBottom - frame.bounds.bottom < 14, 'hand tools must not drift upward into the play lane')
 }
 
-const { projectSettlementContent } = load('assets/scripts/scenes/SettlementPresentation.ts', { './MatchEndedPresentation': load('assets/scripts/scenes/MatchEndedPresentation.ts') })
+const { projectSettlementContent } = load('assets/scripts/scenes/SettlementPresentation.ts', { './MatchEndedPresentation': load('assets/scripts/scenes/MatchEndedPresentation.ts', { './DuplicateTablePresentation': load('assets/scripts/scenes/DuplicateTablePresentation.ts') }) })
 const snapshot = {
   state: { players: { p1: { name: '我', team: 'teamA' }, p2: { name: '左家', team: 'teamB' }, p3: { name: '队友', team: 'teamA' }, p4: { name: '右家', team: 'teamB' } } },
   settlement: { fullRank: ['p3', 'p1', 'p4', 'p2'], winnerTeam: 'teamA', levelUp: 3, message: '双上', isGameWon: false },
@@ -65,6 +65,15 @@ assert.doesNotMatch(JSON.stringify(singleResult), /升 0 级|完成过 A|下一�
 assert.equal(singleResult.players.length, 4)
 assert.ok(singleResult.players.every(player => player.ready === '本局完成'))
 assert.equal(projectSettlementContent(independentSnapshot, 'p2', null, true, [], singleEnded).title, '本局结束 · 失利')
+const individualResult = projectSettlementContent({
+  ...independentSnapshot,
+  state: { ...independentSnapshot.state, matchFormat: { kind: 'independent', individualRanking: true } },
+  settlement: { ...independentSnapshot.settlement, fullRank: ['p1', 'p3', 'p4', 'p2'], playerPoints: { p1: 3, p3: 2, p4: 1, p2: 0 } },
+}, 'p4', null, true, [], singleEnded)
+assert.equal(individualResult.title, '本轮结束')
+assert.match(individualResult.summary, /第 3 名 · 获得 1 分/)
+assert.doesNotMatch(individualResult.summary, /我方 3|对方 0|失利/)
+assert.match(individualResult.players[2].ready, /本轮得 1 分/)
 
 // Exercise the real settlement renderer; rows and their columns must not
 // collide, including a long Unicode player name and narrow overlay reflow.

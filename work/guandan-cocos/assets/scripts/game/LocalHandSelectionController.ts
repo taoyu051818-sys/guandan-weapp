@@ -1,6 +1,6 @@
 import { diagnosePlay, getPlayInfo, rankHintMoves } from '../core/generated'
 import type { Card, EngineState, HintProtectedGroup, HintRequest, MatchState, PlayerId, PlayValidation, RankedHintMove, TributeState } from '../core/generated'
-import { canSelectPlayingHand } from './HandInteractionPolicy'
+import { canSelectPlayingHand, canSelectTributeHand, resolveHandCapabilities } from './HandInteractionPolicy'
 
 export type LocalHandSelectionContext = Readonly<{
   state: EngineState & Partial<Pick<MatchState, 'roundId' | 'revision'>>
@@ -85,7 +85,7 @@ export class LocalHandSelectionController {
     context: LocalHandSelectionContext,
     protectedGroups: readonly HintProtectedGroup[] = [],
   ): string | null {
-    if (context.actionPending || context.phase !== 'playing' || context.state.currentTurn !== context.humanId) return null
+    if (!resolveHandCapabilities(context, context.humanId, { trustee: false }).canHint) return null
     const signature = this.createHintSignature(context, protectedGroups)
     if (signature !== this.hintSignature) {
       this.hintSignature = signature
@@ -95,16 +95,24 @@ export class LocalHandSelectionController {
         lastPlay: context.state.lastValidPlay,
         ruleProfile: context.state.ruleProfile,
         protectedGroups,
-      })
+      }).filter(choice => protectedGroups.every(group => {
+        if (group.kind !== 'locked') return true
+        const selected = new Set(choice.cards.map(card => card.id))
+        const included = group.cardIds.filter(id => selected.has(id)).length
+        return included === 0 || included === group.cardIds.length
+      }))
     }
     const choices = this.hintChoices
-    if (!choices.length) return '没有可用提示，请选择不要'
+    if (!choices.length) {
+      this.clear()
+      return protectedGroups.some(group => group.kind === 'locked')
+        ? '没有不拆锁牌的提示，可先恢复牌组或选择不要' : '没有可用提示，请选择不要'
+    }
     const choice = choices[this.hintIndex++ % choices.length]
     const cards = [...choice.cards]
     this.replace(cards.map(card => card.id))
     const validation = diagnosePlay(cards, context.state.lastValidPlay, context.state.ruleProfile)
     const info = validation.resolution ?? getPlayInfo(cards, context.state.ruleProfile)
-    if (choice.warning === 'splits-locked-group') return '没有其他合法牌，将拆锁牌组'
     return info ? `提示：${playTypeNames[info.type] ?? info.type} · 可出` : playValidationHint(validation)
   }
 
@@ -137,7 +145,7 @@ export class LocalHandSelectionController {
     if (context.phase === 'playing' && !canSelectPlayingHand(context.state, context.humanId, context.actionPending)) {
       return ''
     }
-    if (context.phase === 'tribute' && !this.canActInTribute(context)) return '当前等待其他玩家操作'
+    if (context.phase === 'tribute' && !canSelectTributeHand(context.tribute, context.humanId)) return '当前等待其他玩家操作'
     return null
   }
 
@@ -148,11 +156,4 @@ export class LocalHandSelectionController {
     return playValidationHint(diagnosePlay(cards, context.state.lastValidPlay, context.state.ruleProfile))
   }
 
-  private canActInTribute (context: LocalHandSelectionContext): boolean {
-    const tribute = context.tribute
-    if (!tribute || tribute.isAntiTribute || tribute.phase === 'done') return false
-    return tribute.phase === 'tributing'
-      ? tribute.actions.some(action => action.from === context.humanId && !action.card)
-      : tribute.actions.some(action => action.to === context.humanId && !action.returnCard)
-  }
 }

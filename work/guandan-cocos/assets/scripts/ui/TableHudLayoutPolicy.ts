@@ -115,10 +115,10 @@ const resolveSeatLayout = (bounds: TableHudBounds, seatSize: TableHudSize): Tabl
   const sideSeatX = seatSize.width * bounds.scale / 2 + 12
   const sideColumnX = 156 * bounds.scale / 2 + 12
   const bottomSeatY = bounds.bottom + seatSize.height * bounds.scale / 2 + 38 * bounds.scale
-  const topSeatX = -seatSize.width * bounds.scale / 2 - 70 * bounds.scale
-  const topSeatPlacement = seatSize.width <= 210
-    ? { id: 'seat-top', x: -220, y: TABLE_HUD_TURN_OPERATION_ANCHORS.top.y, width: 210 * bounds.scale, height: 76 * bounds.scale, priority: 80, shiftAxis: 'x' as const, shiftStep: 16 * bounds.scale, maxShift: 160 * bounds.scale, canHide: false }
-    : { id: 'seat-top', x: topSeatX, y: TABLE_HUD_TURN_OPERATION_ANCHORS.top.y, width: seatSize.width * bounds.scale, height: seatSize.height * bounds.scale, priority: 80, shiftAxis: 'x' as const, shiftStep: 16 * bounds.scale, maxShift: 160 * bounds.scale, canHide: false }
+  // Preserve the portrait anchor while moving its former right-hand text below it.
+  const topSeatX = (seatSize.width <= 210 ? -220 : -(seatSize.width / 2 + 70) * bounds.scale) - 96 * bounds.scale
+  const topSeatY = TABLE_HUD_TURN_OPERATION_ANCHORS.top.y - 30 * bounds.scale
+  const topSeatPlacement = { id: 'seat-top', x: topSeatX, y: topSeatY, width: 156 * bounds.scale, height: 168 * bounds.scale, priority: 80, shiftAxis: 'x' as const, shiftStep: 16 * bounds.scale, maxShift: 160 * bounds.scale, canHide: false }
   const placements = resolveSafePriorityRects({ left: bounds.left + 8, right: bounds.right - 8, top: bounds.top - 8, bottom: bounds.bottom + 8 }, [
     topSeatPlacement,
     { id: 'seat-bottom', x: bounds.left + sideSeatX, y: bottomSeatY, width: seatSize.width * bounds.scale, height: seatSize.height * bounds.scale, priority: 75, shiftAxis: 'x' as const, shiftStep: 16 * bounds.scale, maxShift: 160 * bounds.scale, canHide: false },
@@ -138,7 +138,7 @@ const resolveSeatLayout = (bounds: TableHudBounds, seatSize: TableHudSize): Tabl
   return {
     bottom: place('seat-bottom', { x: bounds.left + sideSeatX, y: bottomSeatY }),
     right: place('seat-right', { x: bounds.right - sideColumnX, y: 16 }),
-    top: place('seat-top', { x: topSeatX, y: TABLE_HUD_TURN_OPERATION_ANCHORS.top.y }),
+    top: place('seat-top', { x: topSeatX, y: topSeatY }),
     left: place('seat-left', { x: bounds.left + sideColumnX, y: 16 }),
   }
 }
@@ -162,8 +162,10 @@ const resolveBottomLayout = (
   if (!splitRows) {
     const suitX = laneLeft + suitSize.width * singleRowScale / 2
     const toolbarX = bounds.right - 8 - toolbarSize.width * singleRowScale / 2
+    const rightShift = Math.min(20 * singleRowScale, Math.max(0,
+      toolbarX - (toolbarSize.width + suitSize.width) * singleRowScale / 2 - TABLE_HUD_BOTTOM_GROUP_GAP - suitX))
     return {
-      suitBar: { x: suitX, y: controlLaneY, scale: singleRowScale, visible: true },
+      suitBar: { x: suitX + rightShift, y: controlLaneY, scale: singleRowScale, visible: true },
       toolbar: { x: toolbarX, y: controlLaneY, scale: singleRowScale, visible: true },
     }
   }

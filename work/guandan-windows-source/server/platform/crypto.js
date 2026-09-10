@@ -155,7 +155,8 @@ export class GameTicketVerifier {
       return { claims: null, consumed: false }
     }
     const claims = verifyCompactToken(token, this.secret, { now: this.now(), kind: 'game-ticket', audience: 'guandan-game' })
-    if (!claims.jti || !claims.sub || !claims.matchId || !/^\d{6}$/.test(String(claims.roomId)) || (!/^p[1-4]$/.test(String(claims.seat)) && !(claims.roomKind === 'friend' && claims.seat === 'observer' && claims.roomSettings?.spectator !== 'off'))) {
+    const validSeat = (claims.roomKind === 'friend' && claims.roomSettings?.format === 'duplicate' ? /^p[1-8]$/ : /^p[1-4]$/).test(String(claims.seat))
+    if (!claims.jti || !claims.sub || !claims.matchId || !/^\d{6}$/.test(String(claims.roomId)) || (!validSeat && !(claims.roomKind === 'friend' && claims.seat === 'observer' && claims.roomSettings?.spectator !== 'off'))) {
       throw unauthorized('入桌票据字段不完整')
     }
     if (!ticketRoomKinds.has(claims.roomKind)) throw unauthorized('入桌票据房间类型无效')

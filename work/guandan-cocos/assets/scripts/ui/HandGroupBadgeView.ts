@@ -1,3 +1,4 @@
+import { drawUiFrame } from './UiFrameStyle'
 import { Color, Graphics, Label, Node, UITransform, Vec3 } from 'cc'
 import type { HandGroupBadge } from '../game/HandStackLayout'
 
@@ -42,7 +43,7 @@ export class HandGroupBadgeView {
     this.graphics.fillColor = new Color(251, 252, 248, 238)
     this.graphics.strokeColor = color
     this.graphics.lineWidth = 1.3
-    this.graphics.roundRect(-width / 2, -height / 2, width, height, 3)
+    drawUiFrame(this.graphics, -width / 2, -height / 2, width, height, 'tag')
     this.graphics.fill()
     this.graphics.stroke()
   }

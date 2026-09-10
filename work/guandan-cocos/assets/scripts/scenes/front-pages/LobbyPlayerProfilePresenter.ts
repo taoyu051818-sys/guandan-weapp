@@ -30,11 +30,11 @@ export class LobbyPlayerProfilePresenter {
     const points = platformConfigured && !wallet.fresh ? '--' : String(Math.max(0, Math.round(wallet.value.points)))
     const s = layout.scale, r = layout.account
     ui.panel('LobbyAccountBacking', r.x, r.y, r.width, r.height, {
-      fill: new Color(16, 44, 61, 102), lineWidth: 0, radius: 5 * s,
+      fill: new Color(16, 44, 61, 102), lineWidth: 0, frame: 'tag', frameScale: s,
     })
     const avatar = layout.point(32, 35)
     ui.panel('LobbyAvatarBacking', avatar.x, avatar.y, 44 * s, 44 * s, {
-      fill: new Color(20, 51, 65), stroke: new Color(250, 233, 180), lineWidth: s, radius: 6 * s,
+      fill: new Color(20, 51, 65), stroke: new Color(250, 233, 180), lineWidth: s, frame: 'control', frameScale: s,
     })
     mountProfileAvatar(ui.parent, profile, this.dependencies.auth, avatar.x, avatar.y, 40 * s)
     const leftText = (text: string, x: number, y: number, size: number, width: number): void => {

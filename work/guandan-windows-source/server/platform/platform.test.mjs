@@ -259,6 +259,13 @@ try {
   assert.equal(avatarSaved.status, 200, 'WeChat-compatible POST must save profiles')
   assert.equal((await call(baseUrl, '/api/v1/profile/avatar')).status, 401, 'avatar reads require the account token')
   assert.equal((await call(baseUrl, '/api/v1/profile/avatar', { token: users[0].token })).payload.data.dataUri, null)
+  assert.equal((await call(baseUrl, '/api/v1/profile/avatar', { method: 'POST', body: { avatarUrl: 'https://wx.qlogo.cn/mmopen/test/132' } })).status, 401, 'draft preview requires authentication')
+  assert.equal((await call(baseUrl, '/api/v1/profile/avatar', { method: 'POST', token: users[0].token, body: { avatarUrl: 'http://127.0.0.1/private' } })).status, 400, 'draft preview cannot proxy arbitrary hosts')
+  const beforePreview = (await call(baseUrl, '/api/v1/profile', { token: users[0].token })).payload.data.user
+  const preview = await call(baseUrl, '/api/v1/profile/avatar', { method: 'POST', token: users[0].token, body: { avatarUrl: 'asset:ui/common/default-avatar/texture' } })
+  assert.equal(preview.status, 200)
+  assert.equal(preview.payload.data.avatarUrl, 'asset:ui/common/default-avatar/texture', 'draft reads must return the requested avatar, not the stored old one')
+  assert.deepEqual((await call(baseUrl, '/api/v1/profile', { token: users[0].token })).payload.data.user, beforePreview, 'preview must not save the draft')
   assert.equal((await call(baseUrl, '/api/v1/profile', { method: 'POST', token: users[0].token,
     body: { avatarUrl: 'https://127.0.0.1/secret' } })).status, 400)
   const afterRenameLogin = await call(baseUrl, '/api/v1/auth/wx-login', { method: 'POST', body: { code: 'valid-1', displayName: '陵水玩家' } })

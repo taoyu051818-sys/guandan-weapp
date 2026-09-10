@@ -3,10 +3,11 @@ import { canonicalJsonFingerprint } from './canonical-json.js'
 import { classicStakeForMode, settleClassicStake } from './classic-stakes.js'
 import { badRequest, conflict, forbidden } from './errors.js'
 import { friendRoomKind } from './friend-room-service.js'
-import { applyMatchRating } from './rating.js'
+import { applyMatchRating, createInitialRating } from './rating.js'
 import { sanitizeSpectatorTimeline } from './spectator-domain.js'
 import { completeTournamentAssignment } from './tournament-orchestrator.js'
-import { isFixedTournament, qualificationStatus, rankTournamentEntries, tournamentRunError } from './tournament-service.js'
+import { isFixedTournament, tournamentRunError } from './tournament-service.js'
+import { qualificationStatus, rankTournamentEntries } from './tournament-standings.js'
 
 const seats = ['p1', 'p2', 'p3', 'p4']
 const rewards = [100, 60, 30, 10]
@@ -204,7 +205,13 @@ export class GameResultService {
       tournament.currentRound = Math.min(roundsTotal, Math.max(...standings.map(item => item.played), 1))
       tournament.status = standings.length >= 4 && standings.every(item => item.played >= roundsTotal) ? 'finished' : 'running'
     }
-    standings.forEach((standing, index) => { standing.advanced = qualificationStatus(tournament, standing, index) === 'qualified' })
+    standings.forEach((standing, index) => {
+      Object.assign(state.tournamentStandings[`${tournament.id}:${standing.userId}`], {
+        rank: standing.rank,
+        opponentPoints: standing.opponentPoints,
+        advanced: qualificationStatus(tournament, standing, index) === 'qualified',
+      })
+    })
   }
 
   finalizeMatch (state, match, tournament, eventId, event, timeline, finishedAt, finalSequence, now) {
@@ -262,22 +269,28 @@ export class GameResultService {
         return { eventId, accepted: true, duplicate: true, processedAt: previous.processedAt }
       }
       const match = this.resolveMatch(state, eventId, event)
+      const roomBots = new Set(match?.kind === friendRoomKind
+        ? match.participants.filter(p => p.isBot && /^friendbot_[a-f0-9]{24}$/.test(p.userId)).map(p => p.userId) : [])
       const timeline = this.resolveTimeline(state, event, finishedAt, finalSequence)
       const { tournament, fixedRun } = this.resolveTournament(state, match, event.userIdsBySeat)
       seats.forEach(seat => {
         const userId = event.userIdsBySeat[seat]
+        if (roomBots.has(userId)) return
         if (!state.wallets[userId] || !state.users[userId]) throw badRequest('UNKNOWN_RESULT_USER', `结算用户不存在：${seat}`)
       })
+      const ratingFor = seat => roomBots.has(event.userIdsBySeat[seat]) ? createInitialRating(event.userIdsBySeat[seat]) : this.ensurePlayerRating(state, event.userIdsBySeat[seat])
       const ratingResult = applyMatchRating(
-        ['p1', 'p3'].map(seat => this.ensurePlayerRating(state, event.userIdsBySeat[seat])),
-        ['p2', 'p4'].map(seat => this.ensurePlayerRating(state, event.userIdsBySeat[seat])),
+        ['p1', 'p3'].map(ratingFor),
+        ['p2', 'p4'].map(ratingFor),
         event.winnerTeam,
       )
       const ratingByUser = Object.fromEntries([...ratingResult.teamA, ...ratingResult.teamB].map(rating => [rating.id, rating]))
       const classicSettlement = match && classicStakeForMode(match.mode)
         ? settleClassicStake({ mode: match.mode, winnerTeam: event.winnerTeam, userIdsBySeat: event.userIdsBySeat, balancesByUser: Object.fromEntries(Object.values(event.userIdsBySeat).map(userId => [userId, state.wallets[userId].balance])) })
         : null
-      event.ranking.forEach((seat, index) => this.settlePlayer({ state, eventId, event, tournament, replayId: `rpl_${eventId}`, ratingByUser, classicSettlement, seat, index, now, finishedAt }))
+      event.ranking.forEach((seat, index) => {
+        if (!roomBots.has(event.userIdsBySeat[seat])) this.settlePlayer({ state, eventId, event, tournament, replayId: `rpl_${eventId}`, ratingByUser, classicSettlement, seat, index, now, finishedAt })
+      })
       this.settleTournament(state, tournament, fixedRun, match, eventId, event, now)
       this.finalizeMatch(state, match, tournament, eventId, event, timeline, finishedAt, finalSequence, now)
       state.gameResults[eventId] = { eventId, event: structuredClone(event), processedAt: now }

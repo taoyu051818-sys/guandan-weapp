@@ -1,4 +1,10 @@
-import type { PlayerId, Rank, Team } from '../core/generated'
+import type { EngineState, PlayerId, Rank, Team } from '../core/generated'
+
+export const projectTableModeLabel = (state: EngineState, viewerId: PlayerId, hideScore: boolean, singleRound: boolean): string | null => {
+  if (state.matchFormat?.kind === 'rotating') return `转蛋 · ${state.matchFormat.rotatingScoring}分制${hideScore ? '' : ` · 我的积分 ${state.playerScores?.[viewerId] ?? 0}`}`
+  if (state.matchFormat?.kind === 'independent') return `${state.matchFormat.levelMode === 'random' ? '随机级牌' : '固定级牌'} · ${singleRound ? '单局' : '定局玩法'}`
+  return null
+}
 
 export type TablePlayerTeams = Readonly<Record<PlayerId, Readonly<{ team: Team }>>>
 

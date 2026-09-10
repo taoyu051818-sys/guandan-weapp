@@ -152,6 +152,4 @@ export interface GameState {
   campaignProgress: CampaignProgress | null;
   playerStats: PlayerStats; // 玩家数据看板
   settings: GameSettings; // 游戏设置
-  activeChats: Record<PlayerId, { message: string, id: number } | null>; // 聊天气泡状态
-  sendChatMessage: (playerId: PlayerId, message: string) => number;
 }

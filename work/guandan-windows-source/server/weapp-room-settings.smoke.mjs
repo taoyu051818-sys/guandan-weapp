@@ -149,6 +149,8 @@ try {
   const timedRoomId = '717171'
   const timedSettings = {
     ...fullSettings,
+    format: 'rotating', levelMode: 'fixed', levelRank: 2, tributeEnabled: false,
+    teamRotation: 'draw', rotatingScoring: 6, scoring: 'double-3',
     rounds: 8,
     turnSeconds: 20,
     totalTimeMinutes: 20,
@@ -164,7 +166,7 @@ try {
   const blockedChatId = nextRequestId++
   const blockedChatPromise = waitFor(timedHost, 'error', packet => packet.requestId === blockedChatId)
   send(timedHost, 'chat', { roomId: timedRoomId, text: '谢谢' }, blockedChatId)
-  assert.match((await blockedChatPromise).message, /禁止互动/)
+  assert.match((await blockedChatPromise).message, /未知|不支持/)
 
   const readyId = nextRequestId++
   const readyPromise = waitFor(timedHost, 'actionAccepted', packet => packet.requestId === readyId)
@@ -175,6 +177,10 @@ try {
   const matchEndedPromise = waitFor(timedHost, 'matchEnded', packet => packet.matchEnded?.reason === 'time-limit')
   send(timedHost, 'startGame', { roomId: timedRoomId }, startId)
   const started = await startedPromise
+  assert.equal(started.state.matchFormat.kind, 'rotating')
+  assert.equal(started.state.matchFormat.rotatingScoring, 6)
+  assert.ok(started.state.pairingCard && started.state.pairingCard.suit !== 'joker')
+  assert.deepEqual(started.state.playerScores, { p1: 0, p2: 0, p3: 0, p4: 0 })
   assert.equal(started.turnDeadlineAt, null, '无托管的真人回合不应建立自动代打截止时间')
   assert.ok(started.totalDeadlineAt - started.matchStartedAt === 2000, '自定义总时长必须进入独立权威截止时间')
   assert.deepEqual(started.spectatorPolicy, { mode: 'live', allowed: true, delayRounds: 0 })
@@ -186,6 +192,7 @@ try {
   const timedEnd = await matchEndedPromise
   assert.equal(timedEnd.phase, 'settlement')
   assert.equal(timedEnd.turnDeadlineAt, null)
+  assert.deepEqual(timedEnd.matchEnded.playerScores, { p1: 0, p2: 0, p3: 0, p4: 0 })
 
   process.stdout.write('weapp friend room settings integration passed\n')
 } finally {

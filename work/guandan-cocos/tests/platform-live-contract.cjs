@@ -81,6 +81,35 @@ const close = runtime => new Promise(resolve => runtime.server.close(resolve))
     assert.equal(profile.displayName, '契约玩家1')
     assert.equal((await gateways[0].wallet.getWallet()).points, 10_000)
 
+    // Send the real Cocos form's complete settings through HTTP, not just the server normalizer.
+    const { loadTs } = require('./support/load-typescript-module.cjs')
+    const core = require(path.resolve(projectRoot, '../../shared-core/dist'))
+    const models = loadTs(path.join(projectRoot, 'assets/scripts/network/LobbyModels.ts'), { './DuplicateRoomModel': loadTs(path.join(projectRoot, 'assets/scripts/network/DuplicateRoomModel.ts')) })
+    const form = loadTs(path.join(projectRoot, 'assets/scripts/scenes/front-pages/FriendRoomSettingsPolicy.ts'), {
+      '../../network/LobbyModels': models, '../../core/generated/lib/matchFormat': core,
+    })
+    for (const target of ['过6', '过10', '过A', '过A翻山']) {
+      let settings = form.changeFriendRoomFormat(form.createDefaultFriendRoomSettings(), 'upgrade')
+      settings = form.updateFriendRoomChoice(settings, 'upgrade-target', target)
+      settings = { ...settings, counterEnabled: true, disableVoice: false, spectator: 'delay-15' }
+      const created = await gateways[0].friendRooms.create(settings)
+      assert.equal(created.roomSettings.upgradeTarget, settings.upgradeTarget)
+      assert.equal(created.roomSettings.spectator, 'delay-15')
+      await gateways[0].friendRooms.cancel(created.matchId)
+    }
+    const roundRoom = await gateways[0].friendRooms.create(form.createDefaultFriendRoomSettings())
+    assert.equal(roundRoom.roomSettings.format, 'rounds')
+    const unauthorizedNumberJoin = await fetch(`${baseUrl}/api/v1/friend-rooms/join-by-number`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ roomId: roundRoom.roomId }) })
+    assert.equal(unauthorizedNumberJoin.status, 401, 'room numbers must not bypass login')
+    for (let seat = 1; seat < 4; seat++) {
+      const guest = await gateways[seat].friendRooms.joinRoomNumber(roundRoom.roomId)
+      assert.equal(guest.seat, `p${seat + 1}`)
+      assert.equal(guest.roomSettings.format, 'rounds')
+      assert.equal(guest.roomId, roundRoom.roomId)
+      assert.equal('inviteCode' in guest, false)
+    }
+    await gateways[0].friendRooms.cancel(roundRoom.matchId)
+
     const products = await gateways[0].shop.listProducts()
     const soap = products.find(product => product.id === 'soap')
     assert.ok(soap)

@@ -13,6 +13,7 @@ export type PlatformMatchRecoveryDependencies = Readonly<{
   lobby: LobbyController
   enterLobby: () => void
   restoreFriendRoom?: (entry: Extract<MatchRecoveryEntry, { roomKind: 'friend' }>) => void
+  restoreMatchOrigin?: (entry: Extract<MatchRecoveryEntry, { roomKind: 'match' }>) => void
   showRecoveryAvailable: (message: string) => void
   onPendingChanged?: (pending: boolean) => void
   showNotice: (title: string, detail?: string) => void
@@ -79,6 +80,7 @@ export class PlatformMatchRecoveryCoordinator {
       }
       this.dependencies.enterLobby()
       if (entry.roomKind === 'friend') this.dependencies.restoreFriendRoom?.(entry)
+      else this.dependencies.restoreMatchOrigin?.(entry)
       this.dependencies.lobby.enterMatchedRoom({
         entryAttemptId: entry.entryAttemptId, recoveryAttemptId: entry.recoveryAttemptId,
         matchId: entry.matchId, roomId: entry.roomId, gameEndpoint: entry.gameEndpoint,

@@ -56,8 +56,7 @@ const kingBombVoice = voiceProfile(['niuma/king_bomb'])
 
 /**
  * Resolves only unambiguous announcements. The curated Female matrix covers all
- * physical single/pair ranks, while wildcard-resolved singles/pairs stay silent
- * rather than announcing the red-heart level card as its represented rank.
+ * physical ranks and valid heart-wildcard pairs, announcing the resolved pair rank.
  */
 export const resolvePlayVoiceProfile = (action: PlayAction): PlayVoiceProfile | null => {
   if (action.type === PlayType.Straight) return straightVoice
@@ -69,7 +68,16 @@ export const resolvePlayVoiceProfile = (action: PlayAction): PlayVoiceProfile | 
   if (action.type === PlayType.Bomb) return bombVoice
   if (action.type === PlayType.Rocket) return kingBombVoice
   if (action.type !== PlayType.Single && action.type !== PlayType.Pair) return null
-  if (action.resolution?.wildcardUsages?.length) return null
+  if (action.resolution?.wildcardUsages?.length) {
+    if (action.type !== PlayType.Pair || action.cards.length !== 2) return null
+    const natural = action.cards.find(card => !card.isRedJoker)
+    const rank = natural?.rank
+    if (!natural || rank === 'Small' || rank === 'Big' || natural.suit === 'joker') return null
+    const usages = action.resolution.wildcardUsages
+    if (!usages.every(usage => usage.representedValue === natural.value && usage.representedSuit !== 'joker' &&
+      action.cards.some(card => card.id === usage.cardId && card.isRedJoker))) return null
+    return pairVoices[String(rank)] ?? null
+  }
   const ranks = new Set(action.cards.map(card => String(card.rank)))
   if (ranks.size !== 1) return null
   const rank = ranks.values().next().value as string | undefined

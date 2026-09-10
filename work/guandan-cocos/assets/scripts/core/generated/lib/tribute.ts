@@ -1,6 +1,7 @@
 import type { Card, PlayerId } from '../types/game'
 import { createDeck } from './deck'
 import { MATCH_LEVELS } from './matchFormat'
+import { arrangeRotatingRound } from './variantRules'
 import type {
   BeginPlayAfterTributeCommand,
   GameEvent,
@@ -119,7 +120,7 @@ export const prepareNextRound = (
 ): TributeOperationResult => {
   if (state.phase !== 'settled' || !state.settlement) return failure('MATCH_NOT_SETTLED')
   if (state.settlement.isGameWon) return failure('MATCH_ALREADY_WON')
-  const independent = state.matchFormat?.kind === 'independent'
+  const independent = state.matchFormat?.kind === 'independent' || state.matchFormat?.kind === 'rotating'
   const nextLevel = independent ? command.nextLevel : state.settlement.currentLevel
   if (nextLevel === undefined || !MATCH_LEVELS.includes(nextLevel) ||
     (independent && state.matchFormat?.levelMode === 'fixed' && nextLevel !== state.matchFormat.levelRank)) return failure('INVALID_NEXT_LEVEL')
@@ -148,9 +149,7 @@ export const prepareNextRound = (
     }
   })
   const skipTribute = independent || state.matchFormat?.tributeEnabled === false
-  return {
-    ok: true,
-    state: {
+  let prepared: MatchState = {
       ...state,
       roundId,
       phase: skipTribute ? 'playing' : 'tribute',
@@ -167,7 +166,12 @@ export const prepareNextRound = (
       settlement: null,
       tribute: skipTribute ? null : tribute,
       roundMeta: skipTribute ? null : { fromTribute: true, isAntiTribute: resisted },
-    },
+    }
+  try { prepared = arrangeRotatingRound(prepared, command.pairingIndex) }
+  catch { return failure('INVALID_ROTATING_PAIRING') }
+  return {
+    ok: true,
+    state: prepared,
     events: [
       { type: 'ROUND_PREPARED', roundId, mode, status: skipTribute ? 'ready' : tribute.status },
       ...(!skipTribute && resisted ? [{ type: 'ANTI_TRIBUTE_DECLARED' as const, mode }] : []),

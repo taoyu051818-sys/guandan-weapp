@@ -1,10 +1,10 @@
-import { Color, EditBox, type Label, Node, UITransform, Vec3, tween } from 'cc'
+import { Color, type Label, Node, UITransform, Vec3, tween } from 'cc'
 import {
   type FriendRoomSettings,
   LobbyController,
   type LobbySnapshot,
 } from '../../network/LobbyController'
-import type { FrontPageGateways, MatchQueueId, MatchRecoveryEntry } from '../../services/FrontPageGatewayContracts'
+import type { FrontPageGateways, MatchQueueId, MatchRecoveryEntry, UserProfile } from '../../services/FrontPageGatewayContracts'
 import { WechatFriendInvite } from '../../services/WechatFriendInvite'
 import { GameSession } from '../../session/GameSession'
 import { ScreenAdapter } from '../../ui/ScreenAdapter'
@@ -15,7 +15,6 @@ import { attachLobbyAmbientMotion } from '../../ui/LobbyAmbientMotion'
 import { PageRouter } from '../PageRouter'
 import { FriendRoomSettingsPresenter } from './FriendRoomSettingsPresenter'
 import { FriendRoomPlatformFlow } from './FriendRoomPlatformFlow'
-import { FriendRoomPlatformPresenter } from './FriendRoomPlatformPresenter'
 import { FriendRoomWaitingPresenter } from './FriendRoomWaitingPresenter'
 import { FrontPagePlayerState } from './FrontPagePlayerState'
 import { FrontPageWalletState } from './FrontPageWalletState'
@@ -31,6 +30,7 @@ const settle = <T>(promise: Promise<T>): Promise<Settled<T>> => promise.then(
 )
 
 export type LobbyPageDependencies = {
+  profileLoaded?: (profile: UserProfile) => void
   router: PageRouter
   session: GameSession
   lobby: LobbyController
@@ -57,12 +57,11 @@ export type LobbyPageDependencies = {
 
 /** Owns the lobby landing page, classic rooms, room connection flow, and waiting UI. */
 export class LobbyPageDomain {
-  private roomCodeInput: EditBox | null = null
+  private friendRoomEntryReturnPage: 'menu' | 'friend-room-settings' = 'menu'
   private classicRoomMode: ClassicRoomMode = 'classic'
   private pendingFriendRoomSettings: FriendRoomSettings | null = null
   private readonly friendRoomSettingsPresenter: FriendRoomSettingsPresenter
   private readonly friendRoomPlatformFlow: FriendRoomPlatformFlow | null
-  private readonly friendRoomPlatformPresenter: FriendRoomPlatformPresenter
   private readonly friendRoomWaitingPresenter: FriendRoomWaitingPresenter
   private readonly wechatInvite: WechatFriendInvite
   private readonly playerProfilePresenter: LobbyPlayerProfilePresenter
@@ -79,11 +78,10 @@ export class LobbyPageDomain {
       screen: dependencies.screen,
       backgroundArt: LOBBY_ART.friendBackground,
       updateSessionSettings: settings => dependencies.session.updateSettings(settings),
-      joinRoom: () => this.openLobby(),
       createRoom: settings => this.openLobby(settings),
+      joinRoom: roomId => this.joinRoomNumber(roomId),
       goBack: () => this.showMenu(),
     })
-    this.friendRoomPlatformPresenter = new FriendRoomPlatformPresenter(dependencies.screen)
     this.friendRoomWaitingPresenter = new FriendRoomWaitingPresenter(
       dependencies.screen, dependencies.lobby, LOBBY_ART.defaultAvatar, () => this.leaveFriendRoomToMenu(),
     )
@@ -102,7 +100,16 @@ export class LobbyPageDomain {
             expiresAt: entry.expiresAt,
             displayName: dependencies.player.dashboard?.user.displayName ?? '陵水玩家',
           }),
-          showNotice: dependencies.showNotice,
+          showNotice: (title, detail) => {
+            // A failed HTTP reservation returns to its origin, keeping the rule
+            // draft. It must not strand the player on an empty entry screen.
+            if (dependencies.session.snapshot.status === 'lobby' && !dependencies.lobby.snapshot.roomId &&
+              !this.friendRoomPlatformFlow?.snapshot.busy && !this.friendRoomPlatformFlow?.snapshot.entry) {
+              if (this.friendRoomEntryReturnPage === 'friend-room-settings') this.showFriendRoomSettings()
+              else this.showMenu()
+            }
+            dependencies.showNotice(title, detail)
+          },
           onChanged: () => {
             if (dependencies.router.current === 'lobby' && dependencies.session.snapshot.status === 'lobby') this.renderLobby(dependencies.lobby.snapshot)
           },
@@ -198,7 +205,7 @@ export class LobbyPageDomain {
       fill: new Color(24, 48, 65, 218),
       stroke: new Color(159, 204, 231, 210),
       lineWidth: 2,
-      radius: 6,
+      frame: 'control',
     })
     ui.outlinedLabel('经典掼蛋', leftX, this.dependencies.screen.safeTopY(96), Math.min(32, Math.max(26, safeHeight * 0.058)), {
       width: leftWidth + 20,
@@ -218,7 +225,7 @@ export class LobbyPageDomain {
         textOutlineColor: active ? new Color(255, 235, 157) : new Color(28, 36, 32),
         textOutlineWidth: active ? 0 : 1,
         disabled: !mode.available,
-        radius: 5,
+        frame: 'tag',
       })
       node.setPosition(new Vec3(leftX, modeStartY - index * modeGap, 0))
       if (mode.available) node.on(Node.EventType.TOUCH_END, () => { this.classicRoomMode = mode.id; this.showClassicRooms() })
@@ -265,6 +272,7 @@ export class LobbyPageDomain {
       this.dependencies.issuePageRequest()
       this.dependencies.invalidateMatchAttempt()
       this.dependencies.setTableVisible(false)
+      this.dependencies.setFriendRoomWaitingVisible(false)
       if (this.dependencies.session.snapshot.status !== 'menu') this.dependencies.session.leaveToMenu()
     }
     this.friendRoomSettingsPresenter.show()
@@ -284,7 +292,7 @@ export class LobbyPageDomain {
     ui.menuLabel('选择匹配方式', 0, 165, 20)
     this.sizedButton(ui, '快速匹配\n自动寻找三名玩家', 0, 85, 520, 72, 23, () => this.dependencies.beginMatch('quick', '快速匹配', 'online'))
     this.sizedButton(ui, '比赛场\n日赛 · 周赛 · 月赛 · 主题赛事', 0, 0, 520, 72, 23, this.dependencies.showCompetition)
-    this.sizedButton(ui, '好友房\n设置规则、创建房间或输入六位房间码', 0, -85, 520, 72, 23, () => this.showFriendRoomSettings())
+    this.sizedButton(ui, '好友房\n设置规则，与微信好友同玩', 0, -85, 520, 72, 23, () => this.showFriendRoomSettings())
     this.pageButton(ui, '返回大厅', -180, () => this.showMenu())
   }
 
@@ -306,53 +314,19 @@ export class LobbyPageDomain {
         }
       }, 0)
     }
-    const draftRoomCode = this.roomCodeInput?.string ?? ''
     const ui = this.dependencies.router.open('lobby')
-    this.roomCodeInput = null
-    this.dependencies.setFriendRoomWaitingVisible(Boolean(snapshot.roomId))
+    // HTTP creation, WebSocket entry and occupied seats all use the same table.
+    // Never enable old hands/HUD until an authoritative game snapshot arrives.
+    this.dependencies.setFriendRoomWaitingVisible(true)
     if (snapshot.roomId) {
       this.renderFriendTableLobby(ui, snapshot)
       return
     }
-    if (this.friendRoomPlatformFlow) {
-      this.friendRoomPlatformPresenter.renderEntry(ui, this.friendRoomPlatformFlow.snapshot, {
-        create: () => this.showFriendRoomSettings(),
-        join: inviteText => { void this.friendRoomPlatformFlow?.join(inviteText) },
-        cancel: () => this.friendRoomPlatformFlow?.leave(),
-        back: () => this.showMenu(),
-      })
-      return
-    }
-    ui.menuLabel('多人联机大厅', 0, 220, 42)
-    const connectionText = snapshot.roomStatus === 'rejoining'
-      ? '连接已恢复，正在验证房间身份…'
-      : snapshot.roomStatus === 'joining'
-        ? '正在进入房间…'
-        : snapshot.connected
-          ? '服务已连接 · 发现附近房间'
-          : '正在连接服务…'
-    ui.menuLabel(snapshot.error ?? connectionText, 0, 165, 20)
-    if (snapshot.roomStatus === 'joining' && !snapshot.roomId) {
-      ui.menuLabel('', 0, 105, 22)
-      this.pageButton(ui, '取消进入', 30, () => this.dependencies.lobby.leaveRoom())
-    } else {
-      this.pageButton(ui, '设置并创建好友房', 95, () => this.showFriendRoomSettings())
-      this.pageButton(ui, '刷新房间列表', 35, () => this.dependencies.lobby.refreshRooms())
-      const input = ui.roomCodeInput(0, -28)
-      this.roomCodeInput = input.getComponentInChildren(EditBox)
-      if (this.roomCodeInput) this.roomCodeInput.string = draftRoomCode
-      this.pageButton(ui, '加入输入的房间', -85, () => this.dependencies.lobby.joinRoom(this.roomCodeInput?.string.trim() ?? ''))
-      snapshot.rooms.slice(0, 3).forEach((room, index) => {
-        this.pageButton(ui, `加入 ${room.hostName} 的房间 ${room.roomId}（${room.playerCount}/4）`, -140 - index * 48, () => this.dependencies.lobby.joinRoom(room.roomId))
-      })
-    }
-    this.pageButton(ui, '返回大厅', -210, () => { this.dependencies.lobby.leaveRoom(); this.showMenu() })
-  }
-
-  /** Releases transient input state when another domain clears or replaces the page tree. */
-  public resetInput (): void {
-    this.roomCodeInput = null
-    this.friendRoomPlatformPresenter.resetInput()
+    const busy = this.friendRoomPlatformFlow?.snapshot.busy
+    // A previous socket/recovery error must not cover a new HTTP request.
+    const status = busy === 'creating' ? '正在创建房间…' : busy === 'joining' ? '正在加入好友房…'
+      : snapshot.error ?? (snapshot.roomStatus === 'rejoining' ? '正在恢复房间…' : '正在进入牌桌…')
+    this.friendRoomWaitingPresenter.renderEntering(ui, status)
   }
 
   public reflow (): void {
@@ -373,7 +347,6 @@ export class LobbyPageDomain {
   public hide (): void {
     this.pendingFriendRoomSettings = null
     this.friendRoomSettingsPresenter.hide()
-    this.resetInput()
   }
 
   public destroy (): void {
@@ -389,6 +362,7 @@ export class LobbyPageDomain {
     if (this.isDisposed()) return
     this.friendRoomSettingsPresenter.hide()
     this.dependencies.setTableVisible(false)
+    this.friendRoomEntryReturnPage = settings ? 'friend-room-settings' : 'menu'
     this.pendingFriendRoomSettings = settings
     this.dependencies.session.enterLobby()
     if (this.friendRoomPlatformFlow) {
@@ -407,6 +381,15 @@ export class LobbyPageDomain {
     this.renderLobby(this.dependencies.lobby.snapshot)
   }
 
+  private joinRoomNumber (roomId: string): void {
+    const flow = this.friendRoomPlatformFlow
+    if (!flow) { this.dependencies.showNotice('暂时无法加入', '房号加入需要平台服务，请检查服务配置'); return }
+    if (this.isDisposed() || flow.snapshot.busy || this.recoveryPending) return
+    this.openLobby()
+    this.friendRoomEntryReturnPage = 'friend-room-settings'
+    void flow.joinRoomNumber(roomId)
+  }
+
   private startClassicTier (tier: (typeof CLASSIC_ROOM_TIERS)[number]): void {
     if (this.classicRoomMode !== 'classic') {
       this.dependencies.showNotice('该玩法尚未开放', '当前规则引擎仅支持四人经典掼蛋')
@@ -417,9 +400,10 @@ export class LobbyPageDomain {
 
   private renderFriendTableLobby (ui: RuntimeUiFactory, snapshot: LobbySnapshot): void {
     const platformEntry = this.friendRoomPlatformFlow?.snapshot.entry ?? null
-    this.friendRoomWaitingPresenter.render(ui, snapshot, Boolean(platformEntry), platformEntry ? () => {
+    const inviteText = platformEntry?.roomId === snapshot.roomId ? this.friendRoomPlatformFlow?.snapshot.inviteText : null
+    this.friendRoomWaitingPresenter.render(ui, snapshot, Boolean(platformEntry), inviteText ? () => {
       try {
-        this.wechatInvite.share(platformEntry.roomId === snapshot.roomId ? this.friendRoomPlatformFlow?.snapshot.inviteText ?? null : null)
+        this.wechatInvite.share(inviteText)
       } catch (error) {
         this.dependencies.showNotice('暂时无法邀请', error instanceof Error ? error.message : '请稍后重试')
       }
@@ -445,6 +429,7 @@ export class LobbyPageDomain {
       if (walletResult.status === 'fulfilled') this.dependencies.wallet.update(walletResult.value)
       else this.dependencies.wallet.invalidate()
       if (!this.isDisposed() && requestToken === this.dependencies.currentPageRequest() && this.dependencies.router.current === 'menu') this.renderMenu()
+      if (!this.isDisposed() && dashboardResult.status === 'fulfilled') this.dependencies.profileLoaded?.(dashboardResult.value.user)
     })
   }
 
@@ -454,13 +439,13 @@ export class LobbyPageDomain {
   private renderQuickStart (ui: RuntimeUiFactory, x: number, y: number, width: number, height: number, s: number): void {
     const button = ui.button('LobbyQuickStart', '', x, width, height, 22, {
       fill: new Color(239, 187, 79), pressedFill: new Color(232, 177, 66),
-      stroke: new Color(255, 235, 173), lineWidth: 2 * s, radius: 8 * s,
+      stroke: new Color(255, 235, 173), lineWidth: 2 * s, frame: 'panel', frameScale: s,
     })
     button.setPosition(new Vec3(x, y, 0))
     // All decorative layers stay inside the original hit box and inherit its
     // press/cancel feedback; they never register their own input handlers.
     ui.panel('QuickStartInnerRim', 0, 0, width - 8 * s, height - 8 * s, {
-      fill: new Color(255, 224, 145, 0), stroke: new Color(174, 110, 27, 125), lineWidth: s, radius: 6 * s,
+      fill: new Color(255, 224, 145, 0), stroke: new Color(174, 110, 27, 125), lineWidth: s, frame: 'control', frameScale: s,
     }, button)
     const title = lobbyLabel(ui, '快速开始', 0, 7 * s, 23, width - 24 * s, s, button, new Color(101, 66, 28))
     const subtitle = lobbyLabel(ui, '随机级牌 · 单局对战', 0, -11 * s, 12, width - 24 * s, s, button, new Color(101, 66, 28), 0, false)
@@ -495,7 +480,7 @@ export class LobbyPageDomain {
 
   private compactButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, action: () => void): Node {
     const node = ui.button('CompactButton', text, x, width, height, fontSize, {
-      fill: new Color(26, 51, 56, 224), pressedFill: new Color(52, 83, 72, 240), stroke: new Color(241, 207, 101, 245), textColor: new Color(255, 240, 181), textOutlineWidth: 2, radius: 6,
+      fill: new Color(26, 51, 56, 224), pressedFill: new Color(52, 83, 72, 240), stroke: new Color(241, 207, 101, 245), textColor: new Color(255, 240, 181), textOutlineWidth: 2, frame: 'control',
     })
     node.setPosition(new Vec3(x, y, 0))
     node.on(Node.EventType.TOUCH_END, action)

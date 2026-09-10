@@ -62,8 +62,6 @@ export const createRoomMetadata = ({ playerIds: ids, createResumeToken, createBo
       lobbyReady: { p1: false, p2: false, p3: false, p4: false },
       roundReady: { p1: false, p2: false, p3: false, p4: false },
       dissolveVote: null,
-      chatLastAcceptedAt: { p1: 0, p2: 0, p3: 0, p4: 0 },
-      chatLastPhraseAt: { p1: {}, p2: {}, p3: {}, p4: {} },
       statsBySeat: createGameStatsBySeat(),
       roundStatsBySeat: createGameStatsBySeat(),
       version: 0,

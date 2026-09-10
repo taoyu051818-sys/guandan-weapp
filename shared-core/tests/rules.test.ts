@@ -91,3 +91,23 @@ describe('legalMoves', () => {
       .toEqual(representatives.map(key))
   })
 })
+
+describe('heart-level wildcard cannot represent jokers', () => {
+  for (const level of [2, 9, 'A'] as const) {
+    it(`rejects joker substitution at level ${level} in rules and move generation`, () => {
+      const deck = createDeck(level)
+      const wild = deck.filter(card => card.isRedJoker)
+      const jokers = deck.filter(card => card.suit === 'joker')
+      const profile = getRuleProfile('classic')
+      for (const joker of jokers) expect(resolvePlay([wild[0], joker], profile)).toBeNull()
+      expect(resolvePlay([...wild, ...jokers.slice(0, 2)], profile)).toBeNull()
+      expect(resolvePlay([wild[0], ...jokers.slice(0, 3)], profile)).toBeNull()
+      const moves = legalMoves([...wild, ...jokers], null, profile)
+      expect(moves.some(move => move.some(card => card.isRedJoker) && move.some(card => card.suit === 'joker'))).toBe(false)
+      expect(resolvePlay(jokers, profile)?.type).toBe(PlayType.Rocket)
+      expect(resolvePlay(wild, profile)?.type).toBe(PlayType.Pair)
+      const ordinary = deck.find(card => card.rank === 7 && !card.isLevelCard)!
+      expect(resolvePlay([wild[0], ordinary], profile)?.type).toBe(PlayType.Pair)
+    })
+  }
+})

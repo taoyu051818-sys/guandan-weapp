@@ -59,8 +59,14 @@ area.layout({ width: 1280, height: 720, safeLeft: 80, safeRight: 24, safeTop: 0,
 const own = area.getActionWorldPosition('p1')
 const top = area.getActionWorldPosition('p3')
 assert.equal(own.x, top.x)
-assert.equal(top.y - own.y, 99, 'self and teammate fans stay close with a small visible gap')
-assert.ok(top.y - own.y > 118 * .8, 'settled teammate/local card fans leave a visible vertical gap')
+assert.equal(own.x, 28, 'both central fans follow the safe centre without the former 72-unit right offset')
+assert.equal(own.y, 86, 'lowering the opposite fan must not move the local fan')
+assert.equal(top.y, 165, 'opposite fan is lowered by 20 scene units to clear the card counter')
+assert.equal(top.y - own.y, 79, 'retain the adjacent central lanes rather than moving other controls')
+for (const human of ['p1', 'p2', 'p3', 'p4']) {
+  const opposite = ['p3', 'p4', 'p1', 'p2'][['p1', 'p2', 'p3', 'p4'].indexOf(human)]
+  assert.deepEqual(area.getActionWorldPosition(opposite, human), top, 'the offset follows the opposite seat, not a fixed player ID')
+}
 assert.ok(area.getActionWorldPosition('p2').x > 340, 'single card sits closer to the right avatar')
 assert.ok(area.getActionWorldPosition('p4').x < -284, 'single card sits closer to the left avatar')
 assert.deepEqual(area.getActionWorldPosition('p2', 'p2'), own, 'viewer-relative player rotation must preserve the local lane')
@@ -69,6 +75,13 @@ area.render([action])
 let group = area.node.getChildByName('play-p1')
 assert.equal(group.scale.x, .8, 'recovered cards must immediately use their final size')
 assert.equal(tweens.length, 0, 'snapshot recovery must not replay landing or shrinking')
+const oppositeAction = { ...action, playerId: 'p3' }
+area.resetPresentation(2)
+area.render([action, oppositeAction])
+assert.equal(area.node.getChildByName('play-p1'), undefined, 'a new opposite play replaces the preceding local fan, so the adjacent lanes do not obscure one another')
+assert.equal(area.node.getChildByName('play-p3').position.y, 165)
+area.layout({ width: 1280, height: 720, safeLeft: 80, safeRight: 24, safeTop: 0, safeBottom: 0 })
+assert.equal(area.node.getChildByName('play-p3').position.y, 165, 'resize must retain the same landing anchor')
 area.clearPresentation()
 const ticket = area.deferAction(action, 0)
 area.render([action])
@@ -160,6 +173,19 @@ for (const viewport of [
   }
   assert.deepEqual(playedLayout.turnTimerPosition(viewport, 'top'), { x: 0, y: 218 }, 'teammate timer is unchanged')
   assert.deepEqual(playedLayout.turnTimerPosition(viewport, 'bottom'), { x: 0, y: 44 }, 'local operation row is unchanged')
+}
+
+// The 874x402 simulator keeps a 1280-unit logical width, not 720-unit height.
+const phoneViewport = { width: 1280, height: 1280 * 402 / 874, safeLeft: 0, safeRight: 0, safeTop: 0, safeBottom: 0 }
+const hudPolicy = loadPureUi('TableHudLayoutPolicy')
+const phoneScale = hudPolicy.resolveTableHudBounds(phoneViewport).scale
+for (const height of [42, 82]) {
+  const counter = hudPolicy.resolveTableHudCounterPlacement(phoneViewport, { width: 596, height }, 82)
+  const counterBottom = counter.position.y - height * phoneScale / 2
+  // Include the artwork children extending 2 units above CardVisual's nominal bounds.
+  const oppositeTop = playedLayout.playedCardPosition(phoneViewport, 2, 6).y + (118 / 2 + 2) * .8
+  const clearancePx = (counterBottom - oppositeTop) * 874 / 1280
+  assert.ok(clearancePx >= 3.5, `opposite rank strip must clear ${height === 82 ? 'expanded' : 'folded'} counter: ${clearancePx}px`)
 }
 const orderTableLayers = loadPureUi('TableLayerOrder').orderTableLayers
 const layerRoot = { children: [] }

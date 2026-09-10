@@ -182,7 +182,7 @@ assert.equal(formatForNewRoom({ entryKind: 'friend', roomSettings: upgrade }).ki
 for (const patch of [{ format: 'rounds', tributeEnabled: true }, { format: 'upgrade', levelMode: 'random' }, { format: 'rounds', levelRank: 'joker' }]) {
   assert.throws(() => normalizeFriendRoomSettings(patch, { strict: true }))
 }
-for (const mode of ['quick', 'classic_50', 'classic_300', 'classic_2000', 'classic_10000']) {
+for (const mode of ['quick', 'classic_50', 'classic_300', 'classic_2000', 'classic_10000', 'lingshui_16_cup']) {
   const opening = createRoomOpeningState({ entryKind: 'match', matchMode: mode }, getRuleProfile('classic'), () => 0.99, () => false)
   assert.equal(opening.currentLevel, 'A')
   assert.deepEqual(opening.teamLevels, { teamA: 'A', teamB: 'A' })

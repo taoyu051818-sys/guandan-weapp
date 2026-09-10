@@ -1,3 +1,6 @@
+import { TableTributeInfoView } from './TableTributeInfoView'
+import { layoutTableToolbar } from './TableToolbarLayout'
+import { TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT, tableButtonWidth } from './TableButtonMetrics'
 import { Color, EventTouch, Graphics, Label, Node, Sprite, SpriteFrame, Tween, UITransform, Vec3 } from 'cc'
 import { TableHudSeatViewGroup } from './TableHudSeatViewGroup'
 import { TableHandViewStatus } from './TableHandViewStatus'
@@ -25,7 +28,6 @@ import {
   createTableHudLabel as createLabel,
   drawTableHudButton,
   drawTableHudPanel as drawPanel,
-  EXPANDED_BACK_SIZE,
   EXPANDED_ROUND_HEIGHT,
   EXPANDED_ROUND_WIDTH,
   EXPANDED_SUIT_BAR_HEIGHT,
@@ -75,6 +77,7 @@ export class TableGameHud {
 
   private readonly turnTimer = new TableHudTurnTimerView()
   private readonly seats = new TableHudSeatViewGroup()
+  private readonly tributeInfo = new TableTributeInfoView()
   private readonly handViewStatus = new TableHandViewStatus()
 
   private counterPanel: Node | null = null
@@ -95,7 +98,7 @@ export class TableGameHud {
   private turnActionNodes: Node[] = []
   private lockButton: ButtonView | null = null
   private arrangeButton: ButtonView | null = null
-  private chatButton: ButtonView | null = null
+  private trusteeButton: ButtonView | null = null
   private readonly overlayPositions: Partial<Record<DraggableOverlay, Readonly<{ x: number, y: number }>>> = {}
   private activeDrag: DraggableOverlay | null = null
 
@@ -126,6 +129,7 @@ export class TableGameHud {
     this.seats.onSeatAvatar = playerId => this.actions.onSeatAvatar?.(playerId)
     this.createSuitBar(root)
     this.createToolbar(root)
+    this.tributeInfo.mount(root)
     this.handViewStatus.mount(root, this.lockButton?.node, this.arrangeButton?.node)
     this.applyExpandedHudMetrics()
     this.renderViews()
@@ -208,7 +212,7 @@ export class TableGameHud {
   /** Screen-space arbitration for controls intentionally drawn above the hand. */
   public hitTestInteractiveScreenPoint (screenPoint: Readonly<{ x: number, y: number }>): boolean {
     if (!this.visible || !this.root?.activeInHierarchy) return false
-    return hitTestVisibleNodes([this.seats.ownAvatarHitNode, this.backButton?.node, this.counterPanel, this.suitBar, this.toolbar, this.operationOverlay, this.turnTimer.node], screenPoint)
+    return hitTestVisibleNodes([this.seats.ownAvatarHitNode, this.backButton?.node, this.counterPanel, this.suitBar, this.lockButton?.node, this.arrangeButton?.node, this.trusteeButton?.node, ...this.turnActionNodes, this.turnTimer.node], screenPoint)
   }
 
   public setOwnAvatarFrame (frame: SpriteFrame | null): void { this.seats.setOwnAvatarFrame(frame) }
@@ -246,6 +250,7 @@ export class TableGameHud {
     this.place(this.counterPanel, counter.position.x, counter.position.y, bounds.scale, 80)
 
     this.seats.layout(layout.seats)
+    this.tributeInfo.layout(layout.seats.top)
     this.handViewStatus.layout(bounds)
     this.place(this.suitBar, layout.bottom.suitBar.x, layout.bottom.suitBar.y, layout.bottom.suitBar.scale, 20)
     this.place(this.toolbar, layout.bottom.toolbar.x, layout.bottom.toolbar.y, layout.bottom.toolbar.scale, 30)
@@ -280,6 +285,7 @@ export class TableGameHud {
 
   public dispose (): void {
     this.handViewStatus.dispose()
+    this.tributeInfo.dispose()
     this.seats.dispose()
     this.turnTimer.dispose()
     this.root?.destroy()
@@ -306,7 +312,7 @@ export class TableGameHud {
     this.turnActionNodes = []
     this.lockButton = null
     this.arrangeButton = null
-    this.chatButton = null
+    this.trusteeButton = null
     this.suitButtons.clear()
     this.activeDrag = null
   }
@@ -337,8 +343,8 @@ export class TableGameHud {
 
   private applyExpandedHudMetrics (): void {
     if (this.backButton) {
-      configureTransform(this.backButton.node, EXPANDED_BACK_SIZE, EXPANDED_BACK_SIZE)
-      configureLabelMetrics(this.backButton.label, 54, 52, 24, 0, 2)
+      configureTransform(this.backButton.node, tableButtonWidth('返回'), TABLE_BUTTON_HEIGHT)
+      configureLabelMetrics(this.backButton.label, tableButtonWidth('返回') - 12, TABLE_BUTTON_HEIGHT - 6, TABLE_BUTTON_FONT, 0, 0)
       this.drawToolButton(this.backButton, false, false)
     }
 
@@ -346,32 +352,22 @@ export class TableGameHud {
       configureTransform(this.roundPanel, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT)
       configureLabelMetrics(this.roundLabel, EXPANDED_ROUND_WIDTH - 16, 40, 30, 0, 19)
       configureLabelMetrics(this.levelLabel, EXPANDED_ROUND_WIDTH - 16, 34, 26, 0, -21)
-      if (this.roundGraphics) drawPanel(this.roundGraphics, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT, 8)
+      if (this.roundGraphics) drawPanel(this.roundGraphics, EXPANDED_ROUND_WIDTH, EXPANDED_ROUND_HEIGHT)
     }
 
     if (this.suitBar) configureTransform(this.suitBar, EXPANDED_SUIT_BAR_WIDTH, EXPANDED_SUIT_BAR_HEIGHT)
     configureLabelMetrics(this.suitTitleLabel, 126, 52, 28, -174, 0)
     this.suitButtons.forEach((view, suit) => {
       const index = SUITS.indexOf(suit)
-      configureTransform(view.node, 62, 58)
+      configureTransform(view.node, 62, TABLE_BUTTON_HEIGHT)
       view.node.setPosition(new Vec3(-66 + index * 70, 0, 2))
       configureTransform(view.sprite.node, 43, 43)
       view.sprite.node.setPosition(Vec3.ZERO)
     })
 
     if (this.toolbar) configureTransform(this.toolbar, EXPANDED_TOOLBAR_WIDTH, EXPANDED_TOOLBAR_HEIGHT)
-    this.configureToolbarButton(this.lockButton, -164, 132, 64, 28)
-    this.configureToolbarButton(this.arrangeButton, 0, 172, 64, 30)
-    this.configureToolbarButton(this.chatButton, 164, 132, 64, 28)
+    layoutTableToolbar(this.toolbar, [this.lockButton, this.arrangeButton, this.trusteeButton])
 
-  }
-
-  private configureToolbarButton (view: ButtonView | null, x: number, width: number, height: number, fontSize: number): void {
-    if (!view) return
-    configureTransform(view.node, width, height)
-    view.node.setPosition(new Vec3(x, 0, 1))
-    configureLabelMetrics(view.label, width - 20, height - 10, fontSize, 0, 0)
-    this.drawToolButton(view, false, false)
   }
 
   private createRoundPanel (parent: Node): void {
@@ -427,7 +423,7 @@ export class TableGameHud {
     const hitArea = new Node('CounterToggleHitArea')
     hitArea.parent = panel
     hitArea.setPosition(new Vec3(270, 0, 4))
-    configureTransform(hitArea, 58, 42)
+    configureTransform(hitArea, 58, TABLE_BUTTON_HEIGHT)
     this.bindPress(hitArea, () => {}, () => {
       const expanded = !this.state.counterExpanded
       this.update({ counterExpanded: expanded })
@@ -442,7 +438,7 @@ export class TableGameHud {
     bar.parent = parent
     configureTransform(bar, 382, 54)
     this.suitBarGraphics = bar.addComponent(Graphics)
-    const title = createLabel(bar, 'SuitBarTitle', 102, 38, 22, new Color(235, 243, 237), -138, 0)
+    const title = createLabel(bar, 'SuitBarTitle', 102, 38, 22, new Color(184, 222, 255), -138, 0)
     title.string = '同花顺'
     title.isBold = true
     this.suitTitleLabel = title
@@ -486,15 +482,15 @@ export class TableGameHud {
     configureTransform(toolbar, BASE_TOOLBAR_WIDTH, 56)
     this.lockButton = this.createButton(toolbar, 'LockHand', '锁牌', -150, 116, 50, 24)
     this.arrangeButton = this.createButton(toolbar, 'ArrangeHand', '一键理牌', 0, 164, 50, 26)
-    this.chatButton = this.createButton(toolbar, 'QuickChat', '快捷语', 150, 116, 50, 24)
+    this.trusteeButton = this.createButton(toolbar, 'TableTrustee', '托管', 150, 116, 50, 24)
 
     this.bindPress(
       this.lockButton.node,
-      pressed => this.drawToolButton(this.lockButton, this.state.lockAction !== 'start', pressed),
+      pressed => this.drawToolButton(this.lockButton, this.state.lockDecision.kind !== 'unavailable', pressed),
       () => { if (this.state.handToolsVisible !== false) this.actions.onHandLockAction?.() },
     )
-    this.bindPress(this.arrangeButton.node, pressed => this.drawToolButton(this.arrangeButton, false, pressed), () => { if (this.state.handToolsVisible !== false) this.actions.onArrange?.() })
-    this.bindPress(this.chatButton.node, pressed => this.drawToolButton(this.chatButton, false, pressed), () => { if (this.state.chatEnabled !== false) this.actions.onChat?.() })
+    this.bindPress(this.arrangeButton.node, pressed => this.drawToolButton(this.arrangeButton, false, pressed), () => { if (this.state.arrangeVisible ?? (this.state.handToolsVisible !== false)) this.actions.onArrange?.() })
+    this.bindPress(this.trusteeButton.node, pressed => this.drawToolButton(this.trusteeButton, false, pressed), () => { if (this.state.trusteeVisible === true) this.actions.onTrustee?.() })
     this.toolbar = toolbar
   }
 
@@ -526,8 +522,12 @@ export class TableGameHud {
 
   private renderViews (): void {
     if (!this.root) return
-    this.handViewStatus.render(this.state.handViewLabel ?? '', this.state.handToolsVisible !== false)
-    if (this.chatButton) this.chatButton.node.active = this.state.chatEnabled !== false
+    this.handViewStatus.render(this.state.handViewLabel ?? '', this.state.handToolsVisible !== false, this.state.arrangeVisible ?? (this.state.handToolsVisible !== false))
+    this.tributeInfo.render(this.state.tributeInfo ?? '')
+    if (this.trusteeButton) {
+      this.trusteeButton.node.active = this.state.trusteeVisible === true
+      this.trusteeButton.label.string = this.state.trusteeActive ? '取消托管' : '托管'
+    }
     if (this.roundLabel) this.roundLabel.string = this.state.matchLabel
     if (this.levelLabel) this.levelLabel.string = this.state.levelLabel
     this.turnTimer.render(this.state)
@@ -535,11 +535,11 @@ export class TableGameHud {
     this.seats.render(this.state.seats)
     this.renderSuitButtons()
     if (this.lockButton) {
-      const labels = { start: '锁牌', cancel: '取消', commit: '确认', unlock: '解锁' } as const
-      this.lockButton.label.string = labels[this.state.lockAction]
-      this.drawToolButton(this.lockButton, this.state.lockAction !== 'start', false)
+      this.lockButton.label.string = this.state.lockDecision.kind === 'unlock' ? '恢复' : '锁牌'
+      this.drawToolButton(this.lockButton, this.state.lockDecision.kind !== 'unavailable', false)
     }
     if (this.arrangeButton) this.arrangeButton.label.string = this.state.arrangeRestoreAvailable ? '复原' : '一键理牌'
+    layoutTableToolbar(this.toolbar, [this.lockButton, this.arrangeButton, this.trusteeButton])
   }
 
   private renderCounter (): void {

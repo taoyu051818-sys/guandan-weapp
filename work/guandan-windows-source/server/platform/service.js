@@ -137,9 +137,11 @@ export class PlatformService {
     return this.accounts.getProfile(userId)
   }
 
-  async updateProfile (userId, { displayName, avatarUrl } = {}) {
-    return this.accounts.updateProfile(userId, { displayName, avatarUrl })
+  async updateProfile (userId, { displayName, avatarUrl, avatarDataUri } = {}) {
+    return this.accounts.updateProfile(userId, { displayName, avatarUrl, avatarDataUri })
   }
+
+  async getUploadedAvatarImage (avatarUrl) { return this.accounts.getUploadedAvatarImage(avatarUrl) }
 
   async getWallet (userId, limit = 20) {
     return this.commerce.getWallet(userId, limit)
@@ -163,6 +165,10 @@ export class PlatformService {
 
   async checkInTournament (userId, tournamentId) {
     return this.tournaments.checkIn(userId, tournamentId)
+  }
+
+  async withdrawTournament (userId, tournamentId, idempotencyKey) {
+    return this.tournaments.withdraw(userId, tournamentId, idempotencyKey)
   }
 
   async getTournamentState (userId, tournamentId) {
@@ -198,6 +204,12 @@ export class PlatformService {
   async joinFriendRoom (userId, { entryAttemptId, roomId, inviteCode } = {}) {
     this.syncFriendRoomDependencies()
     return this.friendRooms.join(userId, { entryAttemptId, roomId, inviteCode })
+  }
+
+  async joinFriendRoomByNumber (userId, { entryAttemptId, roomId } = {}) {
+    await this.getProfile(userId)
+    this.syncFriendRoomDependencies()
+    return this.friendRooms.joinByNumber(userId, { entryAttemptId, roomId })
   }
 
   async recoverActiveFriendRoom (userId, input = {}) {

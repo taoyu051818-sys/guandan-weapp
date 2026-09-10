@@ -244,7 +244,8 @@ const lineBudgets = {
   'services/DataSnapshot.ts': 30,
   'services/DevelopmentPlayerStore.ts': 35,
   'scenes/TableSceneLayout.ts': 75,
-  'scenes/TableMatchCoordinator.ts': 440,
+  'scenes/TableMatchCoordinator.ts': 330,
+  'scenes/TablePhasePresenter.ts': 125,
   'scenes/TableProgressPresentation.ts': 100,
   'scenes/TableNetworkEventBridge.ts': 105,
   'scenes/TableHudPresenter.ts': 245,
@@ -272,7 +273,8 @@ const lineBudgets = {
   'scenes/front-pages/ProfileEditorModal.ts': 180,
   'services/WechatProfileProvider.ts': 90,
   'ui/ProfileAvatar.ts': 90,
-  'scenes/TableTurnClockController.ts': 210,
+  'scenes/TableTurnClockController.ts': 140,
+  'scenes/TableTurnClockProjection.ts': 55,
   'scenes/TableHandInteractionController.ts': 320,
 }
 

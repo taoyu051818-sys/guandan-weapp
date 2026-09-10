@@ -65,7 +65,7 @@ export function renderLobbyEntries (ui: RuntimeUiFactory, layout: LobbyLayout,
     const r = layout[entry.kind], tournament = entry.kind === 'tournament'
     const card = ui.panel(entry.name, r.x, r.y, r.width, r.height, {
       fill: tournament ? new Color(234, 241, 236, 245) : new Color(255, 251, 237),
-      stroke: tournament ? new Color(190, 207, 199) : new Color(234, 214, 155), lineWidth: (tournament ? 1 : 2) * s, radius: 6 * s,
+      stroke: tournament ? new Color(190, 207, 199) : new Color(234, 214, 155), lineWidth: (tournament ? 1 : 2) * s, frame: 'control', frameScale: s,
     })
     if (tournament) {
       lobbyArtwork(card, 'TournamentArtwork', entry.art, { x: r.width / 2 - 35.5 * s, y: 0, width: 61 * s, height: r.height - 10 * s }, .74)
@@ -75,7 +75,7 @@ export function renderLobbyEntries (ui: RuntimeUiFactory, layout: LobbyLayout,
       const footer = (entry.kind === 'classic' ? 54 : 48) * s
       lobbyArtwork(card, 'EntryArtwork', entry.art, { x: 0, y: footer / 2 - s, width: r.width - 4 * s, height: r.height - footer - 2 * s }, .74)
       lobbyLabel(ui, entry.kind === 'classic' ? '经典掼蛋' : '好友房', 0, -r.height / 2 + footer - 18 * s, 24, r.width - 16 * s, s, card)
-      lobbyLabel(ui, entry.kind === 'classic' ? '随机级牌 · 单局对战' : '创建房间 / 加入房间', 0, -r.height / 2 + 13 * s, 12, r.width - 16 * s, s, card, new Color(93, 113, 111), 0, false)
+      lobbyLabel(ui, entry.kind === 'classic' ? '随机级牌 · 单局对战' : '创建房间 · 邀请好友', 0, -r.height / 2 + 13 * s, 12, r.width - 16 * s, s, card, new Color(93, 113, 111), 0, false)
     }
     ui.makeInteractive(card, entry.action)
   }
