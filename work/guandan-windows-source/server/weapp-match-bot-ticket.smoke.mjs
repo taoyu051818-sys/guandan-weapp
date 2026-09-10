@@ -10,6 +10,8 @@ const resultSecret = 'signed-match-bot-result-secret-with-at-least-32-characters
 const spectatorSecret = 'signed-match-bot-spectator-secret-with-at-least-32-characters'
 const roomId = '737373'
 const matchId = 'mat-signed-bot-smoke'
+const matchMode = process.argv[2] || 'classic_50'
+assert.ok(['classic_50', 'no-shuffle_50', 'consecutive_50'].includes(matchMode))
 const botUserIdsBySeat = { p3: `bot_${matchId}_p3`, p4: `bot_${matchId}_p4` }
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)))
@@ -75,14 +77,14 @@ const payloadFor = issued => ({ gameTicket: issued.gameTicket, entryAttemptId: i
 try {
   sockets.push(await connect(), await connect(), await connect())
   const tickets = new GameTicketService({ secret, gameEndpoint: `ws://127.0.0.1:${gamePort}/weapp` })
-  const p1 = tickets.issue({ userId: 'human-1', matchId, roomId, seat: 'p1', botUserIdsBySeat, matchMode: 'classic_50' })
-  const p2 = tickets.issue({ userId: 'human-2', matchId, roomId, seat: 'p2', botUserIdsBySeat, matchMode: 'classic_50' })
+  const p1 = tickets.issue({ userId: 'human-1', matchId, roomId, seat: 'p1', botUserIdsBySeat, matchMode })
+  const p2 = tickets.issue({ userId: 'human-2', matchId, roomId, seat: 'p2', botUserIdsBySeat, matchMode })
   const inconsistentP2 = tickets.issue({
     userId: 'human-2',
     matchId,
     roomId,
     seat: 'p2',
-    matchMode: 'classic_50',
+    matchMode,
     botUserIdsBySeat: { ...botUserIdsBySeat, p4: `bot_${matchId}_other_p4` },
   })
 
@@ -112,13 +114,15 @@ try {
     assert.equal(started[0].state.players[seat].name, started[1].state.players[seat].name, 'all clients see the same nickname')
   }
   assert.equal(started[0].state.players.p1.hand.length, 27)
-  assert.equal(started[0].state.matchFormat.kind, 'independent', 'signed classic mode reaches the authoritative opening state')
+  assert.equal(started[0].state.matchFormat.kind, matchMode === 'consecutive_50' ? 'upgrade' : 'independent', 'signed mode reaches the authoritative opening state')
   assert.equal(started[0].state.currentLevel, started[1].state.currentLevel, 'all clients receive the same server-chosen level')
-  assert.equal(started[0].state.matchFormat.tributeEnabled, false)
+  assert.equal(started[0].state.matchFormat.tributeEnabled, matchMode === 'consecutive_50')
+  assert.equal(started[0].state.matchFormat.dealMode === 'no-shuffle', matchMode === 'no-shuffle_50')
+  if (matchMode === 'consecutive_50') assert.equal(started[0].state.currentLevel, 2)
 } finally {
   sockets.forEach(socket => socket.close())
   child.kill('SIGTERM')
   await close(collector)
 }
 
-console.log('weapp signed match bot ticket integration passed')
+console.log(`weapp signed match bot ticket integration passed: ${matchMode}`)

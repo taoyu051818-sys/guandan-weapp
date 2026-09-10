@@ -16,6 +16,7 @@ const acceptedFields = new Set([
   'mode',
   'format', 'levelMode', 'levelRank', 'tributeEnabled', 'upgradeTarget',
   'teamRotation', 'rotatingScoring',
+  'dealMode',
   'counterEnabled', 'disableVoice',
   'rounds', 'roundCount', 'gameCount', 'customRoundCount',
   'scoring', 'doubleDownScore', 'doubleDownPoints',

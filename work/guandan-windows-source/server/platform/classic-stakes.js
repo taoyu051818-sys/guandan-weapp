@@ -1,11 +1,9 @@
-export const CLASSIC_STAKES = Object.freeze({
-  classic_50: 50,
-  classic_300: 300,
-  classic_2000: 2_000,
-  classic_10000: 10_000,
-})
+import { createRequire } from 'node:module'
+const { CLASSIC_QUEUES } = createRequire(import.meta.url)('../../../../shared-core/dist')
 
-export const classicStakeForMode = mode => CLASSIC_STAKES[mode] || null
+export const CLASSIC_STAKES = Object.freeze(Object.fromEntries(CLASSIC_QUEUES.map(queue => [queue.id, queue.stake])))
+
+export const classicStakeForMode = mode => Object.hasOwn(CLASSIC_STAKES, mode) ? CLASSIC_STAKES[mode] : null
 
 const requireWalletBalance = (balances, userId) => {
   const balance = balances[userId]

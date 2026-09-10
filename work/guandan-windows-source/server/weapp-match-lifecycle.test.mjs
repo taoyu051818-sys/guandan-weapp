@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createWeAppMatchLifecycle } from './weapp-match-lifecycle.js'
 import { formatForNewRoom } from './match-format-policy.js'
+import { createRoomOpeningState } from './match-format-policy.js'
+import { createRequire } from 'node:module'
 import './bot-turn-pacing.test.mjs'
+const { getRuleProfile, settleMatchState, dealGameCards } = createRequire(import.meta.url)('../../../shared-core/dist')
 
 const playerIds = ['p1', 'p2', 'p3', 'p4']
 let clock = 10_000
@@ -35,8 +38,8 @@ const lifecycle = createWeAppMatchLifecycle({
   isShuttingDown: () => false,
   enqueueServerOperation: operation => Promise.resolve().then(operation),
   ensureLiveMetadata,
-  isFriendRoom: () => true,
-  isMatchRoom: () => false,
+  isFriendRoom: room => room.entryKind !== 'match',
+  isMatchRoom: room => room.entryKind === 'match',
   isBotPlayer: () => false,
   botPolicyForRoom: () => { throw new Error('not used') },
   existingBotPolicyForRoom: () => null,
@@ -45,7 +48,7 @@ const lifecycle = createWeAppMatchLifecycle({
     state: { ...state, phase: 'settled', revision: (state.revision ?? 0) + 1, settlement: nextSettlement },
     events: [{ type: 'ROUND_SETTLED', settlement: nextSettlement }],
   }),
-  shuffleRandom: Math.random,
+  shuffleRandom: () => 0.99,
   persistRuntimeState: () => {},
   commitRuntimeState: async () => {},
   stagePendingSideEffects: () => {},
@@ -147,6 +150,31 @@ assert.equal(tournamentRoom.matchEnded.configuredRounds, 1)
 const upgradeRoom = { ...room, roomId: '456789', roomSettings: { ...room.roomSettings, format: 'upgrade', totalTimeMinutes: 0 }, totalDeadlineAt: null, matchEnded: null, roundSequence: 32 }
 settleThroughAction(upgradeRoom, { isGameWon: false, winnerTeam: 'teamA' })
 assert.equal(upgradeRoom.matchEnded, null, '升级房第33局仍不触发定局终局')
+const consecutiveRoom = { ...room, roomId: '456781', entryKind: 'match', matchMode: 'consecutive_50', matchEnded: null, roundSequence: 32 }
+consecutiveRoom.state = { matchFormat: formatForNewRoom(consecutiveRoom) }
+settleThroughAction(consecutiveRoom, { isGameWon: false, winnerTeam: 'teamA' })
+assert.equal(consecutiveRoom.matchEnded, null, '连打过 A 不应因一副结束或默认局数而终止')
+settleThroughAction(consecutiveRoom, { isGameWon: true, winnerTeam: 'teamA' })
+assert.equal(consecutiveRoom.matchEnded.reason, 'passed-a')
+assert.equal(consecutiveRoom.matchEnded.winnerTeam, 'teamA')
+const noShuffleRoom = { ...quickRoom, matchEnded: null, roundSequence: 0, matchMode: 'no-shuffle_50' }
+noShuffleRoom.state = { matchFormat: formatForNewRoom(noShuffleRoom) }
+settleThroughAction(noShuffleRoom, { isGameWon: false, winnerTeam: 'teamA' })
+assert.equal(noShuffleRoom.matchEnded.reason, 'single-round')
+const nextRoom = { roomId: '456782', entryKind: 'friend', version: 1, gameVersion: 1, roundSequence: 1,
+  roomSettings: { format: 'rounds', rounds: 4, dealMode: 'no-shuffle', trusteeSeconds: 0 }, scores: { teamA: 0, teamB: 0 } }
+const opening = createRoomOpeningState(nextRoom, getRuleProfile('classic'), () => 0.5, () => false)
+opening.finishedPlayers = ['p1', 'p3']
+nextRoom.state = settleMatchState(opening).state
+nextRoom.roundResult = nextRoom.state.settlement
+// The production next-round path must retain the dealer strategy, including after JSON restore.
+const restoredNext = JSON.parse(JSON.stringify(nextRoom))
+lifecycle.prepareNextRound(restoredNext)
+assert.equal(restoredNext.state.currentLevel, 'A')
+assert.equal(restoredNext.state.matchFormat.dealMode, 'no-shuffle')
+const expectedHands = dealGameCards('A', 'no-shuffle', () => 0.99)
+for (const id of playerIds) assert.deepEqual(restoredNext.state.players[id].hand, expectedHands[id])
+assert.equal(restoredNext.state.phase, 'playing')
 lifecycle.dispose()
 
 const runDeadlineFailureCase = async ({ bot = false, trustee = false, dispatchMatchIntentImpl, persistFailures = 0 } = {}) => {

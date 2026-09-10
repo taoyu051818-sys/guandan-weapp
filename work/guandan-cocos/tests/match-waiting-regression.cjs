@@ -37,6 +37,7 @@ new Function('exports', 'module', 'require', matchmakingOutput)(matchmakingModul
   if (request === '../../ui/CoastalUi') return {}
   if (request === './MatchmakingPageView') return { renderMatchmakingPage: () => ({ string: '' }) }
   if (request === '../../services/MatchWaitingPresentation') return { matchWaitingText }
+  if (request === '../../core/generated/lib/classicModes') return require(path.join(projectRoot, 'assets/scripts/core/generated/lib/classicModes.ts'))
   throw new Error(`unexpected dependency ${request}`)
 })
 const { MatchmakingPageDomain } = matchmakingModule.exports

@@ -20,6 +20,7 @@ import { FrontPagePlayerState } from './FrontPagePlayerState'
 import { FrontPageWalletState } from './FrontPageWalletState'
 import { CLASSIC_ROOM_MODES, CLASSIC_ROOM_TIERS, LOBBY_ART, type ClassicRoomMode } from './LobbyPageCatalog'
 import { LobbyPlayerProfilePresenter } from './LobbyPlayerProfilePresenter'
+import { classicQueueId } from '../../core/generated/lib/classicModes'
 
 type LobbyMatchReturnPage = 'menu' | 'online' | 'classic-rooms'
 type Settled<T> = { status: 'fulfilled', value: T } | { status: 'rejected', reason: unknown }
@@ -200,40 +201,37 @@ export class LobbyPageDomain {
     const safeHeight = this.dependencies.screen.safeSize().y
     const leftWidth = Math.min(190, Math.max(140, safeWidth * 0.17))
     const leftX = this.dependencies.screen.safeLeftX(leftWidth / 2 + 14)
-    const panelHeight = Math.min(500, safeHeight - 92)
+    const panelHeight = CLASSIC_ROOM_MODES.length * 64 + 16
     ui.panel('ClassicModePanel', leftX, -8, leftWidth, panelHeight, {
       fill: new Color(24, 48, 65, 218),
       stroke: new Color(159, 204, 231, 210),
       lineWidth: 2,
       frame: 'control',
     })
-    ui.outlinedLabel('经典掼蛋', leftX, this.dependencies.screen.safeTopY(96), Math.min(32, Math.max(26, safeHeight * 0.058)), {
-      width: leftWidth + 20,
-      color: new Color(255, 239, 172),
-      outlineColor: new Color(48, 35, 22),
-      outlineWidth: 4,
-    })
-    const modeGap = Math.min(64, (panelHeight - 62) / CLASSIC_ROOM_MODES.length)
-    const modeStartY = panelHeight / 2 - 54
+    const modeGap = 64
+    const modeStartY = -8 + (CLASSIC_ROOM_MODES.length - 1) * modeGap / 2
     CLASSIC_ROOM_MODES.forEach((mode, index) => {
       const active = mode.id === this.classicRoomMode
-      const node = ui.button('ClassicModeTab', mode.available ? mode.label : `${mode.label}  锁`, leftX, leftWidth - 18, 48, Math.max(22, Math.min(24, leftWidth * 0.13)), {
+      const node = ui.button('ClassicModeTab', mode.label, leftX, leftWidth - 18, 48, Math.max(22, Math.min(24, leftWidth * 0.13)), {
         fill: active ? new Color(232, 178, 61, 245) : new Color(31, 61, 81, 235),
         pressedFill: new Color(198, 140, 40, 245),
         stroke: active ? new Color(255, 239, 163) : new Color(99, 145, 171, 180),
         textColor: active ? new Color(68, 44, 17) : new Color(235, 242, 238),
         textOutlineColor: active ? new Color(255, 235, 157) : new Color(28, 36, 32),
         textOutlineWidth: active ? 0 : 1,
-        disabled: !mode.available,
         frame: 'tag',
       })
       node.setPosition(new Vec3(leftX, modeStartY - index * modeGap, 0))
-      if (mode.available) node.on(Node.EventType.TOUCH_END, () => { this.classicRoomMode = mode.id; this.showClassicRooms() })
+      if (!active) node.on(Node.EventType.TOUCH_END, () => { this.classicRoomMode = mode.id; this.showClassicRooms() })
     })
 
     const contentLeft = leftX + leftWidth / 2 + 20
     const contentRight = this.dependencies.screen.safeRightX(18)
     const contentWidth = Math.max(460, contentRight - contentLeft)
+    const selectedMode = CLASSIC_ROOM_MODES.find(mode => mode.id === this.classicRoomMode)!
+    ui.outlinedLabel(selectedMode.description, (contentLeft + contentRight) / 2, this.dependencies.screen.safeTopY(66), 22, {
+      width: contentWidth, height: 32, color: new Color(255, 239, 182), outlineColor: new Color(29, 55, 64), outlineWidth: 2,
+    })
     const gap = Math.max(8, Math.min(15, contentWidth * 0.018))
     const cardWidth = Math.min(188, (contentWidth - gap * 3) / 4)
     const cardHeight = cardWidth * 1.5
@@ -391,11 +389,8 @@ export class LobbyPageDomain {
   }
 
   private startClassicTier (tier: (typeof CLASSIC_ROOM_TIERS)[number]): void {
-    if (this.classicRoomMode !== 'classic') {
-      this.dependencies.showNotice('该玩法尚未开放', '当前规则引擎仅支持四人经典掼蛋')
-      return
-    }
-    this.dependencies.beginMatch(tier.queueId, `${tier.name} · 底分${tier.score}`, 'classic-rooms')
+    const mode = CLASSIC_ROOM_MODES.find(item => item.id === this.classicRoomMode)!
+    this.dependencies.beginMatch(classicQueueId(mode.id, tier.score), `${mode.label} · ${tier.name} · 底分${tier.score}`, 'classic-rooms')
   }
 
   private renderFriendTableLobby (ui: RuntimeUiFactory, snapshot: LobbySnapshot): void {

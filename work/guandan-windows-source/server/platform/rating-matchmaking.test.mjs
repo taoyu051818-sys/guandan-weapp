@@ -49,7 +49,7 @@ const manyGamesSameScore = applyMatchRating([lowFiveThousandGames, lowPartner], 
 closeTo(manyGamesSameScore.teamAEloDelta, lowUpset.teamAEloDelta, 1e-9)
 assert.notEqual(calculateBaseScore(lowFiveThousandGames), calculateBaseScore(lowTenGames), '场次只应通过基础分体现')
 
-assert.deepEqual(CLASSIC_STAKES, { classic_50: 50, classic_300: 300, classic_2000: 2_000, classic_10000: 10_000 })
+assert.deepEqual(CLASSIC_STAKES, Object.fromEntries(['classic', 'no-shuffle', 'consecutive'].flatMap(mode => [50, 300, 2000, 10000].map(stake => [`${mode}_${stake}`, stake]))))
 Object.entries(CLASSIC_STAKES).forEach(([mode, stake]) => assert.equal(classicStakeForMode(mode), stake))
 assert.equal(classicStakeForMode('quick'), null)
 const seats = { p1: 'a1', p2: 'b1', p3: 'a2', p4: 'b2' }

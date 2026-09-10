@@ -4,6 +4,7 @@ import { matchErrorDetail } from '../../services/MatchmakingErrorPresentation'
 import { matchWaitingText, type MatchWaitingStage } from '../../services/MatchWaitingPresentation'
 import type { PageRouter } from '../PageRouter'
 import { renderMatchmakingPage } from './MatchmakingPageView'
+import { isPublicClassicQueue } from '../../core/generated/lib/classicModes'
 
 export type MatchReturnPage = 'menu' | 'online' | 'classic-rooms' | 'tournament-center'
 export type MatchAssignment = { tournamentId: string, assignmentId: string }
@@ -52,7 +53,7 @@ export class MatchmakingPageDomain {
     const token = this.matchAttemptToken
     this.matchingStartedAt = Date.now()
     this.matchingQueueName = queueName
-    this.matchingBotFillEnabled = queueId === 'quick' || queueId.startsWith('classic_')
+    this.matchingBotFillEnabled = isPublicClassicQueue(queueId)
     this.matchingStage = 'requesting'
     this.matchingReturnPage = returnPage
     this.retryRequest = () => this.begin(queueId, queueName, returnPage, assignment)
