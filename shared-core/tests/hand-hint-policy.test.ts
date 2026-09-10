@@ -58,10 +58,10 @@ describe('hand hint policy', () => {
     expect(moves[0].warning).toBeNull()
   })
 
-  it('allows splitting a locked group only when no intact legal move exists', () => {
+  it('never splits a locked group even when no intact legal move exists', () => {
     const hand = [card('8s', 8, 8), card('8c', 8, 8, 'club')]
     const moves = rank(hand, lastSingle(7), [{ id: 'locked-8', kind: 'locked', cardIds: ['8s', '8c'] }])
-    expect(moves[0].warning).toBe('splits-locked-group')
+    expect(moves).toEqual([])
   })
 
   it('prefers an ordinary level card over the heart level wildcard', () => {

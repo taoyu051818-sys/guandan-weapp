@@ -16,7 +16,7 @@ const roomId = '314159'
 const randomPrelude = `data:text/javascript,${encodeURIComponent('let seed=0x5eed1234; Math.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296)')}`
 const child = spawn(process.execPath, ['--import', randomPrelude, 'server/weapp-ws.js'], {
   cwd: process.cwd(),
-  env: { ...process.env, WEAPP_HOST: '127.0.0.1', WEAPP_WS_PORT: String(port), WEAPP_TURN_TIMEOUT_MS: '10000', WEAPP_TRUSTEE_ACTION_DELAY_MS: '5000' },
+  env: { ...process.env, WEAPP_HOST: '127.0.0.1', WEAPP_WS_PORT: String(port), WEAPP_TURN_TIMEOUT_MS: '10000', },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 let childOutput = ''

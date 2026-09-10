@@ -41,7 +41,7 @@ const aiContext: AIContext = {
 const input: AIWorkerDecisionInput = {
   hand: [card],
   lastPlay: null,
-  difficulty: 'medium',
+  difficulty: 'master',
   myTeam: 'teamB',
   players,
   myPlayerId: 'p2',
@@ -49,20 +49,16 @@ const input: AIWorkerDecisionInput = {
 };
 
 describe('AI worker protocol', () => {
-  it('carries the exact seed, tuning, and decision rule profile', () => {
+  it('carries the exact seed and decision rule profile', () => {
     const baseline = createAIEngine({ ruleProfile: profile, seed: 9 });
     const checkpoint = baseline.checkpoint();
     const request = createAIWorkerRequest(17, input, {
       seed: 20260811,
-      hardTuning: baseline.getHardRuntimeTuning(),
-      masterTuning: baseline.getMasterRuntimeTuning(),
     }, checkpoint);
 
     expect(request.id).toBe(17);
     expect(request.engine.seed).toBe(20260811);
     expect(request.engine.ruleProfile).toEqual(aiContext.ruleProfile);
-    expect(request.engine.hardTuning).toEqual(baseline.getHardRuntimeTuning());
-    expect(request.engine.masterTuning).toEqual(baseline.getMasterRuntimeTuning());
     expect(request.checkpoint).toEqual(checkpoint);
     expect(() => assertAIWorkerRequest(request)).not.toThrow();
     expect(aiWorkerEngineConfigKey(request.engine)).toBe(
@@ -74,8 +70,6 @@ describe('AI worker protocol', () => {
     const baseline = createAIEngine({ ruleProfile: profile, seed: 9 });
     const request = createAIWorkerRequest(18, input, {
       seed: 9,
-      hardTuning: baseline.getHardRuntimeTuning(),
-      masterTuning: baseline.getMasterRuntimeTuning(),
     });
     request.engine.ruleProfile = getRuleProfile('tournament');
 

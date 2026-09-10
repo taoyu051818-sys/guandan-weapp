@@ -104,9 +104,10 @@ const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
     update: (settings, selected) => ({ ...settings, turnSeconds: Number(selected.replace('秒', '')) as FriendRoomSettings['turnSeconds'] }),
   },
   {
-    id: 'trustee-seconds', tab: 'rules', label: '托管', options: ['无托管', '15秒', '30秒', '60秒'],
-    selected: settings => settings.trusteeSeconds === 0 ? '无托管' : `${settings.trusteeSeconds}秒`,
-    update: (settings, selected) => ({ ...settings, trusteeSeconds: selected === '无托管' ? 0 : Number(selected.replace('秒', '')) as 15 | 30 | 60 }),
+    id: 'trustee-seconds', tab: 'rules', label: '托管', options: ['开启', '关闭'],
+    selected: settings => settings.trusteeSeconds === 0 ? '关闭' : '开启',
+    // Wire compatibility: legacy nonzero values mean enabled, not a thinking delay.
+    update: (settings, selected) => ({ ...settings, trusteeSeconds: selected === '关闭' ? 0 : 15 }),
   },
   {
     id: 'total-time', tab: 'experience', label: '总时长', options: ['不限制', '20分钟', '30分钟', '60分钟'],

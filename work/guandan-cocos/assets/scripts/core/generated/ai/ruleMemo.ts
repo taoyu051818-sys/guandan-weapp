@@ -1,4 +1,4 @@
-import type { Card, PlayAction } from '../types/game';
+import { PlayType, type Card, type PlayAction } from '../types/game';
 import {
   canPlay,
   getPlayInfo,
@@ -89,6 +89,7 @@ export const createRuleMemoService = ({
     lastPlay: PlayAction | null,
     ruleProfile: RuleProfile = getRuleProfile(),
   ): ReturnType<typeof resolvePlayForContext> => {
+    if (!lastPlay || lastPlay.type === PlayType.Pass) return memoGetPlayInfo(cards, ruleProfile);
     const key = scopedKey(
       `${ruleProfileKey(ruleProfile)}:${cardsKey(cards)}->resolution:${playKey(lastPlay)}`,
     );

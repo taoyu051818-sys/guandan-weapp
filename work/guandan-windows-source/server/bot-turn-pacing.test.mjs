@@ -1,65 +1,74 @@
 import assert from 'node:assert/strict'
-import { botOpeningDelay, isDeliberatePlay, prepareBotPlay } from './bot-turn-pacing.js'
+import { decisionDelayMs, prepareBotPlay } from './bot-turn-pacing.js'
 import { createTurnClock } from './weapp-turn-clock.js'
 import { BOT_NICKNAMES, generatedPlayerNickname, roomPlayerNicknames } from './player-nicknames.js'
 
-const card = (id, rank) => ({ id, rank })
-const hand = [card('a', 7), card('b', 7), card('c', 7), card('d', 7), card('e', 9)]
-assert.equal(isDeliberatePlay(hand, hand.slice(0, 4)), true)
-assert.equal(isDeliberatePlay(hand, [hand[0]]), true)
-assert.equal(isDeliberatePlay(hand, [hand[4]]), false)
-assert.equal(isDeliberatePlay(hand, []), false)
-assert.notEqual(botOpeningDelay(650, () => 0), botOpeningDelay(650, () => 1))
-for (const base of [500, 650, 1000]) {
-  assert.equal(botOpeningDelay(base, () => 0), 500)
-  assert.equal(botOpeningDelay(base, () => 0.5), 1000)
-  assert.equal(botOpeningDelay(base, () => 1), 1500)
+for (const [cost, expected] of [[0, 500], [1, 500], [10, 500], [20, 1000], [40, 2000], [60, 3000], [200, 3000]]) {
+  assert.equal(decisionDelayMs(cost, () => 0.1), expected)
+  assert.equal(decisionDelayMs(cost, () => 0.099), expected * 3)
 }
-assert.equal(botOpeningDelay(10, () => 1), 30, 'explicit accelerated test clocks remain supported')
-let time = 1_650, choices = 0
-const room = { roomId: '123456', state: { revision: 1, playArea: [], players: { p2: { hand } } },
-  botTurnStartedAt: 1_000, turnDeadlineAt: 21_000 }
-const policy = { chooseCards: () => { choices++; return hand.slice(0, 4) } }
-let result = prepareBotPlay(room, 'p2', policy, { now: () => time, random: () => 1, baseMs: 650 })
-assert.equal(room.pendingBotPlay.at, 4_000, 'deliberate action ends at 3s total, not 3s after its wakeup')
-assert.equal(result.waitMs, 2_350)
+assert.equal(decisionDelayMs(NaN, () => 0.5), 500)
+assert.equal(decisionDelayMs(-4, () => 0.5), 500)
+assert.equal(Array.from({ length: 100 }, (_, i) => decisionDelayMs(20, () => i / 100)).filter(n => n === 3000).length, 10)
+let time = 1000, choices = 0, measureTime = 0
+const hand = [{ id: 'a', rank: 7 }, { id: 'b', rank: 9 }]
+const room = { roomId: '123456', state: { revision: 1, playArea: [], players: { p2: { hand } } }, turnDeadlineAt: 21000 }
+const policy = { chooseCards: () => { choices++; return [hand[0]] } }
+const timing = { now: () => time, random: () => 0.5, measure: () => { const result = measureTime; measureTime += 20; return result } }
+let result = prepareBotPlay(room, 'p2', policy, timing)
+assert.equal(room.pendingBotPlay.at, 2000)
+assert.equal(room.pendingBotPlay.elapsedMs, 20)
+assert.equal(result.waitMs, 1000)
 const restored = JSON.parse(JSON.stringify(room))
-time = 3_000
-result = prepareBotPlay(restored, 'p2', policy, { now: () => time, random: () => 0, baseMs: 650 })
-assert.equal(choices, 1, 'restart/retry does not choose again or shorten the decision')
-assert.equal(result.waitMs, 1_000)
-time = 4_500
-assert.equal(prepareBotPlay(restored, 'p2', policy, { now: () => time, baseMs: 650 }).waitMs, 0)
-const capped = { ...room, pendingBotPlay: null, turnDeadlineAt: 2_000 }
-assert.equal(prepareBotPlay(capped, 'p2', policy, { now: () => 1_650, random: () => 1, baseMs: 650 }).waitMs, 350)
+time = 1700
+result = prepareBotPlay(restored, 'p2', policy, { ...timing, random: () => { throw Error('must not reroll') } })
+assert.equal(choices, 1)
+assert.equal(result.waitMs, 300)
+time = 2500
+assert.equal(prepareBotPlay(restored, 'p2', policy, timing).waitMs, 0)
+const capped = { ...room, pendingBotPlay: null, turnDeadlineAt: 2700 }
+assert.equal(prepareBotPlay(capped, 'p2', policy, { ...timing, random: () => 0 }).waitMs, 200)
+assert.equal(capped.pendingBotPlay.delayMs, 3000, 'deadline caps schedule, not the recorded humanized sample')
 restored.state.revision++
-prepareBotPlay(restored, 'p2', policy, { now: () => time, baseMs: 650 })
-assert.equal(choices, 3, 'changed authoritative state invalidates the old plan')
+prepareBotPlay(restored, 'p2', policy, timing)
+assert.equal(choices, 3)
+const passing = { ...room, pendingBotPlay: null }
+assert.equal(prepareBotPlay(passing, 'p2', { chooseCards: () => [] }, timing).waitMs, 1000, 'passing uses the same measured policy')
 
-let timer, published = 0
+let timer, bot = true
 const timedRoom = { roomId: '234567', state: { currentTurn: 'p2', phase: 'playing' }, trustees: {} }
 const clocks = createTurnClock({
   clearTurnTimer: () => { timer = null }, turnTimers: new Map(), ensureLiveMetadata: () => {},
   deadlineStepFor: r => r.state.phase === 'playing' ? { playerId: r.state.currentTurn, action: 'play' } : null,
-  isBotPlayer: () => true, isMatchRoom: () => true, botActionDelayMs: 650, friendSecondMs: 1000,
-  trusteeActionDelayMs: 500, turnTimeoutMs: 20_000, now: () => time,
+  isBotPlayer: () => bot, isMatchRoom: () => true, friendSecondMs: 1000,
+  turnTimeoutMs: 20000, now: () => time,
   scheduleTimeout: (callback, delay) => { timer = { callback, delay }; return timer },
-  enqueueServerOperation: fn => fn(), automatedDeadline: () => {}, publishTurnStatus: () => published++,
+  enqueueServerOperation: fn => fn(), automatedDeadline: () => {}, publishTurnStatus: () => {},
 })
-time = 10_000
+time = 10000
 clocks.armTurnDeadline(timedRoom)
-assert.equal(timedRoom.turnDeadlineAt, 30_000, 'bot seats retain the same public 20s turn budget')
-assert.ok(timer.delay >= 500 && timer.delay <= 1500)
-timedRoom.pendingBotPlay = { at: 12_800 }
-time = 11_000
+assert.equal(timedRoom.turnDeadlineAt, 30000)
+assert.equal(timer.delay, 0, 'calculate immediately; delay is measured and planned afterwards')
+timedRoom.pendingBotPlay = { at: 12800 }
+time = 11000
 clocks.restoreTurnDeadline(timedRoom)
-assert.equal(timer.delay, 1_800)
-assert.equal(timedRoom.turnDeadlineAt, 30_000)
+assert.equal(timer.delay, 1800)
+bot = false
+timedRoom.trustees.p2 = { reason: 'manual' }
+clocks.armTurnDeadline(timedRoom)
+assert.equal(timer.delay, 0, 'trustees use the identical immediate planning path')
+assert.equal(timedRoom.turnDeadlineAt, 31000, 'trustees keep the full public turn budget')
+timedRoom.pendingBotPlay = { at: 15000 }
+clocks.restoreTurnDeadline(timedRoom)
+assert.equal(timer.delay, 4000, 'restart restores trustee thinking, not just bot thinking')
+timedRoom.trustees.p2 = null
+clocks.armTurnDeadline(timedRoom)
+assert.equal(timedRoom.pendingBotPlay, null, 'cancel trustee discards pending automatic cards')
+assert.equal(timer.delay, 20000)
 timedRoom.state.phase = 'settled'
 clocks.restoreTurnDeadline(timedRoom)
 assert.equal(timer, null)
 assert.equal(timedRoom.pendingBotPlay, null)
-assert.equal(published, 1)
 
 const names = new Set()
 for (let i = 0; i < 200; i++) {

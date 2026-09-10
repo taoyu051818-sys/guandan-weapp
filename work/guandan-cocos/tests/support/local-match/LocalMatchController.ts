@@ -178,6 +178,11 @@ export class LocalMatchController {
         currentLevel: this.match.currentLevel,
         teamLevels: this.match.teamLevels,
         roundMeta: this.match.roundMeta,
+        publicHistory: this.match.playHistory,
+        turnOrder: this.match.turnOrder,
+        finishedPlayers: this.match.finishedPlayers,
+        roundId: this.match.roundId,
+        revision: this.match.revision,
       },
     )
     if (decision?.length && diagnosePlay(decision, this.match.lastValidPlay, this.match.ruleProfile).canPlay) {

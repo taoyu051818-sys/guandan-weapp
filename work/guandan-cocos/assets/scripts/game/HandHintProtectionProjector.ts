@@ -17,7 +17,7 @@ const classifyGroup = (
 ): HintProtectedGroup['kind'] | null => {
   if (kind === 'king-bomb') return 'rocket'
   if (kind === 'bomb') return 'bomb'
-  if (kind === 'straight-flush' || kind === 'plate' || kind === 'tube' || kind === 'triple-with-pair') {
+  if (kind === 'straight-flush' || kind === 'straight' || kind === 'plate' || kind === 'tube' || kind === 'triple-with-pair') {
     return 'structured'
   }
   const info = getPlayInfo(cards, ruleProfile)

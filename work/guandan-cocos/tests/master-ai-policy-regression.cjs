@@ -13,9 +13,6 @@ const localAIEngine = read('tests/support/local-match/SynchronousLocalAIEngine.t
 const scene = read('assets/scripts/scenes/GameScene.ts')
 const tableMatchCoordinator = read('assets/scripts/scenes/TableMatchCoordinator.ts')
 const aiSource = read('assets/scripts/core/generated/ai/decisionRunner.ts')
-const policyOverrides = read('assets/scripts/core/generated/ai/policyOverrides.ts')
-const fallbackDecision = read('assets/scripts/core/generated/ai/fallbackDecision.ts')
-const decisionSupport = read('assets/scripts/core/generated/ai/decisionSupport.ts')
 
 assert.doesNotMatch(manager, /snapshot\.difficulty/, 'local gameplay must not trust persisted or injected AI difficulty')
 assert.doesNotMatch(scene, /snapshot\.difficulty/, 'table helpers must not trust persisted or injected AI difficulty')
@@ -25,11 +22,16 @@ assert.match(localAIEngine, /createAIWorkerRuntime\(\)[\s\S]*createAIWorkerReque
 assert.match(localAIEngine, /expectedGeneration[\s\S]*expectedGeneration !== this\.generation/, 'the Cocos AI adapter must invalidate decisions across lifecycle generations')
 assert.match(localMatch, /aiEngine\?\.makeDecision\([\s\S]*difficulty,[\s\S]*player\.team,[\s\S]*this\.match\.players,[\s\S]*playerId,[\s\S]*ruleProfile: this\.match\.ruleProfile/, 'the injected AI engine must receive rules, difficulty, authoritative teams and player identity')
 assert.doesNotMatch(manager, /\bmakeDecision\(/, 'GameManager must not bind the module-level AI singleton')
-assert.match(decisionSupport, /const getTeammateId[\s\S]*id !== myPlayerId && players\[id\]\.team === myTeam/, 'AI teammate identity must come from the authoritative team field')
-assert.match(decisionSupport, /const teammateHand = players\[teammateId\][\s\S]*players\[teammateId\]\.hand\.length/, 'pressure modelling must not mistake the bot itself for its teammate')
-assert.match(aiSource, /createDecisionRunner[\s\S]*observeRuntimeIntel\(lastPlay, players\)[\s\S]*search\.chooseEndgamePlay/, 'the runner must preserve the decision gate and search ordering')
-assert.match(policyOverrides, /createPolicyOverrides[\s\S]*chooseMasterOverrideImpl[\s\S]*hardTacticalOverrideImpl[\s\S]*chooseMediumOverrideImpl/, 'difficulty policies must be adapted outside the engine state container')
-assert.match(fallbackDecision, /createFallbackDecision[\s\S]*master_pre6_bomb_hold[\s\S]*bomb_conservation[\s\S]*humanizeJitter/, 'ordinary follow, lead and humanization fallback must stay outside the gate runner')
+assert.doesNotMatch(aiSource, /chooseLockedEndgameRoute|master_pre6_no_nonbomb_follow/, 'retired master early-return policies must not bypass team planning')
+
+const teamSource = read('assets/scripts/core/generated/ai/team/policy.ts')
+const hintSource = read('assets/scripts/core/generated/hints/handHintPolicy.ts')
+assert.match(aiSource, /chooseTeamPlay/)
+assert.match(hintSource, /chooseTeamPlay/)
+assert.match(teamSource, /assessHandStrength/)
+for (const retired of ['strategies/hard.ts', 'strategies/medium.ts', 'strategies/master.ts', 'strategies/profiles.ts', 'search.ts', 'fallbackDecision.ts', 'decisionSupport.ts', 'config.ts', 'runtimeIntel.ts', 'policyOverrides.ts']) {
+  assert.equal(fs.existsSync(path.join(root, 'assets/scripts/core/generated/ai', retired)), false, 'retired lower policy: ' + retired)
+}
 
 const core = require(path.resolve(root, '../../shared-core/dist'))
 const card = (id, suit, rank, value) => ({ id, suit, rank, value, isLevelCard: false })

@@ -160,8 +160,6 @@ export const loadGameSecurityConfig = (env = process.env) => {
     allowedOrigins,
     wsPort: integerSetting(env, 'WEAPP_WS_PORT', 3002, { minimum: 1, maximum: 65535 }),
     turnTimeoutMs: integerSetting(env, 'WEAPP_TURN_TIMEOUT_MS', 20_000, { minimum: 100, maximum: 60 * 60_000 }),
-    trusteeActionDelayMs: integerSetting(env, 'WEAPP_TRUSTEE_ACTION_DELAY_MS', 500, { minimum: 10, maximum: 60_000 }),
-    botActionDelayMs: integerSetting(env, 'WEAPP_BOT_ACTION_DELAY_MS', 500, { minimum: 10, maximum: 60_000 }),
     friendSecondMs,
     totalMinuteMs,
     dissolveTimeoutMs: integerSetting(env, 'WEAPP_DISSOLVE_TIMEOUT_MS', 30_000, { minimum: 1000, maximum: 60 * 60_000 }),

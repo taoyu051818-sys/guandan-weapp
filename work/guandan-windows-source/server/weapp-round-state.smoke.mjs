@@ -80,7 +80,7 @@ const stop = child => {
 const timeoutPort = 39112
 const timeoutChild = launch(timeoutPort, {
   WEAPP_TURN_TIMEOUT_MS: '100',
-  WEAPP_TRUSTEE_ACTION_DELAY_MS: '25',
+
   WEAPP_FRIEND_SECOND_MS: '5',
   WEAPP_EMPTY_ROOM_TIMEOUT_MS: '150',
 })
@@ -122,7 +122,7 @@ try {
 }
 
 const roundPort = 39113
-const roundChild = launch(roundPort, { WEAPP_TURN_TIMEOUT_MS: '30000', WEAPP_TRUSTEE_ACTION_DELAY_MS: '50', WEAPP_FRIEND_SECOND_MS: '5' })
+const roundChild = launch(roundPort, { WEAPP_TURN_TIMEOUT_MS: '30000', WEAPP_FRIEND_SECOND_MS: '5' })
 let roundSockets = []
 try {
   await delay(250)
@@ -322,7 +322,7 @@ try {
 }
 
 const antiPort = 39114
-const antiChild = launch(antiPort, { WEAPP_TURN_TIMEOUT_MS: '30000', WEAPP_TRUSTEE_ACTION_DELAY_MS: '50', WEAPP_FRIEND_SECOND_MS: '5' }, '1')
+const antiChild = launch(antiPort, { WEAPP_TURN_TIMEOUT_MS: '30000', WEAPP_FRIEND_SECOND_MS: '5' }, '1')
 let antiSockets = []
 try {
   await delay(250)

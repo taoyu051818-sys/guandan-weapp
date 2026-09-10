@@ -1,6 +1,8 @@
 import type { Card, PlayAction } from '../types/game'
 import type { RuleProfile } from '../lib/rules'
 
+import type { TeamObservation } from '../ai/team/types'
+
 export type HintProtectionKind = 'locked' | 'rocket' | 'bomb' | 'structured' | 'triple' | 'pair'
 
 export type HintProtectedGroup = Readonly<{
@@ -13,6 +15,8 @@ export type HintRequest = Readonly<{
   hand: readonly Card[]
   lastPlay: PlayAction | null
   ruleProfile: RuleProfile
+  observation?: Omit<TeamObservation, 'hand' | 'lastPlay' | 'profile'>
+  seed?: number
   protectedGroups: readonly HintProtectedGroup[]
 }>
 

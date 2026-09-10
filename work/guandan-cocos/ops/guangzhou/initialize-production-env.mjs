@@ -28,7 +28,6 @@ if (existsSync(target)) {
     WEAPP_WS_PORT: '33102',
     WEAPP_ALLOWED_ORIGINS: 'https://api.yutechhn.cn,https://servicewechat.com',
     WEAPP_TURN_TIMEOUT_MS: '20000',
-    WEAPP_BOT_ACTION_DELAY_MS: '650',
   }
   writeFileSync(target, Object.entries(config).map(([key, value]) => `${key}=${value}`).join('\n') + '\n', { mode: 0o600, flag: 'wx' })
   console.log('Production environment created with four independent signing keys.')

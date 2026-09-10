@@ -62,8 +62,6 @@ const roomOperationKey = roomId => `room:${roomId}`
 
 const security = loadGameSecurityConfig()
 const TURN_TIMEOUT_MS = security.turnTimeoutMs
-const TRUSTEE_ACTION_DELAY_MS = security.trusteeActionDelayMs
-const BOT_ACTION_DELAY_MS = security.botActionDelayMs
 const FRIEND_SECOND_MS = security.friendSecondMs
 const TOTAL_MINUTE_MS = security.totalMinuteMs
 const DISSOLVE_TIMEOUT_MS = security.dissolveTimeoutMs
@@ -422,8 +420,6 @@ const commitRuntimeState = async () => {
 const matchLifecycle = createWeAppMatchLifecycle({
   playerIds: ids, rooms, connections,
   turnTimeoutMs: TURN_TIMEOUT_MS,
-  trusteeActionDelayMs: TRUSTEE_ACTION_DELAY_MS,
-  botActionDelayMs: BOT_ACTION_DELAY_MS,
   friendSecondMs: FRIEND_SECOND_MS,
   totalMinuteMs: TOTAL_MINUTE_MS,
   testMatchEndPersistFailures: process.env.NODE_ENV === 'test' && process.env.WEAPP_TEST_FAIL_MATCH_END_PERSIST_ONCE === '1' ? 1 : 0,

@@ -30,8 +30,8 @@ assert.throws(() => normalizeFriendRoomSettings({ format: 'rounds', upgradeTarge
   const clock = createTurnClock({
     clearTurnTimer: id => timers.delete(id), turnTimers: timers, ensureLiveMetadata: () => {},
     deadlineStepFor: () => ({ playerId: 'p1', action: 'play' }), isBotPlayer: () => bot,
-    isMatchRoom: () => false, botActionDelayMs: 1000, friendSecondMs: 1000,
-    trusteeActionDelayMs: 1000, turnTimeoutMs: 20000, now: () => 100,
+    isMatchRoom: () => false, friendSecondMs: 1000,
+    turnTimeoutMs: 20000, now: () => 100,
     scheduleTimeout: (_callback, delay) => { scheduled++; duration = delay; return scheduled },
     enqueueServerOperation: callback => callback(), automatedDeadline: () => {}, publishTurnStatus: () => {},
   })

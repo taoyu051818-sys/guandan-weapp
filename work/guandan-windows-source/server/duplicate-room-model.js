@@ -1,6 +1,5 @@
 import { createRequire } from 'node:module'
 import { createInitialMatchState } from './game-session.js'
-import { botOpeningDelay } from './bot-turn-pacing.js'
 const { createGame, chooseMatchLevel, getRuleProfile, transition, variantAward } = createRequire(import.meta.url)('../../../shared-core/dist')
 
 export const DUPLICATE_SEATS = Array.from({ length: 8 }, (_, i) => `p${i + 1}`)
@@ -27,7 +26,7 @@ export const dealDuplicateRound = (room, random, now) => {
     }
     return [table, { state: createInitialMatchState({ players, ruleProfile: rules, currentLevel: level, dealerId: leader,
       teamLevels: { teamA: level, teamB: level }, matchFormat: format, roundId: room.completedRounds + 1,
-      revision: room.version + 1 }), botWakeAt: now + botOpeningDelay(500), deadlineAt: now + room.settings.turnSeconds * 1000 }]
+      revision: room.version + 1 }), pendingBotPlay: null, deadlineAt: now + room.settings.turnSeconds * 1000 }]
   }))
   room.members.forEach(m => { m.ready = Boolean(m.bot); m.watch = null })
   room.phase = 'playing'; room.roundTallied = false
@@ -42,7 +41,7 @@ export const playDuplicate = (room, member, type, payload, now) => {
     cardIds: payload.cardIds, expectedRevision: table.state.revision, roundId: table.state.roundId })
   if (!result.ok) throw new Error(result.error?.message || result.error?.code || '出牌不合法')
   table.state = result.state
-  table.botWakeAt = now + botOpeningDelay(500)
+  table.pendingBotPlay = null
   table.deadlineAt = result.state.phase === 'settled' ? null : now + room.settings.turnSeconds * 1000
   if (room.tables.A.state.phase === 'settled' && room.tables.B.state.phase === 'settled' && !room.roundTallied) {
     const row = { round: room.completedRounds + 1, A: null, B: null, red: 0, blue: 0 }

@@ -4,7 +4,7 @@ import type { AIEngine, Difficulty } from './types'
 
 export const runAiTurns = (
   state: EngineState,
-  difficulty: Difficulty = 'medium',
+  difficulty: Difficulty = 'master',
   maxTurns = 12,
   injectedAI?: AIEngine,
 ): EngineState => {
@@ -28,6 +28,9 @@ export const runAiTurns = (
         currentLevel: next.currentLevel,
         teamLevels: { teamA: next.currentLevel, teamB: next.currentLevel },
         roundMeta: null,
+        turnOrder: next.turnOrder,
+        publicHistory: next.playArea,
+        finishedPlayers: next.finishedPlayers,
         ruleProfile: next.ruleProfile,
       },
     )

@@ -96,8 +96,6 @@ assert.throws(() => loadGameSecurityConfig(equivalentRelativeCollision), /解析
 for (const [name, value] of [
   ['WEAPP_WS_PORT', '0'],
   ['WEAPP_TURN_TIMEOUT_MS', '99'],
-  ['WEAPP_TRUSTEE_ACTION_DELAY_MS', '9'],
-  ['WEAPP_BOT_ACTION_DELAY_MS', '60001'],
   ['WEAPP_MAX_MESSAGE_BYTES', '65536'],
   ['WEAPP_MAX_CONNECTIONS', '3'],
   ['WEAPP_MAX_ROOMS', '0'],

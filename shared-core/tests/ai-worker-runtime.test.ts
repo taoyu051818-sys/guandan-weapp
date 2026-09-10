@@ -50,7 +50,7 @@ const aiContext: AIContext = {
 const input: AIWorkerDecisionInput = {
   hand,
   lastPlay: null,
-  difficulty: 'easy',
+  difficulty: 'master',
   myTeam: 'teamB',
   players,
   myPlayerId: 'p2',
@@ -64,8 +64,6 @@ describe('AI worker runtime', () => {
     const runtime = createAIWorkerRuntime();
     const engineConfig = {
       seed,
-      hardTuning: main.getHardRuntimeTuning(),
-      masterTuning: main.getMasterRuntimeTuning(),
     };
     let checkpoint = main.checkpoint();
 
@@ -103,8 +101,6 @@ describe('AI worker runtime', () => {
     const runtime = createAIWorkerRuntime();
     const engineConfig = {
       seed,
-      hardTuning: bootstrap.getHardRuntimeTuning(),
-      masterTuning: bootstrap.getMasterRuntimeTuning(),
     };
     const first = runtime.handle(createAIWorkerRequest(
       1,
@@ -123,7 +119,7 @@ describe('AI worker runtime', () => {
       first.checkpoint,
     ));
     expect(second.error).toBeUndefined();
-    expect(second.metrics?.cacheHitAllPlays).toBe(1);
+    expect(second.metrics?.cacheHitAllPlays).toBe(2);
     expect(second.metrics?.cacheMissAllPlays).toBe(0);
   });
 

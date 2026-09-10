@@ -14,7 +14,7 @@ export interface HandArrangementOptions {
   suitOrder: readonly Suit[]
 }
 
-export type HandGroupKind = 'king-bomb' | 'bomb' | 'straight-flush' | 'plate' | 'tube' | 'triple-with-pair'
+export type HandGroupKind = 'king-bomb' | 'bomb' | 'straight-flush' | 'plate' | 'tube' | 'triple-with-pair' | 'straight' | 'pair' | 'triple'
 export type HandGroupOrigin = 'rank' | 'auto' | 'manual'
 
 /** One horizontal hand lane. Groups and loose cards deliberately share one sequence. */
@@ -102,6 +102,9 @@ export const KIND_PRIORITY: Readonly<Record<HandGroupKind, number>> = {
   plate: 300,
   tube: 200,
   'triple-with-pair': 100,
+  straight: 90,
+  triple: 50,
+  pair: 20,
 }
 
 export const compareText = (left: string, right: string): number => left < right ? -1 : left > right ? 1 : 0

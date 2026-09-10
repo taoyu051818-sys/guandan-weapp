@@ -14,6 +14,9 @@ const secret = 'bot-smoke-secret-with-at-least-thirty-two-characters'
 const stateDir = mkdtempSync(join(tmpdir(), 'guandan-weapp-bots-'))
 const stateFile = join(stateDir, 'rooms.json')
 const sockets = []
+// Production pacing includes a 10% 3x branch: up to 9 seconds. This private
+// room uses its own turnSeconds, not WEAPP_TURN_TIMEOUT_MS for matchmaking.
+const botActionTimeoutMs = 12000
 let child = null
 let nextRequestId = 1
 
@@ -25,7 +28,7 @@ const startServer = () => {
       ...process.env,
       WEAPP_WS_PORT: String(port),
       WEAPP_ROOM_STATE_FILE: stateFile,
-      WEAPP_BOT_ACTION_DELAY_MS: '40',
+
       WEAPP_TURN_TIMEOUT_MS: '5000',
       GAME_TICKET_SECRET: secret,
     },
@@ -195,8 +198,8 @@ try {
 
   const playId = nextRequestId++
   const playAccepted = waitFor(restoredHost, 'actionAccepted', packet => packet.requestId === playId)
-  const botActionPromise = waitFor(restoredHost, 'botAction', packet => packet.playerId === 'p2', 8000)
-  const botStatePromise = waitFor(restoredHost, 'gameState', packet => packet.state.playArea.some(action => action.playerId === 'p2'), 8000)
+  const botActionPromise = waitFor(restoredHost, 'botAction', packet => packet.playerId === 'p2', botActionTimeoutMs)
+  const botStatePromise = waitFor(restoredHost, 'gameState', packet => packet.state.playArea.some(action => action.playerId === 'p2'), botActionTimeoutMs)
   send(restoredHost, 'play', { roomId: friendRoomId, cardIds: [started.state.players.p1.hand.at(-1).id] }, playId)
   const [, botAction, botState] = await Promise.all([playAccepted, botActionPromise, botStatePromise])
   assert.equal(botAction.difficulty, 'master', '机器人自动动作必须明确使用最高档 master AI')

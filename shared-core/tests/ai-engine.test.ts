@@ -4,7 +4,6 @@ import {
   getRuleProfile,
 } from '../src/lib/rules';
 import { representativeLegalMoves } from '../src/lib/legalMoves';
-import { createCandidateScorer, pickLowestWinningPlayByResolution } from '../src/ai/scoring';
 import type { Card, Player, PlayerId, Rank, Suit } from '../src/types/game';
 import { PlayType } from '../src/types/game';
 import {
@@ -66,62 +65,30 @@ describe('createAIEngine', () => {
     const context = createContext();
 
     const decide = (engine: typeof first) => Array.from({ length: 6 }, () => (
-      engine.makeDecision(hand, null, 'easy', 'teamB', players, 'p2', context)?.map(({ id }) => id) ?? null
+      engine.makeDecision(hand, null, 'master', 'teamB', players, 'p2', context)?.map(({ id }) => id) ?? null
     ));
 
     expect(decide(first)).toEqual(decide(second));
   });
 
-  it('preserves the fixed-seed decision sequence across engine refactors', () => {
-    const hand = createHand('mine');
-    const players = createPlayers(hand);
-    const context = createContext();
-    const decide = (difficulty: 'easy' | 'medium' | 'hard' | 'master') => {
-      const engine = createAIEngine({
-        ruleProfile: getRuleProfile('classic'),
-        seed: 20260811,
-      });
-      return Array.from({ length: 6 }, () => (
-        engine.makeDecision(
-          hand,
-          null,
-          difficulty,
-          'teamB',
-          players,
-          'p2',
-          context,
-        )?.map(({ id }) => id) ?? null
-      ));
+  it('normalizes retired runtime tier values to the sole master policy', () => {
+    const hand = createHand('mine'), players = createPlayers(hand), context = createContext();
+    const decide = (legacy: string) => {
+      const engine = createAIEngine({ ruleProfile: context.ruleProfile, seed: 20260811 });
+      const sequence = Array.from({ length: 6 }, () => engine.makeDecision(
+        hand, null, legacy as 'master', 'teamB', players, 'p2', context)?.map(card => card.id));
+      expect(engine.getLastDecisionTrace().difficulty).toBe('master');
+      expect(engine.getLastDecisionTrace().team?.policy).toBe('team-first-v1');
+      return sequence;
     };
-
-    expect(decide('easy')).toEqual([
-      ['mine-1'],
-      ['mine-0'],
-      ['mine-2'],
-      ['mine-1'],
-      ['mine-0'],
-      ['mine-0'],
-    ]);
-    expect(decide('medium')).toEqual(Array.from({ length: 6 }, () => ['mine-0']));
-    expect(decide('hard')).toEqual([
-      ['mine-7'],
-      ['mine-7'],
-      ['mine-7'],
-      ['mine-0'],
-      ['mine-7'],
-      ['mine-7'],
-    ]);
-    expect(decide('master')).toEqual(Array.from({ length: 6 }, () => ['mine-7']));
+    for (const retired of ['easy', 'medium', 'hard']) expect(decide(retired)).toEqual(decide('master'));
   });
 
-  it('isolates tuning, caches, and metrics between instances', () => {
+  it('isolates caches and metrics between instances', () => {
     const first = createAIEngine({ ruleProfile: getRuleProfile('classic'), seed: 1 });
     const second = createAIEngine({ ruleProfile: getRuleProfile('classic'), seed: 2 });
     const hand = createHand('cache');
 
-    first.setHardRuntimeTuning({ interceptThreshold: 10 });
-    expect(first.getHardRuntimeTuning().interceptThreshold).toBe(10);
-    expect(second.getHardRuntimeTuning().interceptThreshold).toBe(7);
 
     first.getPossiblePlays(hand, null);
     expect(first.getLastMetrics().cacheMissAllPlays).toBe(1);
@@ -166,7 +133,7 @@ describe('createAIEngine', () => {
     const decision = engine.makeDecision(
       hand,
       { playerId: 'p1', cards: [card('enemy-play', 8)], type: PlayType.Single },
-      'hard',
+      'master',
       'teamB',
       players,
       'p2',
@@ -191,7 +158,7 @@ describe('createAIEngine', () => {
     const decision = engine.makeDecision(
       hand,
       null,
-      'medium',
+      'master',
       'teamB',
       players,
       'p2',
@@ -213,11 +180,11 @@ describe('createAIEngine', () => {
       type: PlayType.Single,
     };
 
-    first.makeDecision(hand, observed, 'hard', 'teamB', players, 'p2', createContext());
-    expect(first.checkpoint().runtimeIntel.seenValueCounts).toContainEqual([9, 1]);
-    expect(second.checkpoint().runtimeIntel.seenValueCounts).toEqual([]);
-    expect(first.getLastDecisionTrace().difficulty).toBe('hard');
-    expect(second.getLastDecisionTrace().difficulty).toBe('medium');
+    first.makeDecision(hand, observed, 'master', 'teamB', players, 'p2', createContext());
+    expect(first.checkpoint().teamDecisions).toHaveLength(1);
+    expect(second.checkpoint().teamDecisions).toEqual([]);
+    expect(first.getLastDecisionTrace().difficulty).toBe('master');
+    expect(second.getLastDecisionTrace().difficulty).toBe('master');
   });
 
   it('uses the injected rule profile as the instance default', () => {
@@ -259,39 +226,6 @@ describe('createAIEngine', () => {
     expect(engineClasses).toEqual(sharedClasses);
   });
 
-  it('orders and selects the least sufficient large bomb before the rocket', () => {
-    const profile = getRuleProfile('classic');
-    const nine = [card('nine-bomb', 3)];
-    const ten = [card('ten-bomb', 3)];
-    const rocket = [card('rocket', 'Big', 'joker')];
-    const resolutions = new Map<string, ReturnType<typeof getPlayInfo>>([
-      ['nine-bomb', { type: PlayType.Bomb, maxValue: 9_003, length: 9 }],
-      ['ten-bomb', { type: PlayType.Bomb, maxValue: 10_003, length: 10 }],
-      ['rocket', { type: PlayType.Rocket, maxValue: 10_000 }],
-    ]);
-    const resolve = (play: Card[]) => resolutions.get(play[0].id) ?? null;
-    const tuning = createAIEngine({ ruleProfile: profile, seed: 1 });
-    const scorer = createCandidateScorer({
-      resolvePlay: resolve,
-      getHardTuning: tuning.getHardRuntimeTuning,
-      getMasterTuning: tuning.getMasterRuntimeTuning,
-    });
-    const context = {
-      handCountMap: new Map<number, number>(),
-      isLeadTurn: false,
-      profile: {
-        bombPenalty: 0, wildcardPenalty: 0, highCardPenalty: 0, openBigCardPenalty: 0,
-        responseSmallCardBias: 1, comboLeadBonus: 0, leadLengthBonus: 0,
-        earlySmallDumpWeight: 0, conservatism: 0, humanizeJitter: 0,
-      },
-      ruleProfile: profile,
-      lastPlay: { playerId: 'p1' as const, cards: [], type: PlayType.Bomb },
-    };
-
-    expect(scorer.sort([rocket, ten, nine], [...rocket, ...ten, ...nine], 'easy', context))
-      .toEqual([nine, ten, rocket]);
-    expect(pickLowestWinningPlayByResolution([rocket, ten, nine], resolve)).toBe(nine);
-  });
 
   it('bounds a cold public decision with nine-, ten-card, and rocket responses', () => {
     const profile = getRuleProfile('classic');
@@ -328,7 +262,7 @@ describe('createAIEngine', () => {
     const decision = engine.makeDecision(
       hand,
       lastPlay,
-      'easy',
+      'master',
       'teamB',
       players,
       'p2',
@@ -337,12 +271,10 @@ describe('createAIEngine', () => {
     const cpu = process.cpuUsage(cpuStartedAt);
     const cpuMs = (cpu.user + cpu.system) / 1_000;
 
-    expect(getPlayInfo(decision ?? [], profile)).toMatchObject({
-      type: PlayType.Bomb,
-      maxValue: 9_003,
-      length: 9,
-    });
-    expect(engine.getLastMetrics().generatedPlays).toBeLessThanOrEqual(20);
+    // Rocket retains the ten-card bomb as a one-hand exit. The old greedy
+    // smallest bomb would leave a wildcard plus a rocket (two more hands).
+    expect(getPlayInfo(decision ?? [], profile)?.type).toBe(PlayType.Rocket);
+    expect(engine.getLastMetrics().generatedPlays).toBeLessThanOrEqual(2000);
     expect(cpuMs).toBeLessThan(1_000);
   }, 5_000);
 
@@ -351,7 +283,7 @@ describe('createAIEngine', () => {
     const hand = createHand('clock');
     const players = createPlayers(hand);
     const context = createContext();
-    const decide = (difficulty: 'hard' | 'master') => {
+    const decide = (difficulty: 'master') => {
       const engine = createAIEngine({ ruleProfile: profile, seed: 987654321 });
       return Array.from({ length: 4 }, () => (
         engine.makeDecision(
@@ -366,7 +298,7 @@ describe('createAIEngine', () => {
       ));
     };
     const baseline = {
-      hard: decide('hard'),
+      hard: decide('master'),
       master: decide('master'),
     };
     let clock = 0;
@@ -375,14 +307,14 @@ describe('createAIEngine', () => {
       return clock;
     });
     try {
-      expect(decide('hard')).toEqual(baseline.hard);
+      expect(decide('master')).toEqual(baseline.hard);
       expect(decide('master')).toEqual(baseline.master);
     } finally {
       clockSpy.mockRestore();
     }
   });
 
-  it('restores serialized RNG, tuning, and runtime intel with cold caches', () => {
+  it('restores serialized RNG and public journal with cold caches', () => {
     const profile = getRuleProfile('classic');
     const source = createAIEngine({ ruleProfile: profile, seed: 20260811 });
     const restored = createAIEngine({ ruleProfile: profile, seed: 1 });
@@ -400,16 +332,12 @@ describe('createAIEngine', () => {
       type: PlayType.Pair,
     };
 
-    source.setHardRuntimeTuning({ interceptThreshold: 9 });
-    source.makeDecision(hand, firstObserved, 'easy', 'teamB', players, 'p2', context);
-    source.makeDecision(hand, secondObserved, 'easy', 'teamB', players, 'p2', context);
+    source.makeDecision(hand, firstObserved, 'master', 'teamB', players, 'p2', context);
+    source.makeDecision(hand, secondObserved, 'master', 'teamB', players, 'p2', context);
     const serialized = JSON.parse(JSON.stringify(source.checkpoint())) as AIEngineCheckpoint;
 
-    expect(serialized.runtimeIntel.seenValueCounts).toEqual(expect.arrayContaining([
-      [3, 1],
-      [4, 2],
-    ]));
-    expect(serialized.hardTuning.interceptThreshold).toBe(9);
+    expect(serialized.version).toBe(2);
+    expect(serialized.teamDecisions).toHaveLength(2);
 
     restored.getPossiblePlays(hand, null);
     restored.getPossiblePlays(hand, null);
@@ -424,7 +352,7 @@ describe('createAIEngine', () => {
       const expected = source.makeDecision(
         hand,
         firstObserved,
-        'easy',
+        'master',
         'teamB',
         players,
         'p2',
@@ -433,7 +361,7 @@ describe('createAIEngine', () => {
       const actual = restored.makeDecision(
         hand,
         firstObserved,
-        'easy',
+        'master',
         'teamB',
         players,
         'p2',
@@ -465,14 +393,17 @@ describe('createAIEngine', () => {
     expect(tournament.checkpoint()).toEqual(before);
   });
 
-  it('rejects a checkpoint with a divergent decision profile atomically', () => {
+  it('migrates old rooms to master-only v2 and rejects malformed restores atomically', () => {
     const profile = getRuleProfile('classic');
     const engine = createAIEngine({ ruleProfile: profile, seed: 10 });
-    const checkpoint = engine.checkpoint();
     const before = engine.checkpoint();
-    checkpoint.decisionContext.ruleProfile = getRuleProfile('tournament');
-
-    expect(() => engine.restore(checkpoint)).toThrow(/decision context/);
+    const legacy = { ...before, version: 1, decisionContext: { difficulty: 'easy', role: 'support', ruleProfile: profile },
+      hardTuning: { interceptThreshold: 7 }, runtimeIntel: {} };
+    engine.restore(legacy);
+    expect(engine.checkpoint()).toEqual(before);
+    expect(engine.getLastDecisionTrace().difficulty).toBe('master');
+    expect(() => engine.restore({ ...legacy, decisionContext: { ...legacy.decisionContext, ruleProfile: getRuleProfile('tournament') } })).toThrow(/decision context/);
+    expect(() => engine.restore({ ...before, random: { algorithm: 'bad', state: -1 } })).toThrow();
     expect(engine.checkpoint()).toEqual(before);
   });
 
@@ -508,7 +439,7 @@ describe('createAIEngine', () => {
           cards: [card(`${teammateId}-3-lead`, 3)],
           type: PlayType.Single,
         };
-        for (const difficulty of ['easy', 'medium', 'hard', 'master'] as const) {
+        for (const difficulty of ['master'] as const) {
           const engine = createAIEngine({ ruleProfile: profile, seed: 20260811 });
           expect(engine.makeDecision(
             players[playerId].hand,

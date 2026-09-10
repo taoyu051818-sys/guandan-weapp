@@ -387,13 +387,13 @@ assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-3'])
 assert.equal(selection.replaceFromInput(['missing-card'], selectionContext), '手牌已更新，请重新选择')
 assert.deepEqual(Array.from(selection.selectedCardIds), [], 'a stale batch selection must clear atomically')
 assert.match(selection.hint(selectionContext), /提示：/)
-assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-3'], 'the first hint must select the least damaging legal move')
+assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-8'], 'against one-card opponents the highest-tier hint must block, not blindly shed the smallest card')
 assert.match(selection.hint(selectionContext), /提示：/)
-assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-8'], 'an unchanged hint context must cycle deterministically')
+assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-3'], 'an unchanged hint context must cycle deterministically')
 assert.equal(hintRankCalls, 1, 'an unchanged hint context must reuse its ranked candidate list')
 const nextHintContext = { ...selectionContext, state: { ...selectionState, roundId: 2, revision: 0 } }
 assert.match(selection.hint(nextHintContext), /提示：/)
-assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-3'], 'a round signature change must reset hint cycling to the best move')
+assert.deepEqual(Array.from(selection.selectedCardIds), ['p1-8'], 'a round signature change must reset hint cycling to the best move')
 assert.equal(hintRankCalls, 2, 'an authoritative signature change must invalidate the hint cache')
 
 const networkCallbacks = []

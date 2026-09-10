@@ -1,20 +1,10 @@
-import { legalMoves } from '../lib/legalMoves'
+import { chooseTeamPlay } from '../ai/team/policy'
+import { createSeededRandom } from '../ai/random'
+import type { TeamObservation } from '../ai/team/types'
+import { legalMoves, structuralLegalMoves } from '../lib/legalMoves'
 import { getPlayInfo, resolvePlayForContext } from '../lib/rules'
 import { PlayType, type Card } from '../types/game'
 import type { HintDamage, HintProtectedGroup, HintRequest, RankedHintMove } from './model'
-
-const DAMAGE_WEIGHT = Object.freeze({
-  splitRocket: 10_000,
-  splitBomb: 5_000,
-  useRocket: 3_500,
-  useBomb: 2_500,
-  splitStructured: 800,
-  splitTriple: 300,
-  splitPair: 100,
-  wildcard: 20,
-})
-
-const cardsKey = (cards: readonly Card[]): string => cards.map(card => card.id).sort().join(',')
 
 const partiallyUses = (moveIds: ReadonlySet<string>, group: HintProtectedGroup): boolean => {
   const usedCount = group.cardIds.reduce((count, cardId) => count + Number(moveIds.has(cardId)), 0)
@@ -58,16 +48,6 @@ const calculateDamage = (
   const beatMargin = info && lastInfo && info.type === lastInfo.type
     ? Math.max(0, info.maxValue - lastInfo.maxValue)
     : request.lastPlay ? 0 : normalizedLeadValue
-  const score =
-    splitRocketCount * DAMAGE_WEIGHT.splitRocket +
-    splitBombCount * DAMAGE_WEIGHT.splitBomb +
-    Number(usesRocket) * DAMAGE_WEIGHT.useRocket +
-    Number(usesBomb) * DAMAGE_WEIGHT.useBomb +
-    splitStructuredCount * DAMAGE_WEIGHT.splitStructured +
-    splitTripleCount * DAMAGE_WEIGHT.splitTriple +
-    splitPairCount * DAMAGE_WEIGHT.splitPair +
-    wildcardCount * DAMAGE_WEIGHT.wildcard +
-    beatMargin
   return {
     splitsLockedGroup,
     splitRocketCount,
@@ -79,27 +59,40 @@ const calculateDamage = (
     splitPairCount,
     wildcardCount,
     beatMargin,
-    score,
+    score: 0, // populated with the highest-strength policy rank below
   }
 }
 
-/**
- * Ranks legal physical moves without changing legality. Partial locked-group
- * moves are excluded whenever any intact-lock alternative exists.
+/** Hints use the same team policy as trustees/bots. Locks are physical input
+ * constraints, not a weaker difficulty or a second strategic ranking.
  */
 export const rankHintMoves = (request: HintRequest): readonly RankedHintMove[] => {
-  const ranked = legalMoves(request.hand, request.lastPlay, request.ruleProfile).map(cards => {
-    const damage = calculateDamage(cards, request)
-    return {
-      cards,
-      damage,
-      warning: damage.splitsLockedGroup ? 'splits-locked-group' as const : null,
-    }
-  })
-  const intactLockMoves = ranked.filter(move => !move.damage.splitsLockedGroup)
-  const candidates = intactLockMoves.length > 0 ? intactLockMoves : ranked
-  return candidates.sort((left, right) =>
-    left.damage.score - right.damage.score ||
-    left.cards.length - right.cards.length ||
-    cardsKey(left.cards).localeCompare(cardsKey(right.cards)))
+  const hasLocks = request.protectedGroups.some(group => group.kind === 'locked')
+  const moves = hasLocks ? legalMoves(request.hand, request.lastPlay, request.ruleProfile)
+    : structuralLegalMoves([...request.hand], request.ruleProfile)
+      .filter(cards => resolvePlayForContext(cards, request.lastPlay, request.ruleProfile))
+  const candidates = moves.filter(cards => !calculateDamage(cards, request).splitsLockedGroup)
+  if (!candidates.length) return []
+  const self = request.observation?.self ?? 'p1'
+  const team = request.observation?.team ?? 'teamA'
+  const observation: TeamObservation = {
+    self, team, order: ['p1', 'p2', 'p3', 'p4'],
+    seats: [
+      { id: 'p1', team: 'teamA', count: request.hand.length },
+      { id: 'p2', team: 'teamB', count: 27 },
+      { id: 'p3', team: 'teamA', count: 27 },
+      { id: 'p4', team: 'teamB', count: 27 },
+    ],
+    history: request.lastPlay ? [request.lastPlay] : [], historyComplete: false,
+    level: request.hand.find(card => card.isLevelCard)?.rank ?? 2, finishedPlayers: [],
+    ...request.observation,
+    hand: [...request.hand], lastPlay: request.lastPlay, profile: request.ruleProfile,
+  }
+  const seed = request.seed ?? [...request.hand.map(card => card.id).sort().join(',')]
+    .reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619), 2166136261)
+  const decision = chooseTeamPlay(observation, candidates,
+    () => structuralLegalMoves([...request.hand], request.ruleProfile), createSeededRandom(seed))
+  return decision.ranked.map((cards, index) => ({
+    cards, damage: { ...calculateDamage(cards, request), score: index }, warning: null,
+  }))
 }

@@ -173,13 +173,14 @@ const classifyGroup = (
   cards: readonly Card[],
   cardIds: readonly CardId[],
   requestedKind?: HandGroupClassification,
+  ruleProfile?: RuleProfile,
 ): HandGroupClassification => {
   if (requestedKind === 'rank-stack') {
     const requested = new Set(cardIds)
     const ranks = new Set(cards.filter(card => requested.has(card.id)).map(card => String(card.rank)))
     if (ranks.size === 1) return 'rank-stack'
   }
-  return recognizeHandGroup(cards, cardIds)?.kind ?? 'manual'
+  return recognizeHandGroup(cards, cardIds, { ruleProfile })?.kind ?? 'manual'
 }
 
 export const normalizeHandGroupingState = (
@@ -219,7 +220,7 @@ export const normalizeHandGroupingState = (
     cardIds.forEach(cardId => claimed.add(cardId))
     groups.push({
       id: rawGroup.id,
-      kind: classifyGroup(cards, cardIds, rawGroup.kind),
+      kind: classifyGroup(cards, cardIds, rawGroup.kind, ruleProfile),
       origin,
       locked,
       cardIds,

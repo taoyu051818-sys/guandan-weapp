@@ -39,7 +39,7 @@ await new Promise(r => collector.listen(0, '127.0.0.1', r))
 const launch = () => {
   child = spawn(process.execPath, ['server/weapp-ws.js'], { env: { ...process.env, NODE_ENV: 'test', WEAPP_WS_PORT: String(port),
     WEAPP_ROOM_STATE_FILE: file, GAME_TICKET_REQUIRED: 'true', GAME_TICKET_SECRET: secret, GAME_RESULT_SECRET: secret,
-    GAME_SPECTATOR_EVENT_SECRET: secret, WEAPP_BOT_ACTION_DELAY_MS: '10', WEAPP_FRIEND_SECOND_MS: '1',
+    GAME_SPECTATOR_EVENT_SECRET: secret, WEAPP_FRIEND_SECOND_MS: '1',
     WEAPP_TEST_RANDOM_SEED: '0x88776655',
     GAME_SPECTATOR_EVENT_ENDPOINT: `http://127.0.0.1:${collector.address().port}/api/v1/game/spectator-events` }, stdio: ['ignore', 'pipe', 'pipe'] })
   child.stdout.on('data', b => { logs += b }); child.stderr.on('data', b => { logs += b })

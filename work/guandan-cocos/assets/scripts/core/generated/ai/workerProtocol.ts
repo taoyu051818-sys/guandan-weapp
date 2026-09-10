@@ -4,14 +4,10 @@ import type {
   AIContext,
   AIDecisionMetrics,
   AIEngineCheckpoint,
-  HardRuntimeTuning,
-  MasterRuntimeTuning,
 } from './types';
 
 export type AIWorkerRuntimeConfig = {
   seed: number;
-  hardTuning: HardRuntimeTuning;
-  masterTuning: MasterRuntimeTuning;
 };
 
 export type AIWorkerEngineConfig = AIWorkerRuntimeConfig & {
@@ -21,7 +17,7 @@ export type AIWorkerEngineConfig = AIWorkerRuntimeConfig & {
 export type AIWorkerDecisionInput = {
   hand: Card[];
   lastPlay: PlayAction | null;
-  difficulty: 'easy' | 'medium' | 'hard' | 'master';
+  difficulty: 'master';
   myTeam: Team;
   players: Record<PlayerId, Player>;
   myPlayerId: PlayerId;
@@ -66,8 +62,6 @@ export const createAIWorkerRequest = (
 export const aiWorkerEngineConfigKey = (config: AIWorkerEngineConfig): string => JSON.stringify([
   config.seed >>> 0,
   ruleProfileKey(config.ruleProfile),
-  config.hardTuning,
-  config.masterTuning,
 ]);
 
 export const assertAIWorkerRequest: (
