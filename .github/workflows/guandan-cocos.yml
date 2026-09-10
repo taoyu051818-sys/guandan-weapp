@@ -1,11 +1,13 @@
 name: Guandan Cocos Client
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'shared-core/**'
       - '.gitignore'
-      - 'scripts/check-repository-boundaries.mjs'
+      - 'scripts/**'
+      - 'asset-library/**'
       - 'work/guandan-cocos/**'
       - '.github/workflows/guandan-cocos.yml'
   push:
@@ -13,7 +15,8 @@ on:
     paths:
       - 'shared-core/**'
       - '.gitignore'
-      - 'scripts/check-repository-boundaries.mjs'
+      - 'scripts/**'
+      - 'asset-library/**'
       - 'work/guandan-cocos/**'
       - '.github/workflows/guandan-cocos.yml'
 
@@ -23,6 +26,7 @@ permissions:
 jobs:
   regression:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       GUANDAN_FORCE_PACKAGE_TYPESCRIPT: '1'
     defaults:
@@ -35,7 +39,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: work/guandan-cocos/pnpm-lock.yaml
       - name: Install locked dependencies

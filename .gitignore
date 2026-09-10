@@ -1,6 +1,7 @@
 # Dependency and generated output
 **/node_modules/
 **/dist/
+/release-artifacts/
 **/.DS_Store
 **/.cache/
 
