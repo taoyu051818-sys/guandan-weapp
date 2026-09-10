@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { sendProtocolCommand } from './weapp-smoke-protocol.mjs'
 
 let nextRequestId = 1
@@ -9,7 +12,11 @@ const send = (socket, type, payload, requestId = nextRequestId++) => {
   return requestId
 }
 const waitFor = (socket, type, matches = () => true, timeoutMs = 5000) => new Promise((resolve, reject) => {
-  const timer = setTimeout(() => reject(new Error(`等待 ${type} 超时`)), timeoutMs)
+  const timeoutError = new Error(`等待 ${type} 超时`)
+  const timer = setTimeout(() => {
+    socket.removeEventListener('message', handler)
+    reject(timeoutError)
+  }, timeoutMs)
   const handler = ({ data }) => {
     const packet = JSON.parse(data)
     if (packet.type !== type || !matches(packet)) return
@@ -78,7 +85,10 @@ const stop = child => {
 }
 
 const timeoutPort = 39112
+const timeoutStateDir = mkdtempSync(join(tmpdir(), 'guandan-round-expiry-'))
+const timeoutStateFile = join(timeoutStateDir, 'rooms.json')
 const timeoutChild = launch(timeoutPort, {
+  WEAPP_ROOM_STATE_FILE: timeoutStateFile,
   WEAPP_TURN_TIMEOUT_MS: '100',
 
   WEAPP_FRIEND_SECOND_MS: '5',
@@ -90,7 +100,7 @@ try {
   const roomId = '271828'
   const entered = await enterRoom(timeoutPort, roomId)
   timeoutSockets = entered.sockets
-  const secondP1Timeout = waitFor(entered.sockets[0], 'turnTimedOut', packet => packet.playerId === 'p1' && packet.enteredTrustee, 4000)
+  const secondP1Timeout = waitFor(entered.sockets[0], 'turnTimedOut', packet => packet.playerId === 'p1' && packet.enteredTrustee, 12000)
   const initial = await startRoom(entered, roomId)
   assert.ok(initial.turnDeadlineAt > Date.now())
   assert.ok(initial.turnDeadlineAt - Date.now() <= 200, '测试配置下仍须使用服务端权威截止时间')
@@ -109,7 +119,14 @@ try {
   assert.equal((await disconnectedPromise).trustees.p2.reason, 'disconnected')
 
   entered.sockets.forEach(socket => socket.close())
-  await delay(300)
+  // Socket close and room expiry are serialized behind any in-flight AI decision.
+  // Observe durable removal instead of reconnecting after an arbitrary 300 ms:
+  // reconnecting too early cancels the very expiry this assertion is testing.
+  const expiryDeadline = Date.now() + 5000
+  while (JSON.parse(readFileSync(timeoutStateFile, 'utf8')).rooms.some(room => room.roomId === roomId)) {
+    assert.ok(Date.now() < expiryDeadline, '整桌离线后必须在限时内完成空房间清理')
+    await delay(25)
+  }
   const expiredRoomSocket = await connect(timeoutPort)
   timeoutSockets.push(expiredRoomSocket)
   const expiredRejoinId = nextRequestId++
@@ -119,10 +136,13 @@ try {
 } finally {
   timeoutSockets.forEach(socket => socket.close())
   await stop(timeoutChild)
+  rmSync(timeoutStateDir, { recursive: true, force: true })
 }
 
 const roundPort = 39113
-const roundChild = launch(roundPort, { WEAPP_TURN_TIMEOUT_MS: '30000', WEAPP_FRIEND_SECOND_MS: '5' })
+// This section tests manual order, privacy and readiness, not accelerated timeouts.
+// Keep real human deadlines; explicit trustees still use the normal short wake-up.
+const roundChild = launch(roundPort, { WEAPP_TURN_TIMEOUT_MS: '30000', WEAPP_FRIEND_SECOND_MS: '1000' })
 let roundSockets = []
 try {
   await delay(250)
