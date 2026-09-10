@@ -72,7 +72,10 @@ describe('public modes and dealing', () => {
       for (const count of bigJokers) expect(count / 3000).toBeGreaterThan(0.45)
       for (const count of bigJokers) expect(count / 3000).toBeLessThan(0.55)
     }
-    expect(totals[1] / totals[0]).toBeGreaterThan(1.4)
-    expect(totals[1] / totals[0]).toBeLessThan(2)
+    // The six-group opening target replaces the old six-packet deal's 1.4–2x
+    // concentration budget. Keep an explicit bound plus the independent
+    // arrangement/single-card regression, not only "more bombs than random".
+    expect(totals[1] / totals[0]).toBeGreaterThan(2)
+    expect(totals[1] / totals[0]).toBeLessThan(2.5)
   })
 })

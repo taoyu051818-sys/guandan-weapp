@@ -33,10 +33,8 @@ const {
   recognizeHandGroup,
   sortHandDisplayUnits,
   suggestHandGroups,
+  selectNonOverlappingSuggestions,
 } = require(arrangementPath)
-// Preserve the old policy fixtures to verify the offline comparison baseline,
-// not to constrain the new runtime planner to obsolete greedy choices.
-const { selectLegacySuggestions: selectNonOverlappingSuggestions } = require('../../../scripts/support/legacy-hand-arrangement.cjs')
 const { HandGrouping } = require(groupingPath)
 const { HandWorkspace } = require(workspacePath)
 const { createHandStackLayout, handStackRise, STACK_EXPOSURE_HEIGHT } = require(stackLayoutPath)
@@ -1078,7 +1076,7 @@ function verifyRuntimeIntegration () {
   assert.doesNotMatch(interactionSource, /HandInteractionStateMachine|private readonly interaction/, 'derived input state must not have a second mutable lifecycle')
   assert.match(interactionSource, /this\.workspace\.syncAuthoritativeHand\(hand, \{[\s\S]*levelRank: snapshot\.state\.currentLevel/, 'an authoritative hand update must pass the current level into the hand workspace')
   assert.doesNotMatch(interactionSource, /from 'cc'/, 'the hand interaction owner must remain independently testable without Cocos')
-  assert.match(workspaceSource, /this\.grouping\.autoGroup/, 'the hand workspace must own smart grouping')
+  assert.match(workspaceSource, /this\.grouping\.autoGroup/, 'the workspace uses the simple rule grouping')
   assert.match(workspaceSource, /this\.grouping\.stackMatchingRanks\(\)/, 'default table presentation must stack repeated ranks')
   assert.match(workspaceSource, /this\.grouping\.createLockedGroup\(cardIds, ruleProfile\)/, 'the workspace locks current selected IDs using the rule profile')
   assert.doesNotMatch(turnClockSource, /handStackRise/, 'the countdown layer must not react to presentation-only hand height')
@@ -1165,8 +1163,7 @@ for (const rank of [10, 'J', 'Q', 'K', 'A', 'Small', 'Big']) {
 const highTube = [10, 'J', 'Q'].flatMap(rank => [card(`run-${rank}-a`, rank), card(`run-${rank}-b`, rank, 'heart')])
 assert.equal(selectNonOverlappingSuggestions(suggestHandGroups(highTube))[0]?.kind, 'tube', 'high three-pair runs remain eligible')
 
-// Live planner integration: the historical assertions above that call
-// selectNonOverlappingSuggestions validate only the frozen benchmark baseline.
+// Simple runtime grouping must leave ordinary straights to explicit manual locks.
 const plannerHand = [
   card('plan-3-a', 3, 'spade'), card('plan-3-b', 3, 'heart'),
   card('plan-4', 4, 'club'), card('plan-5', 5, 'diamond'),
@@ -1180,15 +1177,17 @@ liveGrouping.autoGroup()
 const planned = liveGrouping.getSnapshot()
 assert.deepEqual(planned.groups.find(g => g.id === lockedKings).cardIds.slice().sort(), ['plan-K-a', 'plan-K-b'])
 const straightGroup = planned.groups.find(g => g.kind === 'straight')
-assert.ok(straightGroup, 'ordinary straight must now be a runtime automatic group')
-assert.equal(straightGroup.locked, false, 'arranging does not silently lock a group')
-assert.equal(straightGroup.cardIds.length, 5)
+assert.equal(straightGroup, undefined, 'automatic arrangement must not form ordinary straights')
 idSetEquals(planned.displayCardIds, plannerHand.map(c => c.id))
 assert.equal(JSON.stringify(plannerHand), beforePlan, 'the authoritative cards must not be mutated')
 const groupMembership = snapshot => snapshot.groups.map(g => g.cardIds.slice().sort().join(',')).sort()
 liveGrouping.autoGroup()
 assert.deepEqual(groupMembership(liveGrouping.getSnapshot()), groupMembership(planned))
 assert.equal(liveGrouping.getSnapshot().groups.find(g => g.id === lockedKings).locked, true)
-assert.deepEqual(liveGrouping.getPlaySelectionForCard(straightGroup.cardIds[0]), [], 'an unlocked top card stays individually selectable')
-console.log('Whole-hand planner integration: ordinary straights, pair splitting, preserved locks and deterministic layout passed')
+const manualIds = ['plan-3-a', 'plan-4', 'plan-5', 'plan-6', 'plan-7']
+const manualStraight = liveGrouping.createLockedGroup(manualIds, classicRuleProfile)
+assert.equal(liveGrouping.getSnapshot().groups.find(g => g.id === manualStraight).kind, 'straight')
+liveGrouping.autoGroup()
+idSetEquals(liveGrouping.getPlaySelectionForCard('plan-3-a'), manualIds)
+console.log('Simple rules: no auto straights; manual straights and other locks survive arrangement')
 process.stdout.write('hand arrangement/grouping regression checks passed\n')

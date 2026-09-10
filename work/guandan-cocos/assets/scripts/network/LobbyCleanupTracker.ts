@@ -29,6 +29,6 @@ export class LobbyCleanupTracker {
   private finish (requestId: number, roomId: string): void {
     if (this.requestRooms.get(requestId) !== roomId) return
     this.requestRooms.delete(requestId)
-    if (![...this.requestRooms.values()].includes(roomId)) this.roomIds.delete(roomId)
+    if (!Array.from(this.requestRooms.values()).includes(roomId)) this.roomIds.delete(roomId)
   }
 }

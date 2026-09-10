@@ -1,7 +1,7 @@
 import { getPlayInfo, type Card, type RuleProfile, type Suit } from '../core/generated'
-import { arrangementKind } from './HandArrangementPlanner'
 import {
   ALL_SUITS,
+  arrangementKind,
   DEFAULT_HAND_SUGGESTIONS,
   KIND_PRIORITY,
   STRAIGHT_FLUSH_SUITS,
@@ -288,6 +288,7 @@ export const suggestHandGroups = (
   }
 
   return Array.from(suggestions.values())
+    .filter(suggestion => suggestion.kind !== 'triple-with-pair' || options.ruleProfile.enableTripleWithPair)
     .sort((left, right) => compareSuggestions(left, right, options.ruleProfile))
     .slice(0, options.maxSuggestions)
 }
@@ -306,4 +307,16 @@ export const recognizeHandGroup = (
   return info && kind ? { key: suggestionKey(kind, cardIds), kind, cardIds: [...cardIds],
     wildcardUsages: info.wildcardUsages?.map(usage => ({ ...usage })) ?? [], primaryValue: info.maxValue,
     priority: KIND_PRIORITY[kind] } : null
+}
+
+/** Fixed rule priority, one pass. No whole-hand scoring/search or ordinary straights.
+ * High pairs stay available as controls instead of becoming full-house kickers. */
+export const selectNonOverlappingSuggestions = (suggestions: readonly HandGroupSuggestion[]): HandGroupSuggestion[] => {
+  const used = new Set<CardId>()
+  return suggestions.filter(suggestion => {
+    if (suggestion.kind === 'straight' || (suggestion.kind === 'triple-with-pair' && (suggestion.pairValue ?? Infinity) >= 10) ||
+        suggestion.cardIds.some(id => used.has(id))) return false
+    suggestion.cardIds.forEach(id => used.add(id))
+    return true
+  })
 }

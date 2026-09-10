@@ -37,6 +37,7 @@ export {
   getStraightFlushSuitAvailability,
   recognizeHandGroup,
   selectStraightFlushForSuit,
+  selectNonOverlappingSuggestions,
   suggestHandGroups,
   suggestStraightFlushGroups,
 } from './HandGroupSuggestions'

@@ -35,7 +35,7 @@ export class FriendRankingModal {
   private render (message: string, pending = false): Node | null {
     if (!this.root?.isValid) return null
     this.canvas?.destroy(); this.canvas = null
-    for (const node of [...this.root.children]) { this.stop(node); node.removeFromParent(); node.destroy() }
+    for (const node of this.root.children.slice()) { this.stop(node); node.removeFromParent(); node.destroy() }
     const ui = new RuntimeUiFactory(this.root)
     ui.panel('FriendRankingShade', 0, 0, this.screen.viewport.width, this.screen.viewport.height, { fill: new Color(2, 12, 20, 220), frame: 'square', lineWidth: 0 })
     const panel = ui.panel('FriendRankingPanel', 0, 0, 760, 550, { fill: new Color(17, 52, 72, 255), stroke: new Color(109, 160, 181), frame: 'panel' })

@@ -1,0 +1,347 @@
+{
+  "seed": 49261000,
+  "baselinePath": "/Users/mac/Documents/Codex/2026-08-02/wo-yi/release-artifacts/20260910-six-group-no-shuffle/stage/shared-core/dist",
+  "node": "v26.7.0",
+  "policyHands": 104,
+  "identicalPartitionsAndScores": true,
+  "byMode": {
+    "random": {
+      "hands": 52,
+      "oldMs": {
+        "p50": 13.971458999999982,
+        "p95": 69.52016599999979,
+        "max": 252.8031249999999,
+        "total": 1331.688083
+      },
+      "newMs": {
+        "p50": 13.80645800000002,
+        "p95": 40.86058400000002,
+        "max": 103.50504099999989,
+        "total": 990.4191690000008
+      },
+      "cpuReduction": 0.2562679041410324,
+      "meanGroups": 9.26923076923077
+    },
+    "no-shuffle": {
+      "hands": 52,
+      "oldMs": {
+        "p50": 33.06574999999975,
+        "p95": 320.63945799999965,
+        "max": 379.74275000000125,
+        "total": 4457.626004000003
+      },
+      "newMs": {
+        "p50": 27.691541999999572,
+        "p95": 96.78504099999964,
+        "max": 115.76883400000042,
+        "total": 2105.9332070000014
+      },
+      "cpuReduction": 0.5275661966458682,
+      "meanGroups": 6.326923076923077
+    }
+  },
+  "interactive": {
+    "engine": "wechatgame",
+    "hands": 26,
+    "scheduler": "manual frame queue with real CPU clock; no idle intervals; includes final apply callback",
+    "sliceBudgetMs": 4,
+    "submitMs": {
+      "p50": 0.7579590000004828,
+      "p95": 1.2411250000004657,
+      "max": 2.3504999999986467,
+      "total": 22.3232509999998
+    },
+    "tapMs": {
+      "p50": 0.4041669999987789,
+      "p95": 1.1949170000007143,
+      "max": 1.439791000000696,
+      "total": 12.509166999998342
+    },
+    "cachedTapMs": {
+      "p50": 1.0493750000005093,
+      "p95": 8.436874999999418,
+      "max": 13.493459000001167,
+      "total": 52.1042509999952
+    },
+    "maxCallbackMs": {
+      "p50": 4.061250000000655,
+      "p95": 10.996040999998513,
+      "max": 14.229458000001614,
+      "total": 130.2560020000019
+    },
+    "callbacks": {
+      "p50": 9,
+      "p95": 34,
+      "max": 36,
+      "total": 271
+    },
+    "frameCpuMs": {
+      "p50": 32.7103339999976,
+      "p95": 143.57616899999994,
+      "max": 161.70829200000298,
+      "total": 1101.5824630000116
+    },
+    "samples": [
+      {
+        "mode": "random",
+        "level": 2,
+        "submitMs": 2.3504999999986467,
+        "tapMs": 0.6566249999996217,
+        "cachedTapMs": 1.1095409999998083,
+        "maxCallbackMs": 4.033416000000216,
+        "callbacks": 7,
+        "frameCpuMs": 26.281083000001672
+      },
+      {
+        "mode": "random",
+        "level": 3,
+        "submitMs": 1.0100000000002183,
+        "tapMs": 0.44708299999911105,
+        "cachedTapMs": 1.21875,
+        "maxCallbackMs": 7.0289169999996375,
+        "callbacks": 7,
+        "frameCpuMs": 31.911291999997047
+      },
+      {
+        "mode": "random",
+        "level": 4,
+        "submitMs": 0.7985829999997804,
+        "tapMs": 0.4041669999987789,
+        "cachedTapMs": 0.9900830000005953,
+        "maxCallbackMs": 4.005417000000307,
+        "callbacks": 3,
+        "frameCpuMs": 10.619959000001472
+      },
+      {
+        "mode": "random",
+        "level": 5,
+        "submitMs": 1.013375000000451,
+        "tapMs": 0.410874999999578,
+        "cachedTapMs": 1.8949999999986176,
+        "maxCallbackMs": 4.75933299999997,
+        "callbacks": 6,
+        "frameCpuMs": 24.831835000004503
+      },
+      {
+        "mode": "random",
+        "level": 6,
+        "submitMs": 0.7821660000008706,
+        "tapMs": 0.41708399999879475,
+        "cachedTapMs": 1.2934580000001006,
+        "maxCallbackMs": 5.692458999999872,
+        "callbacks": 9,
+        "frameCpuMs": 38.00666800000181
+      },
+      {
+        "mode": "random",
+        "level": 7,
+        "submitMs": 0.7520000000004075,
+        "tapMs": 0.3632500000003347,
+        "cachedTapMs": 1.0493750000005093,
+        "maxCallbackMs": 4.591082999999344,
+        "callbacks": 5,
+        "frameCpuMs": 20.607499999996435
+      },
+      {
+        "mode": "random",
+        "level": 8,
+        "submitMs": 1.0129170000000158,
+        "tapMs": 0.4206659999999829,
+        "cachedTapMs": 1.2250829999993584,
+        "maxCallbackMs": 4.061250000000655,
+        "callbacks": 7,
+        "frameCpuMs": 25.53966599999876
+      },
+      {
+        "mode": "random",
+        "level": 9,
+        "submitMs": 0.8085829999999987,
+        "tapMs": 0.4199159999989206,
+        "cachedTapMs": 1.4042090000002645,
+        "maxCallbackMs": 4.038416999999754,
+        "callbacks": 8,
+        "frameCpuMs": 29.65824900000007
+      },
+      {
+        "mode": "random",
+        "level": 10,
+        "submitMs": 0.7579590000004828,
+        "tapMs": 0.42537500000071304,
+        "cachedTapMs": 1.3626669999994192,
+        "maxCallbackMs": 4.070125000000189,
+        "callbacks": 8,
+        "frameCpuMs": 31.79374999999891
+      },
+      {
+        "mode": "random",
+        "level": "J",
+        "submitMs": 1.2411250000004657,
+        "tapMs": 1.439791000000696,
+        "cachedTapMs": 8.436874999999418,
+        "maxCallbackMs": 10.996040999998513,
+        "callbacks": 36,
+        "frameCpuMs": 161.70829200000298
+      },
+      {
+        "mode": "random",
+        "level": "Q",
+        "submitMs": 0.7509170000012091,
+        "tapMs": 0.37466700000004494,
+        "cachedTapMs": 1.069499999999607,
+        "maxCallbackMs": 4.0049159999998665,
+        "callbacks": 3,
+        "frameCpuMs": 11.245750000000044
+      },
+      {
+        "mode": "random",
+        "level": "K",
+        "submitMs": 0.6811669999988226,
+        "tapMs": 0.31141699999898265,
+        "cachedTapMs": 1.436874999999418,
+        "maxCallbackMs": 4.047582999999577,
+        "callbacks": 9,
+        "frameCpuMs": 34.89608099999714
+      },
+      {
+        "mode": "random",
+        "level": "A",
+        "submitMs": 0.6954999999998108,
+        "tapMs": 0.3587920000009035,
+        "cachedTapMs": 0.9547089999996388,
+        "maxCallbackMs": 4.006417000000511,
+        "callbacks": 4,
+        "frameCpuMs": 12.700792000001456
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 2,
+        "submitMs": 0.619791000000987,
+        "tapMs": 0.8852920000008453,
+        "cachedTapMs": 0.8950420000001031,
+        "maxCallbackMs": 4.011625000001004,
+        "callbacks": 9,
+        "frameCpuMs": 33.08783400000175
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 3,
+        "submitMs": 0.7108330000010028,
+        "tapMs": 0.36620899999979883,
+        "cachedTapMs": 1.0021669999987353,
+        "maxCallbackMs": 4.034750000000713,
+        "callbacks": 10,
+        "frameCpuMs": 37.61695899999904
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 4,
+        "submitMs": 0.992499999998472,
+        "tapMs": 1.1949170000007143,
+        "cachedTapMs": 5.3674579999988055,
+        "maxCallbackMs": 5.607167000000118,
+        "callbacks": 34,
+        "frameCpuMs": 143.57616899999994
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 5,
+        "submitMs": 0.9294590000008611,
+        "tapMs": 0.38479200000074343,
+        "cachedTapMs": 0.9410410000000411,
+        "maxCallbackMs": 4.3104590000002645,
+        "callbacks": 11,
+        "frameCpuMs": 44.39033499999823
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 6,
+        "submitMs": 0.7296670000014274,
+        "tapMs": 0.43224999999983993,
+        "cachedTapMs": 0.9086250000000291,
+        "maxCallbackMs": 4.125334000000294,
+        "callbacks": 6,
+        "frameCpuMs": 22.478125999999975
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 7,
+        "submitMs": 0.6497499999986758,
+        "tapMs": 0.29408299999886367,
+        "cachedTapMs": 0.8289169999989099,
+        "maxCallbackMs": 4.006542000000991,
+        "callbacks": 10,
+        "frameCpuMs": 38.44350200000008
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 8,
+        "submitMs": 0.6757090000010066,
+        "tapMs": 0.27229199999965203,
+        "cachedTapMs": 0.8262500000000728,
+        "maxCallbackMs": 4.014666999999463,
+        "callbacks": 9,
+        "frameCpuMs": 32.7103339999976
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 9,
+        "submitMs": 0.8115419999994629,
+        "tapMs": 0.3100830000003043,
+        "cachedTapMs": 0.8655830000006972,
+        "maxCallbackMs": 4.2707919999993464,
+        "callbacks": 5,
+        "frameCpuMs": 18.592125000001033
+      },
+      {
+        "mode": "no-shuffle",
+        "level": 10,
+        "submitMs": 0.9503749999985303,
+        "tapMs": 0.7960000000002765,
+        "cachedTapMs": 13.493459000001167,
+        "maxCallbackMs": 14.229458000001614,
+        "callbacks": 30,
+        "frameCpuMs": 135.14095400000042
+      },
+      {
+        "mode": "no-shuffle",
+        "level": "J",
+        "submitMs": 0.6624169999995502,
+        "tapMs": 0.2967079999998532,
+        "cachedTapMs": 0.8086249999996653,
+        "maxCallbackMs": 4.0179169999992155,
+        "callbacks": 9,
+        "frameCpuMs": 33.40429000000222
+      },
+      {
+        "mode": "no-shuffle",
+        "level": "Q",
+        "submitMs": 0.622957999999926,
+        "tapMs": 0.26612500000010186,
+        "cachedTapMs": 0.998250000000553,
+        "maxCallbackMs": 4.006375000000844,
+        "callbacks": 10,
+        "frameCpuMs": 39.77254200000425
+      },
+      {
+        "mode": "no-shuffle",
+        "level": "K",
+        "submitMs": 0.6832500000000437,
+        "tapMs": 0.2844999999997526,
+        "cachedTapMs": 0.8782499999997526,
+        "maxCallbackMs": 4.279916999999841,
+        "callbacks": 9,
+        "frameCpuMs": 36.1644600000036
+      },
+      {
+        "mode": "no-shuffle",
+        "level": "A",
+        "submitMs": 0.6302079999986745,
+        "tapMs": 0.27620800000113377,
+        "cachedTapMs": 0.8444589999999152,
+        "maxCallbackMs": 4.005624999999782,
+        "callbacks": 7,
+        "frameCpuMs": 26.403916000001118
+      }
+    ]
+  }
+}

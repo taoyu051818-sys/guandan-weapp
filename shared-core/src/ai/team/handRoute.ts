@@ -34,11 +34,11 @@ export const createHandRoutePlanner = (
     shift += group.count;
   }
   const full = (1 << hand.length) - 1;
-  const orderedGroups = [...groups.values()];
+  const orderedGroups = Array.from(groups.values());
   const requirements = (cards: Card[]) => {
     const counts = new Map<string, number>();
     cards.forEach(card => counts.set(faceKey(card), (counts.get(faceKey(card)) ?? 0) + 1));
-    return [...counts].map(([id, count]) => ({ group: groups.get(id)!, count }));
+    return Array.from(counts, ([id, count]) => ({ group: groups.get(id)!, count }));
   };
   const moves: Move[] = [];
   const seen = new Set<string>();
@@ -51,7 +51,7 @@ export const createHandRoutePlanner = (
     if (info) moves.push({ needs, size: cards.length, type: info.type, value: info.maxValue });
   }
   moves.sort((a, b) => b.size - a.size || a.value - b.value);
-  const byGroup = new Map([...groups.values()].map(group => [group, moves.filter(move =>
+  const byGroup = new Map(Array.from(groups.values(), group => [group, moves.filter(move =>
     move.needs.some(need => need.group === group))]));
   const subtract = (state: number, needs: Move['needs']): number => {
     let result = state;

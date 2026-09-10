@@ -46,7 +46,7 @@ export class OptionalAudioAssetCache<T> {
   public dispose (): void {
     if (this.disposed) return
     this.disposed = true
-    const pending = [...this.pending.values()]
+    const pending = Array.from(this.pending.values())
     this.pending.clear()
     this.clips.clear()
     this.failures.clear()

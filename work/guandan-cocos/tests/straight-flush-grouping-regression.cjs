@@ -135,7 +135,7 @@ function verifyTableIntegration () {
   assert.match(suitHandler, /workspace\.straightFlushCardIds\(suit/, 'pressing a lit suit obtains its exact candidate')
   assert.match(suitHandler, /ruleAuthority\.replaceSelectedCards\(ids\)/, 'suit shortcuts use the same visible selection')
   assert.doesNotMatch(workspace, /lockDraft/, 'the workspace cannot own a hidden second selection')
-  assert.doesNotMatch(suitHandler, /\.arrange/, 'suit controls must not reorder the whole hand')
+  assert.doesNotMatch(suitHandler, /\.(?:arrange|toggleArrangement|applyAutoGroups)\s*\(/, 'suit controls must not reorder the whole hand; cancelling pending work is allowed')
   assert.match(
     handInteraction,
     /const stackCardIds = snapshot\.phase === 'playing'[\s\S]*playSelectionForCard\(cardId\)[\s\S]*const nextSelected = new Set\(selected\)[\s\S]*replaceSelectedCards\(Array\.from\(nextSelected\)\)/,

@@ -1,41 +1,16 @@
 // Execute the delivered System.register modules, not a fresh TypeScript transpilation.
 // Cocos rendering/resources are mocked; this is not a substitute for phone testing.
-const fs = require('node:fs')
-const path = require('node:path')
 const vm = require('node:vm')
 const assert = require('node:assert/strict')
-const root = path.resolve(__dirname, '../..')
-const registrations = new Map()
-const cache = new Map()
+const { createBuiltRuntime } = require('./cocos-built-runtime.cjs')
 const stages = []
 const failures = []
 let ready = false
-const context = vm.createContext({
-  URL: undefined, URLSearchParams: undefined, crypto: undefined, console, setTimeout, clearTimeout,
-  System: { register (name, deps, declare) {
-    if (Array.isArray(name)) {
-      assert.equal(name.length, 0, 'only the dependency-free generated chunk wrapper is expected')
-      deps(() => {}, {}).execute()
-      return
-    }
-    registrations.set(name, { deps, declare })
-  } },
-})
-for (const relative of ['src/chunks/bundle.js', 'assets/main/index.js']) {
-  const file = path.join(root, 'build/wechatgame', relative)
-  vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file })
-}
 const config = {
   version: 1, platformEndpoint: 'https://api.yutechhn.cn/guandan', lobbyEndpoint: 'wss://api.yutechhn.cn/guandan/weapp',
   platformAllowDevelopmentLogin: false, platformAllowInsecureEndpoint: false, platformAllowInsecureGameEndpoint: false,
 }
-context.__GUANDAN_BUILD_TARGET__ = 'wechatgame'
-context.__GUANDAN_RUNTIME_CONFIG__ = config
 const overrides = {
-  cc: {
-    cclegacy: { _RF: { push () {}, pop () {} } }, game: { restart: () => Promise.resolve() },
-    Component: class {}, _decorator: { ccclass: () => target => target },
-  },
   'chunks:///_virtual/StartupLoadingOverlay.ts': { StartupLoadingOverlay: class {
     resize () {} bringToFront () {} fadeOut () { return Promise.resolve() }
     setProgress (progress) { stages.push(progress) }
@@ -44,27 +19,9 @@ const overrides = {
   'chunks:///_virtual/GameAssetLoader.ts': { ensureGameAssetBundle: () => Promise.resolve({}) },
   'chunks:///_virtual/ClassicCardFrameStore.ts': { preloadAllClassicCardFrames: () => Promise.resolve(true) },
 }
-function load (id) {
-  if (overrides[id]) return overrides[id]
-  if (cache.has(id)) return cache.get(id)
-  const entry = registrations.get(id)
-  assert.ok(entry, `missing built module ${id}`)
-  const result = {}
-  cache.set(id, result)
-  const body = entry.declare((key, value) => {
-    if (typeof key === 'object') { Object.assign(result, key); return key }
-    result[key] = value
-    return value // SystemJS _export also returns the value used by local assignments.
-  }, { id })
-  entry.deps.forEach((dep, index) => {
-    const target = dep.startsWith('./') ? id.slice(0, id.lastIndexOf('/') + 1) + dep.slice(2) : dep
-    const exports = load(target)
-    body.setters[index]?.(exports)
-  })
-  body.execute()
-  return result
-}
-const get = name => load(`chunks:///_virtual/${name}.ts`)
+const { get, context } = createBuiltRuntime('wechatgame', overrides)
+context.__GUANDAN_BUILD_TARGET__ = 'wechatgame'
+context.__GUANDAN_RUNTIME_CONFIG__ = config
 // Exercise the delivered touch adapter too: no design-space conversion is
 // allowed before UITransform.hitTest performs its own camera conversion.
 const screenPoint = { x: 149, y: 42 }

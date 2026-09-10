@@ -243,7 +243,7 @@ export class TableHandInteractionController {
         ? this.workspace.getLockDecision(settings.ruleProfile, snapshot.selectedCardIds)
         : { kind: 'unavailable', reason: 'interaction-blocked' },
       arrangeRestoreAvailable: this.workspace.canRestoreArrangement,
-    })
+    }, this.workspace.groupPresentation)
   }
 
 }

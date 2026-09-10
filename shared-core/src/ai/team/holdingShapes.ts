@@ -58,7 +58,7 @@ export const summarizeHolding = (hand: readonly Card[], profile: RuleProfile): H
       // With no wildcard or alternative suit, a natural flush is exclusively
       // a bomb in classic rules, not also an ordinary straight.
       if (type === PlayType.Straight && profile.straightFlushAsBomb && wild === 0
-        && [...suits.values()].filter(suit => ranks.some(rank => suit[rank] > 0)).length <= 1) return;
+        && Array.from(suits.values()).filter(suit => ranks.some(rank => suit[rank] > 0)).length <= 1) return;
       const high = ranks[ranks.length - 1];
       add(type, ranks.length * copies, type === PlayType.StraightFlush ? 5500 + high : high);
     }

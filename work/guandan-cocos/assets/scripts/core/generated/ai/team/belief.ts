@@ -27,7 +27,7 @@ const collectPassEvidence = (view: TeamObservation): Map<PlayerId, PassEvidence[
         === view.seats.find(s => s.id === target!.playerId)?.team });
       evidence.set(action.playerId, items.slice(-3));
       passes++;
-      const otherActive = [...remaining].filter(([id, count]) => id !== target!.playerId && count > 0).length;
+      const otherActive = Array.from(remaining).filter(([id, count]) => id !== target!.playerId && count > 0).length;
       if (passes >= otherActive) target = null;
     }
   }
@@ -57,7 +57,7 @@ export const createPublicBelief = (view: TeamObservation, random: RandomSource) 
   const others = view.seats.filter(seat => seat.id !== view.self && seat.count > 0);
   const required = others.reduce((sum, seat) => sum + seat.count, 0);
   const coverage = unseen.length ? Math.min(1, required / unseen.length) : 1;
-  const valid = required <= unseen.length && ![...known.values()].some(count => count > 0);
+  const valid = required <= unseen.length && !Array.from(known.values()).some(count => count > 0);
   const count = valid ? (others.some(seat => seat.count <= 10) ? 32 : 12) : 0;
   const passes = collectPassEvidence(view);
   const samples: Sample[] = [];
@@ -104,7 +104,7 @@ export const createPublicBelief = (view: TeamObservation, random: RandomSource) 
     const shapes: Partial<Record<PlayType, number>> = {};
     for (const type of Object.values(PlayType)) {
       if (type === PlayType.Pass) continue;
-      const hits = samples.reduce((sum, sample) => sum + ([...sample.shapes.get(seat.id)!.values()]
+      const hits = samples.reduce((sum, sample) => sum + (Array.from(sample.shapes.get(seat.id)!.values())
         .some(shape => shape.type === type) ? sample.weight : 0), 0);
       shapes[type] = weightSum ? Number((hits / weightSum).toFixed(3)) : 0;
     }

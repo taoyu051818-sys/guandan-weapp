@@ -147,6 +147,7 @@ assert.deepEqual(oversizedEngineArtifacts, [], 'unused Bullet, Spine, or WASM ar
 assert.equal(settings.physics?.physicsEngine, '', '3D physics must remain cropped from this 2D client')
 
 execFileSync(process.execPath, [path.join(projectRoot, 'tests/support/wechat-built-startup.cjs')], { cwd: projectRoot, stdio: 'inherit' })
+execFileSync(process.execPath, [path.join(projectRoot, 'tests/support/cocos-built-gameplay.cjs'), 'wechatgame'], { cwd: projectRoot, stdio: 'inherit' })
 execFileSync(process.execPath, [path.join(projectRoot, 'scripts/verify-retirement.mjs'), '--wechat'], { cwd: projectRoot, stdio: 'inherit' })
 
 console.log(`WeChat ${packageOnly ? 'package only' : 'release build'} verified: AppID ${expectedAppId}, main ${formatMiB(mainBytes)}, game-assets ${formatMiB(subpackageBytes)}, total ${formatMiB(totalBuildBytes)}`)

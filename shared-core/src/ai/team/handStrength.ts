@@ -17,7 +17,7 @@ export const assessHandStrength = (hand: readonly Card[], route: RouteEstimate, 
   const counts = new Map<number, number>();
   hand.filter(card => !card.isRedJoker && card.suit !== 'joker')
     .forEach(card => counts.set(card.value, (counts.get(card.value) ?? 0) + 1));
-  const naturalBombs = [...counts.values()].filter(count => count >= 4).length;
+  const naturalBombs = Array.from(counts.values()).filter(count => count >= 4).length;
   const routeBombs = route.types.filter(type => type === PlayType.Bomb || type === PlayType.StraightFlush).length;
   // Do not sum overlapping natural/flush alternatives. The chosen partition
   // also recognizes intact straight-flush controls without counting variants.

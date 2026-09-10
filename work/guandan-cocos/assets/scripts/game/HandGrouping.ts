@@ -6,6 +6,7 @@ import {
   getStraightFlushSuitAvailability,
   normalizeHandArrangementOptions,
   selectStraightFlushForSuit,
+  selectNonOverlappingSuggestions,
   suggestHandGroups,
   type CardId,
   type HandDisplayUnit,
@@ -17,7 +18,6 @@ import {
   type StraightFlushSuit,
   type StraightFlushSuitAvailability,
 } from './HandArrangement'
-import { planHandGroups } from './HandArrangementPlanner'
 import {
   cardUnitKey,
   cloneArrangement,
@@ -321,9 +321,12 @@ export class HandGrouping {
    * Appends deterministic smart groups from every editable card. Explicit
    * locks survive unchanged; default same-rank stacks are dissolved first.
    */
-  public autoGroup (_options: Partial<HandSuggestionOptions> = {}): HandGroupSuggestion[] {
+  public autoGroup (options: Partial<HandSuggestionOptions> = {}): HandGroupSuggestion[] {
     const editableCards = this.editableCards()
-    const applied = planHandGroups(editableCards, this.state.ruleProfile)
+    const applied = selectNonOverlappingSuggestions(suggestHandGroups(editableCards, {
+      ...options, ruleProfile: this.state.ruleProfile,
+      allowAceLowStraight: this.state.ruleProfile.allowA2345Straight,
+    }))
     this.commit(draft => {
       draft.layoutMode = 'smart-arranged'
       const used = new Set<CardId>()

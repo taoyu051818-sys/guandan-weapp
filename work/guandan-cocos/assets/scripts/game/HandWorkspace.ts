@@ -1,3 +1,4 @@
+import { HandGroupPresentationCache } from './HandGroupPresentationCache'
 import type { Card, Rank, RuleProfile } from '../core/generated'
 import {
   HandGrouping,
@@ -44,6 +45,7 @@ type HandArrangementState =
  */
 export class HandWorkspace {
   private readonly grouping = new HandGrouping()
+  public readonly groupPresentation = new HandGroupPresentationCache()
   private authoritativeSignature = ''
   private authorityRoundId: number | null = null
   private arrangementState: HandArrangementState = { mode: 'point-stacked' }
@@ -58,6 +60,7 @@ export class HandWorkspace {
   public syncAuthoritativeHand (hand: readonly Card[], options: HandWorkspaceSyncOptions): boolean {
     if (this.authorityRoundId !== null && this.authorityRoundId !== options.roundId) {
       this.grouping.reset()
+      this.groupPresentation.clear()
       this.arrangementState = { mode: 'point-stacked' }
     }
     this.authorityRoundId = options.roundId
@@ -68,7 +71,7 @@ export class HandWorkspace {
       options.direction,
       String(options.autoSort),
       profileSignature,
-      hand.map(card => card.id).sort().join('\u0000'),
+      hand.map(card => JSON.stringify([card.id, card.rank, card.suit, card.value, card.isLevelCard, card.isRedJoker === true])).sort().join('\u0000'),
     ].join('\u0001')
     if (signature === this.authoritativeSignature) return false
     this.authoritativeSignature = signature
@@ -97,6 +100,7 @@ export class HandWorkspace {
     this.authorityRoundId = null
     this.arrangementState = { mode: 'point-stacked' }
     this.grouping.reset()
+    this.groupPresentation.clear()
   }
 
   public resetForTableExit (): void {

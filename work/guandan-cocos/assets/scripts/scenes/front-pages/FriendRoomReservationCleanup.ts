@@ -15,7 +15,7 @@ export class FriendRoomReservationCleanup {
     // Do not start a new admission while a previous explicit release is in flight.
     this.retry()
     this.pendingRequests += 1
-    return this.cancelling.size ? Promise.all([...this.cancelling.values()]).then(() => {}) : null
+    return this.cancelling.size ? Promise.all(Array.from(this.cancelling.values())).then(() => {}) : null
   }
 
   public endRequest (): void {

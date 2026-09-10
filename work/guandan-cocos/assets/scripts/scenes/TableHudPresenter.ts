@@ -53,7 +53,6 @@ export type TableMatchControls = Readonly<{
   levelLabel: Label | null
   overlayLabel: Label | null
 }>
-
 /** Owns authoritative HUD projection, presentation assets and HUD-only state. */
 export class TableHudPresenter {
   private tableHud: TableGameHud | null = null

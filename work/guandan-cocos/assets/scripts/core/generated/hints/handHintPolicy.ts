@@ -88,7 +88,7 @@ export const rankHintMoves = (request: HintRequest): readonly RankedHintMove[] =
     ...request.observation,
     hand: [...request.hand], lastPlay: request.lastPlay, profile: request.ruleProfile,
   }
-  const seed = request.seed ?? [...request.hand.map(card => card.id).sort().join(',')]
+  const seed = request.seed ?? Array.from(request.hand.map(card => card.id).sort().join(','))
     .reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619), 2166136261)
   const decision = chooseTeamPlay(observation, candidates,
     () => structuralLegalMoves([...request.hand], request.ruleProfile), createSeededRandom(seed))

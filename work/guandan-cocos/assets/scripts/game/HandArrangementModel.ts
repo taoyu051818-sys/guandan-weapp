@@ -1,4 +1,4 @@
-import { getRuleProfile, type Card, type Rank, type RuleProfile, type Suit } from '../core/generated'
+import { getRuleProfile, PlayType, type Card, type Rank, type RuleProfile, type Suit } from '../core/generated'
 
 export type CardId = string
 export type HandSortMode = 'rank' | 'suit'
@@ -15,6 +15,14 @@ export interface HandArrangementOptions {
 }
 
 export type HandGroupKind = 'king-bomb' | 'bomb' | 'straight-flush' | 'plate' | 'tube' | 'triple-with-pair' | 'straight' | 'pair' | 'triple'
+/** Classification also supports manually locked straights, pairs and triples. */
+export const arrangementKind = (type: PlayType): HandGroupKind | null => ({
+  [PlayType.Single]: null, [PlayType.Pass]: null,
+  [PlayType.Pair]: 'pair', [PlayType.Triple]: 'triple',
+  [PlayType.Straight]: 'straight', [PlayType.StraightFlush]: 'straight-flush',
+  [PlayType.Bomb]: 'bomb', [PlayType.Rocket]: 'king-bomb',
+  [PlayType.TripleWithPair]: 'triple-with-pair', [PlayType.Plate]: 'plate', [PlayType.Tube]: 'tube',
+} as const)[type]
 export type HandGroupOrigin = 'rank' | 'auto' | 'manual'
 
 /** One horizontal hand lane. Groups and loose cards deliberately share one sequence. */

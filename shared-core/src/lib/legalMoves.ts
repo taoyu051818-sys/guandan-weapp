@@ -174,7 +174,8 @@ export const structuralLegalMoves = (
     const existing = candidates.get(key);
     if (!existing || cardsKey(move).localeCompare(cardsKey(existing)) < 0) candidates.set(key, move);
   }
-  return [...candidates.values()].filter(move => resolve(move) !== null);
+  // Cocos compiles array spread in loose mode; iterators need explicit materialization.
+  return Array.from(candidates.values()).filter(move => resolve(move) !== null);
 };
 
 /**

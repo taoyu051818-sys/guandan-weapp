@@ -1,0 +1,356 @@
+{
+  "target": "wechatgame",
+  "node": "v26.7.0",
+  "samples": 13,
+  "measurement": "compiled Cocos JS, Node host real timers, includes idle timer waits and checkpoint preparation; excludes Cocos rendering/native touch dispatch, not a phone benchmark",
+  "comparison": "same current algorithm and prepared layouts; previousGap=16ms timer, current=0ms timer, both 4ms soft CPU budgets",
+  "current": {
+    "warmWallMs": {
+      "p50": 65.97770799999944,
+      "p95": 217.65887500000008,
+      "max": 217.65887500000008
+    },
+    "cpuMs": {
+      "p50": 49.94616600000063,
+      "p95": 171.81750300000112,
+      "max": 171.81750300000112
+    },
+    "callbacks": {
+      "p50": 13,
+      "p95": 40,
+      "max": 40
+    },
+    "maxCallbackMs": {
+      "p50": 4.075959000000694,
+      "p95": 14.574292000000241,
+      "max": 14.574292000000241
+    },
+    "clickAndProjectionMs": {
+      "p50": 0.10166700000036144,
+      "p95": 0.1974580000005517,
+      "max": 0.1974580000005517
+    },
+    "restoreMs": {
+      "p50": 0.021875000000363798,
+      "p95": 0.05533299999990504,
+      "max": 0.05533299999990504
+    },
+    "repeatedMs": {
+      "p50": 0.072624999999789,
+      "p95": 0.1534159999999929,
+      "max": 0.1534159999999929
+    }
+  },
+  "previousGap": {
+    "warmWallMs": {
+      "p50": 338.65354100000013,
+      "p95": 1089.6536250000004,
+      "max": 1089.6536250000004
+    },
+    "cpuMs": {
+      "p50": 65.66891699999996,
+      "p95": 238.99587499999961,
+      "max": 238.99587499999961
+    },
+    "callbacks": {
+      "p50": 16,
+      "p95": 50,
+      "max": 50
+    },
+    "maxCallbackMs": {
+      "p50": 4.797708000000057,
+      "p95": 28.187041999999565,
+      "max": 28.187041999999565
+    },
+    "clickAndProjectionMs": {
+      "p50": 0.15183299999989686,
+      "p95": 0.3355419999999185,
+      "max": 0.3355419999999185
+    },
+    "restoreMs": {
+      "p50": 0.035499999999956344,
+      "p95": 0.07499999999993179,
+      "max": 0.07499999999993179
+    },
+    "repeatedMs": {
+      "p50": 0.11458399999992253,
+      "p95": 0.45699999999999363,
+      "max": 0.45699999999999363
+    }
+  },
+  "rows": [
+    {
+      "level": 2,
+      "current": {
+        "warmWallMs": 62.42604199999994,
+        "cpuMs": 46.86508100000003,
+        "callbacks": 12,
+        "maxCallbackMs": 4.070209000000091,
+        "clickAndProjectionMs": 0.12220800000000054,
+        "restoreMs": 0.035874999999919055,
+        "repeatedMs": 0.10391600000002654
+      },
+      "previousGap": {
+        "warmWallMs": 357.09162499999996,
+        "cpuMs": 80.38791400000017,
+        "callbacks": 16,
+        "maxCallbackMs": 18.39058399999999,
+        "clickAndProjectionMs": 0.3355419999999185,
+        "restoreMs": 0.07129199999997127,
+        "repeatedMs": 0.45699999999999363
+      }
+    },
+    {
+      "level": 3,
+      "current": {
+        "warmWallMs": 74.93395900000007,
+        "cpuMs": 55.816207000000304,
+        "callbacks": 14,
+        "maxCallbackMs": 4.562291999999957,
+        "clickAndProjectionMs": 0.12495799999999235,
+        "restoreMs": 0.05533299999990504,
+        "repeatedMs": 0.1534159999999929
+      },
+      "previousGap": {
+        "warmWallMs": 356.97845800000005,
+        "cpuMs": 67.24812400000008,
+        "callbacks": 17,
+        "maxCallbackMs": 4.597834000000034,
+        "clickAndProjectionMs": 0.1866659999999456,
+        "restoreMs": 0.07499999999993179,
+        "repeatedMs": 0.1432079999999587
+      }
+    },
+    {
+      "level": 4,
+      "current": {
+        "warmWallMs": 217.60391600000003,
+        "cpuMs": 167.98437500000045,
+        "callbacks": 40,
+        "maxCallbackMs": 7.49737499999992,
+        "clickAndProjectionMs": 0.12950000000000728,
+        "restoreMs": 0.01812500000005457,
+        "repeatedMs": 0.059333000000151515
+      },
+      "previousGap": {
+        "warmWallMs": 1067.9122080000002,
+        "cpuMs": 220.00879200000054,
+        "callbacks": 50,
+        "maxCallbackMs": 8.570583999999826,
+        "clickAndProjectionMs": 0.12487499999997453,
+        "restoreMs": 0.022124999999959982,
+        "repeatedMs": 0.2507919999998194
+      }
+    },
+    {
+      "level": 5,
+      "current": {
+        "warmWallMs": 85.88341599999967,
+        "cpuMs": 63.98441599999978,
+        "callbacks": 16,
+        "maxCallbackMs": 4.0366250000001855,
+        "clickAndProjectionMs": 0.09387500000002547,
+        "restoreMs": 0.021750000000338332,
+        "repeatedMs": 0.0742499999996653
+      },
+      "previousGap": {
+        "warmWallMs": 419.63445900000033,
+        "cpuMs": 78.86187400000063,
+        "callbacks": 20,
+        "maxCallbackMs": 4.0715000000000146,
+        "clickAndProjectionMs": 0.18120799999996962,
+        "restoreMs": 0.038875000000189175,
+        "repeatedMs": 0.11508299999968585
+      }
+    },
+    {
+      "level": 6,
+      "current": {
+        "warmWallMs": 46.897707999999966,
+        "cpuMs": 34.77579100000003,
+        "callbacks": 9,
+        "maxCallbackMs": 4.03866700000026,
+        "clickAndProjectionMs": 0.09508300000015879,
+        "restoreMs": 0.02658300000030067,
+        "repeatedMs": 0.07279200000039054
+      },
+      "previousGap": {
+        "warmWallMs": 233.41987500000005,
+        "cpuMs": 44.8089989999994,
+        "callbacks": 11,
+        "maxCallbackMs": 4.797708000000057,
+        "clickAndProjectionMs": 0.11887500000011642,
+        "restoreMs": 0.03333299999985684,
+        "repeatedMs": 0.09220800000002782
+      }
+    },
+    {
+      "level": 7,
+      "current": {
+        "warmWallMs": 61.944458999999824,
+        "cpuMs": 46.74737599999844,
+        "callbacks": 12,
+        "maxCallbackMs": 4.051124999999956,
+        "clickAndProjectionMs": 0.08512500000006185,
+        "restoreMs": 0.020292000000154076,
+        "repeatedMs": 0.06154199999991761
+      },
+      "previousGap": {
+        "warmWallMs": 356.81749999999965,
+        "cpuMs": 69.13379099999929,
+        "callbacks": 17,
+        "maxCallbackMs": 5.116415999999845,
+        "clickAndProjectionMs": 0.13183399999979883,
+        "restoreMs": 0.04320800000004965,
+        "repeatedMs": 0.11858299999994415
+      }
+    },
+    {
+      "level": 8,
+      "current": {
+        "warmWallMs": 71.38604099999975,
+        "cpuMs": 53.34291500000063,
+        "callbacks": 14,
+        "maxCallbackMs": 4.070125000000189,
+        "clickAndProjectionMs": 0.10104099999989558,
+        "restoreMs": 0.021583000000191532,
+        "repeatedMs": 0.07008300000006784
+      },
+      "previousGap": {
+        "warmWallMs": 338.65354100000013,
+        "cpuMs": 65.66891699999996,
+        "callbacks": 16,
+        "maxCallbackMs": 5.61462500000016,
+        "clickAndProjectionMs": 0.16624999999976353,
+        "restoreMs": 0.035499999999956344,
+        "repeatedMs": 0.11029199999984485
+      }
+    },
+    {
+      "level": 9,
+      "current": {
+        "warmWallMs": 29.19499999999971,
+        "cpuMs": 21.286708999999973,
+        "callbacks": 6,
+        "maxCallbackMs": 4.034042000000227,
+        "clickAndProjectionMs": 0.10166700000036144,
+        "restoreMs": 0.0282919999999649,
+        "repeatedMs": 0.10633300000017698
+      },
+      "previousGap": {
+        "warmWallMs": 146.21062500000016,
+        "cpuMs": 26.337082999999893,
+        "callbacks": 7,
+        "maxCallbackMs": 4.0340000000001055,
+        "clickAndProjectionMs": 0.11404099999981554,
+        "restoreMs": 0.034166999999797554,
+        "repeatedMs": 0.09254099999998289
+      }
+    },
+    {
+      "level": 10,
+      "current": {
+        "warmWallMs": 217.65887500000008,
+        "cpuMs": 171.81750300000112,
+        "callbacks": 38,
+        "maxCallbackMs": 14.574292000000241,
+        "clickAndProjectionMs": 0.10775000000012369,
+        "restoreMs": 0.021666999999979453,
+        "repeatedMs": 0.06320899999991525
+      },
+      "previousGap": {
+        "warmWallMs": 1089.6536250000004,
+        "cpuMs": 238.99587499999961,
+        "callbacks": 50,
+        "maxCallbackMs": 28.187041999999565,
+        "clickAndProjectionMs": 0.15183299999989686,
+        "restoreMs": 0.035750000000007276,
+        "repeatedMs": 0.10750000000007276
+      }
+    },
+    {
+      "level": "J",
+      "current": {
+        "warmWallMs": 46.74762499999997,
+        "cpuMs": 36.18254099999831,
+        "callbacks": 9,
+        "maxCallbackMs": 4.1747499999992215,
+        "clickAndProjectionMs": 0.08679200000005949,
+        "restoreMs": 0.021875000000363798,
+        "repeatedMs": 0.06908300000031886
+      },
+      "previousGap": {
+        "warmWallMs": 292.5488750000004,
+        "cpuMs": 53.860083999999915,
+        "callbacks": 14,
+        "maxCallbackMs": 4.033582999999453,
+        "clickAndProjectionMs": 0.15816600000016479,
+        "restoreMs": 0.03874999999970896,
+        "repeatedMs": 0.11795799999981682
+      }
+    },
+    {
+      "level": "Q",
+      "current": {
+        "warmWallMs": 82.10462499999994,
+        "cpuMs": 61.496375000000626,
+        "callbacks": 16,
+        "maxCallbackMs": 4.075959000000694,
+        "clickAndProjectionMs": 0.12399999999979627,
+        "restoreMs": 0.025708999999551452,
+        "repeatedMs": 0.072624999999789
+      },
+      "previousGap": {
+        "warmWallMs": 319.41020799999933,
+        "cpuMs": 61.195668000002115,
+        "callbacks": 15,
+        "maxCallbackMs": 5.183665999999903,
+        "clickAndProjectionMs": 0.13716699999986304,
+        "restoreMs": 0.03170800000043528,
+        "repeatedMs": 0.09599999999954889
+      }
+    },
+    {
+      "level": "K",
+      "current": {
+        "warmWallMs": 58.48199999999997,
+        "cpuMs": 44.09070800000154,
+        "callbacks": 11,
+        "maxCallbackMs": 4.088333000000603,
+        "clickAndProjectionMs": 0.07754100000056496,
+        "restoreMs": 0.01883300000008603,
+        "repeatedMs": 0.06099999999969441
+      },
+      "previousGap": {
+        "warmWallMs": 311.3040000000001,
+        "cpuMs": 57.53283700000247,
+        "callbacks": 15,
+        "maxCallbackMs": 4.035165999999663,
+        "clickAndProjectionMs": 0.14545799999996234,
+        "restoreMs": 0.03337500000088767,
+        "repeatedMs": 0.10541699999976117
+      }
+    },
+    {
+      "level": "A",
+      "current": {
+        "warmWallMs": 65.97770799999944,
+        "cpuMs": 49.94616600000063,
+        "callbacks": 13,
+        "maxCallbackMs": 4.158292000000074,
+        "clickAndProjectionMs": 0.1974580000005517,
+        "restoreMs": 0.054917000000386906,
+        "repeatedMs": 0.11908299999959127
+      },
+      "previousGap": {
+        "warmWallMs": 316.8189999999995,
+        "cpuMs": 59.427332000000206,
+        "callbacks": 15,
+        "maxCallbackMs": 4.035832999999911,
+        "clickAndProjectionMs": 0.15945899999951507,
+        "restoreMs": 0.03487500000028376,
+        "repeatedMs": 0.11458399999992253
+      }
+    }
+  ]
+}
