@@ -20,7 +20,7 @@ const opts = { now: () => clock, connections, send: (c, type, p) => c.packets.pu
   reporter: { configured: true, claimStart: async e => { events.push(e) }, enqueue: async e => { events.push(e) } },
   filePath: join(temp, 'rooms.json'), random: () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296) }
 let runtime = new DuplicateRoomRuntime(opts); clearInterval(runtime.timer)
-const roomId = '904262'; const settings = normalizeFriendRoomSettings({ format: 'duplicate', rounds: 2, levelMode: 'random' })
+const roomId = '904262'; const settings = normalizeFriendRoomSettings({ format: 'duplicate', rounds: 2, levelMode: 'random', dealMode: 'no-shuffle' })
 const cmd = async (c, type, p = {}, requestId = ++id, allowError = false) => {
   const message = { type, requestId, payload: { roomId, ...p } }
   await runtime.handle(c, message)
@@ -75,6 +75,8 @@ try {
   assert.equal(events[0].type, 'game-start'); assert.equal(Object.keys(events[0].friendRoster).length, 8)
   for (let round = 1; round <= 2; round++) {
     const r = runtime.rooms.get(roomId)
+    assert.equal(r.tables.A.state.matchFormat.dealMode, 'no-shuffle')
+    assert.equal(r.tables.B.state.matchFormat.dealMode, 'no-shuffle')
     assert.equal(r.tables.A.state.currentLevel, r.tables.B.state.currentLevel)
     assert.equal(r.tables.A.state.currentTurn, TABLE_SEATS[round - 1])
     assert.equal(r.tables.A.state.currentTurn, r.tables.B.state.currentTurn)

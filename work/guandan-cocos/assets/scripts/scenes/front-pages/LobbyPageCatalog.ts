@@ -1,7 +1,7 @@
 import { Color } from 'cc'
-import type { MatchQueueId } from '../../services/FrontPageGatewayContracts'
+import { CLASSIC_MODES, type ClassicMode, type ClassicBaseStake } from '../../core/generated/lib/classicModes'
 
-export type ClassicRoomMode = 'classic' | 'consecutive' | 'no-shuffle' | 'team-turn' | 'upgrade80'
+export type ClassicRoomMode = ClassicMode
 
 export const LOBBY_ART = Object.freeze({
   entryClassic: 'ui/lobby/entry-classic/texture',
@@ -17,17 +17,11 @@ export const LOBBY_ART = Object.freeze({
   tierGold: 'ui/lobby/tier-gold/texture',
 })
 
-export const CLASSIC_ROOM_MODES: ReadonlyArray<{ id: ClassicRoomMode, label: string, available: boolean }> = [
-  { id: 'classic', label: '随机级牌', available: true },
-  { id: 'consecutive', label: '连打过A', available: false },
-  { id: 'no-shuffle', label: '不洗牌', available: false },
-  { id: 'team-turn', label: '团团转', available: false },
-  { id: 'upgrade80', label: '升级80分', available: false },
-]
+export const CLASSIC_ROOM_MODES = CLASSIC_MODES
 
-export const CLASSIC_ROOM_TIERS: ReadonlyArray<{ name: string, score: number, queueId: MatchQueueId, art: string, accent: Color }> = [
-  { name: '初级场', score: 50, queueId: 'classic_50', art: LOBBY_ART.tierGreen, accent: new Color(75, 160, 78) },
-  { name: '中级场', score: 300, queueId: 'classic_300', art: LOBBY_ART.tierBlue, accent: new Color(53, 139, 218) },
-  { name: '高级场', score: 2000, queueId: 'classic_2000', art: LOBBY_ART.tierViolet, accent: new Color(139, 79, 211) },
-  { name: '大师场', score: 10000, queueId: 'classic_10000', art: LOBBY_ART.tierGold, accent: new Color(230, 123, 42) },
+export const CLASSIC_ROOM_TIERS: ReadonlyArray<{ name: string, score: ClassicBaseStake, art: string, accent: Color }> = [
+  { name: '初级场', score: 50, art: LOBBY_ART.tierGreen, accent: new Color(75, 160, 78) },
+  { name: '中级场', score: 300, art: LOBBY_ART.tierBlue, accent: new Color(53, 139, 218) },
+  { name: '高级场', score: 2000, art: LOBBY_ART.tierViolet, accent: new Color(139, 79, 211) },
+  { name: '大师场', score: 10000, art: LOBBY_ART.tierGold, accent: new Color(230, 123, 42) },
 ]

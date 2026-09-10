@@ -3,8 +3,9 @@
  * Keep this module free of sample data, transport code and Cocos dependencies.
  */
 import type { FriendRoomSettings } from '../network/LobbyModels'
+import { CLASSIC_QUEUES } from '../core/generated/lib/classicModes'
 
-export const MATCH_QUEUE_IDS = ['quick', 'classic_50', 'classic_300', 'classic_2000', 'classic_10000', 'rookie_cup', 'weekend_cup', 'master_cup', 'lingshui_16_cup'] as const
+export const MATCH_QUEUE_IDS = ['quick', ...CLASSIC_QUEUES.map(queue => queue.id), 'rookie_cup', 'weekend_cup', 'master_cup', 'lingshui_16_cup'] as const
 export type MatchQueueId = typeof MATCH_QUEUE_IDS[number]
 
 export type MatchTicket = {

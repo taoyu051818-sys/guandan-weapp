@@ -80,6 +80,7 @@ const closeSockets = () => sockets.splice(0).forEach(socket => socket.close())
 
 const fullSettings = {
   mode: 'classic',
+  format: 'rounds', levelMode: 'random', levelRank: 2, tributeEnabled: false, dealMode: 'no-shuffle',
   rounds: 12,
   scoring: 'double-4',
   scoreVisibility: 'hidden',
@@ -100,7 +101,8 @@ try {
   const host = await connect()
 
   const illegalSettings = [
-    { ...fullSettings, rounds: 6 },
+    { ...fullSettings, rounds: 33 },
+    { ...fullSettings, dealMode: 'fake' },
     { ...fullSettings, turnSeconds: 25 },
     { ...fullSettings, trusteeSeconds: 10 },
     { ...fullSettings, totalTimeMinutes: 5 },
@@ -178,6 +180,7 @@ try {
   send(timedHost, 'startGame', { roomId: timedRoomId }, startId)
   const started = await startedPromise
   assert.equal(started.state.matchFormat.kind, 'rotating')
+  assert.equal(started.state.matchFormat.dealMode, 'no-shuffle')
   assert.equal(started.state.matchFormat.rotatingScoring, 6)
   assert.ok(started.state.pairingCard && started.state.pairingCard.suit !== 'joker')
   assert.deepEqual(started.state.playerScores, { p1: 0, p2: 0, p3: 0, p4: 0 })

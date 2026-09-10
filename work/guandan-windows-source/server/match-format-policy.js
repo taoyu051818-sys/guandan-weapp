@@ -1,16 +1,13 @@
 import { createRequire } from 'node:module'
-import { classicStakeForMode } from './platform/classic-stakes.js'
 import { createInitialMatchState } from './game-session.js'
 import { roomPlayerNicknames } from './player-nicknames.js'
-const { normalizeRoomFormat, roomMatchFormat, chooseMatchLevel, createGame, arrangeRotatingRound } = createRequire(import.meta.url)('../../../shared-core/dist')
-
-export const isClassicQuickMode = mode => mode === 'quick' || Boolean(classicStakeForMode(mode))
+const { normalizeRoomFormat, roomMatchFormat, chooseMatchLevel, createGame, arrangeRotatingRound, classicMatchFormat } = createRequire(import.meta.url)('../../../shared-core/dist')
 export const isSingleRoundMatch = room => room.entryKind === 'match' && room.state?.matchFormat?.kind === 'independent'
 
 export const formatForNewRoom = room => {
-  if (room.entryKind === 'match') return (isClassicQuickMode(room.matchMode) || room.matchMode === 'lingshui_16_cup')
-    ? { kind: 'independent', levelMode: 'random', levelRank: 2, tributeEnabled: false, doubleDown: 3, ...(room.matchMode === 'lingshui_16_cup' ? { individualRanking: true } : {}) }
-    : undefined
+  if (room.entryKind === 'match') return room.matchMode === 'lingshui_16_cup'
+    ? { kind: 'independent', levelMode: 'random', levelRank: 2, tributeEnabled: false, doubleDown: 3, individualRanking: true }
+    : classicMatchFormat(room.matchMode)
   const settings = normalizeRoomFormat(room.roomSettings || {})
   return settings ? roomMatchFormat(settings, room.roomSettings.scoring === 'double-4' ? 4 : 3) : undefined
 }
@@ -19,7 +16,7 @@ export const createRoomOpeningState = (room, ruleProfile, random, isBotPlayer) =
   const matchFormat = formatForNewRoom(room)
   const level = matchFormat ? chooseMatchLevel(matchFormat, random) : 2
   const pairingIndex = matchFormat?.kind === 'rotating' && matchFormat.teamRotation === 'draw' ? Math.floor(random() * 52) : undefined
-  const dealt = createGame(level, 'p1', ruleProfile, random)
+  const dealt = createGame(level, 'p1', ruleProfile, random, matchFormat?.dealMode)
   const nicknames = roomPlayerNicknames(room)
   Object.keys(dealt.players).forEach(id => {
     const isAI = isBotPlayer(room, id)

@@ -1,4 +1,4 @@
-import { createDeck, dealCards, shuffleDeck } from './deck'
+import { dealGameCards, type DealMode } from './dealing'
 import { getRuleProfile, resolvePlayForContext, type RuleProfile } from './rules'
 import { cloneSettlementResult, settleMatchState, type SettlementResult } from './settlement'
 import {
@@ -175,8 +175,9 @@ export const createGame = (
   dealer: PlayerId = 'p1',
   ruleProfile: RuleProfile = getRuleProfile('classic'),
   random: () => number = Math.random,
+  dealMode: DealMode = 'random',
 ): EngineState => {
-  const hands = dealCards(shuffleDeck(createDeck(level), random))
+  const hands = dealGameCards(level, dealMode, random)
   const players = ids.reduce((all, id) => ({
     ...all,
     [id]: player(id, hands[id].sort((a, b) => b.value - a.value)),
@@ -234,7 +235,7 @@ export const fullRoundRank = (state: EngineState): PlayerId[] => [
 ]
 
 export const dealNextRound = (previous: EngineState, level: Rank, dealer: PlayerId): EngineState => {
-  const hands = dealCards(shuffleDeck(createDeck(level)))
+  const hands = dealGameCards(level, previous.matchFormat?.dealMode)
   const players = ids.reduce((all, id) => ({
     ...all,
     [id]: {

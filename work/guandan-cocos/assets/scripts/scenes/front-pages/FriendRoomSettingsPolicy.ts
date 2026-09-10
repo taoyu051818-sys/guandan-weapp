@@ -8,6 +8,7 @@ export type FriendRoomSettingsTab = 'rules' | 'experience'
 export type FriendRoomChoiceId =
   | 'rounds-preset'
   | 'level-mode'
+  | 'deal-mode'
   | 'tribute'
   | 'scoring'
   | 'score-visibility'
@@ -62,6 +63,9 @@ export const FRIEND_ROOM_ROUNDS = Object.freeze({
 })
 
 const CHOICE_SCHEMAS: readonly FriendRoomChoiceSchema[] = [
+  { id: 'deal-mode', tab: 'rules', label: '发牌方式', options: ['随机发牌', '不洗牌'],
+    selected: settings => settings.dealMode === 'no-shuffle' ? '不洗牌' : '随机发牌',
+    update: (settings, selected) => ({ ...settings, dealMode: selected === '不洗牌' ? 'no-shuffle' : 'random' }) },
   { id: 'team-rotation', tab: 'rules', label: '队友轮换', options: ['随机抽牌', '顺时针轮换'],
     selected: settings => settings.teamRotation === 'clockwise' ? '顺时针轮换' : '随机抽牌',
     update: (settings, selected) => ({ ...settings, teamRotation: selected === '顺时针轮换' ? 'clockwise' : 'draw' }) },
@@ -195,7 +199,7 @@ export const updateFriendRoomRounds = (
   return normalized === settings.rounds ? settings : { ...settings, rounds: normalized }
 }
 
-export const describeFriendRoomRules = (settings: FriendRoomSettings): string => {
+const describeRoomFormat = (settings: FriendRoomSettings): string => {
   if (settings.format === 'rotating') return `转蛋 · ${settings.rounds}局 · ${settings.levelMode === 'fixed' ? `固定打${settings.levelRank}` : '每局随机'} · ${settings.teamRotation === 'clockwise' ? '顺时针换队' : '抽牌换队'} · ${settings.rotatingScoring ?? 3}分制`
   if (settings.format === 'duplicate') return `复式 · 八人双桌 · ${settings.rounds}局 · ${settings.levelMode === 'fixed' ? `固定打${settings.levelRank}` : '双桌共同随机级牌'} · 胜方3/2/1分`
   const format = settings.format === 'rounds'
@@ -205,8 +209,12 @@ export const describeFriendRoomRules = (settings: FriendRoomSettings): string =>
   return `${format} · ${scoring} · ${settings.trusteeSeconds === 0 ? '无托管' : `${settings.turnSeconds}秒`}`
 }
 
+export const describeFriendRoomRules = (settings: FriendRoomSettings): string =>
+  `${describeRoomFormat(settings)}${settings.dealMode === 'no-shuffle' ? ' · 不洗牌' : ''}`
+
 export const friendRoomRuleHelp = (settings: FriendRoomSettings, tab: FriendRoomSettingsTab): string => tab === 'experience'
   ? '观战可点头像切换手牌；仅开局前可站起、坐下。延迟由服务器控制。'
+  : settings.dealMode === 'no-shuffle' ? '不洗牌：每局重新成组发牌，同点数牌更集中；牌型大小与计分不变。'
   : settings.format === 'rotating' ? '每局换队，积分跟随玩家累计。具体换队与计分见“玩法规则”。'
     : settings.trusteeSeconds === 0 ? '无托管：不倒计时、不自动代打；房间总时长限制仍有效。'
     : settings.format === 'upgrade'

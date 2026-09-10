@@ -12,11 +12,12 @@ export const occupant = (room, seat) => room.members.find(m => m.seat === seat &
 
 /** Draw once, clone twice. Card identity/order, level, leader match across tables. */
 export const dealDuplicateRound = (room, random, now) => {
-  const format = { kind: 'independent', levelMode: room.settings.levelMode, levelRank: room.settings.levelRank, tributeEnabled: false, doubleDown: 3 }
+  const format = { kind: 'independent', levelMode: room.settings.levelMode, levelRank: room.settings.levelRank, tributeEnabled: false, doubleDown: 3,
+    ...(room.settings.dealMode !== undefined ? { dealMode: room.settings.dealMode } : {}) }
   const level = chooseMatchLevel(format, random)
   const leader = TABLE_SEATS[room.completedRounds % 4]
   const rules = getRuleProfile('classic')
-  const deal = createGame(level, leader, rules, random)
+  const deal = createGame(level, leader, rules, random, format.dealMode)
   room.tables = Object.fromEntries(['A', 'B'].map(table => {
     const players = structuredClone(deal.players)
     for (const id of TABLE_SEATS) {

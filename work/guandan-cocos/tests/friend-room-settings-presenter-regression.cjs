@@ -315,7 +315,8 @@ presenter.show()
 const finalCreate = button('创建房间')
 button('传统升级').emit(MockNode.EventType.TOUCH_END)
 assert.equal(presenter.settings.format, 'upgrade')
-assert.equal(currentUi().labels.some(node => node.text === '上下滑动查看更多设置'), false, 'short forms must not suggest nonexistent scrolling')
+assert.equal(currentUi().labels.some(node => node.text === '上下滑动查看更多设置'), true, 'the added dealing row must remain scrollable above the fixed create action')
+assert.ok(button('不洗牌'))
 assert.equal(currentUi().buttons.some(node => node.text === '每局随机'), false)
 assert.ok(button('不进贡'))
 const pageCountBeforeDispose = pages.length
@@ -367,6 +368,7 @@ const lobbyCc = {
 
 const { LobbyPageDomain } = compile(lobbyPagePath, {
   cc: lobbyCc,
+  '../../core/generated/lib/classicModes': compile(path.join(projectRoot, 'assets/scripts/core/generated/lib/classicModes.ts'), {}),
   '../../ui/LobbyLayoutPolicy': compile(path.join(projectRoot, 'assets/scripts/ui/LobbyLayoutPolicy.ts'), {}),
   '../../ui/LobbyAmbientMotion': { attachLobbyAmbientMotion() {} },
   '../../ui/LobbyMenuView': { // Rendering is covered by lobby-artwork/refinement suites.

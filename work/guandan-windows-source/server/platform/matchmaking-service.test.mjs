@@ -90,6 +90,17 @@ const createBotFillFixture = () => {
 }
 
 const singleFixture = createBotFillFixture()
+for (const mode of ['no-shuffle_50', 'consecutive_50']) {
+  const fixture = createBotFillFixture()
+  const classic = await fixture.service.join('h1', { mode: 'classic_50' })
+  const special = await fixture.service.join('h2', { mode })
+  assert.notEqual(classic.matchId, special.matchId, '不同发牌/赛制不可混入同一房间')
+  fixture.advance(3000)
+  const matched = await fixture.service.getStatus('h2', special.matchId)
+  assert.equal(matched.botCount, 3)
+  const claims = new GameTicketVerifier({ secret: fixture.secret, required: true, now: fixture.now }).inspect(matched.gameTicket)
+  assert.equal(claims.matchMode, mode, '新队列赛制必须写入真实签名票据')
+}
 const singleWaiting = await singleFixture.service.join('h1', { mode: 'quick' })
 assert.equal(singleWaiting.status, 'matching')
 assert.equal(singleWaiting.botFillAt, singleFixture.now() + 3_000)

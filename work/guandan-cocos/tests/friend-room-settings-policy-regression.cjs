@@ -61,6 +61,7 @@ assert.deepEqual(FRIEND_ROOM_ROUNDS, { label: '局数', suffix: '局', minimum: 
 
 const rulesRows = friendRoomChoiceRows(firstDefault, 'rules')
 assert.deepEqual(rulesRows.map(row => [row.id, row.label, row.options, row.selected]), [
+  ['deal-mode', '发牌方式', ['随机发牌', '不洗牌'], '随机发牌'],
   ['rounds-preset', '常用局数', ['1局', '4局', '8局', '12局'], '4局'],
   ['level-mode', '级牌', ['每局随机', '固定级牌'], '每局随机'],
   ['scoring', '计分', ['双下3分', '双下4分'], '双下3分'],
@@ -140,5 +141,15 @@ assert.equal(updateFriendRoomChoice(upgraded, 'upgrade-target', '过A翻山').up
 assert.equal(updateFriendRoomChoice(firstDefault, 'upgrade-target', '过6'), firstDefault)
 assert.equal(updateFriendRoomChoice(firstDefault, 'counter', '关闭').counterEnabled, false)
 assert.equal(policy.changeFriendRoomFormat(upgraded, 'rounds').tributeEnabled, false)
+const noShuffle = updateFriendRoomChoice(firstDefault, 'deal-mode', '不洗牌')
+assert.equal(noShuffle.dealMode, 'no-shuffle')
+for (const mode of FRIEND_ROOM_MODES) {
+  const draft = policy.changeFriendRoomFormat(noShuffle, mode.id)
+  assert.equal(format.normalizeRoomFormat(draft).dealMode, 'no-shuffle')
+  assert.match(describeFriendRoomRules(draft), /不洗牌/)
+  assert.equal(friendRoomChoiceRows(draft, 'rules').find(row => row.id === 'deal-mode').selected, '不洗牌')
+}
+assert.equal(updateFriendRoomChoice(noShuffle, 'deal-mode', '随机发牌').dealMode, 'random')
+assert.equal(updateFriendRoomChoice(noShuffle, 'deal-mode', '伪造模式'), noShuffle)
 
 process.stdout.write('friend room settings policy regression checks passed\n')

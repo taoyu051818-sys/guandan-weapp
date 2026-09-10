@@ -193,5 +193,24 @@ for (const mode of ['quick', 'classic_50', 'classic_300', 'classic_2000', 'class
 for (const mode of [undefined, 'tournament']) assert.equal(formatForNewRoom({ entryKind: 'match', matchMode: mode }), undefined)
 const fixed = normalizeFriendRoomSettings({ format: 'rounds', rounds: 1, levelMode: 'fixed', levelRank: 'K' }, { strict: true })
 assert.equal(createRoomOpeningState({ entryKind: 'friend', roomSettings: fixed }, getRuleProfile('classic'), Math.random, () => false).currentLevel, 'K')
+for (const format of ['rounds', 'upgrade', 'rotating', 'duplicate']) {
+  const settings = normalizeFriendRoomSettings({ format, dealMode: 'no-shuffle' }, { strict: true })
+  assert.equal(settings.dealMode, 'no-shuffle')
+  assert.deepEqual(normalizeFriendRoomSettings(JSON.parse(JSON.stringify(settings)), { strict: true }), settings)
+  assert.equal(formatForNewRoom({ entryKind: 'friend', roomSettings: settings }).dealMode, 'no-shuffle')
+}
+assert.throws(() => normalizeFriendRoomSettings({ format: 'rounds', dealMode: 'fake' }, { strict: true }), /发牌方式/)
+for (const stake of [50, 300, 2000, 10000]) {
+  const room = { entryKind: 'match', matchMode: `no-shuffle_${stake}` }
+  const opening = createRoomOpeningState(room, getRuleProfile('classic'), () => 0.99, () => false)
+  assert.equal(opening.matchFormat.dealMode, 'no-shuffle')
+  assert.equal(opening.currentLevel, 'A')
+  assert.equal(isSingleRoundMatch({ ...room, state: opening }), true)
+  const consecutive = createRoomOpeningState({ ...room, matchMode: `consecutive_${stake}` }, getRuleProfile('classic'), () => 0.99, () => false)
+  assert.equal(consecutive.currentLevel, 2)
+  assert.equal(consecutive.matchFormat.upgradeTarget, 'A')
+  assert.equal(consecutive.matchFormat.tributeEnabled, true)
+  assert.equal(isSingleRoundMatch({ ...room, state: consecutive }), false)
+}
 
 process.stdout.write('friend room settings validation tests passed\n')

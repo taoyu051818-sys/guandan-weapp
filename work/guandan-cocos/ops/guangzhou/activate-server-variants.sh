@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# Authorized server-only release. Never sources or replaces production credentials.
+# Authorized server release, optionally including web. Never replaces credentials.
 set -euo pipefail
 release_id=${1:?release id required}
 expected_hash=${2:?SHA-256 required}
-allow_active=${3:-}
-[[ -z "$allow_active" || "$allow_active" == '--allow-active' ]]
+allow_active=
+with_web=false
+for option in "${@:3}"; do
+  case "$option" in
+    --allow-active) allow_active=$option ;;
+    --with-web) with_web=true ;;
+    *) echo "Unknown release option: $option" >&2; exit 2 ;;
+  esac
+done
 [[ "$release_id" =~ ^20[0-9]{6}-[a-z0-9-]+$ ]]
 [[ "$expected_hash" =~ ^[a-f0-9]{64}$ ]]
 archive="/tmp/guandan-release-${release_id}.tgz"
@@ -15,11 +22,15 @@ node=/opt/node-v24.19.0/bin/node
 [[ $(sha256sum "$archive" | cut -d ' ' -f 1) == "$expected_hash" ]]
 previous=$(readlink -f /srv/guandan/current)
 [[ "$previous" == /srv/guandan/releases/* && -d "$previous/web" ]]
-# Archive contains only reviewed server code and built shared rules, no secrets/data.
-tar -tzf "$archive" | "$node" -e 'let s="";process.stdin.on("data",b=>s+=b);process.stdin.on("end",()=>{for(const p of s.trim().split("\n")){if(p.split("/").includes("..")||!(/^(shared-core\/(dist\/|package.json$)|work\/guandan-windows-source\/(server\/|package.json$))/.test(p)))throw Error("Unexpected archive path: "+p)}})'
+# Only reviewed code/rules and explicitly requested web assets; never secrets/data.
+tar -tzf "$archive" | "$node" -e 'let s="";process.stdin.on("data",b=>s+=b);process.stdin.on("end",()=>{for(const p of s.trim().split("\n")){const allowed=/^(shared-core\/(dist\/|package.json$)|work\/guandan-windows-source\/(server\/|package.json$))/.test(p)||(process.argv[1]==="true"&&p.startsWith("web/"));if(p.split("/").includes("..")||!allowed)throw Error("Unexpected archive path: "+p)}})' "$with_web"
 mkdir "$release"
 tar --no-same-owner -xzf "$archive" -C "$release"
-cp -a "$previous/web" "$release/web"
+if [[ "$with_web" == true ]]; then
+  [[ -f "$release/web/index.html" ]]
+else
+  cp -a "$previous/web" "$release/web"
+fi
 chown -R root:root "$release"
 chmod -R go-w "$release"
 cd "$release/work/guandan-windows-source"

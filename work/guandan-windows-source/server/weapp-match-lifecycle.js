@@ -9,7 +9,7 @@ import { createTurnClock } from './weapp-turn-clock.js'
 import { createRoomActionExecutor } from './weapp-room-action-executor.js'
 
 const require = createRequire(import.meta.url)
-const { createDeck, dealCards, shuffleDeck, highestCard, automaticReturnCard, chooseMatchLevel } = require('../../../shared-core/dist')
+const { dealGameCards, highestCard, automaticReturnCard, chooseMatchLevel } = require('../../../shared-core/dist')
 
 /** Owns authoritative turn, match-duration, and round-finalization lifecycles. */
 export const createWeAppMatchLifecycle = ({
@@ -392,7 +392,7 @@ export const createWeAppMatchLifecycle = ({
     const result = room.roundResult
     const nextLevel = ['independent', 'rotating'].includes(room.state.matchFormat?.kind) ? chooseMatchLevel(room.state.matchFormat, shuffleRandom) : result.currentLevel
     const pairingIndex = room.state.matchFormat?.kind === 'rotating' && room.state.matchFormat.teamRotation === 'draw' ? Math.floor(shuffleRandom() * 52) : undefined
-    const dealt = dealCards(shuffleDeck(createDeck(nextLevel), shuffleRandom))
+    const dealt = dealGameCards(nextLevel, room.state.matchFormat?.dealMode, shuffleRandom)
     const dealtHands = Object.fromEntries(playerIds.map(id => [id, [...dealt[id]].sort((a, b) => b.value - a.value)]))
     const transitionResult = dispatchMatchIntent(room.state, { type: 'PREPARE_NEXT_ROUND', dealtHands, nextLevel, ...(pairingIndex !== undefined ? { pairingIndex } : {}) })
     if (!transitionResult.ok) throw new Error(matchFailureMessage(transitionResult.reason))

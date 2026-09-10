@@ -484,6 +484,10 @@ Content-Type: application/json
 
 支持普通快速匹配 `quick`、经典底分场 `classic_50` / `classic_300` / `classic_2000` / `classic_10000`，以及赛事队列 `rookie_cup` / `weekend_cup` / `master_cup` / `lingshui_16_cup`。等待中响应 `data.match`：
 
+经典入口另支持 `no-shuffle_50` / `no-shuffle_300` / `no-shuffle_2000` / `no-shuffle_10000`（随机级牌、多炸单局），以及 `consecutive_50` / `consecutive_300` / `consecutive_2000` / `consecutive_10000`（从 2 连打过 A，含贡还）。各模式独立匹配，沿用同档底分预留及终局结算；连打模式不在小局结束时释放预留或结算整场。队列来源为共享核 `classicModes.ts`，旧的 `quick` 行为不变。
+
+好友房显式赛制 `format` 可附带 `dealMode: "random" | "no-shuffle"`；不填保留随机发牌。`no-shuffle` 表示每局重新生成组合更集中的牌堆，不复用上一局收牌顺序；定局、升级、转蛋和复式均支持。此字段参与签名及严格校验，须先更新服务端再发布新客户端。
+
 `quick` 和四个经典底分场可直接进入匹配，服务端按 `mode` 使用互相独立的等待池，不会跨底分场拼桌。同一等待池允许并行维护多张未满桌，优先选择综合分跨度最小的桌。最早真人等待达到 7000ms 后，下一次 `join / status / cancel` 会在同一个平台事务中先为缺少的 p2—p4 席位生成系统机器人并原子成桌；客户端每秒轮询，因此正常在线等待会自动补位。超过期限后才到达的真人进入另一张桌，不能挤占已签名席位；期限前取消则不会补位。所有赛事队列都禁止机器人补位：未报名返回 `403`，已完成全部轮次返回 `409 TOURNAMENT_ROUNDS_COMPLETE`。`lingshui_16_cup` 不能按普通队列随机凑桌，必须提交服务端当前状态返回的 `{ "mode": "lingshui_16_cup", "tournamentId": "lingshui-16-cup", "assignmentId": "tpa_..." }`；缺失 assignment 返回 `409 TOURNAMENT_ASSIGNMENT_REQUIRED`。
 
 经典场底分分别为 50、300、2000、10000。入队后会为这场匹配预留一份底分；商城兑换和赛事报名只能使用“钱包余额 - 已预留底分”的可用积分，不能花掉正在匹配或已经匹配牌局的底分。余额不足时返回 `409 INSUFFICIENT_CLASSIC_STAKE`。结算为队伍间零和转账：每个败方席位必须向对应胜方席位完整转移一份底分，不允许按剩余余额折扣扣款。匹配取消、异常终止或牌局完成后释放预留资格；`quick` 和赛事沿用非底分奖励规则。
