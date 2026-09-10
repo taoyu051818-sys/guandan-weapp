@@ -9,8 +9,6 @@ import type {
   AIWorkerRuntimeConfig,
   Card,
   Difficulty,
-  HardRuntimeTuning,
-  MasterRuntimeTuning,
   PlayAction,
   Player,
   PlayerId,
@@ -22,8 +20,6 @@ import type { LocalAIEngine } from './LocalMatchController'
 export type SynchronousLocalAIEngineOptions = Readonly<{
   ruleProfile: RuleProfile
   seed: number
-  hardTuning?: Partial<HardRuntimeTuning>
-  masterTuning?: Partial<MasterRuntimeTuning>
 }>
 
 const cloneCheckpoint = (checkpoint: AIEngineCheckpoint): AIEngineCheckpoint =>
@@ -46,8 +42,6 @@ export class SynchronousLocalAIEngine implements LocalAIEngine {
     const bootstrap = createAIEngine(options)
     this.runtimeConfig = {
       seed: options.seed,
-      hardTuning: bootstrap.getHardRuntimeTuning(),
-      masterTuning: bootstrap.getMasterRuntimeTuning(),
     }
     this.initialCheckpoint = bootstrap.checkpoint()
     this.currentCheckpoint = cloneCheckpoint(this.initialCheckpoint)

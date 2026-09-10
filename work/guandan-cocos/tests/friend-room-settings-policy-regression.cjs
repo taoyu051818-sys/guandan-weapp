@@ -65,7 +65,7 @@ assert.deepEqual(rulesRows.map(row => [row.id, row.label, row.options, row.selec
   ['level-mode', '级牌', ['每局随机', '固定级牌'], '每局随机'],
   ['scoring', '计分', ['双下3分', '双下4分'], '双下3分'],
   ['turn-seconds', '出牌时间', ['15秒', '20秒', '30秒', '60秒'], '20秒'],
-  ['trustee-seconds', '托管', ['无托管', '15秒', '30秒', '60秒'], '15秒'],
+  ['trustee-seconds', '托管', ['开启', '关闭'], '开启'],
 ])
 const experienceRows = friendRoomChoiceRows(firstDefault, 'experience')
 assert.deepEqual(experienceRows.map(row => [row.id, row.label, row.options, row.selected]), [
@@ -82,7 +82,7 @@ for (const [id, selected] of [
   ['scoring', '双下4分'],
   ['score-visibility', '结算显示'],
   ['turn-seconds', '60秒'],
-  ['trustee-seconds', '无托管'],
+  ['trustee-seconds', '关闭'],
   ['total-time', '30分钟'],
   ['spectator', '延迟观战'],
   ['spectator-delay', '1局'],

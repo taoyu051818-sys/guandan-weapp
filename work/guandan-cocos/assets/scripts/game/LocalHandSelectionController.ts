@@ -95,6 +95,14 @@ export class LocalHandSelectionController {
         lastPlay: context.state.lastValidPlay,
         ruleProfile: context.state.ruleProfile,
         protectedGroups,
+        observation: {
+          self: context.humanId, team: context.state.players[context.humanId].team,
+          seats: Object.values(context.state.players).map(player => ({ id: player.id, team: player.team, count: player.hand.length })),
+          order: context.state.turnOrder,
+          history: 'playHistory' in context.state && Array.isArray(context.state.playHistory) ? context.state.playHistory : context.state.playArea,
+          historyComplete: true, level: context.state.currentLevel,
+          finishedPlayers: context.state.finishedPlayers, roundId: context.state.roundId, revision: context.state.revision,
+        },
       }).filter(choice => protectedGroups.every(group => {
         if (group.kind !== 'locked') return true
         const selected = new Set(choice.cards.map(card => card.id))
@@ -106,7 +114,7 @@ export class LocalHandSelectionController {
     if (!choices.length) {
       this.clear()
       return protectedGroups.some(group => group.kind === 'locked')
-        ? '没有不拆锁牌的提示，可先恢复牌组或选择不要' : '没有可用提示，请选择不要'
+        ? '没有不拆锁牌的提示，可先恢复牌组或选择不要' : '建议不要，保留牌权或等待机会'
     }
     const choice = choices[this.hintIndex++ % choices.length]
     const cards = [...choice.cards]

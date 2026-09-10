@@ -1,10 +1,10 @@
 import { normalizeFriendRoomSettings } from './friend-room-settings.js'
-import { botOpeningDelay } from './bot-turn-pacing.js'
+import { decisionDelayMs } from './bot-turn-pacing.js'
 
 /** Public turn deadline and private early automated wake-up are separate clocks. */
 export const createTurnClock = ({
   clearTurnTimer, turnTimers, ensureLiveMetadata, deadlineStepFor, isBotPlayer, isMatchRoom,
-  botActionDelayMs, friendSecondMs, trusteeActionDelayMs, turnTimeoutMs,
+  friendSecondMs, turnTimeoutMs,
   now, scheduleTimeout, enqueueServerOperation, automatedDeadline, publishTurnStatus,
 }) => {
   const schedule = (room, step, delay) => {
@@ -27,7 +27,8 @@ export const createTurnClock = ({
     if (!step) { clearStep(room); return }
     const settings = normalizeFriendRoomSettings(room.roomSettings)
     const bot = isBotPlayer(room, step.playerId)
-    if (!bot && !isMatchRoom(room) && settings.trusteeSeconds === 0) {
+    const automatic = bot || Boolean(room.trustees[step.playerId])
+    if (!automatic && !isMatchRoom(room) && settings.trusteeSeconds === 0) {
       clearStep(room)
       room.deadlinePlayerId = step.playerId
       room.deadlineAction = step.action
@@ -35,23 +36,20 @@ export const createTurnClock = ({
       return
     }
     const limit = isMatchRoom(room) ? turnTimeoutMs : settings.turnSeconds * friendSecondMs
-    const delay = !bot && room.trustees[step.playerId]
-      ? isMatchRoom(room) ? trusteeActionDelayMs : settings.trusteeSeconds > 0 ? settings.trusteeSeconds * friendSecondMs : limit
-      : limit
-    room.turnDeadlineAt = now() + delay
+    const delay = limit
+    room.turnDeadlineAt = now() + limit
     room.deadlinePlayerId = step.playerId
     room.deadlineAction = step.action
     room.pendingBotPlay = null
-    room.botTurnStartedAt = bot ? now() : null
-    room.botWakeAt = bot ? now() + Math.min(delay, botOpeningDelay(botActionDelayMs)) : null
-    schedule(room, step, bot ? room.botWakeAt - now() : delay)
+    room.botWakeAt = automatic ? now() + (step.action === 'play' ? 0 : Math.min(limit, decisionDelayMs(0))) : null
+    schedule(room, step, automatic ? room.botWakeAt - now() : delay)
     if (publish) publishTurnStatus(room)
   }
   const restoreTurnDeadline = room => {
     clearTurnTimer(room.roomId)
     const step = deadlineStepFor(room)
     if (!step) { clearStep(room); return }
-    if (!isMatchRoom(room) && !isBotPlayer(room, step.playerId) && normalizeFriendRoomSettings(room.roomSettings).trusteeSeconds === 0) {
+    if (!isMatchRoom(room) && !isBotPlayer(room, step.playerId) && !room.trustees[step.playerId] && normalizeFriendRoomSettings(room.roomSettings).trusteeSeconds === 0) {
       armTurnDeadline(room)
       return
     }
@@ -60,7 +58,7 @@ export const createTurnClock = ({
       armTurnDeadline(room)
       return
     }
-    const wake = isBotPlayer(room, step.playerId) ? room.pendingBotPlay?.at ?? room.botWakeAt ?? deadline : deadline
+    const wake = (isBotPlayer(room, step.playerId) || room.trustees[step.playerId]) ? room.pendingBotPlay?.at ?? room.botWakeAt ?? deadline : deadline
     schedule(room, step, Math.min(deadline, wake) - now())
   }
   return { armTurnDeadline, restoreTurnDeadline }

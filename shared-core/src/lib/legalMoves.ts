@@ -160,8 +160,25 @@ const PLAY_TYPE_ORDER: Readonly<Record<PlayType, number>> = {
   [PlayType.Pass]: 10,
 }
 
+/** Preserves suit/wildcard composition for whole-hand planning, while merging
+ * interchangeable copies. Rank-only representatives cannot safely plan tails.
+ */
+export const structuralLegalMoves = (
+  hand: readonly Card[],
+  profile: RuleProfile,
+  resolve: (cards: Card[]) => ReturnType<typeof getPlayInfo> = cards => getPlayInfo(cards, profile),
+): Card[][] => {
+  const candidates = new Map<string, Card[]>();
+  for (const move of enumerateCandidateMoves(hand)) {
+    const key = semanticCardsKey(move);
+    const existing = candidates.get(key);
+    if (!existing || cardsKey(move).localeCompare(cardsKey(existing)) < 0) candidates.set(key, move);
+  }
+  return [...candidates.values()].filter(move => resolve(move) !== null);
+};
+
 /**
- * Returns one deterministic physical move for every legal semantic class.
+ * Returns one deterministic physical move for every type/value/length class.
  * AI may rank these representatives; callers needing every physical choice
  * must use legalMoves instead.
  */

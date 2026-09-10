@@ -22,7 +22,7 @@ const launch = (totalMinuteMs = 60000) => {
       WEAPP_WS_PORT: String(port),
       WEAPP_ROOM_STATE_FILE: stateFile,
       WEAPP_TOTAL_MINUTE_MS: String(totalMinuteMs),
-      WEAPP_BOT_ACTION_DELAY_MS: '25',
+
     },
     stdio: 'ignore',
   })

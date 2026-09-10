@@ -1,56 +1,22 @@
 import { ruleProfileKey, type RuleProfile } from '../lib/rules';
-import type { AdvancedRole, AIEngineCheckpoint, Difficulty } from './types';
-import { deserializeRuntimeIntel, type RuntimeIntelState } from './runtimeIntel';
+import type { AIEngineCheckpoint } from './types';
+import { createSeededRandom } from './random';
+import { validateTeamRecords } from './team/journal';
 
-export type ValidatedAIEngineCheckpoint = {
-  runtimeIntel: RuntimeIntelState;
-  decisionContext: AIEngineCheckpoint['decisionContext'];
-};
-
-const tuningIsValid = (tuning: Record<string, number | boolean>): boolean =>
-  Object.values(tuning).every(value => (
-    typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
-  ));
-
-export const validateAIEngineCheckpoint = (
-  checkpoint: AIEngineCheckpoint,
-  engineRuleProfile: RuleProfile,
-): ValidatedAIEngineCheckpoint => {
-  if (
-    checkpoint.version !== 1
-    || checkpoint.engineRuleProfileKey !== ruleProfileKey(engineRuleProfile)
-  ) {
+/** Drop retired tuning/intel on v1 migration, retain RNG and public decision journal.
+ * Validate with a temporary RNG so malformed checkpoints cannot partially mutate an engine.
+ */
+export const validateAIEngineCheckpoint = (value: unknown, profile: RuleProfile): AIEngineCheckpoint => {
+  const checkpoint = value as AIEngineCheckpoint & { decisionContext?: { ruleProfile: RuleProfile } };
+  if (!checkpoint || ![1, 2].includes(checkpoint.version)
+    || checkpoint.engineRuleProfileKey !== ruleProfileKey(profile)) {
     throw new Error('AI engine checkpoint is incompatible with this rule profile');
   }
-
-  const runtimeIntel = deserializeRuntimeIntel(checkpoint.runtimeIntel);
-  if (
-    !tuningIsValid({ ...checkpoint.hardTuning })
-    || !tuningIsValid({ ...checkpoint.masterTuning })
-  ) {
-    throw new Error('Invalid AI engine checkpoint tuning');
-  }
-
-  const difficulties = new Set<Difficulty>(['easy', 'medium', 'hard', 'master']);
-  const roles = new Set<AdvancedRole>(['striker', 'support']);
-  const context = checkpoint.decisionContext;
-  if (
-    !difficulties.has(context.difficulty)
-    || !roles.has(context.role)
-    || typeof context.ruleProfile.allowA2345Straight !== 'boolean'
-    || typeof context.ruleProfile.straightFlushAsBomb !== 'boolean'
-    || typeof context.ruleProfile.enableTripleWithPair !== 'boolean'
-    || ruleProfileKey(context.ruleProfile) !== ruleProfileKey(engineRuleProfile)
-  ) {
+  if (checkpoint.decisionContext && ruleProfileKey(checkpoint.decisionContext.ruleProfile) !== ruleProfileKey(profile)) {
     throw new Error('Invalid AI engine checkpoint decision context');
   }
-
-  return {
-    runtimeIntel,
-    decisionContext: {
-      difficulty: context.difficulty,
-      role: context.role,
-      ruleProfile: Object.freeze({ ...context.ruleProfile }),
-    },
-  };
+  const random = createSeededRandom(0);
+  random.restore(checkpoint.random);
+  return { version: 2, engineRuleProfileKey: checkpoint.engineRuleProfileKey,
+    random: random.checkpoint(), teamDecisions: validateTeamRecords(checkpoint.teamDecisions) };
 };

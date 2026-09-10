@@ -14,8 +14,9 @@ const temp = mkdtempSync(join(tmpdir(), 'guandan-duplicate-'))
 const secret = 'duplicate-test-secret-at-least-thirty-two-characters'
 const tickets = new GameTicketService({ secret, gameEndpoint: 'ws://127.0.0.1:3003/weapp' })
 const connections = new Map(DUPLICATE_SEATS.map((s, i) => [s, { id: s, packets: [], acceptingCommands: true }]))
+let clock = Date.now()
 const events = []; let seed = 32451; let id = 0
-const opts = { connections, send: (c, type, p) => c.packets.push({ type, ...p }), verifier: new GameTicketVerifier({ secret, required: true }),
+const opts = { now: () => clock, connections, send: (c, type, p) => c.packets.push({ type, ...p }), verifier: new GameTicketVerifier({ secret, required: true }),
   reporter: { configured: true, claimStart: async e => { events.push(e) }, enqueue: async e => { events.push(e) } },
   filePath: join(temp, 'rooms.json'), random: () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296) }
 let runtime = new DuplicateRoomRuntime(opts); clearInterval(runtime.timer)
@@ -125,12 +126,23 @@ try {
   await cmd(host, 'fillBots', { roomId: botRoomId }); await cmd(host, 'setLobbyReady', { roomId: botRoomId }); await cmd(host, 'startGame', { roomId: botRoomId })
   const bots = runtime.rooms.get(botRoomId)
   assert.equal(bots.members.filter(m => m.bot).length, 7)
-  for (const table of Object.values(bots.tables)) {
-    const start = table.deadlineAt - bots.settings.turnSeconds * 1000
-    assert.ok(table.botWakeAt - start >= 500 && table.botWakeAt - start <= 1500, 'duplicate table persists the same ordinary bot pacing range')
-  }
+  for (const table of Object.values(bots.tables)) assert.equal(table.pendingBotPlay, null, 'new turns have no pre-randomized delay')
   assert.equal(bots.tables.A.state.currentLevel, 2); assert.equal(bots.tables.B.state.currentLevel, 2)
   await cmd(host, 'setTrustee', { roomId: botRoomId }); await runtime.tick()
+  const planned = runtime.rooms.get(botRoomId)
+  for (const table of Object.values(planned.tables)) {
+    assert.ok(table.pendingBotPlay.delayMs >= 500 && table.pendingBotPlay.delayMs <= 9000)
+    assert.equal(table.state.revision, bots.tables.A.state.revision, 'planning cannot dispatch early')
+  }
+  const persistedPlan = structuredClone(planned.tables.B.pendingBotPlay)
+  await runtime.tick()
+  assert.deepEqual(runtime.rooms.get(botRoomId).tables.B.pendingBotPlay, persistedPlan, 'tick must not reroll')
+  await cmd(host, 'cancelTrustee', { roomId: botRoomId })
+  assert.equal(runtime.rooms.get(botRoomId).tables.A.pendingBotPlay, null)
+  await cmd(host, 'setTrustee', { roomId: botRoomId }); await runtime.tick()
+  clock += 9001
+  await runtime.tick()
   assert.ok(runtime.rooms.get(botRoomId).tables.A.state.revision > bots.tables.A.state.revision)
+  assert.ok(runtime.rooms.get(botRoomId).tables.B.state.revision > bots.tables.B.state.revision)
   console.log('Duplicate runtime passed: 8 seats, bots, rearrangement, equal decks, shared levels/leader, both-table barrier, scoring, idempotency, restart and private projections')
 } finally { await runtime.dispose(); rmSync(temp, { recursive: true, force: true }) }

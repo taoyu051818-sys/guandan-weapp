@@ -21,7 +21,7 @@ const launch = () => spawn(process.execPath, ['server/weapp-ws.js'], {
     WEAPP_WS_PORT: String(port),
     WEAPP_ROOM_STATE_FILE: stateFile,
     WEAPP_TURN_TIMEOUT_MS: '8000',
-    WEAPP_TRUSTEE_ACTION_DELAY_MS: '100',
+
     WEAPP_DISSOLVE_TIMEOUT_MS: '10000',
     WEAPP_EMPTY_ROOM_TIMEOUT_MS: '15000',
   },

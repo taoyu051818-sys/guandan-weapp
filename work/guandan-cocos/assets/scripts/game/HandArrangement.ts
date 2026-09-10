@@ -36,7 +36,6 @@ export { arrangeHandGroupCardIds, sortHandDisplayUnits } from './HandDisplayOrde
 export {
   getStraightFlushSuitAvailability,
   recognizeHandGroup,
-  selectNonOverlappingSuggestions,
   selectStraightFlushForSuit,
   suggestHandGroups,
   suggestStraightFlushGroups,

@@ -1,4 +1,4 @@
-import { chooseDuplicateAutomaticCards } from './duplicate-auto-policy.js'
+import { prepareDuplicateAutomaticPlay } from './duplicate-auto-policy.js'
 import { JsonRoomStateStore } from './room-state-store.js'
 import { duplicateEntry } from './duplicate-room-admission.js'
 import { duplicateAction, duplicateEvent, duplicateEndEvent, canStartDuplicate } from './duplicate-room-actions.js'
@@ -13,7 +13,7 @@ export class DuplicateRoomRuntime {
     this.store = new JsonRoomStateStore({ filePath }); this.rooms = new Map(this.store.load().rooms.map(r => [r.roomId, r]))
     this.queue = Promise.resolve(); this.delivering = new Set(); this.disposed = false
     for (const r of this.rooms.values()) r.members.forEach(m => { m.connectionId = null })
-    this.timer = setInterval(() => { void this.serial(() => this.tick()).catch(e => console.warn('Duplicate tick:', e.message)) }, 500)
+    this.timer = setInterval(() => { void this.serial(() => this.tick()).catch(e => console.warn('Duplicate tick:', e.message)) }, 100)
     this.timer.unref?.()
   }
   serial (fn) { const task = this.queue.then(fn); this.queue = task.catch(() => {}); return task }
@@ -147,8 +147,11 @@ export class DuplicateRoomRuntime {
         if (table.state.phase === 'settled') continue
         const m = occupant(room, globalSeat(name, table.state.currentTurn))
         if (!(m.bot || m.trustee || !m.connectionId || now >= table.deadlineAt)) continue
-        if (m.bot && now < Math.min(table.deadlineAt, table.botWakeAt ?? 0)) continue
-        const move = chooseDuplicateAutomaticCards(table, Number(room.roomId) + (name === 'A' ? 1 : 2))
+        const previousPlan = table.pendingBotPlay
+        const plan = prepareDuplicateAutomaticPlay(table, Number(room.roomId) + (name === 'A' ? 1 : 2), this.now)
+        if (previousPlan !== table.pendingBotPlay) changed = true
+        if (plan.waitMs > 0) continue
+        const move = plan.cards
         playDuplicate(room, m, move.length ? 'play' : 'pass', { cardIds: move?.map(c => c.id) }, now)
         changed = true
       }

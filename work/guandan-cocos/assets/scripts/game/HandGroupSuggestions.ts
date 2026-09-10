@@ -1,4 +1,5 @@
-import type { Card, RuleProfile, Suit } from '../core/generated'
+import { getPlayInfo, type Card, type RuleProfile, type Suit } from '../core/generated'
+import { arrangementKind } from './HandArrangementPlanner'
 import {
   ALL_SUITS,
   DEFAULT_HAND_SUGGESTIONS,
@@ -291,12 +292,6 @@ export const suggestHandGroups = (
     .slice(0, options.maxSuggestions)
 }
 
-const sameCardSet = (left: readonly CardId[], right: readonly CardId[]): boolean => {
-  if (left.length !== right.length) return false
-  const expected = new Set(left)
-  return right.every(cardId => expected.has(cardId))
-}
-
 export const recognizeHandGroup = (
   hand: readonly Card[],
   cardIds: readonly CardId[],
@@ -306,26 +301,9 @@ export const recognizeHandGroup = (
   if (requested.size !== cardIds.length) return null
   const groupHand = hand.filter(card => requested.has(card.id))
   if (groupHand.length !== cardIds.length) return null
-  return suggestHandGroups(groupHand, options).find(suggestion => sameCardSet(suggestion.cardIds, cardIds)) ?? null
-}
-
-/** Greedy, deterministic conflict resolution for an automatic one-card-one-group layout. */
-export const selectNonOverlappingSuggestions = (
-  suggestions: readonly HandGroupSuggestion[],
-  ruleProfile: RuleProfile = DEFAULT_HAND_SUGGESTIONS.ruleProfile,
-): HandGroupSuggestion[] => {
-  const used = new Set<CardId>()
-  const selected: HandGroupSuggestion[] = []
-  for (const suggestion of suggestions.slice().sort((left, right) => compareSuggestions(left, right, ruleProfile))) {
-    // Auto-arrange preserves valuable pairs. Manual recognition and legal moves stay unrestricted.
-    if (suggestion.kind === 'triple-with-pair' && (suggestion.pairValue ?? Infinity) >= 10) continue
-    if (suggestion.cardIds.some(cardId => used.has(cardId))) continue
-    selected.push({
-      ...suggestion,
-      cardIds: suggestion.cardIds.slice(),
-      wildcardUsages: suggestion.wildcardUsages.map(usage => ({ ...usage })),
-    })
-    suggestion.cardIds.forEach(cardId => used.add(cardId))
-  }
-  return selected
+  const info = getPlayInfo(groupHand, options.ruleProfile ?? DEFAULT_HAND_SUGGESTIONS.ruleProfile)
+  const kind = info && arrangementKind(info.type)
+  return info && kind ? { key: suggestionKey(kind, cardIds), kind, cardIds: [...cardIds],
+    wildcardUsages: info.wildcardUsages?.map(usage => ({ ...usage })) ?? [], primaryValue: info.maxValue,
+    priority: KIND_PRIORITY[kind] } : null
 }

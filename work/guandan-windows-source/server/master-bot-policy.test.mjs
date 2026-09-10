@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { createRoomBotPolicy, MASTER_BOT_DIFFICULTY, roundMetaForAI } from './master-bot-policy.js'
+import { prepareDuplicateAutomaticPlay } from './duplicate-auto-policy.js'
 
 const require = createRequire(import.meta.url)
 const { createGame, passTurn, playCards } = require('../../../shared-core/dist')
@@ -71,5 +72,37 @@ const continuedChoice = isolatedA.chooseCards({ state: enemyLed, teamLevels: { t
 const restoredChoice = restored.chooseCards({ state: enemyLed, teamLevels: { teamA: 2, teamB: 2 }, playerId: 'p3' })
 assert.deepEqual(restoredChoice?.map(card => card.id), continuedChoice?.map(card => card.id), '恢复后的房间必须延续同一决策序列')
 assert.deepEqual(restored.checkpoint(), isolatedA.checkpoint(), '恢复后的房间必须延续同一记牌与随机状态')
+
+assert.equal(restored.getLastDecisionTrace().team.policy, 'team-first-v1')
+assert.equal(restored.checkpoint().teamDecisions.at(-1).objective, 'team-first-place')
+
+const hidden = controlledGame('p3')
+for (const id of ['p1', 'p2', 'p4']) {
+  hidden.players[id].hand = new Proxy(hidden.players[id].hand, {
+    get(target, property) {
+      assert.equal(property, 'length', '机器人边界只能读取其他玩家的公开余牌数')
+      return target.length
+    },
+  })
+}
+assert.ok(createRoomBotPolicy({ seed: 5 }).chooseCards({ state: hidden, playerId: 'p3' }).length)
+
+let now = 1000
+const timing = { random: () => 0.5, measure: () => 0 }
+const duplicateTable = { state: controlledGame('p1'), deadlineAt: 21000 }
+const first = prepareDuplicateAutomaticPlay(duplicateTable, 51, () => now, timing)
+assert.ok(first.cards.length)
+assert.equal(first.waitMs, 500)
+const replayTable = structuredClone(duplicateTable)
+const checkpoint = structuredClone(duplicateTable.aiCheckpoint)
+now += 600
+assert.equal(prepareDuplicateAutomaticPlay(replayTable, 51, () => now, timing).waitMs, 0)
+assert.deepEqual(replayTable.aiCheckpoint, checkpoint, '恢复复式等待计划不重复决策')
+duplicateTable.state.revision = 2
+replayTable.state.revision = 2
+prepareDuplicateAutomaticPlay(duplicateTable, 51, () => now, timing)
+prepareDuplicateAutomaticPlay(replayTable, 51, () => now, timing)
+assert.deepEqual(replayTable.aiCheckpoint, duplicateTable.aiCheckpoint)
+assert.deepEqual(replayTable.pendingBotPlay, duplicateTable.pendingBotPlay)
 
 process.stdout.write('master bot team-awareness policy tests passed\n')

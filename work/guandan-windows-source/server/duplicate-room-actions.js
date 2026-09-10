@@ -71,7 +71,10 @@ export const duplicateAction = (room, member, type, p, { now, random }) => {
   }
   if (['setTrustee', 'cancelTrustee'].includes(type)) {
     if (waiting || !member.seat || member.watch) throw new Error('当前不能设置托管')
-    member.trustee = type === 'setTrustee'; return
+    member.trustee = type === 'setTrustee'
+    const table = room.tables[tableOf(member.seat)]
+    if (!member.trustee && table.state.currentTurn === localSeat(member.seat)) table.pendingBotPlay = null
+    return
   }
   if (['play', 'pass'].includes(type)) return playDuplicate(room, member, type, p, now)
   throw new Error('复式当前不支持此操作')

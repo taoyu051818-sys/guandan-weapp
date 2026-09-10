@@ -31,11 +31,9 @@ const validateTable = (state, playerId) => {
 export const createRoomBotPolicy = ({
   ruleProfile = getRuleProfile('classic'),
   seed = Math.floor(Math.random() * 0x1_0000_0000),
-  hardTuning,
-  masterTuning,
   checkpoint,
 } = {}) => {
-  const engine = createAIEngine({ ruleProfile, seed, hardTuning, masterTuning })
+  const engine = createAIEngine({ ruleProfile, seed })
   if (checkpoint) engine.restore(checkpoint)
 
   const chooseCards = ({ state, teamLevels, playerId }) => {
@@ -44,18 +42,27 @@ export const createRoomBotPolicy = ({
     }
     const { player, expectedTeam } = validateTable(state, playerId)
     const currentLevel = state.currentLevel
+    // Keep opponent faces outside the policy boundary, including legacy helpers.
+    const publicPlayers = Object.fromEntries(seats.map(seat => [seat, {
+      id: seat, name: '', isAI: state.players[seat].isAI, team: state.players[seat].team,
+      hand: seat === playerId ? player.hand : new Array(state.players[seat].hand.length),
+    }]))
     return engine.makeDecision(
       player.hand,
       state.lastValidPlay,
       MASTER_BOT_DIFFICULTY,
       expectedTeam,
-      state.players,
+      publicPlayers,
       playerId,
       {
         currentLevel,
         teamLevels: teamLevels || state.teamLevels || { teamA: currentLevel, teamB: currentLevel },
         roundMeta: roundMetaForAI(state.roundMeta),
         turnOrder: state.turnOrder,
+        publicHistory: state.playHistory ?? state.playArea,
+        finishedPlayers: state.finishedPlayers,
+        roundId: state.roundId,
+        revision: state.revision,
         ruleProfile: engine.ruleProfile,
       },
     )

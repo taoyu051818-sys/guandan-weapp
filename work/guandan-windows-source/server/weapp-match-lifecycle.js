@@ -17,8 +17,6 @@ export const createWeAppMatchLifecycle = ({
   rooms,
   connections,
   turnTimeoutMs,
-  trusteeActionDelayMs,
-  botActionDelayMs,
   friendSecondMs,
   totalMinuteMs,
   matchEndFinalizeRetryMs = 500,
@@ -328,7 +326,7 @@ export const createWeAppMatchLifecycle = ({
       let command
       if (expectedAction === 'play') {
         const useBotPolicy = isBot || Boolean(room.trustees[expectedPlayerId])
-        const plan = useBotPolicy ? prepareBotPlay(room, expectedPlayerId, botPolicyForRoom(room), { now, baseMs: botActionDelayMs }) : null
+        const plan = useBotPolicy ? prepareBotPlay(room, expectedPlayerId, botPolicyForRoom(room), { now }) : null
         if (plan) snapshot = structuredClone(room) // retries reuse this decision and do not reroll it
         if (plan?.waitMs > 0) {
           await commitRuntimeState()
@@ -386,7 +384,7 @@ export const createWeAppMatchLifecycle = ({
   }
   const { armTurnDeadline, restoreTurnDeadline } = createTurnClock({
     clearTurnTimer, turnTimers, ensureLiveMetadata, deadlineStepFor, isBotPlayer, isMatchRoom,
-    botActionDelayMs, friendSecondMs, trusteeActionDelayMs, turnTimeoutMs,
+    friendSecondMs, turnTimeoutMs,
     now, scheduleTimeout, enqueueServerOperation, automatedDeadline, publishTurnStatus,
   })
 

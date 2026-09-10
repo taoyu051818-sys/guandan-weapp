@@ -140,7 +140,7 @@ export interface GameState {
   playArea: PlayAction[]; // 记录当前轮次出的牌
   lastValidPlay: PlayAction | null; // 上一个有效的出牌（决定了当前需要跟的牌型和大小）
   scores: Record<Team, number>;
-  difficulty: 'easy' | 'medium' | 'hard' | 'master';
+  difficulty: 'master';
   showTutorial: boolean;
   showSettings: boolean;
   finishedPlayers: PlayerId[]; // 记录本局已经出完牌的玩家顺序

@@ -156,7 +156,7 @@ for (const expectedChoice of [
   /id: 'scoring',[^\n]*label: '计分',[^\n]*options: \['双下3分', '双下4分'\]/,
   /id: 'score-visibility',[^\n]*label: '比分',[^\n]*options: \['实时显示', '结算显示'\]/,
   /id: 'turn-seconds',[^\n]*label: '出牌时间',[^\n]*options: \['15秒', '20秒', '30秒', '60秒'\]/,
-  /id: 'trustee-seconds',[^\n]*label: '托管',[^\n]*options: \['无托管', '15秒', '30秒', '60秒'\]/,
+  /id: 'trustee-seconds',[^\n]*label: '托管',[^\n]*options: \['开启', '关闭'\]/,
   /id: 'total-time',[^\n]*label: '总时长',[^\n]*options: \['不限制', '20分钟', '30分钟', '60分钟'\]/,
   /id: 'spectator',[^\n]*label: '允许观战',[^\n]*options: \['禁止观战', '实时观战', '延迟观战'\]/,
   /id: 'auto-sort',[^\n]*label: '一键理牌',[^\n]*options: \['开启', '关闭'\]/,
@@ -250,7 +250,8 @@ assert.match(matchLifecycleServer, /room\.totalDeadlineAt = room\.matchStartedAt
 assert.match(matchLifecycleServer, /adjustDoubleDownSettlement\(\{[\s\S]*result: settlementEvent\.settlement,[\s\S]*state: transitionResult\.state,[\s\S]*previousTeamLevels: previousState\.teamLevels,[\s\S]*roomSettings,[\s\S]*\}\)/, 'double-four scoring must adjust the atomic settlement emitted by the shared engine')
 assert.match(matchLifecycleServer, /hasReachedRoundLimit\(room\.roundSequence, roomSettings\)/)
 const turnClockServer = fs.readFileSync(path.join(serverRoot, 'weapp-turn-clock.js'), 'utf8')
-assert.match(turnClockServer, /settings\.trusteeSeconds \* friendSecondMs/, 'manual trustee timing must be enforced by the authoritative clock')
+assert.doesNotMatch(turnClockServer, /settings\.trusteeSeconds \* friendSecondMs/, 'retired trustee intervals cannot override measured thinking')
+assert.match(turnClockServer, /automatic = bot \|\| Boolean\(room\.trustees\[step.playerId\]\)/, 'bots and trustees use the same planning clock')
 assert.match(turnClockServer, /settings\.turnSeconds \* friendSecondMs/, 'manual first-play timing must be enforced by the authoritative clock')
 assert.doesNotMatch(fs.readFileSync(path.join(serverRoot, 'weapp-game-command-handler.js'), 'utf8'), /type === 'chat'/, 'retired chat has no server handler')
 
