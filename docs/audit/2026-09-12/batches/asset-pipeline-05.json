@@ -1,0 +1,122 @@
+{
+  "batch": "asset-pipeline-05",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/scripts/sync-core.mjs",
+      "sha256": "9ed652a76f4259bd00a49ce67952beea223cbd42054a95df2cb1a97d28bcbe80",
+      "lines": 28,
+      "notes": "完整28行：按明确生成目标仅删除.ts后重新复制，排除兼容lib/ai.ts、保留常规.meta及UUID，仅清退役ai.ts.meta。内存探针使用真实core-sync-policy验证复制/过滤/嵌套清理；非原子同步及遗留非TS元数据为构建工具边界，不宣称生成失败可直接发布。未实际执行同步。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/sync-default-profiles.mjs",
+      "sha256": "4443f0b71999c7dfe0e6d4f8ec6fa0b1465d0d7b87a4a037e6e7933944a277de",
+      "lines": 13,
+      "notes": "完整13行：固定服务器静态目录到客户端图集、catalog条目到asset texture路径和生成TS常量，运行时无需第三方头像域名；内存样本验证映射。目录无旧图清理、catalog受信为仓库素材输入，不推断公网路径攻击。未读取真实用户数据或运行真实复制。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/verify-retirement.mjs",
+      "sha256": "c03cacecdaf33014a5688457c9b57bd9ff41428e1d60e39b5abc009b688ed00d",
+      "lines": 86,
+      "notes": "完整86行：17退役模块路径和meta拒绝、活动TS标记/归档导入检查、20归档音效哈希、4保留licensed音效、当前赛事/回放/观战正向入口，以及可选Web/微信包索引与UUID检查。当前源码和既有两包只读检查通过；文本标记扫描不是完整可达性证明。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/wechat-open-data-package.mjs",
+      "sha256": "5075ea1edada7b2aa80b7e008fa764370796c27746530ec979b1f19d75dfa8bc",
+      "lines": 20,
+      "notes": "完整20行：三文件逐字复制并校验、game.json声明保留其他字段、checkOnly无写入；内存探针覆盖缺配/旧文件，既有微信产物逐字验证通过。不是整包构建新鲜度证明。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/finalize-web-build.mjs",
+      "sha256": "23adf063f3b6b75447824a88b6e6d1df09f03fc6b7d59ad62a7a4cfdc6d4c0ea",
+      "lines": 99,
+      "notes": "完整99行：横屏1280x720、874x402模拟壳、无FPS/splash、嵌入配置与请求环境相等、归档标记扫描；checkOnly全程无写。净化环境缺少显式endpoint时正确失败，提供公开既定HTTPS/WSS端点后当前既有Web构建通过release只读校验。关联BUILD-03-001，不重复。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/more-feature-retirement-regression.cjs",
+      "sha256": "588aeaf9b847b0120a475ef2575379141dc358d65d8530f60fc1f9d95b000830",
+      "lines": 62,
+      "notes": "完整62行：玩家资料入口/赛季任务条件/回放模拟边界/页面退役及session兼容性都是静态源码断言；只读执行通过。未把正则命中当作真实微信点击或服务端奖励授权验证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/retirement-boundary-regression.cjs",
+      "sha256": "8bb82ae81e129fcae8310d030ae6d13508f9209916a8a5f8a82b6c72d3346d64",
+      "lines": 42,
+      "notes": "完整42行：先跑只读retirement verifier，再内存转译真实FrontPageController、显式注入页域，测试两次赛事入口委派、旧实验室入口不存在、无假toast。执行通过；是委派测试，不是赛事全流程验收。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/import-licensed-audio.mjs",
+      "sha256": "572b02761818851349e12dbb03051c45bf6eed39b008b0b0fc0e78874e495982",
+      "lines": 93,
+      "notes": "完整93行：固定catalog选择、下载成功+MP3头/尺寸检查后覆盖、manifest哈希/字节和runtime/archive区分；无超时/整批事务且剪除目录中非列表MP3，不在本审计运行真实导入。内存fetch验证坏响应保留对应当前clip、成功响应记录正确hash；MP3头检查不等于可播放/授权证明。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/import-niuma-audio.mjs",
+      "sha256": "ca900a7d8e60fc0752eaf67e515176275787bdc129c221806e1483b6cde02c8f",
+      "lines": 201,
+      "notes": "完整201行：固定女声/牌型语义映射与排除列表、源HEAD及LICENSE文本比对、快捷语路由证据、旧manifest拥有且hash未变才清理、目标内容保护和稳定meta UUID。未调用外部checkout导入；记录SOURCE-05-C01的HEAD与working tree字节边界，无当前错误素材结论。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/import-niuma-bgm.mjs",
+      "sha256": "59930a1f7472c266ffbffba0443f352b3efc286559edf27795bf4f629937853c",
+      "lines": 90,
+      "notes": "完整90行：固定HEAD/许可、源/目标hash保护、目录及clip meta、稳定UUID、保留format和人工试听边界；内存探针验证不同HEAD前置拒绝/不覆盖已改目标，HEAD相同但working bytes变动会被接受并记为该revision，作为SOURCE-05-C01而非当前缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/verify-legacy-effect-assets.mjs",
+      "sha256": "a87e569b841efd02e7750048c3d900f1e535248d8123fd0daae05fbe664e9968",
+      "lines": 265,
+      "notes": "完整265行：CLI严格参数、manifest shape/安全相对路径/重复项/默认拒绝、许可文件hash、运行目录被禁同扩展hash扫描、可选源checkout和完整拒绝目录核验；净化无外部checkout检查5allowed/39rejected/0runtime/60候选通过。源跳过、转换或改扩展字节及非列项仍非完整来源判定，不能宣称已覆盖全部第三方。"
+    }
+  ],
+  "findings": [],
+  "relatedFindings": [
+    "BUILD-03-001"
+  ],
+  "concerns": [
+    {
+      "id": "SOURCE-05-C01",
+      "status": "verification-gap",
+      "title": "音频导入固定HEAD但读取working tree字节，来源记录不是逐blob核验",
+      "path": "work/guandan-cocos/scripts/import-niuma-bgm.mjs",
+      "line": 52,
+      "evidence": "两个NiuMa导入器仅git rev-parse HEAD与常量比对，音频随后readFile当前checkout；modified文件不改变HEAD，缺少目标文件时仍能复制并记录既定revision。当前未核实真实上游checkout/提交blob与已导入素材是否有差异。",
+      "validation": "asset-pipeline-05内存探针运行真实BGM导入器，注入匹配HEAD及不同working音频bytes，记录了其hash且唯一git调用是rev-parse HEAD；不同HEAD和本地目标被改均正确拒绝。合成边界，不是当前素材已污染的证明。",
+      "recommendation": "后续来源专项逐blob或clean-worktree验证；重新导入时校验选中源文件属于固定revision而非仅HEAD。先不升级确认finding。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "node work/guandan-cocos/tests/more-feature-retirement-regression.cjs; node work/guandan-cocos/tests/retirement-boundary-regression.cjs",
+      "result": "两项既有回归通过；第二项含只读源码/归档retirement。"
+    },
+    {
+      "command": "env -i PATH=/usr/bin:/bin /opt/homebrew/bin/node work/guandan-cocos/scripts/verify-legacy-effect-assets.mjs",
+      "result": "5 allowed,39 rejected,0 runtime; source skipped;60 runtime candidate files。"
+    },
+    {
+      "command": "node docs/audit/2026-09-12/repro/asset-pipeline-05.cjs",
+      "result": "真实脚本内存编译、显式端口：open-data复制/只读/旧文件/声明、同步TS/meta/filter、资料像素与路径、音频坏响应/成功hash、BGM修订和目标保护通过。无网络/子进程或产品文件写入。"
+    },
+    {
+      "command": "env -i PATH=/usr/bin:/bin /opt/homebrew/bin/node work/guandan-cocos/scripts/verify-retirement.mjs --wechat --web",
+      "result": "既有微信包mainBytes=3302334,subpackageBytes=13743105,totalBytes=17045439；Web327文件检查通过，20归档clip hash匹配。纯磁盘内容检查，非上传限额/来源新鲜度/真机播放证明。"
+    },
+    {
+      "command": "env -i PATH=/usr/bin:/bin GUANDAN_PLATFORM_ENDPOINT=https://api.yutechhn.cn/guandan GUANDAN_LOBBY_ENDPOINT=wss://api.yutechhn.cn/guandan/weapp /opt/homebrew/bin/node work/guandan-cocos/scripts/finalize-web-build.mjs --check --release",
+      "result": "只读通过。首次完全空环境缺endpoint被正确拒绝，按CLI契约补入公共发布端点再核验，没有隐藏错误或写回配置。"
+    },
+    {
+      "command": "finalizeOpenDataPackage(repo+'/work/guandan-cocos',true)",
+      "result": "既有微信开放域3文件逐字与当前模板相同，game.json声明正确。"
+    }
+  ],
+  "limitations": [
+    "11个完整文件共999行计新增覆盖，辅助依赖/catalog片段不计。",
+    "所有同步/导入仅内存运行；源码和既有产物只读核验，不重新构建或部署。",
+    "两个既有构建目录mtime为2026-09-10；没有推断它们包含当前全部dirty修改。",
+    "源checkout严格验证、全素材权利证明/依赖许可证、解码试听与真机均未完成；本报告不提供法律授权结论。",
+    "不把文本标记/哈希黑名单或MP3头检查当作全量来源/可达性/可播放证明。"
+  ]
+}

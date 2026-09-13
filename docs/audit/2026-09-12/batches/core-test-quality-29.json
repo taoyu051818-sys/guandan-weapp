@@ -1,0 +1,294 @@
+{
+  "batch": "core-test-quality-29",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "shared-core/tests/ai-engine.test.ts",
+      "sha256": "6dee23442e4e343d856eaa1550b11d4c3803dd85482ba818622f84d34add9072",
+      "lines": 463,
+      "notes": "完整463行。核种子重复、退役档位归一master、缓存/trace隔离、冲刺拦截/对家让牌、规则profile、9/10炸与四王CPU预算、时钟漂移、checkpoint迁移/原子拒绝及动态队伍。标题hard/master实际两者都调用master，是退役别名语义，不代表仍有低档。COLD_RESTORE内存变异被原测试检出。动态队伍核心正例不能覆盖此前RP-13-001服务器适配器。"
+    },
+    {
+      "path": "shared-core/tests/ai-random.test.ts",
+      "sha256": "34b75be05f3dd676bb40a7e552b18fc0845ccf556dcf75bcf571f9b4785b0d10",
+      "lines": 30,
+      "notes": "完整30行。核相同seed、[0,1)范围/100样本唯一性和checkpoint恢复；8数字序列只验证可重复性，不是统计随机质量。RNG_RESTORE故意归零被原恢复测试检出。"
+    },
+    {
+      "path": "shared-core/tests/ai-strength-hints.test.ts",
+      "sha256": "b3aac169c52c5f8780441f024be57437d2426919438eec83d56359f8cd0cf963",
+      "lines": 84,
+      "notes": "完整84行。核牌力tier/plan/权重、队友10张阈值、自然炸弹不重叠计数、同花顺control、提示/托管同种子同首选与两侧对手1/2/5/10张场景。固定小样本与内部trace不证明全局最优胜率、真实手机延迟或所有局面。"
+    },
+    {
+      "path": "shared-core/tests/ai-team-model.test.ts",
+      "sha256": "937c27c592b3f2e4162aed3b2efe147306608dfc53e1e7100833b7d2010778c8",
+      "lines": 141,
+      "notes": "完整141行。核108组合profile/level/手牌能力摘要对权威候选、红心配与普通级牌连续资格、同花/混花语义、公知牌去重/不完整history、pass软证据、20手7张穷举分区与节点预算、先结束队友竞速。部分oracle共用legalMoves/rules，不能独立证明规则完全正确；小手穷举不代表27张最优路线。"
+    },
+    {
+      "path": "shared-core/tests/ai-team-parameters.test.ts",
+      "sha256": "3f34b3ef933b718dd01a3188796219d1a508b04b30a791a2fdc63f528b8c79ff",
+      "lines": 18,
+      "notes": "完整18行。核生产唯一参数对象冻结、9键、有限正数<=3、Reflect.set拒绝。通过说明配置结构健康，不证明这些数值比其他参数组合胜率更优；本轮不重新调参或跑线上数据。"
+    },
+    {
+      "path": "shared-core/tests/ai-team-policy.test.ts",
+      "sha256": "aac3e37d89e4663d6455e7655b64db360144e397a32aee36dfab5058cf58a9ad",
+      "lines": 126,
+      "notes": "完整126行。核12开局seed保炸、所有隐藏手牌用Proxy只许length、5张敌人不强制炸、即刻头游优先、完整公知历史保护队友、让牌、避单与喂牌、概率日志上限/拷贝隔离/恢复/换局。OPENING_BOMB与HIDDEN_FACE两内存变异均被原seed0测试捕获，证明硬门禁和隐私读取测试有效；不是所有牌力的统计胜率证明。"
+    },
+    {
+      "path": "shared-core/tests/ai-worker-protocol.test.ts",
+      "sha256": "32544a04821e531dd6b12f6b01178a6cc189f6694067b119e9f6f1a480a81abc",
+      "lines": 78,
+      "notes": "完整78行。核worker请求id/seed/decision profile/checkpoint一致和profile分叉拒绝；只有两测试，不代表任意畸形结构全覆盖。核心worker现在属于测试/兼容边界，既有CORE-AI-03-C01不重复计数。"
+    },
+    {
+      "path": "shared-core/tests/ai-worker-runtime.test.ts",
+      "sha256": "41592e2b5fd34f5c2d804371a025c82694406ebbeba3cada2031fb90df6f7008",
+      "lines": 133,
+      "notes": "完整133行。核真实worker.handle六步checkpoint与主engine相同、连续请求复用缓存、畸形消息结构化错误。不是实际WebWorker线程postMessage序列化、取消和峰值内存测试；连续旧句柄候选沿用第4批边界。"
+    },
+    {
+      "path": "shared-core/tests/dealing.test.ts",
+      "sha256": "c8c92e136a5ee7690d11af03b7c6a28d4d61f6d7fdf3fddfc69ade2d30b3d015",
+      "lines": 81,
+      "notes": "完整81行。核3模式/12队列、13级随机发牌完全等价、好友房4赛制往返、13×60不洗牌物理守恒/重放、非法RNG与mode拒绝、每策略3000seed炸弹/点值/大王位置差报警。样本阈值不证明公平或每手六组；注释历史six-group描述不变成当前自动理牌承诺。"
+    },
+    {
+      "path": "shared-core/tests/hand-hint-policy.test.ts",
+      "sha256": "960d943d2278d28abcf63b8d5009d5ad608eaefa49701a9d36b234a8fc06272b",
+      "lines": 82,
+      "notes": "完整82行。核7种锁组/散单/拆对/保炸/红心配提示约束。LOCK_FILTER内存删除硬筛选后，原无完整合法选择的锁组测试明确失败。此处无observation走同master策略的默认公开信息，不是另一个低难度算法。"
+    },
+    {
+      "path": "shared-core/tests/no-shuffle-arrangement.test.ts",
+      "sha256": "db5e5fbca683ee151ef00f430f5e67471eeae03d9259721d9b054612b962bc03",
+      "lines": 26,
+      "notes": "完整26行。核13级同seed、108牌守恒、输入牌堆不变、0和1-epsilon两边界随机可终止。没有对每人理牌剩余6手作断言，符合当前恢复简单理牌的边界，不凭文件名宣称六手目标被验证。"
+    },
+    {
+      "path": "shared-core/tests/rules.test.ts",
+      "sha256": "74c8a3d49e9fe877b9a42f5119715355ac3856ff5d7babb0ab607c9c9091b3a7",
+      "lines": 113,
+      "notes": "完整113行。核profile不可变/相互独立、完整物理组合数4/6/4/1、顺序无关、语义代表类和3级红心配不能代王。WILD_JOKER内存扩允许值到16/17被原9级测试检出；共享候选与规则同源oracle的限制已记录。"
+    },
+    {
+      "path": "shared-core/tests/tribute-settlement.test.ts",
+      "sha256": "0cdfeebf5c1a203dc56f1d6e390f54bb423f6d1f089eac83a007bccc4f73171f",
+      "lines": 286,
+      "notes": "完整286行。核K/A传统推进与累计分、单/双贡PREPARE、抗贡确切事件、旧revision/原状态不变、篡改下一副牌拒绝、双贡双还选择私密/完成后转移守恒。STALE_TRIBUTE和PRIVATE_TRIBUTE两变异被检出。名为不接受其他玩家的用例实际只发正确actor/旧revision，单凭此用例不能证明错actor；实际actor边界此前其他批已核，未新报生产缺陷。"
+    },
+    {
+      "path": "shared-core/tests/round-smoke.cjs",
+      "sha256": "ad85608737365c5e0ec4bfc4f5d27163f6dd7ef4e2e1b31bd9fd477b0f3db8fb",
+      "lines": 80,
+      "notes": "完整80行。核退役difficulty别名、旧兼容runAiTurns/dealNextRound、双下结算/还贡最低牌、一个完整自动对局<=3000回合、Plate/Tube/配牌语义。原脚本读dist；本轮隔离loader将其显式指向当前src，不构建不声称现有dist新鲜。一次完整局初始发牌未固定seed；不能据其通过推断所有种子终止或当前网络主链路。"
+    },
+    {
+      "path": "shared-core/tests/rules-regression.cjs",
+      "sha256": "d22830d6a63322d3e350bf742e0284077456f53bafabc981870373398901162a",
+      "lines": 179,
+      "notes": "完整179行并保留原有dirty哈希。核红心配多解释/花色usage、普通级牌不能连续、A低profile、所有诊断码与5.5档位双向比较。SF_STRENGTH内存降回4.5被原5507断言检出。以当前src代dist运行，129次原生assert（含fixture取牌断言）；非构建输出验证。"
+    },
+    {
+      "path": "shared-core/tests/tribute-regression.cjs",
+      "sha256": "26bf7291295f8b6956588b39ea74856074a7faa9bb9a5ad7729bda048b7bd526",
+      "lines": 90,
+      "notes": "完整90行。核真实版本化单贡选贡26/28→选还27/27→开始出牌、roundMeta和退役可变贡还导出不存在。21次原生assert通过，主入口而非旧兼容贡还。原dist导入隔离映射当前src，不声称发布包包含这些更改。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "cd shared-core && node_modules/.bin/vitest run --cache=false --maxWorkers=1 --no-file-parallelism tests/ai-engine.test.ts tests/ai-random.test.ts tests/ai-strength-hints.test.ts tests/ai-team-model.test.ts tests/ai-team-parameters.test.ts tests/ai-team-policy.test.ts tests/ai-worker-protocol.test.ts tests/ai-worker-runtime.test.ts tests/dealing.test.ts tests/hand-hint-policy.test.ts tests/no-shuffle-arrangement.test.ts tests/rules.test.ts tests/tribute-settlement.test.ts",
+      "node docs/audit/2026-09-12/repro/core-test-quality-29.cjs"
+    ],
+    "vitest": {
+      "version": "4.1.10",
+      "node": "26.7.0",
+      "files": 13,
+      "tests": 96,
+      "result": "PASS",
+      "output": "Test Files  13 passed (13)\n      Tests  96 passed (96)\n   Start at  21:58:30\n   Duration  3.37s (transform 194ms, setup 0ms, import 422ms, tests 1.87s, environment 1ms)"
+    },
+    "probe": {
+      "sourceSmoke": [
+        {
+          "test": "tests/rules-regression.cjs",
+          "select": null,
+          "executed": 1,
+          "assertions": 0,
+          "nativeAssertions": 129,
+          "replacements": 0,
+          "error": null,
+          "logs": [
+            "shared-core rules regression passed"
+          ],
+          "sourceModules": 38
+        },
+        {
+          "test": "tests/tribute-regression.cjs",
+          "select": null,
+          "executed": 1,
+          "assertions": 0,
+          "nativeAssertions": 21,
+          "replacements": 0,
+          "error": null,
+          "logs": [
+            "shared-core tribute regression passed"
+          ],
+          "sourceModules": 38
+        },
+        {
+          "test": "tests/round-smoke.cjs",
+          "select": null,
+          "executed": 1,
+          "assertions": 0,
+          "nativeAssertions": 172,
+          "replacements": 0,
+          "error": null,
+          "logs": [
+            "shared-core rules regression passed",
+            "shared-core tribute regression passed",
+            "shared-core round smoke passed"
+          ],
+          "sourceModules": 40
+        }
+      ],
+      "mutationCases": 9,
+      "detected": 9,
+      "mutations": [
+        {
+          "id": "SF_STRENGTH",
+          "source": "src/lib/rules.ts",
+          "test": "tests/rules-regression.cjs",
+          "selectedOriginalBody": null,
+          "baselineAssertions": 129,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": "Expected values to be strictly equal:\n\n4507 !== 5507\n"
+          },
+          "baselineSourceModules": 38
+        },
+        {
+          "id": "WILD_JOKER",
+          "source": "src/lib/rules.ts",
+          "test": "tests/rules.test.ts",
+          "selectedOriginalBody": "rejects joker substitution at level 9 in rules and move generation",
+          "baselineAssertions": 10,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": " toBeNull expected=null actual={\n  type: 'Pair',\n  maxValue: 16,\n  wildcardUsages: [\n    {\n      cardId: 'card-21',\n      representedValue: 16,\n      representedSuit: 'spade'\n    }\n  ]\n}"
+          },
+          "baselineSourceModules": 38
+        },
+        {
+          "id": "LOCK_FILTER",
+          "source": "src/hints/handHintPolicy.ts",
+          "test": "tests/hand-hint-policy.test.ts",
+          "selectedOriginalBody": "never splits a locked group even when no intact legal move exists",
+          "baselineAssertions": 1,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": " toEqual expected=[] actual=[\n  {\n    cards: [ [Object] ],\n    damage: {\n      splitsLockedGroup: true,\n      splitRocketCount: 0,\n      splitBombCount: 0,\n      usesRocket: false,\n      usesBomb: false,\n      splitStructuredCount: 0,\n      splitTripleCount: 0,\n      splitPairCount: 0,\n      wildcardCount: 0,\n      beatMargin: 1,\n      score: 0\n    },\n    warning: null\n  },\n  {\n    cards: [ [Object] ],\n    damage: {\n      splitsLockedGroup: true,\n      splitRocketCount: 0,\n      splitBombCount: 0,\n      usesRocket: false,\n      usesBomb: false,\n      splitStructuredCount: 0,\n      splitTripleCount: 0,\n      splitPairCount: 0,\n      wildcardCount: 0,\n      beatMargin: 1,\n      score: 1\n    },"
+          },
+          "baselineSourceModules": 38
+        },
+        {
+          "id": "RNG_RESTORE",
+          "source": "src/ai/random.ts",
+          "test": "tests/ai-random.test.ts",
+          "selectedOriginalBody": "restores a serialized generator checkpoint",
+          "baselineAssertions": 1,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": " toEqual expected=[\n  0.43526580673642457,\n  0.4406644464470446,\n  0.3548806740436703,\n  0.99454690143466,\n  0.15454978495836258,\n  0.06524764746427536,\n  0.9923748974688351,\n  0.5811940499115735\n] actual=[\n  0.26642920868471265,\n  0.0003297457005828619,\n  0.2232720274478197,\n  0.1462021479383111,\n  0.46732782293111086,\n  0.5450490827206522,\n  0.6152513844426721,\n  0.6489853798411787\n]"
+          },
+          "baselineSourceModules": 2
+        },
+        {
+          "id": "OPENING_BOMB",
+          "source": "src/ai/team/policy.ts",
+          "test": "tests/ai-team-policy.test.ts",
+          "selectedOriginalBody": "retains opening bombs and never reads hidden faces (seed 0)",
+          "baselineAssertions": 5,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": " toBe expected=false actual=true"
+          },
+          "baselineSourceModules": 31
+        },
+        {
+          "id": "HIDDEN_FACE",
+          "source": "src/ai/decisionRunner.ts",
+          "test": "tests/ai-team-policy.test.ts",
+          "selectedOriginalBody": "retains opening bombs and never reads hidden faces (seed 0)",
+          "baselineAssertions": 5,
+          "mutationDetected": true,
+          "signal": {
+            "name": "Error",
+            "message": "hidden hand access: p2.0"
+          },
+          "baselineSourceModules": 31
+        },
+        {
+          "id": "COLD_RESTORE",
+          "source": "src/ai/engine.ts",
+          "test": "tests/ai-engine.test.ts",
+          "selectedOriginalBody": "restores serialized RNG and public journal with cold caches",
+          "baselineAssertions": 15,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": " toBe expected=0 actual=1"
+          },
+          "baselineSourceModules": 31
+        },
+        {
+          "id": "STALE_TRIBUTE",
+          "source": "src/lib/engine.ts",
+          "test": "tests/tribute-settlement.test.ts",
+          "selectedOriginalBody": "selects a required tribute card without accepting another player or a stale revision",
+          "baselineAssertions": 4,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": " toEqual expected={ ok: false, reason: 'STALE_REVISION' } actual={\n  ok: true,\n  state: {\n    revision: 2,\n    roundId: 2,\n    phase: 'tribute',\n    ruleProfile: {\n      allowA2345Straight: true,\n      straightFlushAsBomb: true,\n      enableTripleWithPair: true\n    },\n    currentLevel: 3,\n    levelTeam: 'teamA',\n    teamLevels: { teamA: 2, teamB: 2 },\n    aFailStreaks: { teamA: 0, teamB: 0 },\n    dealerId: 'p1',\n    players: { p1: [Object], p2: [Object], p3: [Object], p4: [Object] },\n    turnOrder: [ 'p1', 'p2', 'p3', 'p4' ],\n    currentTurn: 'p1',\n    trick: { winningPlay: null, passedPlayerIds: [] },\n    playArea: [],\n    playHistory: [],\n    lastValidPlay: null,\n    finishedPlayers: [],\n "
+          },
+          "baselineSourceModules": 38
+        },
+        {
+          "id": "PRIVATE_TRIBUTE",
+          "source": "src/lib/tribute.ts",
+          "test": "tests/tribute-settlement.test.ts",
+          "selectedOriginalBody": "keeps double-tribute choices private and transfers only after both players select",
+          "baselineAssertions": 13,
+          "mutationDetected": true,
+          "signal": {
+            "name": "AssertionError",
+            "message": " toEqual expected=[ { type: 'TRIBUTE_CARD_SELECTED', playerId: 'p2' } ] actual=[ { type: 'TRIBUTE_CARD_SELECTED', playerId: 'p2', cardId: 'card-2' } ]"
+          },
+          "baselineSourceModules": 38
+        }
+      ],
+      "scope": "13 original files / 96 tests separately passed real Vitest; this probe reuses selected unmodified test bodies with exact minimal assertion adapter. Nine source mutations exist in memory only. No mutation coverage or optimal strategy claim."
+    }
+  },
+  "boundaries": [
+    "新增16个原pending测试共2010行；核心源码此前已完整审阅，本次辅助重读rules/tribute/engine/hints/team policy/decisionRunner/random/noShuffleDeal不重复计数。match-format.test.ts已在第6批计覆盖，此次重读不重计。",
+    "真实Vitest执行13个新审TS文件96用例；CJS3入口原读dist，本次隔离loader明确改为当前TS源，仅内存转译，不写dist、构建、安装依赖或改原测试。",
+    "9种源语句变异各用一份独立内存模块缓存，先运行原测试体正常对照，再检测变异。TS目标体采用精确最小expect/it注册替身，不冒充整个Vitest变异框架；CJS保留原生assert计数。九项全部检出只是特定回归防线有效，不是全量mutation覆盖率或没有缺陷。",
+    "开局/牌力/公知信息推断具有回归约束；同源候选/规则oracle、固定seed样本、节点/CPU预算及worker.handle测试都有边界，不由此宣称最高胜率、整局穷举、所有手机性能或实际多线程安全。",
+    "本批未新增确认问题；此前CORE-CONTRACT-06-001错误抗贡事件名仍在，本批不修改不重复报告；RP-13-001适配器动态team缺陷也不因核心动态队伍测试通过而销项。",
+    "仅审计材料新增；原五处修改/HEAD保持，未运行线上API或持久真实数据，未提交推送部署。其余第一方/第三方/资源/发布与跨模块门槛继续保留。"
+  ]
+}

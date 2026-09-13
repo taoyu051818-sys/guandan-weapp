@@ -1,0 +1,229 @@
+{
+  "batch": "hand-projection-26",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandArrangement.ts",
+      "sha256": "7beb6fc00bc1de5574226b2a8ba1d360a59fe9bc5e565bc3a17a639335dea46d",
+      "lines": 43,
+      "notes": "完整43行。稳定导出facade，运行时实现分别归model/ordering/suggestions；分类和公开类型未复制到场景。核消费者实际使用与删除旧打分器边界，未仅因旧facade命名判为死代码。832组实际workspace试验经该facade。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandArrangementModel.ts",
+      "sha256": "1df72a5974f2eaf2a4c9df49997163cb79e72341819a549973ba58b072b1357a",
+      "lines": 239,
+      "notes": "完整239行。核物理点数/级牌15分离、红心配身份、防重复ID、花色补齐与稳定顺序、reconcile移除过期/补新牌且不改规则hand。输入为内部可信类型，未将无效mode/NaN防御不足直接列漏洞；冻结牌832组无mutation。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandDisplayOrdering.ts",
+      "sha256": "0f4e4ef69f3709aeb5e764109899d04c461a03ada594cc3dbf332ac512fb49a9",
+      "lines": 190,
+      "notes": "完整190行。核分组内语义顺序、王炸/同花顺5.5优先、锁组与普通区相对顺序、无固定屏幕占区。确认HAND-26-001：A2345同花顺maxValue=5505被当非A低，auto和lock16组合尾部放A；同物理牌只切straightFlushAsBomb的16对照正确。当前规则禁止普通级牌进连续组，未把其排序设想误判实际故障。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandGroupSuggestions.ts",
+      "sha256": "6017b941a3126c816a33bf225d25388835ed050d1b658d8667c5425b9e92a652",
+      "lines": 322,
+      "notes": "完整322行。核slot分配、普通级牌排除、红心配不替大小王、按花色/序列确定性候选、炸弹5.5排序、低对三带二和一遍互斥选择、不再自动寻找普通顺子。832组产生2770合法auto组合、604可用花色候选，无规则输入修改；未宣称贪心全局最优或候选穷尽所有副本分配。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandRenderProjector.ts",
+      "sha256": "162a901ae6b0521601e88f2dce57f59559df4c5a5ca093c64506dc0a67c5fcb2",
+      "lines": 50,
+      "notes": "完整50行。核阻塞时清选牌、贡还保留单张选择、快照展示字段、workspace缓存注入、只读呈现不获得出牌权。active TableHandInteraction显式共享缓存；队友point-stacked视图无需每帧规则识别。借用hand数组为只读消费契约，未发现当前消费者改规则数据。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandStackLayout.ts",
+      "sha256": "b8079d4763419b2c5cc4449f02cbde87a78d5b399cc453a44fb97fd02b812126",
+      "lines": 120,
+      "notes": "完整120行。核一组一列/牌底基线、40单位露条、不随高组压缩、整体居中无固定区域、视觉和touch共用nextLaneSpacing。832有效分组×5尺寸共4160布局守恒且有限，改变zone不变布局。上层保证唯一cardId/groupId；无效手工重复groupId导致丢槽不是已证实活动路径。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/PublicStraightFlushPossibility.ts",
+      "sha256": "598efb9b947d626435948ba0db87b61cb2e4fb17a0e00b4254ab65e58e6119f6",
+      "lines": 36,
+      "notes": "完整36行。核只读己方已知牌+公开出牌+其余手数、物理ID去重、双副数量夹零与红心配一张一缺口。确认HAND-26-002：未排除普通级牌槽；520精确未见五牌组合中150误亮，370合法对照及150红心配修复对照正常。不是读取对手暗牌或实际允许非法出牌。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/TeammateHandProjector.ts",
+      "sha256": "3e3fa0b43b56c3713748e6f831f6f230a12e15216482fbfae30dcd1979b3bc5f",
+      "lines": 54,
+      "notes": "完整54行。核动态team唯一队友、本人真实空手且finished、phase守卫、占位牌全量拒绝、owner/round重置、只读blocked投影。联合真实服务端stateForViewer的24队伍/玩家组合、24撤权、48非playing守卫通过；server授权仍为源头，未做WS/真机。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/HandGroupBadgeView.ts",
+      "sha256": "70e7541d63b58cf7e0c2714376fd3d079b1b35c7b768c77cd5315d953ad2259a",
+      "lines": 50,
+      "notes": "完整50行。核牌组底牌非交互竖章、字号/小方角、紫/青语义、同键复用和hidden后恢复；文本Array.from按码点拆字。既有真实view+绘图替身验证底部-53/宽20与复用；当前labels≤4字，未把任意超长外部文本作为可达错误。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/simple-hand-arrangement-regression.cjs",
+      "sha256": "2e12c31500c2fbda92ac1cb423d09955339d42a4568f84116a9628594ba17b32",
+      "lines": 65,
+      "notes": "完整65行并执行。104发牌样本，验证旧planner接口退役、合法自动组/无普通混花顺、恢复/重复、红心配手动锁及不变性；无时间阈值，打印Node耗时并不等于真机性能承诺。扩展832组两seed/两方向/两profile。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/straight-flush-grouping-regression.cjs",
+      "sha256": "90c0d1e56fccea648f3809be1892a6ae454b8de0f341b1e0db723d3582058f7c",
+      "lines": 155,
+      "notes": "完整155行并执行。实际候选/分组，覆盖4花色、红心配替代与真王拒绝、确定性最高候选、A低开关、锁组/底牌行为；scene集成部分为regex。只检查A低候选存在，未检查canonical栈内顺序，补充probe发现HAND-26-001。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/hand-group-badge-regression.cjs",
+      "sha256": "073d9c212a9ec641bc608d4fccb58f0dd0f26c99daa79093a4d18cc5379b2da0",
+      "lines": 71,
+      "notes": "完整71行并执行。真实projector按规则判断标签、对子不标、point恢复隐藏、部分出牌清标；BadgeView用轻量cc记录文本和坐标。overlay无touch事件断言与节点复用通过；非GPU字形/真实牌面观感检验。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/card-stack-zorder-regression.cjs",
+      "sha256": "654fc3d7312cdb9c911f7055c02fa0f9d7d4d8a17ecd6a2c488c7bb763b15d07",
+      "lines": 55,
+      "notes": "完整55行并执行。主要是源码regex和本地重写排序比较器，能守结构但不能独立证明真实HandController运行语义。本轮layout真实函数4160样本，触摸测试执行真实CardView/HandController；不将regex覆盖当全链真实输入证明。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/hand-touch-coordinates-regression.cjs",
+      "sha256": "e26352ffbe5b0e69875c3f4345e1611d68efbbeaced2fbb04de0e843478a6858",
+      "lines": 199,
+      "notes": "完整199行并执行。实际CardView和HandController，cc/UITransform屏幕反投影存根；4比例/offset、正反/回扫、tap、hold、cancel、HUD排除/叠牌、全牌灰洗与level角标重绑。未运行Cocos相机/微信原生派发，多指/权威touchend旧事件仍参考CI-05-001。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-hand-interaction-controller-regression.cjs",
+      "sha256": "238d0edb7c55bde8bed46ed1a6cee6823448e0cb8003fea109539be1118b0458",
+      "lines": 427,
+      "notes": "完整427行并执行。真实controller/workspace，ruleAuthority合成；阶段/当前回合/pending/托管/完成96组合、贡还144组合、锁组整选/取消/拒绝混组/复原/过期/新局与队友投影。不能以fake authority动作次数代替真实发包或提示决策；补充probe连接真实服务器视图实现。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-hud-seat-view-group-regression.cjs",
+      "sha256": "7d507ed34f31b3238bc4f424c445121ed1cb8c174fa1e905f7aadcffcfa729bf",
+      "lines": 193,
+      "notes": "完整193行并执行。真实seat group，cc渲染/事件替身，绑定前render、默认头像、六字截断、剩牌/空状态、相对玩家点击闭包、重挂/销毁/再mount。未bindOwnAvatar测试不能证明该额外节点同实例复用；实际owner重建路径前批已界定，不新增重复生命周期问题。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "HAND-26-001",
+      "severity": "P3",
+      "title": "A2345同花顺的叠放顺序把A放到末尾",
+      "path": "work/guandan-cocos/assets/scripts/game/HandDisplayOrdering.ts",
+      "line": 171,
+      "evidence": "连续组排序用 resolution.maxValue === 5 判断A低；当前shared-core同花顺为5500+最高点，因此A2345的maxValue为5505。一键理牌/手动锁牌→HandGroupingState排序→HandStackLayout均输出2,3,4,5,A，而普通A低顺子期望A,2,3,4,5。",
+      "validation": "repro/hand-projection-26.cjs：4花色×自然/红心配×auto/lock=16复现；同牌只将straightFlushAsBomb改false且保持allowA2345Straight为true的16对照顺序正确。选择成员/规则合法性不变，未误称非法出牌或牌丢失。",
+      "recommendation": "将连续牌型的序列端点与炸弹比较强度分开，或统一从规则语义提取A低信息；不要让UI直接把5与5505混为一种量。补自然/红心配、auto/manual、A低/10JQKA和规则profile对照回归。"
+    },
+    {
+      "id": "HAND-26-002",
+      "severity": "P3",
+      "title": "记牌器同花顺可能性仍计入不能参加顺子的普通级牌",
+      "path": "work/guandan-cocos/assets/scripts/game/PublicStraightFlushPossibility.ts",
+      "line": 34,
+      "evidence": "余牌表只清零heart:level并提取万能牌数量，spade/club/diamond的level仍可填自然连续槽。但真实rules.hasPlainLevelCard以及HandGroupSuggestions都拒绝普通级牌参与连续组。例打5、其他牌全已知、唯一未见黑桃34567且没有剩余红心配：记牌器仍亮黑桃，规则无法组成同花顺。",
+      "validation": "当前shared-core createDeck/getPlayInfo对照：13级×4花色×10序列=520，150普通级牌误亮、370合法对照正确；将阻塞级牌替成真实红心配的150控制组正确。520公开牌重复不重复扣数，其他人均少于5张全灰。未见五牌全由一名其他玩家持有，不是分配不确定性的保守估计。",
+      "recommendation": "按当前规则的连续组资格统计自然牌，普通级牌不能直接填槽，红心配单列且一次只补一个缺口；不要访问对手私牌。补跨全部级数、普通级牌断点、红心配已出尽与A低开关的规则一致性对照。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "cd work/guandan-cocos && node tests/simple-hand-arrangement-regression.cjs",
+      "cd work/guandan-cocos && node tests/straight-flush-grouping-regression.cjs",
+      "cd work/guandan-cocos && node tests/hand-group-badge-regression.cjs",
+      "cd work/guandan-cocos && node tests/card-stack-zorder-regression.cjs",
+      "cd work/guandan-cocos && node tests/hand-touch-coordinates-regression.cjs",
+      "cd work/guandan-cocos && node tests/table-hand-interaction-controller-regression.cjs",
+      "cd work/guandan-cocos && node tests/table-hud-seat-view-group-regression.cjs",
+      "node docs/audit/2026-09-12/repro/hand-projection-26.cjs"
+    ],
+    "result": {
+      "arrangements": {
+        "cases": 832,
+        "locks": 832,
+        "layouts": 4160,
+        "legalSuggestions": 2770,
+        "availability": 604,
+        "maxHostMilliseconds": 12.038625000000025,
+        "host": "Node only, not Cocos frame latency or phone latency"
+      },
+      "aceLowOrdering": {
+        "confirmedMismatches": 16,
+        "controls": 16,
+        "example": {
+          "suit": "spade",
+          "wild": false,
+          "route": "auto",
+          "type": "StraightFlush",
+          "maxValue": 5505,
+          "actual": [
+            2,
+            3,
+            4,
+            5,
+            14
+          ],
+          "expected": [
+            14,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        "control": "Same physical A2345, allowA2345Straight=true, only straightFlushAsBomb=false; not the tournament preset"
+      },
+      "publicCounter": {
+        "cases": 520,
+        "falsePositives": 150,
+        "legalControls": 370,
+        "wildcardRepairs": 150,
+        "duplicateChecks": 520,
+        "example": {
+          "level": 2,
+          "suit": "spade",
+          "unseen": [
+            {
+              "rank": 2,
+              "isLevelCard": true
+            },
+            {
+              "rank": 3,
+              "isLevelCard": false
+            },
+            {
+              "rank": 4,
+              "isLevelCard": false
+            },
+            {
+              "rank": 5,
+              "isLevelCard": false
+            },
+            {
+              "rank": 6,
+              "isLevelCard": false
+            }
+          ],
+          "inferred": [
+            "spade"
+          ],
+          "rule": null
+        },
+        "scope": "Public upper-bound only. All five unseen cards assigned to one other player; no allocation uncertainty. No private opponent identities consumed."
+      },
+      "privacy": {
+        "dynamicTeamViewerCombinations": 24,
+        "revocations": 24,
+        "phaseGuards": 48,
+        "changes": 24,
+        "serverProjection": "actual stateForViewer; no sockets, WeChat or real user data"
+      }
+    }
+  },
+  "boundaries": [
+    "本批16个此前pending文件，共2269行；辅助复查已审workspace/grouping/core/server/hud不重复计数，1193行hand-grouping回归仅定位相关段仍pending。",
+    "测试前完整阅读7份入口和依赖loader；Node内存TypeScript编译/合成牌，不访问网络、数据库、真机、凭据，不生成产品文件。",
+    "实际共享核心源被注入客户端generated facade端口；39份生成副本哈希前批/库存验证一致，不等于发布包已包含工作树。",
+    "UI技能两次查询均未命中叠牌选择专项，不持久化未核实建议；审计依据现有产品契约/代码/实际函数执行，无视觉改造。",
+    "首次临时探针漏传规则profile和随后对照误用禁A低的tournament已纠正；二者是审计fixture错误，不列产品问题。最终probe完整通过，并保留控制profile差异说明。",
+    "832组最大12.04ms为当前Node单段理牌观测，不能推断微信首响应、Cocos节点更新或最坏性能；无普通顺子最优搜索或机器人最优性结论。",
+    "仅docs/audit内新增/更新审计产物；五个原有修改、HEAD必须继续不变，长期目标仍active。"
+  ]
+}

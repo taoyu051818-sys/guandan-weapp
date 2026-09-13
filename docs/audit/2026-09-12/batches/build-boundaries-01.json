@@ -1,0 +1,122 @@
+{
+  "batch": "build-boundaries-01",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": ".gitignore",
+      "sha256": "14ccd6f9a3a1621ec8d833c60cb717d349510530be2819bd6ff39175aef43e73",
+      "notes": "忽略依赖、构建、私钥和本地环境；仅公开 .env.example 例外；历史目录防回流。"
+    },
+    {
+      "path": ".github/workflows/guandan-cocos.yml",
+      "sha256": "fe23d58545472f9ca6004ca68bd1f8dffd8c7c837ef0d57d0571b11cb4134dfb",
+      "notes": "客户端改动/共享核心触发，Node22+pnpm9冻结依赖、最小contents read权限；只跑Cocos独立CI，不等于真实引擎产物验收。"
+    },
+    {
+      "path": ".github/workflows/guandan-weapp-server.yml",
+      "sha256": "c22a37882c5cb07fe1b5229cc8d797f66724f18cfd95171899bb0ff79e2b3e17",
+      "notes": "服务端改动/核心触发，完整平台/房间测试、清单、隔离恢复、限定本地负载；不部署。"
+    },
+    {
+      "path": "scripts/check-repository-boundaries.mjs",
+      "sha256": "271f98ad4007b7943a5dcca425dcc823d019e6952c7ea6129bd15006dde6595d",
+      "notes": "已读全文件：退役入口、生产依赖限制；正则扫描有动态路径边界，不等于安全审计。"
+    },
+    {
+      "path": "scripts/release-manifest.mjs",
+      "sha256": "b51f2c9fa6e3ebda9319b5af670c43fb3123d2f5e6976550afb68c05f2c2648f",
+      "notes": "已读全文件：限定输出目标/干净工作树、内容哈希、符号链接拒绝、不覆盖已有manifest；本身不证明产物由当前源码构建。"
+    },
+    {
+      "path": "scripts/release-manifest.test.mjs",
+      "sha256": "0ce399bf2e5fe402fd46e16a38731411862be310e24695ab35998efe1e5a9d7f",
+      "notes": "真实文件系统断言目录顺序、等长内容变化、符号链接和空包；临时目录清理安全边界明确。"
+    },
+    {
+      "path": "scripts/restore-drill.mjs",
+      "sha256": "f77f06ab3bbbd21d868f4e3fea9eb614ebe5df95cdc6a5e8a872783f0eb9aba6",
+      "notes": "只允许无参临时合成数据；四类存储、校验损坏拒绝、幂等恢复；不代表真实线上备份可恢复。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/verify-core-sync.mjs",
+      "sha256": "1291ec76dd5c84d871c28d48c76a8168e9bfc964a7df76806ea9c8fed3887d28",
+      "notes": "逐文件对照39份生成源内容，检测生成多余/缺失/漂移；verify不执行sync写入。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/core-sync-policy.mjs",
+      "sha256": "e20f5e9a5534d25ea74f86ef489d73b0f16f3b20b4193428241480b8970598a5",
+      "notes": "唯一排除是lib/ai.ts兼容barrel；对源与生成映射的边界已检查。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/audit-code-health.mjs",
+      "sha256": "1cad8f5c2c968a4474ace6c127db4962b8a918ad67156d0d05af1cb24c61256d",
+      "notes": "完整审查AST静态可达、序列化UUID入口、保留名单、测试提及和大小指标；指标明确不是测试覆盖率。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/check-server.mjs",
+      "sha256": "0f3c5b24430a4bb5ca757198dd5c9014f5866af7d00c40754334a6a24dc2bda1",
+      "notes": "生产JS语法、本地依赖、循环、测试注册、架构上限；只覆盖当前JS运行结构，不可当作行为验证。"
+    },
+    {
+      "path": "work/guandan-cocos/tsconfig.ci-core.json",
+      "sha256": "9e8c0dce56044bd0a21b6046a335d6413a601a3bd37bb9ecf1c1effdd50b1f4a",
+      "notes": "严格检查有限Cocos无关文件集合；不能覆盖所有引擎适配器，须补运行时完整typecheck。"
+    },
+    {
+      "path": "work/guandan-cocos/tsconfig.refactor-tests.json",
+      "sha256": "887cf21eccfbe69a4cf2bc3391fa34cf4f5dddb1a8da54af50374d341c385f38",
+      "notes": "继承正式配置的契约检查；独立测试include/exclude不扩散生产产物。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/cocos-built-gameplay.cjs",
+      "sha256": "6afdfbf32c85a812f16d91eb3ac680b5a4ab42789bce5d10875da7505417dc04",
+      "notes": "必须真实构建且无skip；读编译模块而非重编译源，覆盖理牌/提示/AI/物理牌守恒；不证明渲染和真机服务行为。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "AUD-BOUNDARY-01",
+      "severity": "verification-gap",
+      "title": "Cocos引擎与真机验收不由默认CI覆盖",
+      "evidence": "客户端workflow只执行test:ci，tsconfig.ci-core列举不依赖引擎的子集；实际build gate是独立命令。",
+      "status": "现有显式边界，不作为新增缺陷；后续必须核查构建新鲜度/完整类型检查和真机清单。"
+    },
+    {
+      "id": "AUD-BOUNDARY-02",
+      "severity": "verification-gap",
+      "title": "清单哈希和合成恢复不证明产物来源或生产恢复能力",
+      "evidence": "release-manifest和restore-drill的注释明确限定；本轮未使用生产备份。",
+      "status": "后续发布链审查保留的验证门槛。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "npm run test:server",
+      "cwd": "work/guandan-windows-source",
+      "result": "passed: full registered server suite including public modes, duplicate/rotating, recovery and signed friend bots",
+      "log": "/tmp/guandan-audit-20260912-server-tests.log"
+    },
+    {
+      "command": "pnpm test:ci",
+      "cwd": "work/guandan-cocos",
+      "result": "passed",
+      "log": "/tmp/guandan-audit-20260912-ci.log"
+    },
+    {
+      "command": "npm run check:server",
+      "cwd": "work/guandan-windows-source",
+      "result": "passed: 85 production JS, 37 budgets",
+      "log": "/tmp/guandan-audit-20260912-server-check.log"
+    },
+    {
+      "command": "node scripts/release-manifest.test.mjs",
+      "result": "passed: hashes/order/symlink rejection"
+    },
+    {
+      "command": "node scripts/restore-drill.mjs",
+      "result": "passed: 4 temporary synthetic stores; no production input"
+    }
+  ]
+}

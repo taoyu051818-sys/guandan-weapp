@@ -1,0 +1,125 @@
+{
+  "batch": "runtime-policy-13",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/game-session.js",
+      "sha256": "9b4d7be6545c8d6cdd795bfdcebbcd5f7475050d3b4e7e053d38f39aeeebfd63",
+      "lines": 211,
+      "notes": "完整211行。核canonical/legacy区分、权威版本注入、旧playArea末次非Pass恢复、贡还暂存回迁、公开错误文案、结算替换。canonical恢复保持动态turnOrder/team；运行探针确认其不会解除RP-13-001，不把深拷贝恢复当作真实磁盘/进程重启。legacy格式缺失及无currentTurn的损坏输入未找到活动生产者，不另报线上问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/game-session.test.mjs",
+      "sha256": "2153ed092210f0690dbb019d2bee9670ddec394041cd51b043e9d44db041c7e6",
+      "lines": 132,
+      "notes": "完整132行并运行通过。核canonical推进/双下结算、legacy过牌与贡牌escrow恢复、权威ruleProfile、pointsEarned与levelUp分离。既有测试不覆盖真实转蛋换队后机器人接口；主状态机同步身份由上游负责，dispatch重新绑定round/rev是内部可信命令约定。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/game-session-projection.test.mjs",
+      "sha256": "66b83a82676875c8a9222478f9162d9889afd75336d74c1adf544dbf4d3d2e41",
+      "lines": 91,
+      "notes": "完整91行并运行通过。核四席自己的牌、双贡/双还完成前保密、出完后队友视角多条件、动态队伍披露、不持有权威引用、非法viewer fail-closed。此批只给新增测试文件计覆盖；game-session-projection.js此前已审不重复计数，未做手机端绘制。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/master-bot-policy.js",
+      "sha256": "4a1c413ff03132526592cfdefd10bbe5805a4099fde40f6ae9eb5062178629f9",
+      "lines": 80,
+      "notes": "完整80行。最高档独立engine、checkpoint、规则键、公开历史与仅余牌数适配；新增12个隐藏牌零读取/相同决策/合法首手对照。确认RP-13-001：validateTable按p1/p3永久teamA、p2/p4永久teamB，与转蛋合法动态team/turnOrder冲突，决策前抛错而非AI算法本身不能处理。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/master-bot-policy.test.mjs",
+      "sha256": "eb0771c72838ff34c7627d1945fa728f3e74fa2717642b712bba625a49d3344e",
+      "lines": 108,
+      "notes": "完整108行并运行通过。既有队友让牌/敌方跟牌、非法队伍、独立seed和恢复、trace目标、Proxy只读对手length、复式等待checkpoint复用。异常校验测试仅手改一个team未改turnOrder，不能证明合法转蛋支持；新增实际发牌与换队跨模块探针复现该缺口。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/bot-turn-pacing.js",
+      "sha256": "116be36996c0bf370b27cb400e262f5c126c8b7ee5646f9c77b463c9e865e1d4",
+      "lines": 34,
+      "notes": "完整34行。cost×50截在500..3000，10%三倍，独立cosmetic RNG；单revision签名、持久cards/at、恢复不重抽、计算耗时包含在等待内和deadline截断。48组cost/rare/deadline补充检查通过；不是手机性能跑分或全部响应必在3秒内证明。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/bot-turn-pacing.test.mjs",
+      "sha256": "a478f6870e8cfecd755b75d6d905d771ddd3bbeaaba1d5fe7e6a40cb90e62da5",
+      "lines": 90,
+      "notes": "完整90行并运行通过。7时延边界/10%分格、缓存重用/JSON恢复/deadline截断/revision失效、机器人与托管提前计算、取消计划、settled清理和200昵称分布。现有cost stub不推进wall clock；补充探针同时推进两个时钟，验证不重复叠加计算时间。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/match-format-policy.js",
+      "sha256": "c3c669d1333af1e24a7a87f86eba53534edb2fb16bb160132a0436eb77a8fd9f",
+      "lines": 34,
+      "notes": "完整34行。公共13种queue（quick+12底分组合）与16人赛均使用共享格式，转蛋实际抽牌后重排turnOrder并重分team；182开局守恒/13级/模式语义通过。确认这是RP-13-001的真实合法状态生产者，不是人为损坏team。复式配对发牌属独立runtime，不以此文件初始化证明双桌同时同牌。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/friend-room-settings.js",
+      "sha256": "47b01724e32ec35ec435f17d60df7635dd2cdb1940f745f142103ba46f6a8a0f",
+      "lines": 241,
+      "notes": "完整241行。严格未知字段/类型、legacy别名/default、安全不可关闭、赛制级牌贡还与打散/轮换/计分约束、局数/回合/托管/观战/体验开关和旧double4结算适配。240规范化/局数/发牌模式交叉fixture通过；nonstrict恢复兼容fallback不等于外部创建绕过严格模式。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/friend-room-settings.test.mjs",
+      "sha256": "1ab3b53b9f6c50cc994b96ba49057563380df5a15b736619df262a4f6e5c64af",
+      "lines": 216,
+      "notes": "完整216行并运行通过。新旧设置alias/invalid、无托管时人类不定时但bot可自动、旧double4、升级无局数限、公开号/级牌/贡还、不洗牌跨四赛制与底分队列。现有rotating用例只比格式字段，未执行动态team的chooseCards，测试全绿仍可出现RP-13-001。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-turn-clock.js",
+      "sha256": "977401e6e5f010a0edc091329c053b3fa409e368db5a28f893e11334492c4a36",
+      "lines": 65,
+      "notes": "完整65行。公开回合期限/私有早唤醒拆开；按角色和无托管设置arm、取消计划、恢复pending.at与botWake、phase结束清理；48角色/玩法/动作组合补充测试通过。stale deadline实际门禁在weapp-match-lifecycle已审，timer端口为合成；null损坏快照未作为合法生产者问题上报。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "RP-13-001",
+      "severity": "P2",
+      "title": "转蛋合法换队被固定席位机器人适配器拒绝，自动重试最终进入关房",
+      "path": "work/guandan-windows-source/server/master-bot-policy.js",
+      "line": 23,
+      "endLine": 26,
+      "evidence": "teamForSeat永久以玩家ID p1/p3为A、p2/p4为B。真实createRoomOpeningState→arrangeRotatingRound会保持认证ID但调整turnOrder并重分team；随机换队52个固定seed中22个实际改变队伍，四个席位共88次chooseCards均在validateTable抛错。顺时针从正常首局经真实prepareNextRound产生第二局turnOrder[p3,p2,p4,p1]，同样不符合固定映射。weapp-match-lifecycle:329机器人/托管共用该适配器；371-375默认3次重试后83-86调用closeRoomWithoutAck。",
+      "validation": "node docs/audit/2026-09-12/repro/runtime-policy-13.mjs：实际opening/arrange/choose/prepare/arm/automatedDeadline代码与内存时钟/持久端口。随机或顺时针×bot或manual trustee×当前或JSON canonical恢复共8例均零revision推进、3条队伍数据错误、close端口收到automated-deadline-failed/roomDissolved/dissolved。定局和顺时针第一局×bot/trustee四对照真实合法出牌，未关房。",
+      "impact": "合法换队后的转蛋房，只要轮到机器人或已进入托管的玩家自动出牌，决策失败并触发异常关房流程；真人手动出牌未通过此路径，不因此一并判定失败。未重建真实微信连接、存储断电或观察线上事故；close端口捕获关房请求而非真实外部广播。52seed计数不是线上发生率。",
+      "recommendation": "校验权威turnOrder是四个合法ID的排列，并按当前物理位置/当前队伍分组验证一队两人、对家同队，使用state.players[playerId].team作为AI队伍；不要仅删除校验或继续用固定ID推队友。保留认证ID绑定与隐藏牌边界。加转蛋抽牌实际重排、顺时针第二/三局、真人托管/机器人、恢复后继续自动出牌的端到端回归；验证普通固定队伍与非法不一致状态仍正确拒绝。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 11,
+    "reviewedLines": 1302,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/game-session.test.mjs",
+        "result": "passed; synthetic, no external network"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/game-session-projection.test.mjs",
+        "result": "passed; synthetic, no external network"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/master-bot-policy.test.mjs",
+        "result": "passed; synthetic, no external network"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/bot-turn-pacing.test.mjs",
+        "result": "passed; synthetic, no external network"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/friend-room-settings.test.mjs",
+        "result": "passed; synthetic, no external network"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/runtime-policy-13.mjs",
+      "result": "182 public openings, 240 friend settings, 48 clocks, 48 timing fixtures, 12 hidden-view/legal controls passed. 52 draw seeds yielded 22 dynamically regrouped tables/88 rejected bot seats; 8 actual lifecycle failure paths and 4 normal controls reproduce RP-13-001."
+    }
+  },
+  "limitations": [
+    "No product changes/build/commit/deployment. All selected files full-read; auxiliaries already covered or not counted.",
+    "Draw seed ratio is deterministic diagnostic sample, not population prevalence; clockwise settlement manually supplied before real next-round path, not a full game played.",
+    "Actual bot/core/lifecycle modules are used, but persistence, publication, queue scheduling clocks and final close callback are synthetic; no real websocket client or phone.",
+    "No new claim about legacy corrupted snapshots, strict input bypass, algorithm optimality or platform startup credential behavior.",
+    "Existing tests green do not cover rotated identity vs physical seat invariants; source-backed cross-module failure is retained, not fixed under audit authority."
+  ]
+}

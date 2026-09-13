@@ -1,0 +1,112 @@
+{
+  "batch": "arrangement-records-37",
+  "reviewer": "root",
+  "reviewedAt": "2026-09-13",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "docs/ARRANGEMENT_LATENCY_20260910.json",
+      "sha256": "80474aff6a1ab184838da87141406ac104b40d7d7401c4a95f1d5d809ee6bbe2",
+      "lines": 347,
+      "notes": "完整347行。104手历史旧/新政策汇总、26组两发牌模式×13级数交互明细；24个可重算分位/最大/总和及两CPU下降率一致。manual frame queue不含idle，engine=wechatgame仅编译目标，宿主Node而非手机。未提供104手实体分组/评分或完整old/new时长，不能仅由identicalPartitionsAndScores=true重证一致性。实际当前已退役搜索，旧绝对本地baselinePath仅来源记录未执行。"
+    },
+    {
+      "path": "docs/HAND_ARRANGEMENT_BENCHMARK_20260910.json",
+      "sha256": "bd4d7f3ec01d471237e2442b0231abe308801a3b5bc61d8936d90fd8bb9c4f7c",
+      "lines": 167,
+      "notes": "完整167行。7挑战参数+legacy各120手训练、冻结reserve与legacy各240独立验证汇总；0.07训练控制损失/每省一手、0.50用配及拆炸/散单门槛重算，仅reserve合格，0.10验证控制损失上限通过。计数均值/exactRate与样本分母相容，耗时分位有序。结构样本非实战头游率；原手牌和单次时长未保留，既有guarded失败批不可当最终holdout。已明确退役，不将weights写回当前简单理牌。"
+    },
+    {
+      "path": "docs/HAND_LAYOUT_SNAPSHOT_TIMING_20260910.json",
+      "sha256": "7ca5acf7477929e97414ddaf9b105a9bfb8579d1e6abd535bf0bf00f0b31d230",
+      "lines": 356,
+      "notes": "完整356行。13级数、16ms/0ms两种间隔同算法的14组指标、42个p50/p95/max全部从26行结果重算一致，墙钟>=CPU>=最大callback。13样本floor(n*.95)取最大值，不能解读为大样本P95保证。实际最大callback14.57ms，4ms是协作软预算；包含Node timer等待但不含Cocos绘制/原生触摸。历史快照预热路径已退役。"
+    },
+    {
+      "path": "docs/NO_SHUFFLE_VALIDATION_20260910.json",
+      "sha256": "c24655baf7f99456704add364ccb84d28b90146a1c5e0611f1c1dd9801debfcd",
+      "lines": 292,
+      "notes": "完整292行。两策略各260桌1040手、13级数；组数直方图、四席/各级数加权均值与牌型频数均闭合，p90/p95重算正确。7项文档门槛重新计算皆true，当前历史样本平均6.0596、50手超过八组。指标是当时搜索理牌分组数，不是实际出牌次数，当前取消普通顺子自动组后不再适用旧六手约束。缺实体手牌/合法性日志和逐项计时，不由passed布尔证明这几项。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "finalChecks": {"headUnchanged":true,"originalDirtyHashes":5,"reviewedHashes":628,"uniqueIssues":40,"firstParty":"628/629","percent":99.84,"generatedCopies":39,"inventory":"Audit inventory verified: 628/629 first-party files; 39 generated copies.","gitDiffCheck":"passed"},
+    "commands": [
+      "node docs/audit/2026-09-12/repro/arrangement-records-37.mjs",
+      "node work/guandan-cocos/tests/simple-hand-arrangement-regression.cjs"
+    ],
+    "results": {
+      "historicalData": {
+        "results": {
+          "latency": {
+            "fullSamples": 26,
+            "recomputedStatistics": 24,
+            "cpuRatios": 2,
+            "currentScope": "historical manual-frame queue on Node, not phone latency",
+            "unverifiableFromJsonAlone": [
+              "104 hands identical physical partitions/scores: no raw hands/partitions included",
+              "byMode old/new timing percentiles and meanGroups: no per-hand observations included"
+            ]
+          },
+          "snapshot": {
+            "fullLevelRows": 13,
+            "comparedModes": 2,
+            "recomputedStatistics": 42,
+            "p95EqualsMaxForThirteenSamples": true,
+            "currentScope": "Node real timers, excludes Cocos/native input",
+            "currentMeasuredMaxCallbackMs": 14.574292000000241,
+            "fourMsIsHardLimit": false
+          },
+          "arrangement": {
+            "trainCandidates": 7,
+            "trainingHandsPerCandidate": 120,
+            "holdoutHandsPerCandidate": 240,
+            "selected": "reserve",
+            "selectionRecomputed": true,
+            "holdoutConstraintsPass": true,
+            "currentScope": "retired structural planner; not current auto-arrange or player win rate",
+            "unverifiableFromJsonAlone": [
+              "raw hand identities/partitions and individual timing samples not included",
+              "seed fields describe intended independence, not proof of original execution history"
+            ]
+          },
+          "noShuffle": {
+            "policies": 2,
+            "handsPerPolicy": 1040,
+            "groupHistogramsReconciled": true,
+            "weightedSeatAndLevelTotalsReconciled": true,
+            "recomputedAcceptanceChecks": 7,
+            "handsOverEight": 50,
+            "currentScope": "historical production planner counted ordinary straights; six-hand guarantee no longer applicable",
+            "unverifiableFromJsonAlone": [
+              "per-hand cards/legality and exactRate search cutoff logs omitted",
+              "timing percentiles cannot be reconstructed from aggregates alone"
+            ]
+          }
+        },
+        "productWrites": 0,
+        "retiredBenchmarkInvoked": false,
+        "networkRequests": 0
+      },
+      "currentSimpleArrangement": {
+        "simpleArrangement": "passed",
+        "samples": 104,
+        "host": "Node; excludes Cocos rendering, not phone latency",
+        "clickMs": {
+          "p50": 1.4045839999999998,
+          "p95": 7.484584000000041,
+          "max": 10.358542000000057
+        }
+      }
+    },
+    "limitations": [
+      "关联历史Markdown全文辅助读取，但不加入第一方覆盖；全部明确标记退役。",
+      "逐份人工审阅JSON并独立聚合，不是只检查已有passed布尔；不能重建缺失原始牌组/历史运行时刻。",
+      "当前简单理牌104手回归为Node/当前已核同步的生成源码；不能代替手机触摸/渲染耗时。",
+      "TEAM_POLICY_BENCHMARK_20260910.json只完整读取非games元信息、10组汇总及pairWins；完整游戏明细尚未逐段审阅，本批不计其覆盖。第六批对1216历史记录的自动重汇总不替代本次完整文件审阅。",
+      "本批初次工具路径查询用了不存在的shared-core/tools/scripts和同名Markdown路径，已改为实际scripts/support及已退役文档；尝试games压缩打印命令多一个右括号未成功，未执行产品入口，无产品缺陷结论。"
+    ]
+  }
+}

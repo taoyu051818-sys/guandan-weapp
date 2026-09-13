@@ -1,0 +1,155 @@
+{
+  "batch": "effect-orchestration-23",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectController.ts",
+      "sha256": "c39cc5dd2f6428a6546eff3467d350fb0e7eae2df280f4623741cbd3379d1aa6",
+      "lines": 342,
+      "notes": "完整342行。核setup唯一registry、画质变更取消、action/queue委托、major优先级/busy所有权、shake和卡牌反应取消、只读asset缓存。活动调用为GameScene/TableMatchCoordinator；本批不运行完整Controller与真实renderer，资源加载迟到/actual renderer下一批复核，不以分层合理推定所有绘制无问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectPlaybackCoordinator.ts",
+      "sha256": "3cea9c33f5dbe3140b01103eccea744e0cfc1e8f033d279f529fc4d482d288b5",
+      "lines": 220,
+      "notes": "完整220行。核串行动作包含preload/flight/impact全寿命、代际重置不受旧promise堵塞、语音只在开始一次、取消和恢复语义不同、普通/六炸与普通炸分路、失败释放和barrier。28阶段×reason取消，40串行动作、7失败和4prepared场景通过；资源/flight端口合成，不是GPU。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectActionPresentationCoordinator.ts",
+      "sha256": "9789f0f26ff3ed4bf77c9ce6a2aa10a06e837a1713b1c83faf84962bf47f3e63",
+      "lines": 103,
+      "notes": "完整103行。核静默baseline/duplicate保留本地origin、只连续append播一次、gap取消并reset、ticket贯穿逐张reveal、提前reset稍后接presentation。11真实PlayArea配合成CardView案例通过；不得只按actionCount推定跨桌身份无风险，已知CS-01-001在上游仍未修复。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/CardFlightController.ts",
+      "sha256": "fdf925200c6eeab2eafea910d718132becf907e35fac77c173d49f1beda15d26",
+      "lines": 114,
+      "notes": "完整114行。核独立ghost、world→local、统一扇形间距/0.8比例、贝塞尔与完成前缩放、逐张回收再reveal、异常callback不中断、预载/中途取消/池失败回收。10组60/120Hz+5故障/取消，以本机Tween算法和内存节点通过。未测真实分辨率变化中的飞行轨迹。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/NetworkEffectSyncPolicy.ts",
+      "sha256": "668a1a87910123bdfc23fb4a820c4da2e9af56967f257bf15af8dd498eab7433",
+      "lines": 70,
+      "notes": "完整70行。核room/version/actionCount门禁及forced recovery优先、跨room静默、round-reset和actiongap、不因metadata版本差当作新动作。1248人工观察/force组合与既有tracker回归通过；不重复计旧跨桌source身份缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectPolicy.ts",
+      "sha256": "906b2009b4bf3314d6f73bcf80f17faa684f42bf2ddd5f77cf84a3f09e7233d9",
+      "lines": 23,
+      "notes": "完整23行。核immutable policy只0/1大特效、永不禁止输入、替换旗标规范化。5非法/合法max值对照；注释中的可替换不证明活动串行队列真的发生并发major。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/ArchivedPlayVisuals.ts",
+      "sha256": "aec076dec38a951438674e633db0dbfa424e9b81950d0ec57fe09b9806218b85",
+      "lines": 100,
+      "notes": "完整100行。核退役原因/旧renderer/key/type永久清单freeze、四个仅炸弹allowlist、flow通配拒绝。actual registry对所有拒绝key与3画质/两种注册表均零render；它是防回流清单，不是僵尸玩法入口。资源许可证与source来源仍为后续专项。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectRendererRegistry.ts",
+      "sha256": "0ae9a5bd565ee8c470e6ee35e52a84980536b094b37ca00b0e635ab5ce757efb",
+      "lines": 126,
+      "notes": "完整126行。核先全量校验再register、normalize去重、按renderer身份unregister、fallback不得绕过禁入、prepare/render异常转换、active句柄清理、clear按唯一实例dispose。既有及64补充registry/prepared案例通过。动态替换旧renderer的dispose语义不用于当前只setup注册一次的活动流程，未误报泄漏。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectProfileResolver.ts",
+      "sha256": "fcb92940d3dcbb8cab4e888a1e5c9f1e1a543446c045b1226bb3126730ea6d66",
+      "lines": 34,
+      "notes": "完整34行。核仅Bomb含专属效果、六张单独key、非炸含同花顺/王炸只飞牌与语音、off保留语音/独立sound设置、reduced缩短且降画质。198类型/张数/画质映射通过；这是视觉策略不是同花顺5.5张大小比较实现。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectRecipes.ts",
+      "sha256": "05e030d30dd04a427339be58cbc40a18e4843faa9b64dc12b5fdf500358ef52d",
+      "lines": 79,
+      "notes": "完整79行。核immutable普通炸与六炸配方、full/reduced/off、禁止额外flow配方。既有配方单测通过；旧crack/flame计数字段不代表renderer绘制全部层，实际消费者后续核验，不直接宣称死代码可删。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectRenderer.ts",
+      "sha256": "91ea539f00145d043dc26e8b5c392920cbd1787b53ff43ffaeb239317ddd8614",
+      "lines": 11,
+      "notes": "完整11行。核纯type renderer契约supports/prepare/render/dispose及handle/服务边界；无运行时入口，不将类型文件误当失活业务。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/effect-controller-lifecycle-regression.cjs",
+      "sha256": "038393a7a98935e6931e9187310af04c114125b4b74c1ef7ee04c1549e25a265",
+      "lines": 133,
+      "notes": "完整133行并执行通过。两纯协调器实际加载，第一快照/重复/origin/序列gap/recovery迟到/off/不可用覆盖。原依赖isBomb恒false且getFlight=null，故未覆盖真实炸弹/飞牌或完整EffectController；本批补足协调器分路但真实renderer另审。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/network-effects-regression.cjs",
+      "sha256": "ae630d71d04445e5d7c1cb85f0df923772d9f8b09c1d0c47fa82afcc792b1cc9",
+      "lines": 100,
+      "notes": "完整100行并执行通过。实际纯policy+LobbySyncTracker验证gameVersion与roommetadata分离、force重复恢复；其余为source regex连接断言，不代表执行完整socket/scene。补充1248观察组合，无真实网络。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/effect-renderer-migration-regression.cjs",
+      "sha256": "b862e4c91e3de7c73a97cc13b05d5a4a82b120bb33273f123157038bc5402131",
+      "lines": 586,
+      "notes": "完整586行并执行通过。执行handle/registry/recipes/catalog与manifest哈希守卫；renderer/Controller/PlayArea/Hand的大量校验为source正则，不是节点行为测试。只读已跟踪素材哈希，不下载、不写，不把declared许可或regex成功等同授权/GPU验收。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/effect-controller-lifecycle-regression.cjs",
+      "node work/guandan-cocos/tests/network-effects-regression.cjs",
+      "node work/guandan-cocos/tests/effect-renderer-migration-regression.cjs",
+      "node docs/audit/2026-09-12/repro/effect-orchestration-23.cjs"
+    ],
+    "result": {
+      "cancellationCases": 28,
+      "serializationFailureCases": 47,
+      "presentationCases": 11,
+      "flightCases": 15,
+      "registryPreparedCases": 64,
+      "observations": 1248,
+      "profileCases": 198,
+      "engineSources": [
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-manager.ts",
+          "sha256": "fe4fef5bc18c27d953e16d4b1b0f962f568ae0f101f3ea82711f366715d0178d"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action.ts",
+          "sha256": "ca33a1a2bb363ab57e3cd48be146afe8c646e46984b773252d8b883fbff1ec36"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween.ts",
+          "sha256": "923522464ca5fbfe4990525f2c9eb7872fdac4f3f9b598210a9886df772a6aec"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/core/algorithm/easing.ts",
+          "sha256": "f9dc0c58134e2e369bbbc9315ca1b77f2951bec91e8366488fb5cb89a4ad2854"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-interval.ts",
+          "sha256": "2ad01c7284f757fa05c8bb0bb6677323f01624da8abd2ea1bc165c5db5c8aaee"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-instant.ts",
+          "sha256": "130b0b5bd824231744f44db1095f05688963b6f9f8c95d779d774a725f3aa09e"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-unknown-duration.ts",
+          "sha256": "0635050f0805f5b660afa30a4bf95fb5bf73f7de110d2c7b22963a76ca62f5c7"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween-action.ts",
+          "sha256": "d2189496bc6798a4fb9f3789c9ae718eb738d307d70ca6f57806b102c369e2b2"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/set-action.ts",
+          "sha256": "5a65e20b670130606ed00cef54a5c0268ad56320368c634caab9106a79045ae8"
+        }
+      ]
+    },
+    "skill": "UI/UX首个animation interruption feedback返回Loading States，不用于特定取消结论；一次收窄rapid animation interrupted得到Animation/Cancellable State Transitions(Web)。仅将语义状态不依赖动画结束、取消清理作为跨平台审查原则，不套用Web实现到Cocos、不改界面。"
+  },
+  "limitations": [
+    "14文件完整2041行；PlayArea/Hand/GameScene/TableMatch/画面layout仅辅助/此前已审，不重复计数。EffectController静态全读，补充probe实际执行其两协调器、registry/profile/policy/CardFlight，未执行整个scene或Controller与真实renderer连接。",
+    "Cocos3.8.8九份Tween算法按上一批隔离loader引入，Node/渲染/音频/资源/实际时间及network均为合成，不是真机/完整引擎/GPU或网络弱网实测。",
+    "不支持将未知resource永不返回、恶意回调重入或动态更换renderer等未发现活动producer的情景当成已确认业务故障。",
+    "未新增确认缺陷；此前31项17P2/14P3未修复。源码/构建/服务端不写、不部署；audit-only。"
+  ]
+}

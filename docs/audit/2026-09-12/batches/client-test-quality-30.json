@@ -1,0 +1,433 @@
+{
+  "batch": "client-test-quality-30",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/tests/table-hud-turn-timer-view-regression.cjs",
+      "sha256": "2f6368b452adb69d8a53703fca3e6c4e32af03c7bedc1b6560fdd7a8959ff8db",
+      "lines": 129,
+      "notes": "完整129行。核预挂载render、40秒标签不截断而环进度夹紧、最后5秒色、素材替换销毁/环清除、重挂载/重复dispose。cc节点/图形和foundation为内存替身，不是真实引擎父子坐标或GPU测试。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-phase-presenter-regression.cjs",
+      "sha256": "fa7d8df4716e8c4e12bd4ac3c985863c31de96df7a6a587c0b16c6c94b256fa3",
+      "lines": 109,
+      "notes": "完整109行，原有dirty哈希保留。核playing三种动作集合、pending/非当前玩家/完成/托管/观战隐藏；贡还按deadline actor/action门禁和确认还牌/确认贡牌复用；四席准备/取消及终场单行CTA。TRIBUTE_COPY内存变异由真实label值断言检出；play policy和结算renderer为替身，不是联机端到端。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-progress-presentation-regression.cjs",
+      "sha256": "20d6a69b241d7547251b4aa983aa2cfc0a71c7acdc8039ff545fa25812106749",
+      "lines": 50,
+      "notes": "完整50行。核27→10预警一次、9不重播、头二游提示、恢复基线/新局清理和废弃贡牌特效入口不存在。实际Progress与Snapshot转译，事件输入合成；不覆盖未经owner reset的跨房切换，不据此修复既有CS来源身份问题。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-snapshot-presenter-regression.cjs",
+      "sha256": "819d3d9319314416ddf36659da8a45ee88c67fb89c6ff3f6ea6233c7df81285c",
+      "lines": 81,
+      "notes": "完整81行。核剩余27/18/11/10/9/1/0、已结束优先和NaN，四视角级牌/队伍/结算标题；其余为HUD/协调器静态接线断言。未运行实际四个微信客户端或动态转蛋；动态队伍链路在其他批次另核。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-turn-clock-controller-regression.cjs",
+      "sha256": "eff466be305a1f22dbee5152354f933c4bebb9fdb75acc4019bd14cff5cb5760",
+      "lines": 220,
+      "notes": "完整220行。核32席位映射、非网络/无效截止/重连/pending隐藏、ceil/夹紧、单次lobby/time采样、贡还动作标签、last5一次、reset/复用/dispose取消及迟到tick。CLOCK_CANCEL/CLOCK_RESET两变异均被行为断言检出；没有选牌update插在tick前的覆盖，既有CTL-06-001仍有效。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/network-round-state-regression.cjs",
+      "sha256": "b563c8b394358cf458420a8c3da46a2f1ccc79f1478f6fbfbdedb86df9aefcab",
+      "lines": 247,
+      "notes": "完整247行。真实LobbyController/消息owner配FakeSession/socket/storage，核相同version不同类型事件、ready/trustee/deadline、roundEnded viewer stats、6种无gameVersion指令及dissolved清理。Fake off/disposer/no-op schedule不能证明取消寿命；末尾bridge检查是源文本不是WS集成。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/round-view-boundary-regression.cjs",
+      "sha256": "b8f5b1135006c2eb198df889e5fd007ca81cf0fb61712cd7d20f52012f6bc0c7",
+      "lines": 49,
+      "notes": "完整49行。核wire深拷贝冻结、拒绝不完整阶段、投影无回退、server deadline秒数/终场隐藏、退役history。WIRE_COPY变异在第一条真实所有权断言被检出；部分仅一个viewer且畸形wire为合成，非网络schema全域验证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/selection-regression.cjs",
+      "sha256": "adb212c992922378d740a330d0d2cd4c416640532e4c387a091b96c1d08b1249",
+      "lines": 305,
+      "notes": "完整305行。大量源码接线/退役/输入坐标/完整灰选覆盖/lock传递检查，另实际纯拖动/长按/重复claim/多指move/分段采样和选择资格。TOUCH_INTENT/TOUCH_VISIT行为变异均检出。Set快照样例只验证JS机制而非GameManager实例；默认不检查build，本轮不传--require-build。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/hand-grouping-regression.cjs",
+      "sha256": "947ec39e608fc395ec3e4ba2edbbf9b54389a3805e901c7612eb2c1bcfdcb9a3",
+      "lines": 1193,
+      "notes": "完整1193行。完整排序/级牌传递、手牌事务/权威同步/锁组/复原、共享规则候选/配牌/自然炸弹/3带2护大对、紧凑居中叠牌/actual fixtures/动作策略及简单理牌不自动普通顺子。LOCK_ATOMIC/RESTORE_HAND两变异被原行为断言检出。部分测试手牌超过27张是候选单元输入；1516次原生assert含循环/转译检查，不是1516独立场景或微信性能。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/card-presentation-mapper-regression.cjs",
+      "sha256": "b0af1f2ef9f25864c3333da594d4847fa5d920e002b2023a28048ae7666ad8a9",
+      "lines": 56,
+      "notes": "完整56行。核4普通花色/大小王/级牌真实mapper和手牌/落牌/VFX唯一边界。LEVEL_FLAG变异在第7个映射断言检出。异步Promise链仅组织同步验证，没有实际贴图加载、颜色空间/GPU检查。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/card-skin-regression.cjs",
+      "sha256": "35b10dbde1c8c3ad8c276d2f3785074a402d365da6852e8d015970971eaaa035",
+      "lines": 426,
+      "notes": "完整426行。核54面/37PNG映射、尺寸/alpha/RGBA解码/大小王语义同蒙版/可见调色板、总字节预算、源码唯一渲染/缓存/预载和许可证记录文本。运行资源122620字节，现有build config纹理路径检查通过；未构建，不表示发布包源哈希新鲜。背景上游路径不存在时哈希分支跳过，文件/许可文字存在不是授权法律结论。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/fixed-match-fixtures-regression.cjs",
+      "sha256": "c5f95fff1c140b8253d4bfc7b5f1b4b51c483c0c7be6584e42e3cf04e272b1c3",
+      "lines": 40,
+      "notes": "完整40行。核fixture ID唯一、每次新对象、确定手牌、108牌或中局<=108、物理ID唯一/每人<=27及旧runtime路径不存在。中局省略已清理历史，只适用于呈现，不是完整可恢复服务器快照或8/16人赛事验证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/local-match-controller-regression.cjs",
+      "sha256": "29a01cfb2609e0cc5231e0fec1e0d30551ec44705efc86ad24f1af3736214e3d",
+      "lines": 549,
+      "notes": "完整549行。核test-only local fixture拒绝非法动作/贡还/AI、网络真实projection/selection/cache/legacy/resultStats、可重复engine checkpoint、版本代际取消和最多3次失败、网络intent ID/超时。既有常量0.72仅测试夹具不是线上策略。index:eventType的Set检查不能检出重复事件；另有事件次序断言，未据单个弱断言新增生产缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/create-local-match-fixture.cjs",
+      "sha256": "24b59607866bcc14bf67f26f16530c8784132f0ef3ef8b8193ea33ac80a83314",
+      "lines": 24,
+      "notes": "完整24行。以JS访问TS私有constructor并用createMatchState构造合成测试状态，复制playArea为history/last/trick、输入teamLevels/currentLevel/finished。没有注册到运行assets；这是明确测试注入边界，不视为线上状态绕过。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/local-match/LocalAITurnController.ts",
+      "sha256": "bc0a5b5e0d339d31c944fafd6b17066a18351453ead5638b45ace38f03d5154b",
+      "lines": 73,
+      "notes": "完整73行。测试专用AI回合owner，generation+round/revision隔离、0.72秒合成调度、0.25失败重试最多3次、dispose取消/释放engine。当前assets无导入，旧固定延时不代表线上未改真人延迟；依赖队伍/状态来自测试adapter。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/local-match/LocalMatchController.ts",
+      "sha256": "ae2834ad34fc1f6db12a69454ba1503312e841dae26e6a2f17cbd77667fce65a",
+      "lines": 266,
+      "notes": "完整266行。测试专用transition适配器、projection/准备下一局/贡还/AI合法动作fallback，状态可变便于fixture。未传dealMode且旧phase支持不覆盖完整线上赛制；现有消费者为test，不能用本地fixture通过证明线上不洗牌/转蛋/复式流程，更不能未经证据视为活动低档AI。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/local-match/LocalMatchEventController.ts",
+      "sha256": "43bb4f893db11f18535101511b080822fe0539e8536d24434527bbc7ca949224",
+      "lines": 51,
+      "notes": "完整51行。测试专用domain-event→声音/phase/record/selection端口、炸弹统计profile。consume按传入事件顺序处理，不自行去重且ROUND_PREPARED投射旧tribute；未有当前assets消费者，不重复报既有本地统计或活动房结算问题。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/local-match/LocalTurnScheduler.ts",
+      "sha256": "ccf7bae37c9d69b0f478eb5a253d4b27b891ba75b5d3e3e661be49fec2bea966",
+      "lines": 25,
+      "notes": "完整25行。纯测试代际取消与version校验，不保留可独立取消的引擎句柄。旧回调执行前guard，真实测试涵盖新generation/新revision/cancel；不把scheduler替身等同Cocos计时器回收证明。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/local-match/SynchronousLocalAIEngine.ts",
+      "sha256": "fb18f11df93f8e4869b83919b350e2a27d114a231b5043ef663f1b162ed42a14",
+      "lines": 109,
+      "notes": "完整109行。测试专用同步worker.runtime适配、requestId/generation/context验证/checkpoint深复制和reset/dispose；不是实际WebWorker。restoreCheckpoint先拷贝、下一次runtime才验证的边界仅此测试/兼容通道；既有CORE-AI-03-C01不新增计数。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/fixtures/FixedMatchFixtures.ts",
+      "sha256": "d05d6fe8d7f6f4fbb1b1263e674bb943a5935533c58cda6d32e927280bf3eff3",
+      "lines": 98,
+      "notes": "完整98行。只在tests目录，稳定物理ID排序后优先发指定卡，正常/红心配炸弹/跟炸弹三fixture并合并布局fixture。保留fresh副本，后续冻结数组不等于每个layout entry深冻结；无生产输入出口，不因此报配置篡改。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/fixtures/TableLayoutFixtures.ts",
+      "sha256": "9f79c8748cfd596dba61c09ebd005148c2b9cc4217a7338f8eb34d66685d4931",
+      "lines": 73,
+      "notes": "完整73行。7个中局布局/队友视角fixture，pick消费唯一牌池、自己27上界、其他席取牌与已清理牌不强塞；follow/landed/finished视角可复现稳定。刻意省略过去完整history，不是可以拿去跑服务端恢复一致性的fixture。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "cd work/guandan-cocos && node tests/table-hud-turn-timer-view-regression.cjs",
+      "cd work/guandan-cocos && node tests/table-phase-presenter-regression.cjs",
+      "cd work/guandan-cocos && node tests/table-progress-presentation-regression.cjs",
+      "cd work/guandan-cocos && node tests/table-snapshot-presenter-regression.cjs",
+      "cd work/guandan-cocos && node tests/table-turn-clock-controller-regression.cjs",
+      "cd work/guandan-cocos && node tests/network-round-state-regression.cjs",
+      "cd work/guandan-cocos && node tests/round-view-boundary-regression.cjs",
+      "cd work/guandan-cocos && node tests/selection-regression.cjs",
+      "cd work/guandan-cocos && node tests/hand-grouping-regression.cjs",
+      "cd work/guandan-cocos && node tests/card-presentation-mapper-regression.cjs",
+      "cd work/guandan-cocos && node tests/card-skin-regression.cjs",
+      "cd work/guandan-cocos && node tests/fixed-match-fixtures-regression.cjs",
+      "cd work/guandan-cocos && node tests/local-match-controller-regression.cjs",
+      "node docs/audit/2026-09-12/repro/client-test-quality-30.cjs"
+    ],
+    "originalTests": [
+      {
+        "test": "table-hud-turn-timer-view-regression.cjs",
+        "exitCode": 0,
+        "output": "table HUD turn-timer view lifecycle regression checks passed"
+      },
+      {
+        "test": "table-phase-presenter-regression.cjs",
+        "exitCode": 0,
+        "output": "table phase behavior: legal controls, tribute authority, trustees, observers, four-seat readiness and terminal CTA passed"
+      },
+      {
+        "test": "table-progress-presentation-regression.cjs",
+        "exitCode": 0,
+        "output": "Table progress presentation passed: real notices, threshold, recovery and reset"
+      },
+      {
+        "test": "table-snapshot-presenter-regression.cjs",
+        "exitCode": 0,
+        "output": "table snapshot presenter regression checks passed for all four viewer seats"
+      },
+      {
+        "test": "table-turn-clock-controller-regression.cjs",
+        "exitCode": 0,
+        "output": "table turn-clock controller regression checks passed"
+      },
+      {
+        "test": "network-round-state-regression.cjs",
+        "exitCode": 0,
+        "output": "network round-state regression checks passed"
+      },
+      {
+        "test": "round-view-boundary-regression.cjs",
+        "exitCode": 0,
+        "output": "round view ownership, lifecycle completeness, clock projection and retirement passed"
+      },
+      {
+        "test": "selection-regression.cjs",
+        "exitCode": 0,
+        "output": "selection regression checks passed (web build not requested)"
+      },
+      {
+        "test": "hand-grouping-regression.cjs",
+        "exitCode": 0,
+        "output": "Simple rules: no auto straights; manual straights and other locks survive arrangement\nhand arrangement/grouping regression checks passed"
+      },
+      {
+        "test": "card-presentation-mapper-regression.cjs",
+        "exitCode": 0,
+        "output": "card presentation mapper regression checks passed"
+      },
+      {
+        "test": "card-skin-regression.cjs",
+        "exitCode": 0,
+        "output": "card skin regression checks passed (54 classic-only faces, 37 PNG components, shared geometry/cache, startup preload, license, web build checked)"
+      },
+      {
+        "test": "fixed-match-fixtures-regression.cjs",
+        "exitCode": 0,
+        "output": "Test-only fixed fixtures passed: fresh snapshots, 108-card accounting, unique physical cards and four-seat layout states"
+      },
+      {
+        "test": "local-match-controller-regression.cjs",
+        "exitCode": 0,
+        "output": "local match controller and delayed-turn guards passed"
+      }
+    ],
+    "probe": {
+      "baselines": {
+        "selection": {
+          "exitCode": 0,
+          "sourceReads": 0,
+          "assertions": 123,
+          "failure": null,
+          "setupError": null,
+          "output": "selection regression checks passed (web build not requested)"
+        },
+        "hand-grouping": {
+          "exitCode": 0,
+          "sourceReads": 0,
+          "assertions": 1516,
+          "failure": null,
+          "setupError": null,
+          "output": "Simple rules: no auto straights; manual straights and other locks survive arrangement\nhand arrangement/grouping regression checks passed"
+        },
+        "table-turn-clock-controller": {
+          "exitCode": 0,
+          "sourceReads": 0,
+          "assertions": 127,
+          "failure": null,
+          "setupError": null,
+          "output": "table turn-clock controller regression checks passed"
+        },
+        "round-view-boundary": {
+          "exitCode": 0,
+          "sourceReads": 0,
+          "assertions": 19,
+          "failure": null,
+          "setupError": null,
+          "output": "round view ownership, lifecycle completeness, clock projection and retirement passed"
+        },
+        "table-phase-presenter": {
+          "exitCode": 0,
+          "sourceReads": 0,
+          "assertions": 86,
+          "failure": null,
+          "setupError": null,
+          "output": "table phase behavior: legal controls, tribute authority, trustees, observers, four-seat readiness and terminal CTA passed"
+        },
+        "card-presentation-mapper": {
+          "exitCode": 0,
+          "sourceReads": 0,
+          "assertions": 19,
+          "failure": null,
+          "setupError": null,
+          "output": "card presentation mapper regression checks passed"
+        }
+      },
+      "mutations": [
+        {
+          "id": "TOUCH_INTENT",
+          "source": "game/HandDragSelectionPolicy.ts",
+          "test": "selection",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 1,
+            "assertions": 81,
+            "failure": {
+              "name": "AssertionError",
+              "message": "a tap must toggle exactly its starting card\n+ actual - expected\n\n  {\n    cardId: 'card-a',\n+   selected: false\n-   selected: true\n  }\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "TOUCH_VISIT",
+          "source": "game/HandDragSelectionPolicy.ts",
+          "test": "selection",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 1,
+            "assertions": 84,
+            "failure": {
+              "name": "AssertionError",
+              "message": "one drag must never toggle the same physical card twice\n\nfalse !== null\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "LOCK_ATOMIC",
+          "source": "game/HandGrouping.ts",
+          "test": "hand-grouping",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 2,
+            "assertions": 1515,
+            "failure": {
+              "name": "AssertionError",
+              "message": "Expected values to be strictly equal:\n\n1 !== 5\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "RESTORE_HAND",
+          "source": "game/HandGrouping.ts",
+          "test": "hand-grouping",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 2,
+            "assertions": 144,
+            "failure": {
+              "name": "AssertionError",
+              "message": "restore must reject a checkpoint from an older authoritative hand\n\ntrue !== false\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "CLOCK_CANCEL",
+          "source": "scenes/TableTurnClockController.ts",
+          "test": "table-turn-clock-controller",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 1,
+            "assertions": 120,
+            "failure": {
+              "name": "AssertionError",
+              "message": "dispose must cancel its exact scheduled callback once\n+ actual - expected\n\n+ []\n- [\n-   [Function (anonymous)]\n- ]\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "CLOCK_RESET",
+          "source": "scenes/TableTurnClockController.ts",
+          "test": "table-turn-clock-controller",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 1,
+            "assertions": 113,
+            "failure": {
+              "name": "AssertionError",
+              "message": "reset cancels stale rendering until a new snapshot arrives\n\n7 !== 6\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "WIRE_COPY",
+          "source": "game/RoundViewState.ts",
+          "test": "round-view-boundary",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 1,
+            "assertions": 1,
+            "failure": {
+              "name": "AssertionError",
+              "message": "later wire mutations cannot change the accepted state\n\n8 !== 3\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "TRIBUTE_COPY",
+          "source": "scenes/TablePhasePresenter.ts",
+          "test": "table-phase-presenter",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 1,
+            "assertions": 24,
+            "failure": {
+              "name": "AssertionError",
+              "message": "Expected values to be strictly equal:\n\n'确认贡牌' !== '确认还牌'\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        },
+        {
+          "id": "LEVEL_FLAG",
+          "source": "ui/CardPresentationMapper.ts",
+          "test": "card-presentation-mapper",
+          "result": {
+            "exitCode": 1,
+            "sourceReads": 1,
+            "assertions": 7,
+            "failure": {
+              "name": "AssertionError",
+              "message": "Expected values to be strictly equal:\n\nfalse !== true\n"
+            },
+            "setupError": null,
+            "output": ""
+          }
+        }
+      ],
+      "tested": 9,
+      "detected": 9,
+      "scope": "Nine handpicked in-memory source faults detected by six unmodified original CJS test entries. No global mutation coverage, live Cocos/WeChat test, test assertion edits or product writes."
+    },
+    "resource": {
+      "pngs": 37,
+      "bytes": 122620,
+      "builtConfigSha256": "774c02c2d9a466281bdb9f98d3b2b7e41afd3c44d66a797a663c6488b7caec1f"
+    },
+    "limits": [
+      "不新建Cocos或微信构建，card-skin读取已有ignored build config只是纹理路径存在性。",
+      "不读取真实用户/远程API；节点/网络/时钟均为内存替身。",
+      "9个选择性内存故障的检出率不是全库mutation覆盖率；既有39项问题未修复。",
+      "LocalMatch/fixture只在测试边界，不代表活动服务器赛制/AI，也不未经业务后果将夹具局限升级生产缺陷。"
+    ],
+    "skill": "ui-ux-pro-max用于状态可用性和反馈一致性核对，未调整界面。"
+  }
+}

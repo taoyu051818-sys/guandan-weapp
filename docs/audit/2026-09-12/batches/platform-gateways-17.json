@@ -1,0 +1,213 @@
+{
+  "batch": "platform-gateways-17",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/client.ts",
+      "sha256": "71af66a5cd259fe9285eb5eb3389814e718afe035bf11d5e7fcf282b4f0693ec",
+      "lines": 165,
+      "notes": "完整165行。核XHR超时/解析/错误、端点策略、token代际/退出后迟到回调、单飞登录及401重放。补充24个延迟401仅登录/清token各一次，POST意图与幂等头不变；5种XHR回调通过。无真实微信或外网请求。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/factory.ts",
+      "sha256": "d56f971d112c493c432564361f47c163b71dc73c12a4914c4df9a6462f5fcddf",
+      "lines": 31,
+      "notes": "完整31行。核所有活动gateway共享同一client及配置；测试迁移factory委托实际factory，不误判其完全绕开生产逻辑。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/PlatformApi.ts",
+      "sha256": "c3535c17b3cbfc3a43452d38ce8189b6c8159f49bbe9bc9a23b1c83b4541dd7e",
+      "lines": 21,
+      "notes": "完整21行。核活动平台facade类型和实现导出，未引入迁移专用商城/观战实现。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/competitionGateways.ts",
+      "sha256": "9a6165e3361dfb1f0b45cf78711cb6f56fe5adb1ef189ca16ac326dcf529d675",
+      "lines": 33,
+      "notes": "完整33行。核匹配queue、可选assignment校验、票号编码及取消/幂等头。transport401重放保留请求标识；未新增确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/commerceGateways.ts",
+      "sha256": "3f429b7127aefb8d192dd1a70ede2ab614bf2679f1e22b46194c77120ce1d48f",
+      "lines": 16,
+      "notes": "完整16行。核wallet有限数值、积分余额和可选钻石归一化，不虚增货币；未因缺省钻石展示字段判作真实付费功能。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/profileGateways.ts",
+      "sha256": "a508ceb41ca778e7c076628dbb719b72bb324b8cae463dcc54df85c582a809b1",
+      "lines": 122,
+      "notes": "完整122行。核账户/综合分/对局统计、微信资料更新、头像草稿URL与dataURI白名单、season读写。season并非独立模块但有实际路由；只对当前入口核可达，不把未读页面算覆盖。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/replayGateways.ts",
+      "sha256": "cbdf31a2f3171cad447f587450fcbbddad4adfe54aa5b367725c71918e30f00c",
+      "lines": 69,
+      "notes": "完整69行。核对局/复盘DTO白名单丢弃服务端私有额外字段、合法viewerSeat和rank/suit映射。不是实际复盘全流程/绘制验证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/friendRoomGateway.ts",
+      "sha256": "b9aff45479c765aa2c083bbfdf61337232163e311928e872db6640394683e648",
+      "lines": 196,
+      "notes": "完整196行。核配置、创建/加入/恢复、请求ID重用及邀请/票据一致性。确认PG-17-001配置归一化遗漏counterEnabled，以及PG-17-002创建摘要遗漏4项新规则；真实client/service/store/HUD隔离链复现。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/TournamentApiGateway.ts",
+      "sha256": "67a6317237814902d97dbf795b36ff21f8780b591c5a2d13615b4ee12d6ff02e",
+      "lines": 85,
+      "notes": "完整85行。核赛事报名/取消/状态/加入请求、响应赛事ID、幂等键及错误映射；不将报名成功后列表刷新失败等一般故障假设升级确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/tournamentDecoders.ts",
+      "sha256": "58c4a28ef3a73714d72082eb8899c93a7a14bb74d33dc2d0ebd0cc278b4672a9",
+      "lines": 149,
+      "notes": "完整149行；初次聚合输出截断后已独立重读到EOF。核16人赛事元数据、阶段、轮次、桌席、个人排名与晋级投影；缺失/坏值严格拒绝。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/FrontPageGatewayContracts.ts",
+      "sha256": "0be561274ddf4169985fa1ffec56941b75e630e78e5a950928481caef790c80f",
+      "lines": 367,
+      "notes": "完整367行。核活动入口gateway契约与queue目录，主要为擦除的TS类型；兼容类型存在不等同僵尸运行功能。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/FrontPagePreviewData.ts",
+      "sha256": "962cc56a275613d913721386048612f1ed96420b620d48ffa2149793cdb0905e",
+      "lines": 8,
+      "notes": "完整8行。只定义预览数据类型，没有实际在线失败转假成功的fallback。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/platform-api-regression.cjs",
+      "sha256": "0dd02f3c1fde50db8c98ac09cbbf4b03fcef632bb51314d3d99221d12a533892",
+      "lines": 1091,
+      "notes": "完整1091行分段审阅并运行通过。核平台/重放/认证代际/开发门禁/微信随机数/头像等；部分经迁移facade但生产委托仍真实。20并发401原回归通过；缺少记牌器跨请求保存的否定断言。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/platform-live-contract.cjs",
+      "sha256": "6f9568c67441ad9caa27cd157e0b776aa222dadbae895a717b10bd4e7c4e5a71",
+      "lines": 188,
+      "notes": "完整188行并运行通过。临时127.0.0.1动态端口和显式test环境/memory store，实际HTTP契约；finally关闭服务。未启动游戏WS/微信调用，counterEnabled:true未断言往返故漏检PG-17-001。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/friend-room-settings-policy-regression.cjs",
+      "sha256": "0b449ea66cde2aa850a72d6b0200610352153e1b42157b0846aa988d57cc6635",
+      "lines": 155,
+      "notes": "完整155行并运行通过。核规则表单、格式切换、范围与可见性；counter关闭仅在本地DTO断言，未覆盖HTTP→存储→HUD。包含源码字符串门禁，不当作像素证据。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/load-typescript-module.cjs",
+      "sha256": "ebaf167c7fbf50e1181bf87786251cc6e478f6497b95baa34d36f3b4db9655c9",
+      "lines": 17,
+      "notes": "完整17行。核TS内存转译与限定dependency注入，只读源文件不生成产品文件；无类型检查/GPU保证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/typescript.cjs",
+      "sha256": "7b9808290fd6acfc559ec02f52478350b194837d6f3b867cecfcc22243532232",
+      "lines": 12,
+      "notes": "完整12行。核本地TypeScript查找与Cocos编译器回退路径；依赖可用性是测试环境边界，不访问真实账户。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/RetiredPlatformApi.ts",
+      "sha256": "a258aac896a8d65dc449fb23deedb0c33b6ead506d67140136b677d27f9ed023",
+      "lines": 15,
+      "notes": "完整15行。迁移专用factory显式委托当前生产factory后扩展旧接口；活动factory未引用它。兼容测试覆盖应按实际委托而非文件名判断。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/RetiredDevelopmentApis.ts",
+      "sha256": "cc95e75c84f00899387bd0c9ecd8ced8a80c2c55454a94d23b28a2188f95c1a6",
+      "lines": 146,
+      "notes": "完整146行。核迁移假数据列表克隆、只读fixture、开发中写操作显式抛错、有限观战fixture；并非正式在线入口，无删除授权。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/tournamentGateway.ts",
+      "sha256": "bd2f6a97035e6ed39be24e00fec64b5226f8f4d70342071d2ebe7ebe54beff25",
+      "lines": 1,
+      "notes": "完整1行。仅重导出活动TournamentApiGateway；没有第二套赛事实装。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomSettingsPolicy.ts",
+      "sha256": "6f8a9d374b31f236d07c55eac0c53f610f3fecc9609e10b963d7598c1de41e62",
+      "lines": 223,
+      "notes": "完整223行。核默认规则、赛制改变清理不适用字段、有效choice、1–32局及无托管选项；明确存在counter开关生产者。UI技能只用于选择与实际生效一致性审查，未改布局。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform-server.js",
+      "sha256": "07a014467c1b29eb577c52aab899aeb822f6905913b341dfd4d7319682768074",
+      "lines": 41,
+      "notes": "完整41行。核仅显式直接执行才listen、配置/存储/微信Verifier注入、导入无启动副作用。未读取真实env或启动生产进程。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/config.js",
+      "sha256": "4e3d9559384bb7c29c5ffe3f9775e30007069a30e296b8171a98d8311f32ae55",
+      "lines": 175,
+      "notes": "完整175行。核生产密钥目的隔离/长度、HTTPS/WSS/origin、禁止dev/faultclock、四种持久路径唯一性与数值边界。路径比较为词法resolve，不等于物理inode或真实部署验证。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/wx-auth.js",
+      "sha256": "fac39a87c53faa818d8c9492b49417d0b8d036b09c974f072907db3abe65bcd6",
+      "lines": 38,
+      "notes": "完整38行。核固定官方code2session地址、5秒signal、code与openid及平台身份命名空间、错误脱敏；静态审阅和已有本地契约，不调用微信、不核真实凭证。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/http.js",
+      "sha256": "fa2a4b0ff1162e7477e5f1fc2f2333da01f0b1178e1c2313118fa897fe06b1d8",
+      "lines": 279,
+      "notes": "完整279行。核路由权限来自bearer而非body、签名结果/观战与生命周期事件校验、生产开发门禁、body大小/错误响应/CORS。已有live-contract仅覆盖部分路由，不宣称所有拒绝矩阵已实测。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/config.test.mjs",
+      "sha256": "cf5d17fb4aec70093022078a7ac9a7db167b63c063fa34ffe75c2803deec4b33",
+      "lines": 117,
+      "notes": "完整117行并运行通过。纯合成配置检查密钥/生产约束及六对存储路径碰撞；无真实环境/文件存储副作用，不证明部署配置现状。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "PG-17-001",
+      "severity": "P2",
+      "title": "好友房关闭记牌器的选择被配置归一化丢弃",
+      "path": "work/guandan-cocos/assets/scripts/services/platform/friendRoomGateway.ts",
+      "line": 32,
+      "endLine": 46,
+      "evidence": "FriendRoomSettingsPolicy.ts:137–139提供counter开关，生成counterEnabled:false；friendRoomGateway.normalizeRoomSettings的返回白名单不含counterEnabled，create:139–144在发送前丢失，同函数在响应:85再次丢失。server/friend-room-settings.js:190–192支持该字段；TableHudPresenter.ts:144只在明确false时禁用，TableHudDynamicRenderer.ts:39–40因此保持active。",
+      "validation": "repro/platform-gateways-17.cjs使用真实表单→活动factory/client/gateway→真实FriendRoomService/MemoryPlatformStore→真实TableHudPresenter.render。定局/升级/转蛋/复式×开关8例：4个关闭均请求/存储/回包丢字段，HUD为true；直接将原表单传HUD的关闭对照为false。既有policy及platform/live测试均通过但缺跨层关闭断言。",
+      "recommendation": "使用统一完整的活动房间配置codec/schema，双向保留合法布尔字段；增加表单→请求→保存→重入→HUD的false往返回归。不可通过删除开关或全局隐藏记牌器掩盖问题。",
+      "boundary": "内存HTTP与HUD渲染端口，实际业务公式未改；不是8客户端/真机/GPU验证。disableVoice同样被白名单遗漏但未发现活动UI消费者，不作为第二项功能故障。"
+    },
+    {
+      "id": "PG-17-002",
+      "severity": "P3",
+      "title": "修改发牌或赛制选项仍复用旧创建幂等ID",
+      "path": "work/guandan-cocos/assets/scripts/services/platform/friendRoomGateway.ts",
+      "line": 126,
+      "endLine": 131,
+      "evidence": "operationKey未纳入dealMode/upgradeTarget/teamRotation/rotatingScoring；run:180–193在可重试网络错误时保留同key的attempt ID。服务端FriendRoomService:242–253以完整配置摘要校验相同entryAttemptId，修改这些字段产生IDEMPOTENCY_CONFLICT。",
+      "validation": "真实创建已保存后模拟响应丢失，推进人工时钟超过真实默认30分钟租约，再通过表单修改上述4项各一例；第二次仍复用旧ID并报409，第三次因明确冲突已清缓存而使用新ID成功。相同配置的丢响应重试对照保持同ID，仅一个房间。",
+      "recommendation": "从完整canonical配置派生操作身份，相同意图重试保留ID，不同意图不得复用；保持已占位房间的安全释放/过期流程。覆盖每个新增配置字段的幂等身份回归。",
+      "boundary": "可恢复的多一次冲突，不是默默建成错误规则/永久无法创建；仅验证租约已过期场景，不宣称未过期新ID一定成功。人工时钟/模拟丢响应，无真实30分钟等待或线上网络故障。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/platform-api-regression.cjs",
+      "node work/guandan-cocos/tests/friend-room-settings-policy-regression.cjs",
+      "node work/guandan-cocos/tests/platform-live-contract.cjs",
+      "node work/guandan-windows-source/server/platform/config.test.mjs",
+      "node docs/audit/2026-09-12/repro/platform-gateways-17.cjs"
+    ],
+    "result": "四个既有入口exit0；新增探针所有预期复现及正常对照通过。探针收尾后再次独立重跑exit0。",
+    "counterCases": 8,
+    "changedSettingsCases": 4,
+    "sameSettingsRetryControls": 1,
+    "concurrent401Posts": 24,
+    "loginCalls": 1,
+    "clearTokenCalls": 1,
+    "xhrCallbacks": 5
+  },
+  "limitations": [
+    "只写审计目录，保留五处原有修改；无业务修复、构建、提交或部署。",
+    "既有live-contract使用真实临时回环HTTP+合成内存数据，其余补充网络/签票/渲染端口为内存。未调用外网微信或实际账户。",
+    "已完整阅读的26文件3760行计入覆盖；辅助追查的LobbyModels、HUD渲染器、其他页面等不新增计数。",
+    "UI技能用于选择与反馈一致性：首次settings save feedback搜索偏题未采用，唯一重试success error confirmation命中Success Feedback；Web ARIA结果不套用到Cocos。无视觉设计更改。"
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "batch": "client-input-05",
+  "reviewer": "audit_client_state",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/HandController.ts",
+      "sha256": "a0730e33ce88d71d92aa44d9b03b800413115aeed76b25163fff968f5743986c",
+      "notes": "完整270行。审查输入监听生命周期、CardView重绑/移除、显示ID/栈顺序、选择布尔目标、坐标/命中/遮挡、点按/滑动/长按及取消、起点与多pointer门禁、出牌坐标复制和入场完成屏障。确认CI-05-001：只有interactive=false才取消旧输入，权威选择失效但仍可预选时旧end可重新选牌。显式cancel/托管/观战/pending对照正确；点按替代存在，无美术或布局修改。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableHandInteractionController.ts",
+      "sha256": "85fa62067ea51737da3446be522273087bc9350f725c8f7371664a80d70aa9fe",
+      "notes": "完整249行。审查runtime settings实时读取、权威hand同步、普通/锁组原子选择、单张贡还、提示保护、锁动作反馈/重校验、理牌/同花顺和退出/回合reset。真实GameManager及HandController联合探针确认旧gesture在新合法预选上下文仍被接收，归CI-05-001不重复计。锁组未拆开；deadline换人、托管和观战阻塞正常；playSelected仍经过GameManager权威合法性检查。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableMatchCoordinator.ts",
+      "sha256": "56f83336a7733c0eccd5d9cf31a89287d6f9781052732b8929209a85812877eb",
+      "notes": "完整313行。审查mount/dispose、Lobby事件桥、权威包过滤与manager提交、workspace/teammate hand呈现、恢复效果基线、牌桌退出/关房/终场、局间准备、托管与观战元数据先行保护。真实bridge→coordinator→manager→render探针复现CI-05-001，incremental/recovery同根因。GameScene隐藏/销毁时resetForTableExit接线已辅助核验。旧跨桌权威身份/旧消息候选不重复计。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableMatchPorts.ts",
+      "sha256": "36633e5c137eae0f9ebba45040da18239c641882f01ef77d9b319e7d71d2bcc3",
+      "notes": "完整37行。逐项核对session/manager/lobby/hand/呈现能力声明、所有权与实际依赖；接口自身无异步状态或副作用。hand目前仅node/render/入口动画能力，未承载权威selection epoch，属于CI-05-001修复接线位置之一，不另算缺陷。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "CI-05-001",
+      "severity": "P3",
+      "title": "权威清理选择后，未取消的旧触点可重新选中存活牌",
+      "path": "work/guandan-cocos/assets/scripts/ui/HandController.ts",
+      "line": 120,
+      "evidence": "118-123行覆盖selectedCardIds，但只在interactive=false时取消gesture/长按。本人首次超时可在尚未托管时自动出牌（真实weapp-match-lifecycle.js:322-342默认连续第2次才托管）。新状态经TableMatchCoordinator.ts:159-169和NetworkMatchSnapshotController.ts:124-131清空本人旧预选；TableMatchCoordinator.ts:78-85保持非本回合预选interactive=true。旧存活CardView的TOUCH_END经HandController.ts:211-214、264-268及TableHandInteractionController.ts:86-103再次选牌。docs/profile-preselection-polish-20260907.md:10-11明确他人更新保留、本人出牌/不要及手牌变化清理的分界。",
+      "validation": "已确认；由CH-04-C01升级，非第二个同根因问题。报告完整可复制Node探针执行真实CardView输入、HandController、TableHandInteractionController、GameManager/投影、事件bridge、TableMatchCoordinator及核心transition，incremental/recovery均复现预选c→权威本人出b后[]→旧a.touchend后[a]。另执行真实server lifecycle/turnClock/actionExecutor默认首次deadline，得到timeout=1、trustee=null、turnTimedOut后同样结果。网络提交数0；非自己回合正常playSelected入口不发送。cancel/trustee/observer/pending和贡还deadline换人对照均[]；他人动作正常保留c+a；锁组仍原子重选。计时/绘制/输入设备为内存存根，未真机验收，也未证明错误出牌或越权。6项安全既有回归全部通过；MD提取重跑退出0。",
+      "recommendation": "在权威清理选择时产生独立selection/gesture epoch，贯穿桌面协调器与HandController，连同长按取消；覆盖本人动作/手牌、阶段和局边界。不可对每次render或所有网络revision无条件cancel，需保留他人动作/倒计时及本地选择刷新下的预选。添加真实输入→首次超时/恢复→旧end/long-press和正常他人动作对照回归。"
+    }
+  ],
+  "concerns": [],
+  "supersedesConcerns": [
+    {
+      "id": "CH-04-C01",
+      "finding": "CI-05-001",
+      "reason": "本批将合成renderer候选扩展为真实server首次deadline及完整客户端输入/权威/呈现接线，并核对现有预选清理契约；仅计一个P3。旧报告作为历史审计证据保留不改。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "读取README/STATUS/coverage及ui-ux-pro-max完整SKILL；查询dragging movements cancellation --domain ux",
+      "result": "起始coverage128/629，四目标均pending；技能仅用于现有点按/取消契约核查，无新设计系统/界面修改。"
+    },
+    {
+      "command": "node tests/table-match-coordinator-regression.cjs; node tests/table-network-event-bridge-regression.cjs; node tests/table-hand-interaction-controller-regression.cjs; node tests/network-round-state-regression.cjs; node tests/hand-touch-coordinates-regression.cjs; node tests/selection-regression.cjs",
+      "result": "先检查脚本与TypeScript loader，再逐项本地运行；6项全部退出0，无web build请求。"
+    },
+    {
+      "command": "从client-input-05.md提取node heredoc运行",
+      "result": "退出0。当前生成TS核心合法本人出牌+增量/恢复、四种阻塞、他人动作、锁组和贡还权限对照；真实服务器默认首次deadline+客户端全链复现。默认server dispatch读取现有shared-core/dist，本批不构建、不将该产物计人工源码覆盖；视觉/时间/外围持久端口为内存存根。"
+    },
+    {
+      "command": "Node crypto SHA-256与git rev-parse/status/diff最终复核",
+      "result": "4目标合计869行，报告hash与审阅起始一致；HEAD不变、保留原5处dirty，无产品/测试/全库清单写入，未构建/推送/线上操作。"
+    }
+  ],
+  "scope": {
+    "reviewedFiles": 4,
+    "reviewedLines": 869,
+    "newConfirmedFindings": 1,
+    "unconfirmedConcerns": 0,
+    "limitations": "只计4指定目标完整覆盖；辅助调用链/测试不计。无Cocos真实绘制、设备触摸/网络时序或线上数据测试。CI-05-001仅本地旧触点造成的选择清理失效，无越权/自动错误出牌结论。"
+  }
+}

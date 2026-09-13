@@ -1,0 +1,56 @@
+{
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/weapp-command-gateway.js",
+      "sha256": "42f2c4a25e84fe9cd409d8740289987aab4d31384616deb7f979b348b6727cdf",
+      "notes": "完整逐行审阅123行；请求ID、别名缓存、指纹冲突、落盘屏障、版本检查及重放调用链。对应测试通过。未确认越权或重放安全问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-command-router.js",
+      "sha256": "5bfd21a749e7be08d33a920cd03248f28e4c5b19f924232bafafff378db0db00",
+      "notes": "完整逐行审阅20行；命令唯一注册、异步派发和已处理标记。对应测试通过。未确认问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-entry-command-handler.js",
+      "sha256": "f3b1eea342b6c77118910d1db43707f1c2f0b634978a4a226680d20aaa54e81d",
+      "notes": "完整逐行审阅306行；票据检查、恢复凭证、席位/用户绑定、活动连接排他、撤销、令牌轮换和幂等入桌。追查friend observer前置路由；对应测试通过。未确认问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-websocket-transport.js",
+      "sha256": "46fd943788fd4605a97778806a88b618e2c48432dff56845c407cca5ff623449",
+      "notes": "完整逐行审阅140行；Upgrade来源/容量、掩码/长度、解析和连接生命周期；追查命令速率/队列及断连清理接线。对应测试通过。未做真实网络负载测试，不将协议兼容性或资源风险推测列为漏洞。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-accepted-action-store.js",
+      "sha256": "843cc40c187ba74464629e416af49d68e6615c0a90e45625e37d5c6371cecbaf",
+      "notes": "完整逐行审阅43行；容量预约、持久记录淘汰、pending记录保护、令牌身份轮换和删除。对应测试通过。未确认问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-action-executor.js",
+      "sha256": "682b1f59b5aeb5fdec849cbb94fda39c7b03ebb3069826f42fe1956349eb89eb",
+      "notes": "完整逐行审阅77行；权威命令执行、终局记录、持久提交前后发布及失败边界；追查人类命令席位授权和自动动作调用。对应测试通过。未确认问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/game-session-projection.js",
+      "sha256": "699cd6693bc9769de92b2042f6164f34ef18e82834c2afd78867131ee4b41f53",
+      "notes": "完整逐行审阅79行；对手手牌遮蔽、已完成玩家观看存活队友的权威状态条件、贡还私密选择隐藏、复制隔离。追查publisher按真实seat调用。对应隐私测试通过，未确认泄露。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/friend-room-observer-buffer.js",
+      "sha256": "4f114e2c42dc7f947e514d2ac76c2f1ac1ca76e237b4ae9041c98e2b9a00623e",
+      "notes": "完整逐行审阅48行；延迟资格、历史容量、单席手牌与贡还遮蔽。对应测试通过；额外进程内复现确认SA-01-001，未确认提前泄露。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "SA-01-001",
+      "severity": "P2",
+      "title": "按局延迟错误使用已完成局数，导致首局无法在第二局观看",
+      "path": "work/guandan-windows-source/server/friend-room-observer-buffer.js",
+      "line": 18,
+      "evidence": "该行以room.roundSequence||1标记快照局号，34-36行仅放行item.round<(room.roundSequence||1)。weapp-room-metadata.js:44初始roundSequence为0；weapp-match-lifecycle.js:217-224只在结算时+1，391-410开始下一局时保持该计数并以+1报告当前局号。因此首局和第二局进行中快照均标1，整个第二局无法返回首局历史；第二局结算后首次返回的是第二局进行中快照。friend-room-settings.js:240定义delayRounds:1；friend-room-observer-runtime.js:27将无快照映射为observerWaiting。",
+      "validation": "已确认，非待验证。Node v26.7.0无网络进程内导入真实FriendRoomObserverBuffer；以生产生命周期0(首局进行中)→1(首局结算及第二局进行中)→2(第二局结算)捕获状态，断言第二局进行中project()===null，第二局结算后project().state.roundId===2且phase==='playing'，均通过。完整复现代码见同名Markdown。8个对应测试文件全部通过，现有observer测试从1开始，未覆盖真实初值0。该发现是正常多局delayed-round观战的错误延后/首局跳过，不声称未完成局手牌提前泄露。",
+      "recommendation": "使用权威state.roundId保存快照所属局，并依据独立的已完成局数判断可发布范围，明确结算与下一局开始边界；增加从roundSequence=0开始覆盖首两局及终场的跨层回归。"
+    }
+  ]
+}

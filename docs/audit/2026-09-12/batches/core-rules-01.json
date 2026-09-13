@@ -1,0 +1,124 @@
+{
+  "batch": "core-rules-01",
+  "date": "2026-09-12",
+  "repository": "/Users/mac/Documents/Codex/2026-08-02/wo-yi",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewedCount": 8,
+  "reviewedLines": 1506,
+  "reviewed": [
+    {
+      "path": "shared-core/src/lib/engine.ts",
+      "sha256": "57ac03fc1bfb80489bb3e8861447e4119a4baf0025170bb4e87075626bc2a136",
+      "notes": "完整 413 行。审查构造、归属/重复/空牌、阶段/行动者/版本、终局、提交原子性和兼容 API。现行 transition 未确认缺陷；兼容接口确认两个 P3。"
+    },
+    {
+      "path": "shared-core/src/lib/turn.ts",
+      "sha256": "3a817b8b8fffec89051155f70b7c846e5538551d4741cd407f2f3c285d3b2deb",
+      "notes": "完整 152 行。审查活跃座位、搭档接风、过牌集合重置、完成人员、action/事件/状态复制隔离；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/settlement.ts",
+      "sha256": "aa9b7d5ebe1932e542bc72a083ff795d4dbe833326b81be721872387f7f23360",
+      "notes": "完整 218 行。审查双下奖励、K/A 历史规则、显式必打目标及进攻队、A-reset、独立个人排名、转蛋个人累计、分数与复制隔离；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/tribute.ts",
+      "sha256": "ddd36ffea8a7d5cfa784b0d6cdb8d1d3be009a7ac6b1cc2fb79ba62d8fd9eaa9",
+      "notes": "完整 403 行。审查 108 张正牌、级牌一致性、抗贡、贡还资格、双贡大小/等值接收者、双选原子交换及先手授权。2496 周期属性检查通过；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/matchFormat.ts",
+      "sha256": "b59943db571c442939f1619a47e136094b635a0c191116ea74c8bde5a9bc7c9a",
+      "notes": "完整 78 行。审查历史缺省、格式组合、级数/目标/开关/转蛋专属字段、复式映射和随机边界；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/variantRules.ts",
+      "sha256": "5c79b582d1b0aff4cd7a0b287204ae47ba4c09123505afd1924e14a3f9e010b5",
+      "notes": "完整 56 行。审查计分表、52 张抽签索引、双持有人/单人双持、顺时针轮换、身份和手牌保持及个人累计；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/classicModes.ts",
+      "sha256": "14f206e0fcad1282dc2e3d292490d68b5f55fb784a976a148e6c006fbf6da64f",
+      "notes": "完整 31 行。审查 12 队列、quick 别名、无效队列和三种模式投影；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/types/game.ts",
+      "sha256": "7c172253277b221d2cf7b18f4577ccd376c5679e799abda78c06dbd02290a06d",
+      "notes": "完整 155 行。审查牌/玩家/牌型/语义/元信息/历史兼容类型与核心使用关系；类型不等同运行时 JSON 校验，未确认缺陷。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "CORE-RULES-01-001",
+      "severity": "P3",
+      "title": "兼容换局丢失赛制，下一轮提前结束个人排名局",
+      "path": "shared-core/src/lib/engine.ts",
+      "line": 247,
+      "evidence": "dealNextRound 在 238 行读取 previous.matchFormat.dealMode，但 247–255 行返回对象未携带 matchFormat。合法 independent/individualRanking 状态换局后格式为 undefined，同队前两名使 isRoundOver 从 false 变 true，未产生真实第三名即结束。非生成代码检索仅发现 round-smoke.cjs 调用该 helper，未证实现行生产影响。",
+      "validation": "当前 TypeScript 源码内存转译的最小断言已通过：previous 设为 independent + individualRanking，finishedPlayers=[p1,p3] 时 isRoundOver=false；dealNextRound 后重新设相同两名，matchFormat=undefined 且 isRoundOver=true。可重放完整命令见同名 Markdown。",
+      "recommendation": "显式保留赛制及应保留的跨局累计字段并增加个人排名/不洗牌多局回归，或弃用并限制此兼容入口；不要无差别沿用本轮抽签牌。"
+    },
+    {
+      "id": "CORE-RULES-01-002",
+      "severity": "P3",
+      "title": "兼容过牌依赖 action 对象引用，JSON 恢复后提前清轮",
+      "path": "shared-core/src/lib/engine.ts",
+      "line": 276,
+      "evidence": "legacyAdvance 用 action===last 查找末次出牌。JSON 恢复后无引用相等项，lastIndex=-1，277 行 slice(0) 将旧过牌计入当前轮。p1出3、p2过、p3过、p4出6、JSON恢复、p1过，实际直接 p4 领出且 lastValidPlay=null；未恢复的同状态正确轮到 p2 跟牌。主 transition 使用显式 trick，不经过此逻辑，未证实现行生产影响。",
+      "validation": "源码内存转译，使用八张互异正牌组成四家剩余手牌，重放上述合法动作，对同一状态及 JSON 副本执行 p1 过牌。原状态返回 p2/p4-winning，副本返回 p4/null；全部断言通过。可重放完整命令见同名 Markdown。",
+      "recommendation": "按最后非 Pass 动作位置或稳定动作标识定位，或统一显式 trick 模型；增加恢复后历史含旧过牌的回归。"
+    }
+  ],
+  "validation": [
+    {
+      "kind": "existing-tests",
+      "command": "node_modules/.bin/vitest run --cache=false tests/engine-transition.test.ts tests/tribute-settlement.test.ts tests/match-format.test.ts tests/variant-rules.test.ts tests/turn-immutability.test.ts",
+      "cwd": "shared-core",
+      "result": "5 files / 28 tests passed",
+      "runtime": "Node v26.7.0; Vitest 4.1.10"
+    },
+    {
+      "kind": "source-memory-tribute-property-check",
+      "seed": "0x912c0de",
+      "rounds": 2496,
+      "transitions": 10088,
+      "resisted": 603,
+      "equalDoubleTributes": 75,
+      "result": "13 levels × 24 ranks × 8 deals passed immutable input, revision +1, 108 unique-card conservation, distinct recipients, 27-card restoration and leader checks."
+    },
+    {
+      "kind": "source-memory-complete-single-play-rounds",
+      "seed": "0x912a11",
+      "rounds": 234,
+      "transitions": 53573,
+      "result": "13 levels × 6 formats × 3 samples completed within 1000 actions each; input immutability, one revision, unique 108-card conservation including history, finishers, trick consistency, complete rank and finite scores all passed. Does not cover non-single card-combination resolution."
+    },
+    {
+      "kind": "finding-reproduction",
+      "result": "Both P3 findings reproduced directly from current TypeScript source without compiling or overwriting dist."
+    }
+  ],
+  "supportingReadsNotCounted": [
+    "shared-core/tests/engine-transition.test.ts",
+    "shared-core/tests/tribute-settlement.test.ts",
+    "shared-core/tests/match-format.test.ts",
+    "shared-core/tests/variant-rules.test.ts",
+    "shared-core/tests/turn-immutability.test.ts",
+    "shared-core/tests/tribute-regression.cjs",
+    "shared-core/src/lib/deck.ts",
+    "shared-core/src/ai/simulation.ts",
+    "shared-core/src/index.ts",
+    "shared-core/package.json",
+    "shared-core/tsconfig.json",
+    "shared-core/src/lib/rules.ts (partial search)",
+    "shared-core/tests/rules-regression.cjs (partial search; user-modified)",
+    "shared-core/tests/round-smoke.cjs (partial search)",
+    "work/guandan-windows-source/server/game-session.js (partial read)"
+  ],
+  "limitations": [
+    "No online state or external protocol exploitability was tested; this batch treats typed core commands separately from untrusted JSON decoding.",
+    "Compatibility findings do not establish a current production caller or current online match impact.",
+    "Property samples are not exhaustive over all possible deals and legal card combinations.",
+    "Only the 8 reviewed entries count toward the complete-file audit. Supporting reads/search hits do not."
+  ]
+}

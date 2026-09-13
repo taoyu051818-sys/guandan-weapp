@@ -1,0 +1,119 @@
+{
+  "batch": "core-dealing-02",
+  "date": "2026-09-12",
+  "repository": "/Users/mac/Documents/Codex/2026-08-02/wo-yi",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewedCount": 5,
+  "reviewedLines": 875,
+  "reviewed": [
+    {
+      "path": "shared-core/src/lib/rules.ts",
+      "sha256": "e81aaa203b36a0a98b14c535cf7420b71e35e8a3b835c36d62e87d3845f4d63e",
+      "notes": "完整435行。审查不可变规则、面值/级牌、各基础牌型、红心配2–15非王解释、两配花色缩减及去重、上下文解析、5.5同花顺/四王比较、诊断一致性；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/legalMoves.ts",
+      "sha256": "8d9cd4154b488c0f3fa2ec28e888247279806af7f46d77d493378684f3e6aff4",
+      "notes": "完整255行。审查所有候选形状、连续窗口、跨组ID排他、物理/结构/默认代表类去重、缓存语义与排序。80组手牌21936子集及240跟牌视图与规则oracle一致；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/deck.ts",
+      "sha256": "f6ae0e177e9bca892467e60335ca8deef710ff957197c5e7632e6112a7fbbb5e",
+      "notes": "完整93行。审查108正牌唯一ID、两副/花色/级牌/红心配/王标记、面值、Fisher–Yates、四家分发和排序/复制；未确认受支持入口下的缺陷。前批仅辅助读取未计数，本批正式计入。"
+    },
+    {
+      "path": "shared-core/src/lib/dealing.ts",
+      "sha256": "f567e1c83d0bad87a9de0483b964f2ccf103996dc9b4465c008f48c117c2a648",
+      "notes": "完整22行。审查模式白名单、每次RNG有限数/[0,1)检查、普通发牌等价性与集束委托；后段非法RNG被正确拒绝，未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/lib/noShuffleDeal.ts",
+      "sha256": "7a09ccb045e63aaa60b2cf46a07bff896c19e9d8777eccd47089c7d7fdd921ae",
+      "notes": "完整70行。审查排除级牌的自然顺子包、同点包/王单独、池移除、容量27整包/尾拆、最后匿名槽分配、输入不变与极端有效RNG；未确认缺陷。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "relatedExistingFindings": [
+    {
+      "id": "CORE-RULES-01-001",
+      "note": "兼容dealNextRound遗失matchFormat为前批根因，本批不重复立项。正常dealGameCards模式委托本身未发现问题。"
+    }
+  ],
+  "validation": [
+    {
+      "kind": "existing-tests",
+      "cwd": "shared-core",
+      "command": "node_modules/.bin/vitest run --cache=false tests/rules.test.ts tests/context-resolution.test.ts tests/dealing.test.ts tests/no-shuffle-arrangement.test.ts",
+      "result": "4 files / 19 tests passed",
+      "runtime": "Node v26.7.0; Vitest 4.1.10",
+      "startedAtLocal": "2026-09-12 14:19:41 Asia/Shanghai"
+    },
+    {
+      "kind": "existing-user-regression-against-source",
+      "path": "shared-core/tests/rules-regression.cjs",
+      "result": "Passed unchanged, including user-existing modifications. In-memory TypeScript transpilation provided source exports instead of ../dist; no source/test/dist writes."
+    },
+    {
+      "kind": "candidate-exhaustive-subsets",
+      "handProfileViews": 80,
+      "nonemptySubsets": 21936,
+      "legalSubsets": 11354,
+      "responseViews": 240,
+      "levels": 13,
+      "profiles": 2,
+      "result": "Full-subset oracle equals physical legalMoves; structural and default-resolution representative classes complete/deduplicated; permutation deterministic; wildcard usages non-joker; input unchanged. Hands are three targeted 8-card types per level, plus a 10-card bomb hand at level 7."
+    },
+    {
+      "kind": "wildcard-suit-exhaustive-oracle",
+      "groups": 42,
+      "assignments": 94752,
+      "levels": [2, 7, "A"],
+      "profiles": 2,
+      "result": "Each wildcard independently takes every value 2..15 and each ordinary suit; type/value/length sets match optimized suit enumeration on seven targeted group shapes."
+    },
+    {
+      "kind": "bomb-order-matrix",
+      "bombConfigurations": 2808,
+      "naturalSuitWindows": 320,
+      "comparisons": 6896,
+      "result": "All physical 4..10 bomb lengths, 0..2 wildcard counts, levels/nonlevel ranks passed. Rocket beats 10-bombs; classic straight flush beats five but loses to six; tournament windows follow its configured policy."
+    },
+    {
+      "kind": "dealing-property-matrix",
+      "deals": 2600,
+      "levels": 13,
+      "modes": 2,
+      "seedRange": [912000, 912099],
+      "rng": "LCG seed=(imul(seed,1664525)+1013904223)>>>0; output seed/4294967296",
+      "extremeValidClusterDeals": 26,
+      "invalidRngChecks": 13,
+      "naturalBombGroups": { "random": 7163, "no-shuffle": 15606 },
+      "naturalBombRatio": 2.1786960770626833,
+      "result": "Every seat 27, exact 108-card canonical identity/fields, level/wild/joker flags and descending order passed; extreme valid RNG preserves input. Concentration is a sample statistic, not a fairness proof."
+    }
+  ],
+  "validationNotes": [
+    "An initial delayed RNG fault at call 300 was never reached: the constant-0.5 clustered path uses 266 calls. The probe was corrected to calls 108,125,266; all correctly throw INVALID_DEAL_RANDOM. This was a probe-design error, not a product finding.",
+    "README read before task actions; only this batch's two reports were written. Parent task owns inventory/coverage merge.",
+    "Source hashes checked again after validation and report generation."
+  ],
+  "supportingReadsNotCounted": [
+    "shared-core/tests/rules.test.ts",
+    "shared-core/tests/context-resolution.test.ts",
+    "shared-core/tests/dealing.test.ts",
+    "shared-core/tests/no-shuffle-arrangement.test.ts",
+    "shared-core/tests/rules-regression.cjs (user-modified; unchanged)",
+    "work/guandan-cocos/assets/scripts/ui/TablePlayActionPolicy.ts",
+    "shared-core/src/ai/candidates.ts (partial)",
+    "shared-core/src/hints/handHintPolicy.ts (partial)",
+    "work/guandan-windows-source/server/weapp-match-lifecycle.js (partial)",
+    "docs/audit/2026-09-12/README.md"
+  ],
+  "limitations": [
+    "Subset tests verify candidate enumeration against the project's parser, not an independent external rulebook; parser interpretation/order was separately checked.",
+    "Did not exhaust every 27-card hand or 108-card distribution; no device performance or strict statistical fairness proof.",
+    "Production call sites were traced only far enough to understand boundaries; they do not count toward this batch's five complete files.",
+    "No new confirmed finding does not mean the full repository is audited or defect-free."
+  ]
+}

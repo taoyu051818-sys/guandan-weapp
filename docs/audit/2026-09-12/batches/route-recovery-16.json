@@ -1,0 +1,197 @@
+{
+  "batch": "route-recovery-16",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/PageRouter.ts",
+      "sha256": "d2ef848b57db147f2b5f6d2c247088143a6380628d7c4e8f68ea81b39998bf16",
+      "lines": 70,
+      "notes": "完整70行。核单个front layer所有权、同路由重建但不重复route-change通知、旧root先inactive再递归停止Tween/延迟destroy、resize与clear。补充100轮开/重开/清除通过；存根保留isValid模拟延迟销毁，不等于Cocos像素/触控实测。未因无活动调用者的destroy后open可能性报问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/PlatformMatchRecoveryCoordinator.ts",
+      "sha256": "a3035ba50fbcc47a4d328764858329846f49a61dcaf3af8db6dd4cacff2fdf1d",
+      "lines": 105,
+      "notes": "完整105行。核恢复请求单飞、排队合并、3次自动恢复上限、手动重试、有效确认ID、dispose后迟到结果静默和事件解绑；7例补充覆盖成功/空/失败×销毁及入桌回调内重入失败，均通过。不是完整页面/真实HTTP恢复端到端验证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/MatchRecoveryAttempt.ts",
+      "sha256": "137c4c37f05f1db641c264d509bcfbf0303213872a32ef08fa261c3f9c980189",
+      "lines": 31,
+      "notes": "完整31行。核随机ID异步合并、22–128字符校验、按当前ID完成/放弃、工厂失败后可重试。32并发current共用一次生成及4类错误ID重试通过。未将正常协调器已串行化的并发网关假设升级缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/matchRecoveryGateway.ts",
+      "sha256": "ad48adb3cbbf3643163211507fbf671692fb0681e2efe6dabb4f8b381528f90e",
+      "lines": 67,
+      "notes": "完整67行。核match/friend恢复分流、purpose/ID一致性/票据匹配/过期/安全端点和普通match不得携带邀请字段。9例普通match网关探针通过；friend分支的外部normalize函数只追接口，此批不算其实现已审或已测。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/MatchmakingPageDomain.ts",
+      "sha256": "b41b13a4d71dbdb6ded2ebb59a996d77dc4dc00259e9c9011cf2e2653862627d",
+      "lines": 384,
+      "notes": "完整384行。核匹配代际、延迟首请求、重复点击、票据轮询、取消等待join、assigned时恢复入桌、取消未知时保留凭证/延后处理、32项未确认/已协调记录与destroy。既有测试及5阶段公开入口补充通过；未以人工改变私有状态的场景冒充已发现真实页面竞态。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomPlatformFlow.ts",
+      "sha256": "99d6883a226f53f8cc65613988bbc1e0459b36ca995599d56603fc8c11cf45a9",
+      "lines": 155,
+      "notes": "完整155行。核create/join busy与代际、迟到结果释放、恢复/持有/交接、进入牌桌同步失败补偿、leave/destroy。与真实cleanup组合跑4请求的24返回顺序×4结局，加同步entry失败，共97例通过；传入设置视为已验证DTO，不把旧fixture的40秒当现行规则证据。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomReservationCleanup.ts",
+      "sha256": "520639a1a0520a07fe8301a2dc325ab7efb71d00cce4c4a719bd06258057a6af",
+      "lines": 64,
+      "notes": "完整64行。核待请求期间延后清理、adopt保护同房、handoff保护已交接席位、清理单飞/失败保留及下一次重试。97例flow组合检查无误释放/重复取消；取消端口为内存承诺，未覆盖真实平台持久失败/跨设备并发。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/StartupCoordinator.ts",
+      "sha256": "6e01e5bfd0e7948256e62f986927cef83b5a6827db55b75e88785bb508caecc0",
+      "lines": 147,
+      "notes": "完整147行。核bundle→art→96%初始化→sceneStarted就绪门禁、GDS01–04错误及重试、初始化后只能显式重启、dispose代际和进度更新。完整256行既有测试运行通过；restart为存根，不实际重启引擎，未验证真机启动耗时或画面。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/ui-recovery-regression.cjs",
+      "sha256": "03fc13bb0f898e59fd7eda02ae0498dd70e2d66b2a487e072a18f869277fe846",
+      "lines": 172,
+      "notes": "完整172行并运行通过。核布局/牌桌预览/结算恢复契约与源码防回归断言；部分仅字符串匹配及Cocos存根，不证明GPU、点击区域或所有路由销毁。辅助引用模块未因测试加载计为本批完整审阅。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/friend-room-platform-flow-regression.cjs",
+      "sha256": "0cab0c319dac72c923cc67365af1b858b5d9d94ff646666af382af6f517b56c4",
+      "lines": 352,
+      "notes": "完整352行并运行通过。核好友房busy、迟到创建释放、相同房号接纳、交接、邀请缓冲与微信share字段/本地图卡体积。微信接口为合成对象，不发送好友卡或读取真实用户；资源存在和小于200KiB不等于原生展示正确。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/startup-coordinator-regression.cjs",
+      "sha256": "5a12e7d86b654b64828276517f50510242333a25beda40845b6086e3ca7bb9a3",
+      "lines": 256,
+      "notes": "完整256行并运行通过。核启动进度顺序、早/晚sceneStarted、资源失败重试、部分初始化失败改显式重启、dispose及迟到错误。真实StartupCoordinator配内存overlay/bundle/restart，非完整构建启动。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-entry-regression.cjs",
+      "sha256": "9cc347c533e35096815fc3d85b0bb6c3b00abb4887af0d5bfb78cb093094093a",
+      "lines": 1142,
+      "notes": "完整1142行分段审阅并运行通过。核p1创建/p2加入、rejoin purpose、ticket消费重试、看门狗/绝对期限、连接失败代际、旧响应和恢复通知。内存WebSocket复用真实client/wire；测试EventTarget.off为空，不能单凭此断言证明事件解绑；本批恢复探针另使用实际可off的替身。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/match-waiting-regression.cjs",
+      "sha256": "338d2ff48de50ffed6430aca4a85fa0c545a7c4005e61119163dc058792b1bcb",
+      "lines": 305,
+      "notes": "完整305行并运行通过。核等待界面六状态、静态洗牌、动画/性能开关、排队取消/已分配/取消未知/延后和坏票据。部分fixture写私有字段，仅覆盖对应状态分支；补充探针另从begin公开入口检查5种取消时点。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/lobby-entry-ticket-contract.cjs",
+      "sha256": "7897a194b28cb8dfb5e87fc668deba65c9d95c77a60f7844ac5ead253bb964c0",
+      "lines": 79,
+      "notes": "完整79行。核真实client与server entry-ticket handler/store/publisher的合成适配、同ID重复响应及消费一次；由lobby-entry测试执行通过。签名/claims检查采用固定合成端口，不证明鉴权安全；未启动HTTP/WS服务或写真实存储。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/WechatFriendInvite.ts",
+      "sha256": "d2630ad41fe9053f62c26c4993e2b7498287bd801f1cf326609462b05af6f247",
+      "lines": 69,
+      "notes": "完整69行。核房号/邀请码白名单、分享query只含邀请信息、不携带gameTicket、冷启动pending/onShow交接、停用与解绑。既有friend流程用fake wx验证，不发消息、不证明微信原生分享成功或后台授权。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/MatchmakingErrorPresentation.ts",
+      "sha256": "dd0f4d15319af08eb1114670787f3b8b81df26928dd0771ba8b1a9cb3c89e000",
+      "lines": 19,
+      "notes": "完整19行。核401/403、429、retryable、票据消失与底分约束映射，未知错误兜底不直接泄漏服务响应。状态反馈测试通过，不将文案映射当平台真实错误码全覆盖。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/MatchWaitingPresentation.ts",
+      "sha256": "6dd4e089ab382f73c9ce0c4b8397bef8a153f182851f2ef1da75fa1a3ddeb858",
+      "lines": 22,
+      "notes": "完整22行。核正常/取消/入桌/失败/取消不明状态的标题与说明，避免未确认取消被表述为已退出。既有等待测试覆盖；无真实匹配ETA保证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/MatchmakingPageView.ts",
+      "sha256": "7268346ff520763d139b6279cbb5c84903a200ffc6b79937b3f5d65a24767071",
+      "lines": 55,
+      "notes": "完整55行。核状态按钮、220×58操作、居中与失败信息区域、取消/性能降级/减少动态时的动画开关。内存UI树测试通过；不凭此宣称布局变美或微信安全区通过。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyMatchedEntryCoordinator.ts",
+      "sha256": "6e495e0157a3e0b2458f623afc8599359f7da424d1b884f312b7761346e685da",
+      "lines": 195,
+      "notes": "完整195行。核10次业务尝试/6连接失败/6秒watchdog/绝对有效期、同代际回调、connect失败避免双计、purpose和seat决定create/join/rejoin、fail后传恢复ID。lobby-entry完整回归通过；pending/transport外部协作者中尚未全读部分保留跨模块边界。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/validation.ts",
+      "sha256": "dcd826f7fd03739a9075ce760e0eec2bc62d6939ceed0e963eedc37a44b974bb",
+      "lines": 117,
+      "notes": "完整117行。核PlatformApiError封装、HTTP envelope/data展开、对象/字符串/数字/枚举/列表校验、端点策略。补充网关/decoder及4错误envelope与data=0对照通过。数字兼容转换未发现可达业务损害，不把任意坏fixture接受一概报线上漏洞。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/competitionDecoders.ts",
+      "sha256": "6fada865f85f9ee218933de1d5c4f8fbed1bc0fddc6ede378ed7ba4383bb387e",
+      "lines": 87,
+      "notes": "完整87行。核queue/status/entryID/seat/room/token/endpoint、matched必需字段、人数/机器人范围及总量、expiry/botFillAt。6状态×4座位24对照和12非法DTO拒绝通过；queue白名单在探针显式仅quick，不等于完整玩法目录或服务响应已验证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/platform/contracts.ts",
+      "sha256": "5ab7ec9e174b7c266622acee691d7dbbb6eebceeb9dace304b45fadde8519f3a",
+      "lines": 68,
+      "notes": "完整68行。核请求/响应/配置/error类型、PlatformApiError status/code/details/retryable约定；由validation/错误呈现/网关测试消费。类型声明不构成运行时边界，本批未完整审阅实际HTTP client。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 22,
+    "reviewedLines": 3961,
+    "existingTests": [
+      {
+        "command": "node work/guandan-cocos/tests/ui-recovery-regression.cjs",
+        "result": "passed; synthetic ports, no build or external service"
+      },
+      {
+        "command": "node work/guandan-cocos/tests/friend-room-platform-flow-regression.cjs",
+        "result": "passed; synthetic ports, no build or external service"
+      },
+      {
+        "command": "node work/guandan-cocos/tests/startup-coordinator-regression.cjs",
+        "result": "passed; synthetic ports, no build or external service"
+      },
+      {
+        "command": "node work/guandan-cocos/tests/lobby-entry-regression.cjs",
+        "result": "passed; synthetic ports, no build or external service"
+      },
+      {
+        "command": "node work/guandan-cocos/tests/match-waiting-regression.cjs",
+        "result": "passed; synthetic ports, no build or external service"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/route-recovery-16.cjs",
+      "result": "passed",
+      "reservationCases": 97,
+      "trackerCases": 5,
+      "recoveryCases": 7,
+      "gatewayCases": 9,
+      "decoderCases": 36,
+      "matchingCases": 5,
+      "routeCases": 100,
+      "newFindings": 0,
+      "details": [
+        "24 promise orders × 4 room adoption outcomes plus one synchronous entry failure",
+        "32 concurrent recovery-ID requests share one factory; four malformed IDs recover on retry",
+        "success/empty/failure × active/disposed plus reentrant failure exhausting three automatic attempts",
+        "ordinary match recovery only: one valid and eight malformed responses",
+        "six statuses × four seats plus twelve negative DTO cases; four error envelopes and valid data=0 separately",
+        "matching begin/duplicate/cancel before dispatch, during join, queued, assigned, and cancel-uncertain",
+        "100 route open/reopen/clear cycles with deferred-destroy semantics, tween teardown and resize; 200 route-change callbacks"
+      ]
+    },
+    "interactionCriteria": "ui-ux-pro-max skill fully read; local UX query loading cancellation feedback used for loading feedback and lifecycle criteria only. No interface design/edits or unsupported web-stack guidance applied."
+  },
+  "limitations": [
+    "Only these 22 files were fully read and counted. Auxiliary FrontPageController/GameScene/LobbyPage/friendRoomGateway/caller fragments and helper modules are not newly counted.",
+    "No new confirmed finding in these checks does not resolve the existing 24 findings or prove the remaining repository healthy.",
+    "Synthetic network/UI/scheduler/persistence ports; no real HTTP, WebSocket server, WeChat authorization/invite, production account, graphical rendering or device lifecycle test.",
+    "Existing lobby-entry EventTarget.off is a no-op; the added recovery probe uses a removing event fixture but still does not prove every real owner unsubscribes.",
+    "The recovery friend-room decoder branch and full queue catalogue/HTTP transport are outside the added gateway probe; admission signature validation is mocked in the existing contract fixture.",
+    "No product behavior, test assertions, build outputs, deployment, real user data, git commits or engine restart changed."
+  ]
+}

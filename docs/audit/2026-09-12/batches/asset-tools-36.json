@@ -1,0 +1,245 @@
+{
+  "batch": "asset-tools-36",
+  "reviewer": "root",
+  "reviewedAt": "2026-09-13",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/art-source/ui-recovery/generation-prompts.json",
+      "sha256": "c13835659ab883b2a2106dd6a74e374a35ba06a2134a9ea2370574ce2f821484",
+      "lines": 20,
+      "notes": "完整20行。3类生成提示与最终奖杯实底提示，明确拒绝棋盘格尝试；来源元记录不等于可商用授权或当前透明成品。仅创作输入，不是运行时配置，没有执行生成。"
+    },
+    {
+      "path": "work/guandan-cocos/art-source/ui/tournament-cutout.py",
+      "sha256": "359334c3e8fc839ddebf1cef2d279618542e0214a0e3cfdc0d9db3f9d7757320",
+      "lines": 21,
+      "notes": "完整21行。固定输入原图、色差阈值alpha、范围assert、等比缩至480并居中512；top-level直接写衍生文件，禁止普通执行/导入，本批仅编译语法及只读核现有512 RGBA alpha0..255。资产专用去底不能冒充通用抠图，无产品图片变更。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/extract-timer-frame.py",
+      "sha256": "65ffdc5fded0df123f821178404cbbc16e5a60d9cb7e8b818bb4c2e89de741f5",
+      "lines": 105,
+      "notes": "完整105行。四邻域边界连通浅灰背景排除、内部白色保留、带padding等比方图、预乘alpha缩放；main需要显式输入输出。合成56边界像素/白色内部/阈值/64输出/空图拒绝通过，save截留内存。8位通道低alpha量化不套用全alpha颜色下限，不新增实际视觉缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/generate-bomb-vfx-assets.py",
+      "sha256": "61d75f870af33831e73a2eff3be842b3bfb1c0a85e80019640188c1603b4d59c",
+      "lines": 462,
+      "notes": "完整462行。固定种子及按名独立RNG、6个程序图元、4倍抗锯齿、透明RGB扩散、尺寸/alpha/save校验。每项两次像素确定，原save_asset只替换最终写端口，6个内存PNG与现有文件字节一致；RGB扩散不改alpha/原图且遵守距离。默认main会写产品目录，未执行main/无meta变更。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/generate-gameplay-audio-effects-docx.py",
+      "sha256": "d7f8bc245b3f04568ef2fb5d0ac5552092a5a72120836832fa24d54aa42826e3",
+      "lines": 533,
+      "notes": "完整533行。页面/样式/表格/流程/图注/静态评审内容和固定输出；源语法与8个截图输入存在性通过，未调用build或生成DOCX。2026-08-04旧结论、旧localhost和旧P0文本只属于历史，不认作当前功能/事故，不据此恢复金边光环或旧页面。没有Word渲染验收。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/generate-lobby-glint.mjs",
+      "sha256": "5c8a1b58319e64a0c3b341e7428f7e35cd4d67e6c6d494e82dc99330dc9230ab",
+      "lines": 35,
+      "notes": "完整35行。手工PNG/CRC/zlib、48格8×2共16帧、对称sin亮度，模块top-level写固定目标。VM截留mkdir/write，384×96/3786字节与当前PNG相同，3块CRC独立表校验、首末透明、镜像alpha允许浮点取整1差。非运行时循环间隔设置，不覆盖用户1秒要求。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/prepare-steel-plate-voice.py",
+      "sha256": "e6fb73e94b8648124346f7dcc656a18d042a076a0653f28b20b6ba5ded9f7593",
+      "lines": 49,
+      "notes": "完整49行。显式WAV输入/输出、拒绝既存目标/静音/非monoPCM16、10ms RMS剪静音、限增益2和-3dBFS峰值、6ms淡入淡出及0.25–2.5s范围。仅4组新临时合成WAV测试通过，原/既存输出hash不变；无TTS请求/无替换真实语音，工具开源不证明声音服务授权。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/data/default-profiles/catalog.json",
+      "sha256": "8c5793113e6e99e2e4b15fc6783d74767bc3f491fc1d597d5969019802e3be6a",
+      "lines": 178,
+      "notes": "完整178行。24条唯一id/昵称与对应profile:ID和文件，26失败或未取索引共同覆盖1..50；服务器/客户端24文件hash一致，sync脚本内存输出与现有生成TS全文一致。既有交付文档明示24非50，不虚增规模。未联系UAPI/抓新头像，不把公网可查等于使用授权。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "finalChecks": {"headUnchanged":true,"originalDirtyHashes":5,"reviewedHashes":624,"uniqueIssues":40,"firstParty":"624/629","percent":99.21,"generatedCopies":39,"inventory":"Audit inventory verified: 624/629 first-party files; 39 generated copies.","gitDiffCheck":"passed"},
+    "commands": [
+      "node docs/audit/2026-09-12/repro/asset-tools-36.mjs",
+      "PYTHONDONTWRITEBYTECODE=1 /Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 docs/audit/2026-09-12/repro/asset-tools-36.py"
+    ],
+    "results": {
+      "javascript": {
+        "glint": {
+          "size": [
+            384,
+            96
+          ],
+          "frames": 16,
+          "bytes": 3786,
+          "sha256": "7b9ad4d85fb15c3aa011899eba5d51035e56b3ad5d2f0e134d717cea4c880288",
+          "sourceMatchesExisting": true,
+          "chunkCrcChecks": 3,
+          "frameAlphaMax": [
+            0,
+            9,
+            35,
+            73,
+            116,
+            157,
+            190,
+            208,
+            208,
+            190,
+            158,
+            116,
+            73,
+            35,
+            9,
+            0
+          ],
+          "productWrites": 0
+        },
+        "profiles": {
+          "successfulPairs": 24,
+          "failedOrNotFetchedIndices": 26,
+          "uniqueIds": 24,
+          "uniqueNames": 24,
+          "completeIndexPartition": true,
+          "serverClientPixelFileHashesMatch": 24,
+          "generatedTsMatchesActual": true,
+          "newQueries": 0
+        },
+        "scope": "read-only catalog; generator final writes captured in memory; no avatar fetching"
+      },
+      "python": {
+        "python": "3.12.14",
+        "pillow": "12.3.0",
+        "timer": {
+          "borderPixelsRemoved": 56,
+          "enclosedWhitePreserved": true,
+          "premultipliedNoGreenBlueBleed": true,
+          "syntheticExtract": "64x64",
+          "blankRejected": true,
+          "productImagesWritten": 0
+        },
+        "bomb": {
+          "assets": [
+            {
+              "name": "bomb-body.png",
+              "size": [
+                256,
+                256
+              ],
+              "deterministicPixels": true,
+              "generatedSha256": "7ad5d3ecc4715e5bc9809b161b7707809631dc6769c56e5c77f20e951b29ebef",
+              "existingSha256": "7ad5d3ecc4715e5bc9809b161b7707809631dc6769c56e5c77f20e951b29ebef",
+              "byteMatch": true,
+              "pixelMatch": true
+            },
+            {
+              "name": "trail-soft.png",
+              "size": [
+                256,
+                64
+              ],
+              "deterministicPixels": true,
+              "generatedSha256": "d5ef21587ab4248dc55d60475f9adfa769dc146d0c5ab14fb4e1574ebbfc9949",
+              "existingSha256": "d5ef21587ab4248dc55d60475f9adfa769dc146d0c5ab14fb4e1574ebbfc9949",
+              "byteMatch": true,
+              "pixelMatch": true
+            },
+            {
+              "name": "hot-core.png",
+              "size": [
+                256,
+                256
+              ],
+              "deterministicPixels": true,
+              "generatedSha256": "bf79dac949bc0ec4f6b2111d926a56a169669beba0199b3041e8ca68237bf4c5",
+              "existingSha256": "bf79dac949bc0ec4f6b2111d926a56a169669beba0199b3041e8ca68237bf4c5",
+              "byteMatch": true,
+              "pixelMatch": true
+            },
+            {
+              "name": "spark-streak.png",
+              "size": [
+                128,
+                32
+              ],
+              "deterministicPixels": true,
+              "generatedSha256": "d17636715dd07c3fdd14aad510f4e6ad2abced7fd4354496b9a699f5c168383d",
+              "existingSha256": "d17636715dd07c3fdd14aad510f4e6ad2abced7fd4354496b9a699f5c168383d",
+              "byteMatch": true,
+              "pixelMatch": true
+            },
+            {
+              "name": "debris-shard.png",
+              "size": [
+                64,
+                64
+              ],
+              "deterministicPixels": true,
+              "generatedSha256": "10da753e1a9168bf147b0917d254220981642d5a7bac9ce85bccf6dd6ac04f5c",
+              "existingSha256": "10da753e1a9168bf147b0917d254220981642d5a7bac9ce85bccf6dd6ac04f5c",
+              "byteMatch": true,
+              "pixelMatch": true
+            },
+            {
+              "name": "noise-tile.png",
+              "size": [
+                128,
+                128
+              ],
+              "deterministicPixels": true,
+              "generatedSha256": "bcfe8996bbdbf24e79f308dce6ef8673befaa8baf8afceabbb2059b11a9cc359",
+              "existingSha256": "bcfe8996bbdbf24e79f308dce6ef8673befaa8baf8afceabbb2059b11a9cc359",
+              "byteMatch": true,
+              "pixelMatch": true
+            }
+          ],
+          "bleedAlphaUnchanged": true,
+          "productImagesWritten": 0
+        },
+        "cutout": {
+          "size": [
+            512,
+            512
+          ],
+          "mode": "RGBA",
+          "alpha": [
+            0,
+            255
+          ],
+          "scriptExecuted": false
+        },
+        "historicalDocument": {
+          "syntax": true,
+          "existingPictureInputs": 8,
+          "buildInvoked": false,
+          "hardcodedHistoricalDate": "2026-08-04"
+        },
+        "audio": [
+          {
+            "case": "syntheticSuccess",
+            "duration": 0.615,
+            "monoPcm16": true,
+            "fadeEndpointsZero": true
+          },
+          {
+            "case": "existingDestinationRejected",
+            "bothUnchanged": true
+          },
+          {
+            "case": "silenceRejected",
+            "noOutput": true
+          },
+          {
+            "case": "stereoRejected",
+            "noOutput": true
+          }
+        ],
+        "scope": "memory or owned temporary fixtures; no product write, TTS, network or build"
+      }
+    },
+    "limitations": [
+      "没有调用产品写目录的生成入口；Python写入只在新建临时目录，最终图片保存截留内存。",
+      "未生成Word文档/未实际TTS/未联网获取头像或验证商业授权/未真机或GPU验证。",
+      "首次探针错误地要求镜像sin取整alpha完全相同、极低alpha RGB无量化误差；改为1单位镜像容差和alpha>=64颜色约束后重跑通过。不计产品缺陷。",
+      "6份程序图和1份glint源文件对应性仅针对当前工作树，不证明已发布包同步。"
+    ]
+  }
+}

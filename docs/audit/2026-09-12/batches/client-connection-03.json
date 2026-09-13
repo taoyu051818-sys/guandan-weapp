@@ -1,0 +1,38 @@
+{
+  "batch": "client-connection-03",
+  "reviewer": "audit_client_state",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyController.ts",
+      "sha256": "711a53e3ebaa25e714d2bc59f96bdf117e77e0fa33c5572e29bd75ea60e78444",
+      "notes": "完整逐行审阅494行；组件监听器安装/解绑，注入transport边界，手工和平台入桌，expected请求代际，匹配票据重试接线，重复/迟到成功清理，冷热恢复token持久化/轮换，退出/销毁/清房。现有lobby-entry、network-owner和friend-platform-flow回归通过。核对合法好友房座位重排与p5-p8平台到本地席位映射，未把已适配路径误报；未确认新增独立缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbySocketClient.ts",
+      "sha256": "752345930b63f882a3cf0fa5e1ed3a9a1dfe3c36bdca86778eac516918c24e95",
+      "notes": "完整逐行审阅18行；transport接口Promise连接、监听器dispose、可选retryRequestId以及请求结果类型。与Cocos实现和LobbyController消费者逐项核对；接口自身无状态或异步副作用，未确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/CocosSocketClient.ts",
+      "sha256": "b4cfdcc981d0d2d0a836cad5ea10cb900fb82b9fc5a399c1da4ba0ea5f1746fa",
+      "notes": "完整逐行审阅194行；微信端点策略、同URL连接复用、replaceConnection代际失效、open/error/close/message回调门禁，500ms至8s退避及取消、请求ID/64项诊断映射、解析与同步派发。额外真实transport+内存WebSocket复现排除CN-02-C01的旧连接roomView迟到路径：旧message/open/close/error均无副作用。当前连接顺序原样派发。未确认新增独立缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyEntryRequest.ts",
+      "sha256": "96098d5a8d350baf98f0f495526786b62ee022ad8d6adb7009da5c5d6ff3cf64",
+      "notes": "完整逐行审阅30行；pending generation/requestId/responseType/roomId/status匹配，好友房合法视角重排兼容；retryable请求固定JSON body及wire requestId，clear重置。额外断言同body重试ID不变、改变body被拒、clear允许新请求；现有真实client/server票据幂等fixture通过，未确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyEntryAttempt.ts",
+      "sha256": "7f0a17914d5a9ac54276f80c1efae83ff91ffab1979ce0427090d41b9796d2b2",
+      "notes": "完整逐行审阅111行；16字节安全随机数base64url编码、22-128字符格式、WebCrypto/微信native来源、5秒异步超时及一次完成、native缓冲类型/长度，matched attempt重试不变与manual新attempt。额外断言native成功/失败/15字节错误/超时后迟到成功、timer清理、固定128位编码及tracker代际均通过；无Math.random不安全降级，未确认问题。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": [
+    { "command": "Markdown内嵌transport探针：真实CocosSocketClient+内存WebSocket", "result": "agent与root分别提取重跑退出0；旧连接消息/回调无副作用、同连接顺序与请求重试身份、取消重连通过" },
+    { "command": "lobby-entry / lobby-network-owners / wechat-runtime-compatibility / friend-room-platform-flow", "result": "agent安全检查后4个既有回归通过，详见Markdown" }
+  ]
+}

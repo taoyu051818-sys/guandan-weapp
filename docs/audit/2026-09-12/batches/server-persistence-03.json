@@ -1,0 +1,59 @@
+{
+  "batch": "server-persistence-03",
+  "reviewer": "audit_server_authority",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-exit.js",
+      "sha256": "d37bb71a0469ef97bfe2f01d7b94e25af7e317edadc8e82dab2a96538d01f6ff",
+      "notes": "完整逐行审阅98行；成员授权、房间seed/match身份检查、幂等退出记录、退出双提交/重试、席位保留与释放。command-recovery本地回归通过。markOfflineReady跨终场缺口引用SL-02-001，不重复计。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-runtime-recovery.js",
+      "sha256": "8cc2ebbd6ef48dc337a9a5f68907c53405a86c967f97c2ee45da67df8e122d99",
+      "notes": "完整逐行审阅115行；接受记录/关闭索引、房间身份/恢复凭证结构、状态迁移、成员离线、pending副作用与生命周期重新调度、关闭房间清理。对应回归通过，未确认新增独立问题；94-98行是SP-03-002后重启可清理的恢复边界。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-expiry.js",
+      "sha256": "94de25a9940b20c394dbd3b2b31cb0bf7cedec58d5c325efd6123fa9ff7cdb53",
+      "notes": "完整逐行审阅49行；房主/空房存活复核、投票引用/期限、到期自身持久失败回滚及租约。确认SP-03-001与SP-03-002跨模块缺口；现有对应测试通过。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-command-publication.js",
+      "sha256": "a98bef5e29929c9b7e5ab845f7dcacdb22e3fa9e2f8f07f6fabdb8428e9c3216",
+      "notes": "完整逐行审阅17行；恢复发布当前权威状态、贡还/结算、投票/准备的条件与顺序，不重放聊天或旧动画。command-recovery回归覆盖当前发布/隐私；未确认新增独立问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/room-state-store.js",
+      "sha256": "6e61c5d02e788862d3ffbaa294681e10d1511ff555195007fdfe3c87c6debd44",
+      "notes": "完整逐行审阅79行；私有文件硬化接线、schema和损坏失败关闭、保存队列与错误传播、深复制、连接ID清空、精确接受对象确认。辅助追查durable-file原子写/fsync实现；合成临时目录回归通过，未读取真实快照或确认新增独立问题。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "SP-03-001",
+      "severity": "P2",
+      "title": "自动动作回滚替换投票对象，导致已排定的投票超时失效",
+      "path": "work/guandan-windows-source/server/weapp-room-expiry.js",
+      "line": 32,
+      "evidence": "28-32行捕获vote并按引用比较。weapp-match-lifecycle.js:316 structuredClone整房间，371-375或378-382失败回滚经76-78行恢复嵌套对象，产生等值但不同引用的dissolveVote，未重设到期任务。原到期回调32行静默返回，weapp-room-expiry-jobs.js:19-21 finally删除任务。weapp-game-command-handler.js:113因此继续拒绝新解散申请。",
+      "validation": "已确认。无网络导入真实lifecycle+expiry，合成正在投票的房间和可控timer，在自动dispatch注入异常触发真实回滚，再触发原到期回调；vote引用不同但内容相同，投票保留、到期timer为0、无持久提交/expired发布；真实game handler随后proposeDissolve返回已有解散投票进行中。完整可复制脚本见Markdown，现有4文件回归均通过。主动拒绝旧票或重启仍可能恢复，不声称绝对不可恢复。",
+      "recommendation": "以稳定投票ID/代次识别跨回滚业务身份，或在整房间回滚后重建相关期限；保留替代投票对旧任务的隔离。增加投票中自动动作/持久失败回滚后超时的跨模块回归。"
+    },
+    {
+      "id": "SP-03-002",
+      "severity": "P2",
+      "title": "空房或房主过期关闭提交失败后只重试存储，不重试完成关闭",
+      "path": "work/guandan-windows-source/server/weapp-room-expiry.js",
+      "line": 12,
+      "evidence": "12-14及20-24行直接调用closeRoomWithoutAck，无关闭重试；expiry-jobs:19-21失败仍删任务。实际weapp-ws.js:456-475第1次提交失败留下closingReason，第2次失败恢复房间Map并只persistRuntimeState。weapp-runtime-persistence.js:23-29随后只重试保存，不重做删除/finalize。入口无通用closingReason周期扫描；ws:355-369的业务重试仅stage自身异常时在411-413安排，本例只有commit失败不触发。gateway:64阻止closing请求；runtime-recovery:94-98以后重启可清理。",
+      "validation": "已确认。真实expiry+runtimePersistence，以及从weapp-ws读取原样提取的单个closeRoomWithoutAck函数，在内存合成依赖中执行；未加载服务器入口。选未开局host过期，以及已settled且totalTimeMinutes=0的empty过期，排除出牌/总时长timer干扰。分别注入第1/2次save失败，后台保存恢复后均保留1个closing房间，close/persist timer均0，最后保存仍含该room且未finalize。Markdown脚本四种组合可直接复制。没有真实磁盘故障、备份或平台操作。",
+      "recommendation": "持久化失败后重试完整关闭事务而不只重试写盘；在同一房间身份/代次仍有效时保留关闭完成租约，成功delete+commit+finalize后才解除。覆盖第一次和第二次提交失败后无需重启即可完成关闭。"
+    }
+  ],
+  "concerns": [],
+  "validation": [
+    { "command": "Markdown内嵌两段无网络JS复现", "result": "agent和root分别提取运行退出0；投票超时失效及2种关闭原因×2个提交失败位置全部确认" },
+    { "command": "node --test work/guandan-windows-source/server/weapp-runtime-recovery.test.mjs work/guandan-windows-source/server/room-state-store.test.mjs work/guandan-windows-source/server/weapp-room-expiry.test.mjs work/guandan-windows-source/server/weapp-command-recovery.test.mjs", "result": "agent与root均运行通过：4 pass / 0 fail；临时合成存储，不访问生产数据" }
+  ]
+}

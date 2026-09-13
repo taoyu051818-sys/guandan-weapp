@@ -1,0 +1,79 @@
+{
+  "batch": "client-table-lifecycle-06",
+  "reviewer": "audit_client_state",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableLayoutAuditBridge.ts",
+      "sha256": "af9e15fad2b1896d3e542dbf320586c85de48f798608719b5931a2553a9e276d",
+      "notes": "完整214行。核对显式browser+layoutAudit门禁、异常隔离、全局桥/DOM控件成对清理及替代owner保护、canvas逻辑到CSS像素缩放、实际卡面parts、operation空白padding排除、timer父级去重、相对座位出牌标签和辅助区域。现有回归及实际Bridge隔离全局探针通过；不把几何框作为Cocos像素/遮挡验收。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableSceneLayout.ts",
+      "sha256": "78ca8563fe129a5338ad5efc3b3b9fd8e904835c842044ef6a69897f93ca544c",
+      "notes": "完整57行。审阅safeWidth/安全边距、手牌/出牌区/effect root resize、overlay尺寸/文字约束、未挂HUD时回退按钮位置、已挂HUD后回合按钮所有权、贡还/结算入口位置和四座相对布局。真实源既有三种viewport与四座回归通过；保留原有top坐标及布局，不将纯几何断言称真实屏幕安全区保证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableSceneNodes.ts",
+      "sha256": "07dd58dc094aabb8888c545a44c95f41c71b66f4d3f534ceb78e24a504483f0e",
+      "notes": "完整82行。审阅Inspector绑定复用、仅缺失节点创建、4seat幂等、组件挂载、文字/按钮metrics与初始hidden状态、完整非null返回。现有测试实际调用builder两次验证不重复分配并保留Inspector按钮；无额外timer/监听/业务所有权。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableProgressPresentation.ts",
+      "sha256": "a7e3a7ad51c2c292f36cbbecef3b438661d95c0a7ce4c56361c4c54a2067776d",
+      "notes": "完整50行。审阅finishers/handcount展示游标、跨10张阈值、相对本人文案、reset与seedRecovery拷贝、局边界清游标和不修改state。真实模块恢复/重复render/跨局/切viewer探针通过；辅助确认Router恢复结算先network-state（coordinator seedRecovery）再roundEnded，未把历史finishers提示候选误报。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableTurnClockController.ts",
+      "sha256": "940222ceb6af61e3c672ce99b54d0fd87b818a066fae07239ab90cd5551d5f48",
+      "notes": "完整104行。审阅构造单tick、update统一时间/metadata采样、reset隐藏、dispose幂等取消与late tick/update、相对seat/贡还label及最后5秒音。确认CTL-06-001：无声update也覆盖remainingSeconds，使其后的同秒tick误认为已处理该秒而漏发playCountdown；真实输入→manager→coordinator→实际phase→实际clock链路复现，仅本地提示音。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableTurnClockProjection.ts",
+      "sha256": "e1bf51f27e9173daf3bb26626d15ec8968974ecd65a0fa72daf057086ac7ad91",
+      "notes": "完整32行。审阅服务端ready/deadline/matchEnded/pending/phase/seat/finite time门禁、ceil与零下限、房间时长及相对位置。24个turnOrder排列×4viewer×4actor×3phase×6时间点=6912实际投影对照通过；没有客户端自动出牌逻辑。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "CTL-06-001",
+      "severity": "P3",
+      "title": "选牌刷新可吞掉最后五秒计时提示音",
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableTurnClockController.ts",
+      "line": 85,
+      "evidence": "update()在43–49行调用renderClock(false)，85–86行仍把remainingSeconds替换为当前投影秒数；后续1Hz tick在87–89行只在秒数不同于该上次render值时才调用playCountdown。正常点按经TableHandInteractionController.ts:99–102、GameManager.ts:66–72/171–180发guandan:state，TableMatchCoordinator.ts:53/126调用实际TablePhasePresenter.ts:57更新clock。若最后5秒的某个秒数先由输入刷新呈现、随后tick仍处同秒，则该秒无提示音。当前ARCHITECTURE.md:77及gameplay-audio-effects-spec.md:90要求最后5秒语义音；不是用户关闭音效。",
+      "validation": "完整MD探针执行真实CardView输入、HandController、TableHandInteraction、GameManager及核心规则、TableMatchCoordinator、TablePhasePresenter、TableTurnClockController/Projection。固定deadline=6000ms，每秒边界+1ms点按a，+100ms执行1Hz tick；5次同序列得warnings=[]，无点按对照=[5,4,3,2,1]。两者最后label=1s、HUD秒数一致，网络发送均0；reset/dispose后的late tick不再写HUD。时钟/输入设备/音频播放与外围绘制为内存端口，未真机听测；一次符合顺序的刷新会漏该秒，多次可漏多个，不声称所有使用必然漏5声。6项既有回归仍通过，其警报测试没有跨秒update(false)先于tick的对照。",
+      "recommendation": "把已播报游标与最近绘制秒数分离，tick按当前deadline/actor/action等权威时段身份和最后已播秒数去重；reset/dispose或deadline切换重置适当游标。保留update可无声刷新和一次采样，不用所有render都播音来制造重复。添加真实输入或metadata刷新先于tick、反向顺序、重复同秒刷新、恢复/时段切换的音效端口回归。"
+    }
+  ],
+  "concerns": [],
+  "validation": [
+    {
+      "command": "完整重读审计README与ui-ux-pro-max技能；核对当前coverage及所有batch reviewed",
+      "result": "6个目标均未被任何旧批次计入，539行；HEAD及原5处dirty不变。responsive viewport safe area --domain ux偏Web，重试touch safe areas --domain web命中iOS/Android/React Native Safe Area Insets；仅核现有安全边距接线，不迁移平台像素尺寸或改布局。"
+    },
+    {
+      "command": "在work/guandan-cocos逐项运行 table-turn-clock-controller、table-layout-overlap-audit、table-scene-assembly、table-progress-presentation、round-view-boundary、table-match-coordinator 的regression.cjs",
+      "result": "先检查脚本与本地loader，6项全部实际退出0；无构建/产物/网络/持久化写入。"
+    },
+    {
+      "command": "MD探针A：真实点按→manager→coordinator→phase→clock，与tick-only对照",
+      "result": "退出0；复现CTL-06-001，输入先行warnings[] vs control[5,4,3,2,1]；label/HUD正确，networkSends0。复用既有手势测试的Cocos内存设备/绘制端口，实际clock/phase未存根。"
+    },
+    {
+      "command": "MD探针B：实际投影/进度/Bridge控制流，以已有测试内存fixture追加对照",
+      "result": "退出0；6912投影组合、恢复阈值游标、canvas非等比缩放、operation空白排除、timer父级去重、可见性过滤和重排座位出牌标签通过。既有builder测试已验证3viewport/4seat/Inspector/idempotence。"
+    },
+    {
+      "command": "保存前Node crypto SHA-256及git diff --check/status；两段终版探针分别在内存执行",
+      "result": "6目标哈希与起始一致，HEAD1d58999与原5处dirty保留；两段终版探针保存前已实际退出0。根线程告知长期目标paused时报告已保存，之后仅收尾记录，未新增审查/测试，也未从落盘报告提取再跑。仅本批MD/JSON，未更新inventory/coverage/STATUS，未改产品、测试、生成或发布。"
+    }
+  ],
+  "scope": {
+    "reviewedFiles": 6,
+    "reviewedLines": 539,
+    "newConfirmedFindings": 1,
+    "unconfirmedConcerns": 0,
+    "limitations": "仅指定6文件完整计数；其他客户端呈现6文件与root资源4文件不重复计。辅助链路/既有测试不计人工覆盖。无实际Cocos/GPU/安全区/系统旋转/音频听感验收；CTL-06-001只证明音频调用缺失，不改变服务器deadline、托管、选择或规则。"
+  }
+}

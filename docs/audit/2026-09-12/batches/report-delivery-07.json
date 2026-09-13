@@ -1,0 +1,98 @@
+{
+  "batch": "report-delivery-07",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/result-reporter.js",
+      "sha256": "b56fe89904020317ae1cccccf30b969fe07e4ff23998ba6f8bd128c2c0dfec47",
+      "lines": 185,
+      "notes": "完整185行。核持久stage先add再交付、同event去重、restore按finishedAt/ID启动但结果并行、精确DTO签名/回执、bounded与durable两层重试、超时和stop收尾。实际模块故障探针验证add失败不建operation、同事件复用Promise、ack后remove失败精确重试和清理。停机后stage保留durable事件再拒绝，不视为丢事件；没有把结果并行称为同场多次结算允许。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/spectator-event-reporter.js",
+      "sha256": "6bc8b97d3adb51fc33a8093d6c47121365739d469a98fdc1e8bff76158cccb90",
+      "lines": 165,
+      "notes": "完整165行。核每match队列和不吞head拒绝、outbox写失败不污染队列、两层重试、恢复按match/sequence排序、精确ack、lifecycle双签名及独立claimStart契约。真实模块验证同场有序、跨场不阻塞、重启恢复、取消不删除未确认工作。同步game-start特殊路径的业务事务已在第五批审查；不重复归因SE-05-001。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/game-result-outbox-store.js",
+      "sha256": "7d006c26f5b9e41e2367780fe53f641059e36d765612dfa66969c595eaceb0c2",
+      "lines": 98,
+      "notes": "完整98行。核schema/eventId/重复身份校验、JSON克隆、canonical冲突、save成功后才换内存、600/700权限和原子替换接口、ENOENT空/其他坏文件fail-fast。既有真实临时文件重启/rename失败测试通过，新增内存save故障验证add/remove和pending克隆；非多实例队列，不代表断电/共享盘实测。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/spectator-outbox-store.js",
+      "sha256": "ac34ba9f6594d883b1bd33d36ebb2597fb19a65415a64690f980d13ae71bac65",
+      "lines": 95,
+      "notes": "完整95行。核safe sequence、eventId与match/sequence双唯一、逐条snapshot校验、JSON克隆、语义身份、save前后提交界限。真实临时文件回归及内存双唯一/删除失败对照通过。仅校验持久信封，业务事件完整性由上游/平台检查，不能把不验全部业务字段孤立误报。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/game-result-outbox.test.mjs",
+      "sha256": "e2708d79619031262204d584955f079939a3c261b54e0289ff06790111dbac85",
+      "lines": 162,
+      "notes": "完整162行并运行通过。核先持久后请求、stop留存/新实例补发、重复ack删记录、abort signal/签名、canonical冲突、权限/rename失败/临时文件清理、timeout恢复、非协作fetch超时、无durable拒绝与坏JSON/version。mkdtemp新建合成目录finally清理，fetch全部替换；不验证生产回调或断电。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/spectator-outbox.test.mjs",
+      "sha256": "4b19780e8a424470dfb36e485b27c82c568b1d960d6e715471203c9fa00577e1",
+      "lines": 129,
+      "notes": "完整129行并运行通过。核两事件队列停机保留/新实例顺序恢复、公开和生命周期签名、权限/正文幂等、rename失败及坏文件。显式config入参、fetch替换，无生产env或外部连接。只有两事件/一match既有覆盖，本批另补多match乱序恢复/阻塞隔离。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/reporter-delivery.test.mjs",
+      "sha256": "5e69205d6a80b24b929341f72734437fefdca16d50b34f2f90add3e73bf71b84",
+      "lines": 171,
+      "notes": "完整171行并运行通过。核两reporter坏ack不删除、stage/direct跨重试DTO所有权、fetch与body中stop及迟到成功、跨场stop、inner/outer退避取消、不协作fetch超时。memoryOutbox只Map覆盖不具备生产冲突规则，因此补充探针用实际JsonStore.add/remove；未把该简化存根当生产持久一致性证明。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/report-delivery-lifetime.js",
+      "sha256": "83169329e878608b72e2dcf33d65067b7f13ca0e6b5524ed38148c75b22c0d2a",
+      "lines": 71,
+      "notes": "完整71行。核每match stopped/controller/waiter所有权、同步和异步assertActive、AbortController超时race、body等task迟到隔离、finally清timer/listener/controller、wait unref及单键stop幂等。既有中止回归和新增两键wait对照通过。没有reset已停match API属于单生命周期契约；生产stop于显式关闭，不将Map残留单独认定线上泄漏。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/report-event-contract.js",
+      "sha256": "d3a42663e87d3dba37485306ffb9d6f461ab1f3a708a04afd05b323d3a81ff71",
+      "lines": 17,
+      "notes": "完整17行。核标准JSON快照、result要求accepted===true和eventId相等、spectator另核match和sequence精确相等；多组既有坏ack与调用方变异测试通过。这是受信report DTO契约，非不可信外部输入全schema验证。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/canonical-json.js",
+      "sha256": "714637e30b339a5ff00f3fe0f3be31f64cd732760e61bab785ed3360197d768d",
+      "lines": 17,
+      "notes": "完整17行。核对象递归排序、数组顺序保留、Object.fromEntries、fingerprint及旧插入序存储兼容与坏JSON返回false。真实嵌套重排/数组差异/旧fingerprint/自有__proto__对照通过。仅在JSON域讨论等价，不推断任意JS循环对象可序列化。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 10,
+    "reviewedLines": 1110,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/platform/game-result-outbox.test.mjs",
+        "result": "passed; synthetic data and substituted fetch only"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/spectator-outbox.test.mjs",
+        "result": "passed; synthetic data and substituted fetch only"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/reporter-delivery.test.mjs",
+        "result": "passed; synthetic data and substituted fetch only"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/report-delivery-07.mjs",
+      "result": "passed: two actual reporter/store variants; clone/canonical conflicts, failed stage recovery, shared operation, accepted remove retry, per-match ordered restore and independent progress, independent result concurrency, cancellation and fingerprints",
+      "boundary": "Actual Store.add/remove/clone code; save boundary is memory-injected, not filesystem. Actual reporters, identity and lifetime modules; all fetch callbacks synthetic. Existing temporary-file tests separately verify filesystem behavior."
+    }
+  },
+  "limitations": [
+    "Only ten full-read files counted; server entry/coordinator/durable helper were supporting reads already counted elsewhere; platform config/crypto call-site support not counted.",
+    "This subgroup found no new defect, not a claim of end-to-end platform acceptance or all data consistency. SpectatorEventService/domain/HTTP and full release boundaries remain pending.",
+    "No build, generated file, product edits, git operations, deployment, real user data or network callback. Existing tests clean only their own newly created temporary directories.",
+    "Subagent account usage failures prevented new parallel work; root completed this bounded subgroup locally. No usage reset or paid action. User explicitly authorized continuing the paused audit in this turn; automatic goal status was not modified."
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "batch": "client-presentation-06",
+  "reviewer": "audit_client_state",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/CardView.ts",
+      "sha256": "cd0f73d5501a1e9b8b8f3b9bbac18ca364de95ff2baac750d8688b304032f55b",
+      "notes": "完整503行。审阅bind/onLoad重绑、单套四层Sprite复用、joker/普通牌几何与清空、级标/选择灰态/锁标及栈命中条独立、groupBadge清理、共享资源异步requestId+planKey+node.isValid门禁、touch监听与退出清理、入场epoch/Promise屏障。真实模块内存探针覆盖864组牌面与覆盖状态、4类旧响应、失败重试、同脸不同卡ID、替换/点按/禁用/销毁动画收尾；未见新缺陷。已知旧gesture选择问题归CI-05-001不重复计。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/CardPresentationMapper.ts",
+      "sha256": "4514bee7b4c3b08e2db7bc82beb1598895aab6233673820338b48bd335c197d7",
+      "notes": "完整23行。逐项核对标准rank/suit到唯一展示结构：红心/方块红色、双王Big/Small与红黑、双王不挂级标、普通牌沿权威isLevelCard。联合实际CardView/Resolver穷举54种合法牌面与级/选/锁/覆盖状态；无第二个视觉状态源或异步生命周期。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/CardSkinResolver.ts",
+      "sha256": "6e1ac5b9d38f4e6172e60e7c35c4d04ab2ba7bc09e85f495e19a52dcacf5d496",
+      "notes": "完整109行。审阅四花色/13rank和大小王映射、37组件预载清单、54plan唯一key、joker层替代及空字段过滤。既有回归校验37PNG实际组件、牌面/素材元数据/授权引用与已有Web资源表；执行不生成新包，非视觉验收。合法Card模型范围未见映射错误，不把任意非法字符串注入当成当前产品入口。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableHudPresenter.ts",
+      "sha256": "9b2dbb7865c435cb8a675d1ec4a87c3a2c374c976dc7f7f2fdd491cad4115bcf",
+      "notes": "完整244行。审阅mount/dispose及timer/default-avatar取消函数与generation、suit Promise门禁、ownAvatarKey版本、观战清本人头像、座位/队伍/级数/名次/离线/托管/贡还/手牌工具投影和公开记牌边界。真实Presenter内存探针覆盖A/B头像乱序、观察者清空、销毁后的旧头像/资源与合成重新mount后的旧generation、当前资源落地、退出cancel；辅助确认实际GameScene退出后丢弃实例，未把非生产同实例重挂的key保留算确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TablePhasePresenter.ts",
+      "sha256": "e299058b7fa22bf6194124fb8a9fa4d76947415737ebcecda34174e4f94dc907",
+      "notes": "完整110行，按用户原有dirty内容审阅且未修改。核对阶段overlay/settlement清理、终场fallback文案、归位按钮与准备/取消/贡还权限/托管/observer/pending早退、赛事CTA。7项回归之一执行此实际用户版本，另补阶段→贡还/playing/终场/clear调用探针。overlay入场只动scale，关键显隐/按钮状态同步设置不依赖结束事件；未做Cocos实际帧间取消/销毁验收。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableSnapshotPresenter.ts",
+      "sha256": "38a90bff209beb3f1352a82cdc3c65d922666e3a646417804aa08fe1053e138f",
+      "notes": "完整47行。逐项审阅转蛋积分/隐藏分、定局随机固定级别模式文案、座位余牌<=10公开与名次优先、依据当前玩家team而非固定seat推导我方/对方级数及胜负。既有回归覆盖四个观察座位；HUD探针使用实际投影函数。纯投影，无异步/持久状态。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": [
+    {
+      "command": "读取README/STATUS/latest coverage与ui-ux-pro-max完整SKILL；python3 /Users/mac/.codex/skills/ui-ux-pro-max/scripts/search.py \"rapid animation interrupted\" --domain ux",
+      "result": "起始156/629，6目标全pending；窄查询命中Cancellable State Transitions（Web）。仅借用中断后直接落实语义状态的原则，不把Web平台条款强套Cocos，不改美术；早先interruptible animation与animation interruption查询未直接命中，未据此形成问题。"
+    },
+    {
+      "command": "在work/guandan-cocos运行 node tests/{card-skin,card-presentation-mapper,table-phase-presenter,table-snapshot-presenter,table-game-hud,effect-controller-lifecycle,hand-touch-coordinates}-regression.cjs（逐项）",
+      "result": "先核验脚本/loader为安全本地检查，7项实际执行全部退出0。card-skin读已有Web资源config，可能只读可选本机上游bg_front文件；没有构建、素材下载/导入或产物写入。"
+    },
+    {
+      "command": "从client-presentation-06.md的唯一node heredoc提取执行",
+      "result": "退出0：真实CardView/Mapper/Resolver/Geometry的864组合；4类迟到资源（异脸、cached快路径、同脸不同ID、destroy）、失败重绑重试；5个入场barrier经替换/立即完成/点按/disable/destroy完成。真实HUD+Snapshot投影对头像版本、观战清空、asset/头像代际、dispose取消通过。真实Phase控制器以settlement-view/projector端口存根验证清理/显示/终场fallback路径。"
+    },
+    {
+      "command": "Node crypto SHA-256以及git rev-parse/status/diff核对",
+      "result": "6文件共1036行，当前哈希与审阅起始相同，HEAD1d58999dc6e5455b049e1643660bbba3deee1406；保留原5处dirty。仅新增本批MD/JSON审计报告，未改产品/测试/生成/全局inventory/status。"
+    }
+  ],
+  "scope": {
+    "reviewedFiles": 6,
+    "reviewedLines": 1036,
+    "newConfirmedFindings": 0,
+    "unconfirmedConcerns": 0,
+    "limitations": "仅6指定文件计完整人工覆盖；辅助资源store/节点owner/ProfileAvatar/GameScene/协调器/测试等不计覆盖。无Cocos实际绘制、引擎对象释放/帧间调度、真机触摸/网络或线上数据验收。内存探针中的CC/tween/素材/头像加载器/部分HUD与settlement视图为明确存根，不能据此宣称视觉像素正确或无引擎内存泄漏。CS-01-001、CI-05-001不重复计。"
+  }
+}

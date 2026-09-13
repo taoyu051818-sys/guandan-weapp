@@ -1,0 +1,66 @@
+{
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/NetworkActionController.ts",
+      "sha256": "b957692b97ecd47ba4da12eaf8fb214ddb90301ce5de0db9c173e791130f1d11",
+      "notes": "完整逐行审阅78行；请求前网络可用性、同步发送拒绝、requestId对应、8秒超时及generation失效。核对LobbyCommandSender和断线事件接线；现有过期result/timeout回归通过。未确认本文件独立缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/NetworkMatchSnapshotController.ts",
+      "sha256": "42d91b71ccf1e5f31988ad281d0ccb3c40b1c38e22372e1f9be6ab4a9f8f7228",
+      "notes": "完整逐行审阅182行；快照接受、legacy结算适配、进度权威来源、预选保留/清理、pending取消、每局结算副作用。确认CS-01-002；并核验CS-01-001的控制器入口。普通同实例重复结算可去重，不等于跨恢复生命周期幂等。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/LocalHandSelectionController.ts",
+      "sha256": "59e279dd6fdb99f5e3768cbb06064d49f2006331433bfa8fb34d883285ecd2cf",
+      "notes": "完整逐行审阅167行；单张/批量选择、失效卡ID、贡还单选、pending/finished/phase守卫、提示缓存和锁组保护。相关选择及提示回归通过；未确认独立缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/GameManager.ts",
+      "sha256": "3f67beaa5f9b5f991fe5a8edb7ffbb12c05d1b2576b020441261eb2ae48957eb",
+      "notes": "完整逐行审阅217行；网络出牌/不要/贡还命令、snapshot发布、状态复制、abortRound取消调度/选择/去重及session副作用。CS-01-002调用链55-61、103-108行；CS-01-001进入112-113行时不携带恢复或桌身份。未改业务代码。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/GameManagerProjection.ts",
+      "sha256": "d649ae07c7ecc33a95fd99b7ca2429d91ca4c65ca846c6f0c29cdef2a75489f5",
+      "notes": "完整逐行审阅147行；canonical生命周期优先、round/revision单调性、贡还ID至旧格式转换、深复制进度。确认CS-01-001：跨复式桌的受信恢复仍使用原桌生命周期/版本门禁。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/RoundViewState.ts",
+      "sha256": "8b908f9cda32f91d7c9c6ce474d635d5747879900b29dca67cd86b44322782c2",
+      "notes": "完整逐行审阅27行；三态判别联合与phase所需数据、JSON DTO复制冻结边界。round-view-boundary回归通过。未确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandInteractionState.ts",
+      "sha256": "3dd26fa64a3227b7da36c585ef974148b98f6f5b80af3dc756a0c242d11bebe7",
+      "notes": "完整逐行审阅38行；pending/trustee/finished/settlement锁定优先级；贡还不沿用上一局finishedPlayers。纯状态投影无额外可变生命周期，相关回归通过。未确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandInteractionPolicy.ts",
+      "sha256": "b6af418c4bde7d3987f241b5e437ce8a75d2e1d78309288a2fa051ebf91a8ef1",
+      "notes": "完整逐行审阅53行；非本回合预选与提交权限分离、贡还行动者/截止席位、整理和提示能力。结合TableHandInteractionController回归核验命令时重新守卫；未确认独立缺陷。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "CS-01-001",
+      "severity": "P2",
+      "title": "复式换桌观战沿用原桌版本门禁，合法恢复快照被永久判为生命周期倒退",
+      "path": "work/guandan-cocos/assets/scripts/game/GameManagerProjection.ts",
+      "line": 125,
+      "evidence": "125-127行禁止同roundId的settlement回到playing，但没有桌/视角身份。duplicate-room-model.js:28-30给A/B桌相同roundId、独立revision；duplicate-room-actions.js:61-64明确允许本桌settled后watchTable到另一桌。FriendRoomViewReceiver.ts:23-26切换时仅重置LobbySyncTracker（LobbyMessageRouter.ts:37-40），TableMatchCoordinator.ts:159-169随后仍调用原GameManager.applyServerState。由A桌结算切到仍playing的B桌，网络metadata已变成observer/watching=B，B桌状态却在本行被拒绝。即使B桌revision随后超过A桌，staleLifecycle仍为true，不能在本局恢复观战。相同问题也会让两个独立桌不同revision被误判为过期。",
+      "validation": "已确认。无网络Node进程内使用真实core.transition生成settled状态，并串联真实duplicateAction、duplicateSnapshot、LobbyMessageRouter、NetworkMatchSnapshotController。先接收A桌结算，再执行watchTable(B)：roomRole=observer、watching=B、incomingPhase=playing，但applyServerState=false、projection.phase=settlement；另断言B的revision高于A仍被拒绝。6个既有客户端相关回归全部通过，现有observer测试没有接到GameManagerProjection。完整复现见同名Markdown。",
+      "recommendation": "为状态投影建立包含房间/对局/复式桌的authority标识；在经过上游鉴权的视角或桌切换恢复时重建版本/生命周期基线和选择状态，正常同一authority内继续拒绝过期包。不要简单删除staleLifecycle保护。增加A已结算、B未结算且revision更小/更大，以及观察者A/B切换的端到端状态回归。"
+    },
+    {
+      "id": "CS-01-002",
+      "severity": "P3",
+      "title": "结算去重身份仅存内存，恢复同一已结算回合会重复累加持久化本地统计",
+      "path": "work/guandan-cocos/assets/scripts/game/NetworkMatchSnapshotController.ts",
+      "line": 88,
+      "evidence": "88-95行只用recordedRoundKeys决定recordRound，该Set在21行按控制器实例初始化，25-26行reset清空。GameManager.abortRound():103-108在回房恢复清理时重置它；应用重启也会重新创建实例。相反GameSession.ts:65-76、79-90把gamesPlayed/wins/bombsPlayed/firstPlaceFinishes/elo持久化并恢复。LobbyMessageRouter.ts:143-145会对重连的已结算房间再次发round-ended；相同roomId/roundId在新控制器内再次通过本行，GameManager.ts:55-61再调用session.recordRound。普通不重建实例的重复包已有保护，但跨生命周期恢复没有保护。",
+      "validation": "已确认。隔离控制器测试同room=123456、round=1在reset后records从1变2，而同实例第三次重复包仍被正确去重。另仅将cc组件/事件/localStorage换成内存桩，运行真实GameSession与NetworkMatchSnapshotController两个应用生命周期：第一次统计gamesPlayed=1,wins=1,bombsPlayed=7,firstPlaceFinishes=1,elo=1016；第二次恢复同一结算变为2,2,14,2,1032。无磁盘会话写入、无网络调用。影响限本地持久化会话统计及recentMatch时间；根线程全仓引用复核没有找到当前业务UI读取本地统计的入口，个人资料使用profileGateways后台数据，因此列P3数据一致性问题，不声称可见账号计数、服务端计分或平台榜单受影响。",
+      "recommendation": "将已入账的稳定对局/回合身份与本地统计在同一持久化事务中存储，恢复时仅展示既有结算而不重复入账；或明确由服务端统计替代本地累加。身份应包含稳定match/table/round而不只依赖可重用房间号。将presentation reset与统计账本去重分离；补充重启、恢复失败返回大厅再恢复、同包重放的回归。"
+    }
+  ]
+}

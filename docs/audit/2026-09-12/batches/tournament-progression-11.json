@@ -1,0 +1,125 @@
+{
+  "batch": "tournament-progression-11",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-orchestrator.js",
+      "sha256": "81d7fe43e8b6d40e2f7faf3861da6e5f78e9ec106712038da62f6f9261e5bf63",
+      "lines": 305,
+      "notes": "完整305行。核固定16人锁表、3×4编排验证、纯状态替换/克隆、当前轮门禁、重复matched/completed/blocked、四桌汇齐推进和终态。256名单置换及72轮次完成顺序/288完成事务不改冻结输入。发现全局blocked门禁与平台逐桌关闭事务耦合，TO-11-001；暂停赛程本身是设计要求，不建议自动补赛。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-pairing.js",
+      "sha256": "3d4ce36c9a75701f3972c18b48c59ae1551b3faa85ada8397271e7c2486d3e99",
+      "lines": 68,
+      "notes": "完整68行。核16唯一ID与trim/长度、名单顺序哈希、行/列/循环对角线3轮4桌、assignment确定性和无输入变异。256合成排列各72个不重复同桌对，通过；64位截断摘要不作密码学承诺，也未凭理论碰撞报缺陷。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-service.js",
+      "sha256": "ff05838a6607359928f4889be8ceea587110804b1a1eb7f7d23ee6da6d3c6be1",
+      "lines": 240,
+      "notes": "完整240行。核报名价格/钱包预留和幂等、免费fixed16取消、旧receipt不能恢复撤销/再次取消新报名、检录锁定及纯读投影。第16人持久失败与8并发重试、取消落盘失败原子回滚通过。报名与检录分开，实际客户端也明示检录才占位，故不把报名>16直接判为超额参赛；旧收费目录运营归属仍待专项。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-standings.js",
+      "sha256": "225358d78c413acc51fce0dfc98649c006ca627326782dbf9132461dc82b7a38",
+      "lines": 40,
+      "notes": "完整40行。核总分→同桌对手总分→胜局→头游→稳定ID的排序，opponents副本、缺用户兜底、完成3轮方可晋级前8、公开DTO字段。真实服务12终局fixture后独立累计16人分值/9名不同同桌者与opponentPoints一致，最终8资格持久化。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-live.test.mjs",
+      "sha256": "a7e34906d166ac91d1c3bcb9e4d222d0684458c1d95948c497c1bfb23e215cc2",
+      "lines": 312,
+      "notes": "完整312行且运行退出0。真实本地HTTP、合成登录/签名票、满16人锁名单、取消与错误分桌、票过期同桌续票/稳定attempt、entry-timeout忽略不占sequence、3轮12桌结果到前8。存储显式测试env默认memory且finally关闭本地server；结果人工ranking，并非16客户端真实出完牌或真机。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-orchestrator.test.mjs",
+      "sha256": "39c29217956cf0ec9ddf21a4158989f17174e9830c3a0831f4a19a52f481d6ef",
+      "lines": 123,
+      "notes": "完整123行且运行退出0。核重复检录/匹配/完成、未来轮/错match拒绝、全部四桌后推进、终态和一个异常桌。原用例仅重复关闭同一桌，没有覆盖已全局blocked后其他桌的独立收尾；本批补4种首闭桌顺序复现TO-11-001。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-pairing.test.mjs",
+      "sha256": "af2b0f2f65011682c1cba2e87e513dc26e6b9ef88c3dce043fc886f3f1f113f8",
+      "lines": 66,
+      "notes": "完整66行且运行退出0。核16参与者每轮一次、3轮不重复同桌、ID稳定、输入顺序参与seed、重复/缺失/空白/非字符串拒绝。本批额外256排列，未声称穷举16!排列或竞赛强弱平衡。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-service.test.mjs",
+      "sha256": "b216cd23c4323fa034bf90e2175109e61ceac715d062ce2456bc5c4d633aad28",
+      "lines": 47,
+      "notes": "完整47行且运行退出0，静态import standings测试同步运行。既有付费报名幂等/价格和免费取消/旧receipt/重新报名/锁名单；补真实facade-store落盘失败及最终检录原子锁表。旧付费cup是合成兼容测试，当前上线入口只允许免费fixed16，未混为当前付费运营。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/tournament-standings.test.mjs",
+      "sha256": "eeb7d4712e0f3a0441f12726106a2cd4f0a924775ac2eb258c53fcefdfadbf17",
+      "lines": 50,
+      "notes": "完整50行，随service.test静态import退出0。核同分tie-break、跨赛事隔离、输入冻结/返回隔离、对手重复与缺失、资格8/9边界和未完成pending。opponentPoints按同桌遇见次数计，包含当桌搭档；当前编排每人9个不同同桌者，补服务累计对照。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "TO-11-001",
+      "severity": "P2",
+      "title": "赛事已暂停后其他桌异常关闭被拒绝，回滚离席释放并阻止玩家转入其他匹配",
+      "path": "work/guandan-windows-source/server/platform/spectator-event-service.js",
+      "line": 315,
+      "related": [
+        {
+          "path": "work/guandan-windows-source/server/platform/tournament-orchestrator.js",
+          "line": 286
+        },
+        {
+          "path": "work/guandan-windows-source/server/platform/matchmaking-service.js",
+          "line": 261
+        },
+        {
+          "path": "work/guandan-windows-source/server/weapp-room-expiry.js",
+          "line": 13
+        },
+        {
+          "path": "work/guandan-windows-source/server/weapp-ws.js",
+          "line": 456
+        }
+      ],
+      "evidence": "实际PlatformService内存建立16人固定赛事和四个真实assignment，四桌均claim game-start。第一桌合法empty-timeout关闭令run.phase=blocked并释放4人。其他桌room-closed先修改feed/match/participant并删除active索引，随后blockTournamentAssignment因run不再round-active抛RUN_NOT_ACTIVE，整事务回滚。已审生产expiry/close会为未正常结束的空房发同类事件并回收本地room；不需要无效票据或伪造身份。",
+      "validation": "node docs/audit/2026-09-12/repro/tournament-progression-11.mjs：分别让4张桌先关闭，4/4首闭成功且重复幂等；每次其余3桌各两次合法关闭均拒绝，状态完全未变，12个active用户仍在playing；其首用户新quick被ALREADY_MATCHING拒绝，通用cancel被MATCH_NOT_CANCELLABLE拒绝。各fixture重建MemoryPlatformStore+PlatformService后仍拒绝。首闭桌用户作为对照可进入quick。未执行真实16WS断连计时，没声称全平台队列阻塞或永久不可恢复。",
+      "recommendation": "把赛事暂停决策和逐桌资源/身份收尾解耦。run已blocked时仍校验当前赛事/轮次/assignment/match绑定，并原子接收其他已分配桌的合法关闭、释放该桌成员和记录幂等回执；保留首次阻断原因和既有成绩，不自动补赛、晋级或改分。补两桌以上先后/并发终止、回调重试和冷恢复回归。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 9,
+    "reviewedLines": 1251,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/platform/tournament-pairing.test.mjs",
+        "result": "passed; service entry also imports standings test"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/tournament-orchestrator.test.mjs",
+        "result": "passed; service entry also imports standings test"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/tournament-service.test.mjs",
+        "result": "passed; service entry also imports standings test"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/tournament-live.test.mjs",
+        "result": "passed; service entry also imports standings test"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/tournament-progression-11.mjs",
+      "result": "passed assertions: 256 roster permutations; 72 round-order cases/288 completions; atomic final-check-in/three last-join/three last-result/withdraw failures; 3 ticket renewals/3 middle-round memory rehydrations; 12 synthetic result fixtures with 12 retries each; 48 player-round rows and 8 qualifiers. TO-11-001 reproduced in 4 first-close orders, 12 subsequent close events rejected with retries; 12 stale active users per fixture."
+    }
+  },
+  "limitations": [
+    "Only nine full-read files are counted. Config/runtime/result/metadata and frontend controller/model were supporting reads, not added to coverage.",
+    "Normal full tournament HTTP contract and extra terminal result fixtures use synthetic users and memory; not actual 27-card games, 16 sockets, production JSON crash recovery or mobile verification. Full HTTP/config boundaries remain tracked separately.",
+    "Pausing on a broken table is intentional. Finding concerns later room cleanup rollback and stale active user bindings, not the lack of automatic tournament restart or all later score refusal.",
+    "Legacy catalog and paid tournament operations, source tests beyond selected five, client lifecycle/rendering remain pending. Signing/ticket imports do not themselves count as full crypto review.",
+    "Only audit artifacts written. No product changes, new automations, external messages, pushes or deployment. Existing five worktree edits preserved."
+  ]
+}

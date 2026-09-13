@@ -1,0 +1,325 @@
+{
+  "batch": "server-test-quality-32",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "scripts/local-room-load.mjs",
+      "sha256": "d2f91a47f52d78c9a387e46a5c3abb21b32a1c82971561d960d5da29876490d5",
+      "lines": 97,
+      "notes": "完整97行。参数限制1–16房/1–64动作，临时JSON/回环动态端口，child仅继承PATH且不接平台，4席版本收敛/隐藏手牌断言，SIGTERM/SIGKILL只作用本child，清理mkdtemp。实际4房16连接64出牌动作/100ACK通过；默认脚本延迟数据不是AI/WAN/TLS/线上容量证明。"
+    },
+    {
+      "path": "scripts/local-room-peer.mjs",
+      "sha256": "d8483af46260dc66114acfbd3115797bb4ac0c95053ddc68a8c09fd9cb5511fd",
+      "lines": 53,
+      "notes": "完整53行。测试专用回环peer，pending按requestId+响应type管理/关闭reject，open与ACK超时，定时收敛；失败send释放pending，close迟到忽略。version借用smokehelper全房最新缓存，不模拟每个真实客户端独立落后状态。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-bots.smoke.mjs",
+      "sha256": "0f0d21a3126e2dedc1b876d7a695e5fbb87178ee3133c0185ea78685de4990e6",
+      "lines": 231,
+      "notes": "完整231行。房主添加/移除/席位占用/旧恢复凭证不可夺bot、票据匹配房禁手添、重启bot与ready保留、开局master/非trustee、单真人三bot直接解散/原请求拒绝。实际回环通过；只验证一次bot动作及顺利持久化，不覆盖SP-03-002关房落盘失败。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-friend-bots.smoke.mjs",
+      "sha256": "92feee0ddc4f42aab9e8ef427b59a56074c6c4a991e05a5de81755ce044f4bc7",
+      "lines": 117,
+      "notes": "完整117行。实际FriendRoomService/SpectatorEventService内存平台与带签名collector、回环game子进程/临时JSON；普通/转蛋各一局，离线保位/安全离开/稳定botUserID/重启/完成/无bot用户钱包。实际通过；转蛋仅第一局固定组队，不能抵消RP-13-001第二局动态换队失败。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-friend-observer.browser-smoke.mjs",
+      "sha256": "3ecff47887187ad00bd473449c3ec089bd2ef4a0ccec82958eba806f13775e11",
+      "lines": 44,
+      "notes": "完整44行。仅显式GUANDAN_BROWSER_TEST_MODULE才启动Chrome/已有localhost构建/截图固定tmp路径；本轮未设置、未执行。运行配置由init覆盖虽注释说不触生产，真实发布包来源/注入顺序仍须单独核验，不能将socket smoke通过写作浏览器验收。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-friend-observer.smoke.mjs",
+      "sha256": "1364a87351093533db161a261912f2c2f512a1397f5a7f1f7de924c8f99f2d51",
+      "lines": 123,
+      "notes": "完整123行。实际五成员/房主站起/座位对换、实时与delay15首帧守门/切视角隐藏手、observer禁play/坐下、签名friendRoster、重启视角/身份旋转与精确重试/safeExit旧token拒绝。live和15秒延迟实际均通过；不覆盖已知delay-round计数或CS-01/UI-25跨桌客户端行为。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-match-bot-ticket.smoke.mjs",
+      "sha256": "12082812595dd5dcf7150a32da3bc34ea048882de8fd721fb1ae0dc79a31b0e5",
+      "lines": 128,
+      "notes": "完整128行。3种公共模式签票bot名单绑定、不一致拒绝、两真人齐席自动开局、isAI/name一致、随机级数/传统2级/dealMode/贡牌flag。classic/no-shuffle/consecutive三次实测通过；collector仅模拟ACK不真正给平台积分，未跑完整升级场。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-persistence.smoke.mjs",
+      "sha256": "b7c2f98c0eab63169782cb2b40ffc9e2cee4db151b057148dbd6c3b26738cd1f",
+      "lines": 166,
+      "notes": "完整166行。临时目录rename→占位普通文件模拟join/ready落盘失败，原request重试/ACK仅成功后；SIGKILL后移除ruleProfile合成旧快照、deadline/离线票/托管及相同请求ACK/正文冲突。实测通过；未覆盖自动动作/关房阶段失败与全局回执并发。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-protocol.test.mjs",
+      "sha256": "32565751d4e18690df14300c604e43734df035e84c86e67e12571be9f2641a21",
+      "lines": 29,
+      "notes": "完整29行。requestId和版本必需类型/例外、missing/stale/current边界。用内存loader改指当前shared/src/protocol而非dist；chat在非版本清单不代表功能被开放。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-settings.smoke.mjs",
+      "sha256": "4cd162bef02cdbeebe16594660e45ed36561838cadd08a8ebe2bd5c1694c791b",
+      "lines": 205,
+      "notes": "完整205行。8种非法设置拒绝、完整字段/scoreboard/spectatorpolicy往返及SIGKILL后恢复，no-shuffle转蛋6分/无托管与独立总时长2秒终场。实际通过；服务器counter字段可保留，不覆盖PG-17-001客户端白名单遗漏。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-rotating.smoke.mjs",
+      "sha256": "c9129eb900baa43d2c49e44401308a0d923273f0162c14fd9a23575fa83f5c06",
+      "lines": 133,
+      "notes": "完整133行。动态回环端口、cleanenv、固定shuffle seed；四合成人工客户端两副牌按合法最长候选出牌，clockwise3分/draw6分，座序/隐私/无贡/重连/积分累积/终场。实测通过；不是服务器自动AI第二局测试，不能证明动态队伍bot适配正确。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-security.smoke.mjs",
+      "sha256": "cbf2563bcd8980c20e480da43070a238ecad2a274f2b583cb255f3eb6e0fdb6a",
+      "lines": 110,
+      "notes": "完整110行。实际Origin拒绝/4连接/1房间/10指令率限制通过。child直接展开process.env且不覆盖房间路径：两次synthetic caller-owned state被读取改写且测试仍通过，确认TEST-32-001；原测试无清洁环境/独立持久文件保证。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-smoke-protocol.mjs",
+      "sha256": "7d00d10e279994b0cac316cbffefc8215359e4bbf6f77e583a5e83257d423b8f",
+      "lines": 37,
+      "notes": "完整37行。WeakMap按socket+Map按room追踪max版本，发需要expectedVersion的命令时优先用room值；helper可借其他客户端版本且无清room出口。补探socketA只见7、B见9，A默认发9；显式7保留。测试工具边界非生产消息模型。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-ticket.smoke.mjs",
+      "sha256": "08344cf924aba1211fd239d5874affb9314b3dc1abc7f7ca15a15e05664b851f",
+      "lines": 361,
+      "notes": "完整361行。原8席/共享deadline、匿名列表隐藏、错票/同席jti/不同match/响应丢失/断线fresh rekey和短票换发，开局后purpose=rejoin/entryAttempt/旧token失效；公开事件签名/503串行重试/自动动作/空房关闭。实测通过；collector合成，恢复时序80ms不等于不稳定WAN全排列。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-websocket-transport.test.mjs",
+      "sha256": "65f23f40a8c35cabda0435dd54d9670206224f9fb6b97c6c65d84d44ae7f89c9",
+      "lines": 130,
+      "notes": "完整130行。TestSocket+实际传输代码验证2字节帧、65K限制/升级、消息JSON/403/无效JSON。补充实际传输851分段、100连续帧、5拒绝、ping/pong/close及6输出长度对照；不是RFC完整合规或fuzz/DoS容量证明。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "TEST-32-001",
+      "severity": "P3",
+      "title": "旧安全冒烟继承调用者持久路径，测试通过也会改写该文件",
+      "path": "work/guandan-windows-source/server/weapp-security.smoke.mjs",
+      "line": 11,
+      "evidence": "spawn env展开process.env，只覆盖端口/Origin/限额，没有清理WEAPP_ROOM_STATE_FILE或outbox/endpoint变量。真实loadGameSecurityConfig保留该路径，weapp-ws启动恢复和退出提交均使用它。通过全新临时synthetic-caller-owned-state.json注入WEAPP_ROOM_STATE_FILE，原安全测试完整通过，前后SHA改变且仅供审计的额外sentinel被真实存储写回规范化移除；两次独立目录复现。没有读取真实用户数据。",
+      "validation": "node docs/audit/2026-09-12/repro/server-tests-32.mjs securityInherited；使用当前src、隔离loopback、test环境，仅mock调用者提供持久路径，其余原测试不改。16运行场景全绿，说明测试绿不等于没有改写外部指定路径。只确认继承路径读写，没有证明现实环境已发生真实房间丢失、错误积分或外网数据泄露。",
+      "recommendation": "让所有启动服务的测试共享独立fixture owner：环境变量白名单、明确test/loopback、每次mkdtemp提供全部状态/outbox路径，清空外部回调，随机端口并确认自有child关闭后清理。可沿用已审local-room-load的隔离方式。修复需另行授权，本轮未修改原测试。",
+      "impact": "开发者在已导出房间存储配置的shell运行该测试时，会让测试服务操作同一文件；不是普通玩家进行对局时必现的服务端故障。条件性测试工具安全问题，P3。"
+    }
+  ],
+  "concerns": [
+    {
+      "id": "QT-32-C01",
+      "classification": "test coverage interpretation limit",
+      "path": "work/guandan-windows-source/server/weapp-smoke-protocol.mjs",
+      "line": 26,
+      "title": "默认expectedVersion取全房间最高值，不模拟落后客户端自己的版本",
+      "evidence": "两个真实EventTarget测试peer分别只接收7/9，给只见7的peer调用真实sendProtocolCommand默认发9，显式expectedVersion:7则原样保留。不是活动客户端逻辑，不能据此断言线上会跨用户读状态；应将stale测试显式化。"
+    }
+  ],
+  "validation": {
+    "commands": [
+      "node docs/audit/2026-09-12/repro/server-tests-32.mjs protocol transport security settings persistence",
+      "node docs/audit/2026-09-12/repro/server-tests-32.mjs bots friendBots",
+      "node docs/audit/2026-09-12/repro/server-tests-32.mjs matchClassic matchNoShuffle matchConsecutive observer observerDelayed",
+      "node docs/audit/2026-09-12/repro/server-tests-32.mjs rotating ticket load",
+      "node docs/audit/2026-09-12/repro/server-tests-32.mjs securityInherited",
+      "node --require ./docs/audit/2026-09-12/repro/server-test-preload-32.cjs docs/audit/2026-09-12/repro/server-test-quality-32.mjs"
+    ],
+    "tests": [
+      {
+        "name": "protocol",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 288,
+        "stdout": "weapp protocol validation tests passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-protocol.test.mjs\",\"redirects\":1}\n"
+      },
+      {
+        "name": "transport",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 193,
+        "stdout": "weapp websocket transport tests passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-websocket-transport.test.mjs\",\"redirects\":0}\n"
+      },
+      {
+        "name": "security",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1401,
+        "stdout": "weapp origin, connection, room and rate limits passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-security.smoke.mjs\",\"redirects\":0}\n"
+      },
+      {
+        "name": "settings",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 6793,
+        "stdout": "weapp friend room settings integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-room-settings.smoke.mjs\",\"redirects\":1}\n"
+      },
+      {
+        "name": "persistence",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 2154,
+        "stdout": "weapp restart persistence smoke passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-persistence.smoke.mjs\",\"redirects\":1}\n"
+      },
+      {
+        "name": "bots",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 6996,
+        "stdout": "weapp friend-room bot protocol smoke passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-bots.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "friendBots",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 9583,
+        "stdout": "Signed friend bots passed: per-seat add/remove, host-only, offline reservation, durable identity, restart, classic/rotating start and complete settlement without bot accounts\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-friend-bots.smoke.mjs\",\"redirects\":3}\n"
+      },
+      {
+        "name": "matchClassic",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1950,
+        "stdout": "weapp signed match bot ticket integration passed: classic_50\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-match-bot-ticket.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "matchNoShuffle",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1560,
+        "stdout": "weapp signed match bot ticket integration passed: no-shuffle_50\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-match-bot-ticket.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "matchConsecutive",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1422,
+        "stdout": "weapp signed match bot ticket integration passed: consecutive_50\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-match-bot-ticket.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "observer",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 2253,
+        "stdout": "Friend-room observer WebSocket smoke passed (live): five members, host stands, seat swap, private view, action denial, durable restart, retry and exit\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-friend-observer.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "observerDelayed",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 17816,
+        "stdout": "Friend-room observer WebSocket smoke passed (delay-15): five members, host stands, seat swap, private view, action denial, durable restart, retry and exit\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-friend-observer.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "rotating",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 5656,
+        "stdout": "Rotating WebSocket regression passed: 3/6 scores, two rounds, both rotations, private hands, rejoin, terminal totals\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-rotating.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "ticket",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 5061,
+        "stdout": "weapp required game-ticket integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-ticket.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "load",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 2223,
+        "stdout": "{\n  \"result\": \"passed\",\n  \"scope\": \"isolated-loopback-single-process-json\",\n  \"node\": \"v26.7.0\",\n  \"os\": \"darwin\",\n  \"cpu\": \"Apple M1\",\n  \"rooms\": 4,\n  \"connections\": 16,\n  \"turnActions\": 64,\n  \"acknowledgedCommands\": 100,\n  \"ackMs\": {\n    \"p50\": 52.04,\n    \"p95\": 61.89,\n    \"p99\": 63.39,\n    \"max\": 66.2\n  },\n  \"elapsedMs\": 2026,\n  \"persistedBytes\": 114423,\n  \"limitations\": [\n    \"Not a production capacity certification\",\n    \"No WAN/TLS/platform traffic or AI calculation load\",\n    \"Temporary synthetic data removed\"\n  ]\n}\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"local-room-load.mjs\",\"redirects\":1}\n"
+      },
+      {
+        "name": "securityInherited",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 758,
+        "stdout": "weapp origin, connection, room and rate limits passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-security.smoke.mjs\",\"redirects\":0}\n",
+        "inheritedState": {
+          "syntheticOnly": true,
+          "beforeSha256": "d4495004a0c997391e41f3c144afda20048848e47380c4c8b2a7680d99a4f4f9",
+          "afterSha256": "4f58910c8fdbc2e0da04b4f9397fcce286616654cc335545555462f341ff26b7",
+          "changed": true,
+          "callerSentinelRetained": false
+        }
+      }
+    ],
+    "probe": {
+      "segmentationCases": 851,
+      "combinedFrames": 100,
+      "rejectionControls": [
+        "unmasked",
+        "fragmented-unsupported",
+        "binary-unsupported",
+        "oversize-data",
+        "oversize-ping"
+      ],
+      "controlFrames": [
+        "ping",
+        "pong",
+        "close"
+      ],
+      "frameLengthControls": 6,
+      "invalidJsonThenValid": true,
+      "smokeHelper": {
+        "ownReceivedVersion": 7,
+        "borrowedDefaultVersion": 9,
+        "explicitStalePreserved": 7
+      }
+    },
+    "safety": {
+      "node": "v26.7.0",
+      "typescript": "4.9.5",
+      "core": "current shared-core/src; no build/dist writes",
+      "environment": "allowlisted parent PATH/TMPDIR/test/loopback; nested server retains source preload even if its script originally drops NODE_OPTIONS",
+      "network": "only loopback listener/client/local collector; fetch and configured callback endpoints guarded; browser helper not enabled",
+      "storage": "each runner allocates a fresh mkdtemp root; original test paths resolve inside it. securityInherited explicitly injects another synthetic file in same invocation temp root, not real data.",
+      "cleanup": "all execution sessions completed; latest runner verifies owned process group absent before removing temp root. Fixed ports39103/39107/39108/39114/39115/39143 checked: no listeners at final validation; never kill a pre-existing server by port."
+    },
+    "limits": [
+      "15待审文件1964行；weapp-ws/config/crypto/transport实际源等只作已审依赖复核，不重复计覆盖。",
+      "未启用GUANDAN_BROWSER_TEST_MODULE，所以浏览器代码只是完整审查，不能声称真实Cocos/微信交互通过。",
+      "转蛋四真人脚本模拟合法出牌两局；friendBots实际AI仅第一局。已知RP-13-001下一局动态组队仍未修复且不被本轮绿测推翻。",
+      "HTTP collectors多数只回执；friendBots额外使用实际平台friend/events内存服务，仍不是线上计分/账户。",
+      "负载仅4房16连接64单张/过牌动作100ACK，非AI计算、WAN、TLS或生产容量认证。",
+      "raw transport探针是分段/长度/控制帧边界，不是RFC全合规、fuzz或DoS资源上界。",
+      "P3仅确认继承文件改写，不据临时sentinel丢失夸大为已发生真实数据损失。",
+      "没有产品改动、提交推送、构建或部署。"
+    ]
+  }
+}

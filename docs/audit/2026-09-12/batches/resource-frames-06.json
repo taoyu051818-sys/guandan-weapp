@@ -1,0 +1,65 @@
+{
+  "batch": "resource-frames-06",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/ClassicCardFrameStore.ts",
+      "sha256": "59d6634f7e9de51753520544855939b5ea671f24dcadaf5e94bf1cab64d93510",
+      "lines": 71,
+      "notes": "71行全读。进程级有限37组件frameCache与pending Promise去重、then创建唯一SpriteFrame、catch null且finally释放pending、all-or-nothing牌面缓存、预载集合去重。真实模块内存探针验证失败重试与37组件单次请求；消费方必须不销毁共享frame，GPU释放与Creator bundle生命周期未实测。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/ClassicCardGeometry.ts",
+      "sha256": "d50ce8af0ac541754d0d35c862766196c4d89b6ef44284d08aff5f3610f44524",
+      "lines": 27,
+      "notes": "27行全读。82×118参考尺寸、背景/角标/中心4层不可变对象、王74×106独立几何。嵌套freeze和正尺寸检查通过；CardView及Vfx共享引用追踪，前一client-presentation探针覆盖普通/王切换，不当成像素验收。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/DefaultProfileFrames.ts",
+      "sha256": "88bbcca6dbe9a6f9fb2c39254a1ab81c4c7eb83b5ce58422e6490d1d9315a64b",
+      "lines": 20,
+      "notes": "20行全读。昵称定位预置bot头像、frames与pending进程缓存、loadGameAsset callback。pending只add不delete；首次加载错误/超时后仍被永久当在途，确认RESOURCE-06-001 P3。实际TableHudPresenter仅AI席位调用，最终seat frame可降级通用默认头像，不是整个游戏加载失败。真实GameAssetLoader+模拟Bundle证明底层恢复后10次访问零重试，模块重启恢复。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/ProfileAvatar.ts",
+      "sha256": "ebaa1cc983cc6dd0fdb112a64e184b9dbe5fe28dc2f544f2eb401919fc77042b",
+      "lines": 64,
+      "notes": "64行全读。profile id+avatar键、预置与asset白名单/fallback、受auth代理图像、本地JPEG预览、max8 Promise cache、失败delete、Image8秒/1024上限、load/error清timer和destroyed node guard。真实模块内存探针验证local/proxy去重/失败重试/大图/timeout/销毁后不赋值；没有真实微信Image解码/GPU资源存活检查。同步失败cache竞态不作为缺陷：当前loadGameAsset实际Promise微任务回调。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "RESOURCE-06-001",
+      "severity": "P3",
+      "title": "机器人默认头像首次加载失败后，pending标记不释放，资源恢复仍不重试",
+      "path": "work/guandan-cocos/assets/scripts/services/DefaultProfileFrames.ts",
+      "line": 14,
+      "evidence": "11-16行首次请求pending.add(asset)，错误/缺texture直接return，成功也不清pending。TableHudPresenter.ts:133每次render为AI调用defaultProfileFrame；错误分支frames无值而pending持续有值，后续访问无法发出新加载。实际GameAssetLoader错误与15秒超时都有callback并可在后续独立请求恢复。",
+      "validation": "repro/profile-frame-retry-06.cjs执行真实DefaultProfileFrames+GameAssetLoader，只有Cocos Bundle/Texture为合成端口：第一次load报错，后同资产直接loadGameAssetAsync已成功，原module连续10次defaultProfileFrame均undefined且零新请求；新模块生命周期重新加载成功，成功cache连续复用。",
+      "recommendation": "在加载回调的成功/失败路径都清理该asset的pending状态，失败允许后续render重试；保持同一在途请求去重，可另加退避避免持续失败时逐帧请求。补失败→底层恢复→再次render，以及超时/成功去重对照。",
+      "impactBoundary": "限当前进程中首次失败的bot预置头像。TableHudSeatViewGroup.ts:214会使用通用默认头像兜底，非整张牌桌/游戏无法进入，也不宣称线上已发生。"
+    }
+  ],
+  "concerns": [],
+  "validation": [
+    {
+      "command": "node docs/audit/2026-09-12/repro/profile-frame-retry-06.cjs",
+      "result": "confirmed RESOURCE-06-001; actual adapter recovered, 10 original-cache accesses no retry; new module and successful reuse controls"
+    },
+    {
+      "command": "node docs/audit/2026-09-12/repro/frame-stores-06.cjs",
+      "result": "37 shared assets, failure retry/dedupe/all-or-nothing/preload; frozen geometry; bundled/unknown asset fallback; avatar proxy dedupe/retry,1025width rejection,8sec watchdog settlement and destroyed-node assignment guard"
+    }
+  ],
+  "scope": {
+    "reviewedFiles": 4,
+    "reviewedLines": 182
+  },
+  "limitations": [
+    "Only four files completely read/count here; loader, HUD/seat consumer and loader-test helpers are supporting reads and counted in other batches or left pending.",
+    "No network, real Image decoder, Cocos GPU/context teardown, live WeChat profile or real bot/user catalog data. Catalog fixture contains synthetic profile identity only.",
+    "Process-wide caches have explicit ownership; max8 ProfileAvatar Map does not by itself prove SpriteFrame/Texture2D GPU release. Actual engine resource lifecycle remains a separate gate.",
+    "Failure injection reflects current loader callback contract, not proof of observed production incident. No product changes, builds, source assets or deployment."
+  ]
+}

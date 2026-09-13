@@ -1,0 +1,128 @@
+{
+  "batch": "core-worker-04",
+  "reviewer": "/root/audit_core_rules",
+  "date": "2026-09-12",
+  "repository": "/Users/mac/Documents/Codex/2026-08-02/wo-yi",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewedCount": 8,
+  "reviewedLines": 475,
+  "coverageBaseline": { "reviewedFirstParty": 99, "totalFirstParty": 629, "updatedAt": "2026-09-12T06:45:02.504Z" },
+  "reviewed": [
+    {
+      "path": "shared-core/src/ai/checkpoint.ts",
+      "sha256": "13cf58043cd127d798a57d9e544c2a7196369b2ace299e48adc9140c227a9e40",
+      "notes": "完整22行。逐项核对v1迁移/v2输出、规则profile和旧decisionContext兼容性、临时RNG验证后才交给engine restore、journal校验/复制。沿用第三批14类非法恢复原子性证据，当前既有engine测试再次通过；未确认新增缺陷。"
+    },
+    {
+      "path": "shared-core/src/ai/random.ts",
+      "sha256": "00c19b70fc7efdab063dc2383a3543bf42187b159e6e3c08b3f830a2da47c322",
+      "notes": "完整49行。核对uint32种子归一化、mulberry32状态推进、[0,1)结果、checkpoint复制/恢复验证顺序、checkpointable接口守卫。边界状态0和0xffffffff各100样本回放相同；10次非法恢复保持原状态。"
+    },
+    {
+      "path": "shared-core/src/ai/ruleMemo.ts",
+      "sha256": "f9192cee81d26f343e1a44d27b824c2dd922f7d7fcbddfea06c34a2496ff5296",
+      "notes": "完整119行。核对profile/代际键、目标玩家/类型/maxValue/牌ID、resolution与裸牌信息分离、null/false命中、LRU和clear；小容量探针通过。ID-only牌义变动复用属于已编号CORE-AI-03-C01，不重复报缺陷。"
+    },
+    {
+      "path": "shared-core/src/ai/types.ts",
+      "sha256": "5ea84843c2f4139b715a0a7d2cf13a62a328511159868999a7cdba6828b5c1e0",
+      "notes": "完整92行。核对唯一master类型、公开历史/回合与revision上下文、RNG/profile与v2 checkpoint契约、engine边界和可选调用参数。TypeScript类型不视为外部运行时校验或隐藏信息安全边界。"
+    },
+    {
+      "path": "shared-core/src/ai/workerProtocol.ts",
+      "sha256": "512819c56be90f7c5cc1441eeea02baab75419b98c6c07730e8a49b7d0719b8a",
+      "notes": "完整87行。核对请求工厂字段优先级、输入profile归属、seed归一化配置键、请求/响应id与checkpoint一致性检查。assert仅校验内部envelope，非完整网络schema；未发现活动网络消费者。11类畸形runtime消息均返回结构化错误。"
+    },
+    {
+      "path": "shared-core/src/ai/workerRuntime.ts",
+      "sha256": "3728867198576adabe719309a90809d594443d6fc77e9250e7e14c8e34dabc51",
+      "notes": "完整62行。核对配置更换重建、checkpoint冷热分支、成功记录/异常清除continuation marker、响应id/决策/指标/错误；重复明确checkpoint回放一致。真实handle跨级热链复现旧C01，但实例调用仅测试/退役同步适配器，未升级生产finding。同步运行器本身不是异步传输/取消/过期响应接纳器。"
+    },
+    {
+      "path": "shared-core/src/ai/index.ts",
+      "sha256": "6155ebe45ab7c7c0ba3b296147c9bc123eb2407261aabce5bd82f75d23a1b7dd",
+      "notes": "完整2行。核对engine/simulation重导出和workerRuntime经index引入的模块初始化；当前CJS内存转译及Vitest真实加载通过，没有顶层创建运行器/调度副作用。"
+    },
+    {
+      "path": "shared-core/src/ai/simulation.ts",
+      "sha256": "7f79131f625cfeeba49321087d22b09ebeeefa35f7e5bc8516cd6c7456843aef",
+      "notes": "完整42行。核对maxTurns/p1/结局停止、当前席手牌与公开上下文、注入引擎契约及兼容playCards/passTurn权威校验。默认引擎模拟探针隐藏手牌仅length可读，0牌面读取，原状态未改；非法注入牌拒绝。仅round-smoke调用；兼容JSON历史身份问题引用CORE-RULES-01-002而非重复finding。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "CORE-AI-03-C01",
+      "relation": "follow-up-to-existing-concern-not-new-root-cause",
+      "status": "worker-handle-reproduced-but-no-active-production-caller",
+      "title": "连续worker checkpoint跨级保留ID-only热缓存；当前仅测试/退役入口可达",
+      "path": "shared-core/src/ai/workerRuntime.ts",
+      "line": 35,
+      "evidence": "35-41行在所给checkpoint等于上次完成结果时跳过engine.restore，因而不清除规则/候选缓存。相同classic/seed，打2的heart2/card-14和spade7/card-6跟66成功后，把成功checkpoint直接传给同runtime的打3新回合请求，返回旧两张牌；当前打3正牌canPlay=false。新runtime收到同请求返回null。此为CORE-AI-03-C01的真实handle复现，不新增根因。",
+      "validation": "MD探针1使用当前TS源码内存转译、JSON传输往返，结果warmAcrossLevelDecision=[card-6,card-14]、warmCacheHits=1、coldDecision=null；错误清除热marker后用同checkpoint恢复也返回null。",
+      "productionBoundary": "全局调用检索仅核心tests和work/guandan-cocos/tests/support/local-match/SynchronousLocalAIEngine.ts:33/62/90/97创建/调用；生成源只是定义。verify-retirement验证17个退役runtime模块已移除且活动assets不引用测试/归档。现有活动server直接createAIEngine；weapp-match-lifecycle.js:404下一局reset，duplicate-auto-policy.js:9逐决策重建/恢复。没有确认线上worker跨级复用，也没有真实异步Worker传输/响应消费者。",
+      "recommendation": "保留原concern；将来重新接入worker或跨回合持久实例时，明确换级/换局清缓存契约，或将牌义/代际纳入缓存键并加连续checkpoint跨级测试。不将本条计为新增已确认生产事故。"
+    }
+  ],
+  "validation": [
+    {
+      "kind": "existing-tests",
+      "cwd": "shared-core",
+      "command": "node_modules/.bin/vitest run --cache=false tests/ai-worker-protocol.test.ts tests/ai-worker-runtime.test.ts tests/ai-random.test.ts tests/ai-engine.test.ts",
+      "result": "4 files / 24 tests passed",
+      "runtime": "Node v26.7.0; Vitest 4.1.10",
+      "startedAtLocal": "2026-09-12 14:50:13 Asia/Shanghai"
+    },
+    {
+      "kind": "retirement-reachability",
+      "cwd": "work/guandan-cocos",
+      "command": "node scripts/verify-retirement.mjs",
+      "result": "17 removed runtime modules and 20 hash-verified archived clips verified; active replay/observer retained; laboratory excluded. Read-only script inspected before execution; no build flags used."
+    },
+    {
+      "kind": "worker-source-memory-probe",
+      "reproduction": "Markdown probe 1",
+      "result": "Existing C01 reproduced via warm sequential handle; cold restore/error recovery correct; repeated explicit checkpoint reproduces decision and checkpoint; all 11 malformed inputs caught. elapsedMs is intentionally not compared because it is wall-clock telemetry."
+    },
+    {
+      "kind": "simulation-cancellation-random-memo-memory-probe",
+      "reproduction": "Markdown probe 2",
+      "result": "1 simulated action, 0 hidden face reads, unchanged source state, 3 zero-work stop conditions, illegal injected card rejected; 4 retired scheduler cases and 2 synthetic adapter-generation interleavings passed; 200 RNG samples replayed and 10 invalid restores atomic; null/false memo hits, LRU eviction and clear passed. Adapter injection tests a local guard, not real asynchronous Worker transport."
+    },
+    {
+      "kind": "hash-and-working-tree",
+      "result": "Eight reviewed SHA-256 values rechecked at completion; HEAD and five pre-existing dirty file hashes unchanged. Only assigned batch Markdown/JSON added; no product or coverage/inventory writes."
+    }
+  ],
+  "supportingReadsNotCounted": [
+    "docs/audit/2026-09-12/README.md",
+    "docs/audit/2026-09-12/coverage.json (metadata and selected entries)",
+    "docs/audit/2026-09-12/batches/core-ai-03.json",
+    "docs/audit/2026-09-12/batches/core-rules-01.json",
+    "shared-core/src/ai/engine.ts",
+    "shared-core/src/ai/decisionRunner.ts",
+    "shared-core/src/lib/engine.ts (relevant portions)",
+    "shared-core/tests/ai-worker-protocol.test.ts",
+    "shared-core/tests/ai-worker-runtime.test.ts",
+    "shared-core/tests/ai-random.test.ts",
+    "shared-core/tests/round-smoke.cjs",
+    "work/guandan-cocos/tests/support/local-match/SynchronousLocalAIEngine.ts",
+    "work/guandan-cocos/tests/support/local-match/LocalAITurnController.ts",
+    "work/guandan-cocos/tests/support/local-match/LocalTurnScheduler.ts",
+    "work/guandan-cocos/tests/support/local-match/LocalMatchController.ts (selected lifecycle references)",
+    "work/guandan-cocos/scripts/verify-retirement.mjs",
+    "work/guandan-cocos/tests/master-ai-policy-regression.cjs",
+    "work/guandan-cocos/tests/retirement-boundary-regression.cjs",
+    "work/guandan-windows-source/server/duplicate-auto-policy.js",
+    "work/guandan-windows-source/server/master-bot-policy.js (selected references)",
+    "work/guandan-windows-source/server/weapp-match-lifecycle.js (next-round portion)"
+  ],
+  "limitations": [
+    "This batch adds eight first-party full-file reviews only; earlier auxiliary reads do not count as duplicate coverage.",
+    "No confirmed new findings does not imply all repository behavior is correct; no new async Worker integration exists to verify for cancellation, transport ordering or deadline handling.",
+    "Worker protocol accepts trusted internal shapes and passes Player records; default decisionRunner projects public counts. It is not established as a network privacy/schema boundary.",
+    "Simulation uses legacy EngineState helpers, not the authoritative production transition path; CORE-RULES-01-002 remains the existing compatibility-only issue.",
+    "Checkpoint replay excludes elapsedMs; no hard latency/timeout or physical device claim is made.",
+    "Parent owns inventory/coverage refresh. No production fix, build, deployment, external mutation or git commit performed."
+  ]
+}

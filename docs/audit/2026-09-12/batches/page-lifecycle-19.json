@@ -1,0 +1,188 @@
+{
+  "batch": "page-lifecycle-19",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/TournamentCenterController.ts",
+      "sha256": "a139f5cfab414aee21276b7c604019913cb02e1970e5a881e4a5f88bf02e9bf0",
+      "lines": 131,
+      "notes": "核完整控制器的代际、单飞、免费固定16赛事过滤、报名/取消/检录/入桌、后台/离页和一秒续轮询。既有回归及5组补充/30无变化轮询通过；轮询实际为请求结束后再等1秒，不是慢网下严格1Hz。网络/绘制端口为存根。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/TournamentCenterModel.ts",
+      "sha256": "dee894f0c35adea1c10500faef2fccea6264f321365dfcf9d321f2fd4505bdff",
+      "lines": 35,
+      "notes": "核主操作推导优先级、报名/检录门禁、锁定后取消隐藏、暂停/终场/排名与资格文案。主操作在busy/error禁用；取消报名允许在部分错误状态仍请求服务端校验，不直接认为越权。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/TournamentCenterView.ts",
+      "sha256": "1d58dd322a7d29a6fff5ae21d6f1cf850517f857376b9e158a85862d275f4187",
+      "lines": 91,
+      "notes": "核统一安全区缩放、小圆角框、固定方形奖杯槽、报名/取消/分页按钮及成绩/规则文本。按源码检查，无GPU/真机截图或实际字体/奖杯透明像素验收；不声称视觉完美。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/FrontPageController.ts",
+      "sha256": "bd7eddb9c13f85a0c45f2ddabb6b9b98216a19dfda245eb6e3de8c8fa34de0a3",
+      "lines": 260,
+      "notes": "核完整组合根及依赖边界、路由前置暂停、资料保存/排行协调、resize委派、恢复来源、hide/show/destroy解绑。EVENT_SHOW只恢复赛事，不重绘回放暂停按钮，支持RP-19-001调用链；真正引擎事件生命周期未实机验证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FrontPagePlayerState.ts",
+      "sha256": "9d481242c7f43fb031fa857151211d063ba70d93a239a6c737389f2f0b8b7cd1",
+      "lines": 31,
+      "notes": "核深复制冻结资料、dashboard与已编辑profile关系、invalidate清除资料与loadedAt但保留loading；与LobbyPageDomain代际组合复现LP-19-001。未把可能覆盖手工资料的理论竞态当确认缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FrontPageWalletState.ts",
+      "sha256": "90bc4d04b410b56212170474f3771603a9150a99f58b5d7ed0ebebab35fd51ea",
+      "lines": 18,
+      "notes": "核正式钱包初始未知与dev钱包、fresh门禁、update和invalidate；真实大厅probe证明数据已fresh但视图仍旧，不是钱包接口丢数据。返回对象可变但未确认合法消费者造成污染。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/LobbyPageDomain.ts",
+      "sha256": "0d738868c4743ffad14247637d8845becc5198341112ef85543174c7838510fc",
+      "lines": 498,
+      "notes": "完整498行，核大厅/经典3玩法/等级入口、好友设置与入桌委派、邀请/继续牌局、菜单资料刷新、轻量动效及销毁；LP-19-001由待处理请求和页面令牌生命周期不一致引起。辅助细查尚未完整读的好友presenter不计覆盖。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+      "sha256": "1b507839d93803ffbba5cacf319c6d4d670e7ca09f878189b7a4987be06b0380",
+      "lines": 27,
+      "notes": "核账户纯显示与正式经典3模式的标签/描述/级牌规则，采用共享canonical模式常量，不复制规则引擎；目录项/开发文案未据名字扩大为假赛事交易。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/ReplayPageDomain.ts",
+      "sha256": "5622f25cdd565dec63f207767e207b182ca1b41e43bd095eebc0951e729c83a6",
+      "lines": 218,
+      "notes": "完整218行，核列表/详情请求代际、公开数据边界、寻址/播放/定时器取消、退出/后台/重排与返回页；真实模块复现RP-19-001。实际回放只展示公开事件，不还原隐藏手牌。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/ShopPageDomain.ts",
+      "sha256": "939c54bb21d928f4e8b324998d66b84b6e30214423a60663552fbe3622b23e7d",
+      "lines": 45,
+      "notes": "核只读商城预览及详情/返回，无订单或钱包写入依赖；reflow间接调用showPreview会增加页面令牌，不是纯绘制，但未发现实际远端写/业务失败，不作为确认缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/CoastalPreviewPages.ts",
+      "sha256": "ffb44e03398216f211ba8688265e55df5cef1e75bea84b86fe39c593f56ffc4c",
+      "lines": 68,
+      "notes": "核只读商品目录、说明/详情页、保留素材与统一框架，没有购买/库存写功能。固定设计网格与图形控件源码已核，最小机型触控与GPU不在本批结论内。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/replay/ReplayTimeline.ts",
+      "sha256": "b4660bb1c1695618b1d2e68c7ad8d6878cdb8fbbc8d3994f1ebba5cd76d38eb6",
+      "lines": 353,
+      "notes": "完整353行，核白名单复制冻结、序列稳定去重、事件归约、贡还不保留私牌、起局清空、光标夹取/缺口补齐与append缓存。80组乱序/重复/补齐共5280光标与函数归约对照通过；只读public模型不是完整规则引擎。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/ReplayViewpoint.ts",
+      "sha256": "deb1e520a6e5f7563da5e6720b9d7558ea3fb560315234f61fbb7fc1aa301559",
+      "lines": 43,
+      "notes": "核4席旋转和中立fallback、固定队伍胜负标签。实际生产replay缺少viewerSeat而走中立视角；转蛋专用收尾不走常规replay生成，未将合成动态队伍输入误报线上错标。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/ReplayBoardView.ts",
+      "sha256": "7e0deae65e6ca8b5e284826ea0418fa187b02006995ad99ffe3f0c7df6e9def1",
+      "lines": 179,
+      "notes": "核公开牌静态呈现、点数花色兜底、最多14牌/行、座位名称和最近动作、阶段/胜方文案，CardView交互关闭。仅代码阅读与上游纯模型测试，无实际GPU/布局画面验证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/development/FrontPagePreviewData.ts",
+      "sha256": "3b817fcaa3bf57eec432d279cce19dc092571feee1fa7faddca3d8c0ad70e301",
+      "lines": 9,
+      "notes": "核开发预览入口独立创建dashboard/products深冻结快照；由组合根选择，不被页面或正式gateway直接import。既有隔离回归通过。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/DevelopmentApis.ts",
+      "sha256": "21b144a21b340c2665e2edda303e1cb62dafdf68e63bcf4e3ac0b5df2dd0d7c0",
+      "lines": 127,
+      "notes": "完整127行，核8件样品/开发玩家/赛季/公开牌谱、只读钱包及显式未实现错误、auth/dashboard同实例Store、无shop/tournament活动gateway。仅开发回退，样例数据不是线上真实成绩，未发网络/交易。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/DevelopmentPlayerStore.ts",
+      "sha256": "e26ceca854f62722abfdfc40a64b9a2cae52a5145aa80d02c4082d032c415920",
+      "lines": 17,
+      "notes": "核每开发会话独立资料Store、读取防御复制、头像dataUri映射/保存源标记；仅开发输入不冒充正式校验；既有跨会话/外部修改隔离回归通过。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/tournament-center-regression.cjs",
+      "sha256": "89ba5955246071822c252c80db4eef094d45202931274c569e11222d5a7a81d8",
+      "lines": 92,
+      "notes": "完整92行并运行通过。实际Controller+Model，render/HTTP/timers为内存，覆盖双点/报名0分/检录/取消/轮询恢复/无变化不重绘/离页迟到。尚非16人真实联机或像素测试。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/front-page-reflow-regression.cjs",
+      "sha256": "0c989dac29c098e44714b61d1a76303123a2b40799bb3a1f09b93ac01c872a1e",
+      "lines": 34,
+      "notes": "完整34行并运行通过。仅regex检查resize委派和reflow直接方法文本，不追踪间接调用；例如Shop.reflow转showPreview的页面令牌副作用仍会通过。无实际远端写后果，不把覆盖缺口本身升级线上事故。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/preview-state-isolation-regression.cjs",
+      "sha256": "2be5c67cfe86d1add49b5382485e5aec5fbdedbbc7175544685dfb4234951fd6",
+      "lines": 57,
+      "notes": "完整57行并运行通过。deepfreeze、防御复制、跨dev会话、正式无sample、退役tournament不进入活动gateway；RetiredDevelopmentApis已在第17批审阅，这次不重复计数。只内存TS载入。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/replay-viewpoint-regression.cjs",
+      "sha256": "11e3fc68413b534f8c06d4b3d26f33b39e8b8eb46dee7c8ffdb791f5b0904506",
+      "lines": 46,
+      "notes": "完整46行并运行通过。4玩家视角/neutral与胜方标签运行测试，页面/board连接仅regex；不能证明生产回放返回viewerSeat，更不证明转蛋动态队伍还原。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/replay-timeline-regression.cjs",
+      "sha256": "f3833fb133e527c9c92e47e3c71f54386d55f0abda12f4df37601373af3b6996",
+      "lines": 166,
+      "notes": "完整166行并运行通过。顺序/去重/复制、清桌/过牌、序列归约一致、光标/空流、追随尾部与缺口补齐；新探针扩大正常乱序数据覆盖。没有验证网络schema或所有任意坏事件输入。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "LP-19-001",
+      "severity": "P2",
+      "title": "大厅资料请求跨子页面往返后，数据更新但当前菜单不重绘",
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/LobbyPageDomain.ts",
+      "line": 415,
+      "endLine": 426,
+      "evidence": "首次showMenu发起dashboard/wallet请求；请求未完成时进入经典选择或好友设置再showMenu。showMenu增加页面令牌、invalidate资料，但保留loading，使新菜单不再发起请求。旧响应写入状态后仅允许旧令牌重绘，当前菜单令牌不同，因此卡在账号同步中/--。profileLoaded对generated/saved资料不触发资料自动保存重绘。",
+      "validation": "node docs/audit/2026-09-12/repro/lobby-refresh-19.cjs：2子路由×2响应先后共4例，实际Domain、Player/WalletState与ProfilePresenter验证数据fresh/已返回但labels仍旧；执行已安排的invite激活也不恢复；显式reflow恢复。正常菜单及离页不抢路由2对照通过。",
+      "recommendation": "分离资料请求所有权与视图令牌：返厅订阅/接管同一在途刷新，完成后通知当前菜单重绘；保留离页与账户代际隔离，不简单去掉所有token门禁或每次resize重复请求。补成功/失败/快速往返/销毁/资料编辑的时序回归。",
+      "boundary": "不是微信授权失败、后台数据丢失或无法出牌；停滞持续至下一次有效重绘/重入等恢复路径。请求时序/绘制/原生协作者为内存，无真机或真实网络复现。"
+    },
+    {
+      "id": "RP-19-001",
+      "severity": "P3",
+      "title": "回放后台暂停后按钮仍显示暂停，点击反而重新播放",
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/ReplayPageDomain.ts",
+      "line": 46,
+      "endLine": 46,
+      "evidence": "handleApplicationHide调用stopReplayPlayback(false)改变timeline.isPlaying但不重绘；FrontPageController的EVENT_SHOW只恢复赛事。未发生额外reflow时按钮保留暂停，点击调用toggleReplayPlayback读到false并开始播放。",
+      "validation": "node docs/audit/2026-09-12/repro/page-lifecycle-19.cjs：真实ReplayPageDomain/Timeline播放→hide→旧timer不推进→按钮仍暂停→点暂停开始播放；普通暂停立即显示播放、手动seek取消旧timer、迟到详情不抢回列表等对照通过。",
+      "recommendation": "后台停播后同步按钮模型/视图，或前台恢复仅对当前replay-detail重绘已暂停状态，不自动恢复播放；保留timer代际和其他页面不被重新打开的围栏。",
+      "boundary": "只影响回放控制文案/操作预期，不影响实际对局/积分/隐藏牌，也不是后台继续自动播放。存根调用实际hide方法，未验证设备EVENT_SHOW同时触发resize时是否掩盖问题。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "existingTests": [
+      "node work/guandan-cocos/tests/tournament-center-regression.cjs",
+      "node work/guandan-cocos/tests/front-page-reflow-regression.cjs",
+      "node work/guandan-cocos/tests/preview-state-isolation-regression.cjs",
+      "node work/guandan-cocos/tests/replay-viewpoint-regression.cjs",
+      "node work/guandan-cocos/tests/replay-timeline-regression.cjs"
+    ],
+    "existingResult": "5入口通过，均本地合成，无生产服务",
+    "probes": [
+      "node docs/audit/2026-09-12/repro/lobby-refresh-19.cjs",
+      "node docs/audit/2026-09-12/repro/page-lifecycle-19.cjs"
+    ],
+    "probeResult": "4大厅问题时序+2对照；5赛事控制时序含30无变化轮询；80事件集合5280光标对照；1回放后台按钮问题及正常暂停/seek/迟到详情对照。",
+    "skill": "UI/UX Pro Max：已全文阅读，loading cancel feedback --domain ux -n 2返回Feedback/Loading Indicators及Animation/Loading States，采用异步反馈需与状态一致的建议；不采用Web ARIA/CSS示例为Cocos硬规范，不改设计。"
+  },
+  "limitations": [
+    "所有22文件完整阅读并记录哈希；辅助服务端getReplay/finalizeMatch/原生资料同步属于以前已审调用链核对，不重复计数。",
+    "赛事View和ReplayBoard仅源码审核，没有Cocos构建、GPU画面、真机点击、真实前后台或微信授权。",
+    "未据regex全绿宣称所有reflow纯绘制；未据固定队伍辅助函数宣称生产转蛋回放错判；未据开发默认值宣称真实账户/赛程内容。",
+    "未修改业务代码、测试断言或任何发布包/线上状态；原有五处工作树改动保留。"
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "batch": "server-duplicate-04",
+  "reviewer": "audit_server_authority",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/duplicate-room-runtime.js",
+      "sha256": "a9b095a07bfb8f40bda02fdff92103dbf349e843b3b1124e0ed1009d7dfaad53",
+      "notes": "完整逐行审阅173行：独立serial所有权、存储提交与发包顺序、平台开局确认/事件重试、自动动作/双方结算屏障、断连/恢复、关闭墓碑和容量。确认SD-04-001、SD-04-002、SD-04-003；同连接publish在serial内同步发送，未确认独立乱序生产者问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/duplicate-room-admission.js",
+      "sha256": "b6dfff9a18173cf731ce6ef451de15fb1c44aa00c57560cd37006261b35fb733",
+      "notes": "完整逐行审阅51行：签名/entryAttempt/房间租约与设置绑定、8席映射、观战限制、回收票据、token恢复、在线成员互斥。12/30行是SD-04-001拒绝恢复的落实位置；未证明越权持有其他身份凭据，不把多身份前提当作泄密结论。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/duplicate-room-model.js",
+      "sha256": "34599d88bdf6251dd13100d9c850cb8119c80a1a38d33a11407da30abd83b5e8",
+      "notes": "完整逐行审阅61行：一次选级/发牌后分桌深复制、局号与庄轮换、8席到4席映射、权威出牌版本、双桌settled计分门禁与红蓝反向座位映射。既有两轮真实规则驱动回归通过，无新增确认问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/duplicate-auto-policy.js",
+      "sha256": "4f5a7fe6106f7c087f0373612fd3ccb9975a4fe23f75df395c79e52ad4167d4e",
+      "notes": "完整逐行审阅18行：每桌AI checkpoint独立、pendingBotPlay持久化和既有节奏策略转接；辅助追查实际runtime调用与测试中重复tick不重掷、取消托管清计划。未确认新增独立问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/duplicate-room-runtime.test.mjs",
+      "sha256": "fa34ba01078d5c791962dcaabbaad4ca3a3a379adf0a5545fe9175a01fb94bdd",
+      "notes": "完整逐行审阅150行并执行通过：合成签名票据/临时目录、无远程回调，两轮真实规则出牌、相同发牌/级数/庄、快桌屏障/累计分/重启恢复/隐私/机器人节奏。现有save失败断言只覆盖主动setTrustee，不覆盖断连提交失败；正常ended退出测试没有host大厅解散guest复用连接。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/duplicate-room-ws.test.mjs",
+      "sha256": "25797c8643cada638d89eb632e39aef0f426643e328208be81fb5d91b7784bf5",
+      "notes": "完整逐行审阅101行并在env-i净化环境执行通过：回环WebSocket/合成签名collector/内存平台/独占临时目录，8人入桌与局部seat协议、同牌和对手隐藏、正常断连恢复。终局事件由测试直接构造注入平台，不声称其验证完整游戏到平台终场上报；未覆盖本批三条故障边界。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/duplicate-room-roster.js",
+      "sha256": "288f7962ad04774c3a13c82fb6861385bbab963b693f4558155ac9dbdd9825fe",
+      "notes": "完整逐行审阅24行：8个不同身份和8个键校验、活跃参赛者或签名上报的合成机器人白名单、playing阵容锁定、开局重排/其余observer映射。辅助核对签名事件调用链，未确认新增独立问题。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "SD-04-001",
+      "severity": "P2",
+      "title": "断连提交失败保留幽灵在线身份，存储恢复后仍拒绝双桌恢复",
+      "path": "work/guandan-windows-source/server/duplicate-room-runtime.js",
+      "line": 125,
+      "evidence": "119-125行仅在隔离draft清connectionId并await commit；26-30行保存成功后才替换live room。weapp-ws.js:694-696却在调用disconnected后立即删除物理connections项，失败仅记录日志。旧live member.connectionId因一次失败留存，duplicate-room-admission.js:12/30只按其是否非空拒绝token/票据恢复，不核实connections存活；tick没有协调清除这类悬挂身份。",
+      "validation": "已确认。Markdown无网络探针使用真实runtime、真实合成签名票据、filePath为空；仅断连save注入一次失败并按真实close入口删除连接，随后恢复save并成功加入另一房，再执行tick。旧connectionId仍为audit-old而connections无该项；正确resumeToken返回重连凭证无效或该账号已在线，原有效签名票据返回该账号已在另一连接中。运行退出0。constructor:15启动恢复会清在线身份，故不声称永远不可恢复；无越权或牌面泄漏结论。",
+      "recommendation": "把已发生的传输层断连事实与可回滚游戏状态分离，或为断连失败保留按房间/成员/连接代次受保护的业务重试；恢复互斥应区分真实存活连接与悬挂ID。增加一次保存失败、后续存储恢复仍可凭正确身份重连且不抢占新连接的回归。"
+    },
+    {
+      "id": "SD-04-002",
+      "severity": "P2",
+      "title": "双桌大厅解散后未清其他成员连接归属，阻断同连接下一次入房",
+      "path": "work/guandan-windows-source/server/duplicate-room-runtime.js",
+      "line": 94,
+      "evidence": "duplicate-room-actions.js:20-29房主大厅退出将房间置closed；runtime:78仅清请求方的roomId/duplicateRoomId，94向其他人发roomDissolved却不清连接归属。下一房请求在40行被旧roomId拒绝；对旧closed房补发safeExit又被actions:26当作进行中拒绝。owns:21及weapp-ws:671使原本四人房新请求也可因旧duplicateRoomId误路由到双桌。Cocos LobbyMessageRouter:118-120调用LobbyController:414-420仅本地清房，CocosSocketClient:48同URL复用OPEN连接，构成真实客户端触发链。",
+      "validation": "已确认。Markdown无网络探针用两名真实签名入房成员，host safeExit后guest收到roomDissolved但仍指向旧roomId；guest下一房createRoom报请先离开当前牌局，旧房safeExit报复式进行中请使用托管，四人新房请求owns=true。断连并建新connection后同一下一房票据成功roomCreated。运行退出0。Cocos入房失败后MatchedEntryCoordinator:187-193会resetTransport并请求恢复，因此影响收窄为正常复用连接的首次下一房入场失败/额外恢复，不声称客户端永久困住。",
+      "recommendation": "在closed状态已提交后，对仍归属于该房的所有在线连接清理roomId、duplicateRoomId和相关视图缓存，再通知解散；按房间身份检查避免清理已迁移连接。关闭房退出应可幂等收敛，覆盖host大厅退出、到期解散后guest无需重连即可进入双桌和四人新房。"
+    },
+    {
+      "id": "SD-04-003",
+      "severity": "P2",
+      "title": "已确认关闭的双桌墓碑持续占用开房容量，零活动房也拒绝新票据入场",
+      "path": "work/guandan-windows-source/server/duplicate-room-runtime.js",
+      "line": 45,
+      "evidence": "45行用rooms.size进行新房容量检查，包含closed/ended墓碑；161-164行需now超过max(expiresAt,endedAt)+86400000且events清空才删除。weapp-ws.js:771-772把双桌maxRooms上限硬限为64。平台spectator-event-service.js:300-310已在真实room-closed事件接受后将match置aborted并释放activeMatchByUser，friend-room-service.js:265-288随后正常签发新的独立房间票据，但同实例runtime仍用已关闭记录占满容量。",
+      "validation": "已确认。Markdown第三探针使用真实FriendRoomService、SpectatorEventService和DuplicateRoomRuntime，maxRooms=1，内存平台/合成用户/签名票据，无网络。正常host safeExit后真实room-closed被平台接受、关闭事件队列清空、host指针null；推进到旧房lease过期后runtime为0活动房+1墓碑。平台同一host创建第二房并签发有效票据成功，runtime仍报复式房间已满；推进到旧lease+24小时之后tick释放墓碑，新建房又成功。原64上限结论来自同一计数条件及实际入口配置，未宣称真实部署已经耗尽。",
+      "recommendation": "保留防重放墓碑及必要生命周期重试，但把活动房容量与已关闭身份索引分开计数/存储；墓碑可独立压缩和限额，不能为释放容量提前允许旧票重建。增加平台已确认关闭、零活动房、墓碑仍有效时新房可入场的回归，并单独验证旧房票据仍被拒绝。"
+    }
+  ],
+  "concerns": [
+    {
+      "id": "CN-02-C01",
+      "status": "referenced-not-new-finding",
+      "note": "同连接旧生命周期权威包问题沿用既有待验证项。本批确认duplicate的handle/tick/disconnected使用独立serial，publish同步发包且flush异步回调不发视图，未复现独立乱序生产者。外层调度key捕获与执行时roomId变化仅为根线程诊断边界，尚无实际业务错乱证据，不重复计或宣告整体排除。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "cwd=work/guandan-windows-source; env -i PATH=/usr/bin:/bin WEAPP_HOST=127.0.0.1 /opt/homebrew/bin/node --test server/duplicate-room-runtime.test.mjs server/duplicate-room-ws.test.mjs",
+      "result": "2 pass / 0 fail，约5.4秒。先完整阅读测试及服务配置边界并检查39139无监听；只回环合成服务/自建临时目录，无继承生产环境注入。"
+    },
+    {
+      "command": "cwd=仓库根；Markdown中的三个node --input-type=module探针",
+      "result": "三段均退出0；SD-04-001正确两类凭证恢复被拒绝、SD-04-002关闭通知后首次下一房入场被拒绝且新transport可恢复、SD-04-003平台释放旧房并签新票后仍因旧墓碑计数被拒绝。探针禁用周期timer、filePath为空、无网络/真实存储；第三段平台采用MemoryPlatformStore。"
+    },
+    {
+      "command": "报告结束前复核7个源文件SHA-256、HEAD及git status --short",
+      "result": "HEAD保持1d58999dc6e5455b049e1643660bbba3deee1406；7个源文件hash与reviewed匹配，原五处业务未提交修改保留，仅写本批审计报告，不刷新清单。"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "batch": "platform-friend-06",
+  "reviewer": "/root/audit_core_rules",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/friend-room-number-limiter.js",
+      "sha256": "849425e3ab8cb534fa3cd958cfd24d6f6a893084fb975c33dec4cecf3e6441de",
+      "lines": 20,
+      "notes": "完整读审。核按用户60秒窗口、6次上限、到期回收及10000键内存边界；现有纯内存回归覆盖这些边界。未确认新增问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/friend-room-personal-scores.js",
+      "sha256": "6f27cb0cc8806c17af45ee082574caa555656e9fa11562468904db609bbbc734",
+      "lines": 16,
+      "notes": "完整读审。核转蛋个人分/队伍分互斥、3/6计分的单人范围和总和；真实 SpectatorEventService 调用前经 normalizeSpectatorEvent 验证四席完整整数，未将绕过上游的孤立API误用列为问题。未新增计分探针。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/friend-room-roster.js",
+      "sha256": "1f010c45199574dd8626e94c9873e2e66b7b9f8edbbf42de3ed94c98175028cc",
+      "lines": 32,
+      "notes": "完整读审。核真实开局提交的四人唯一性、活动授权成员/签名机器人白名单、spectator off限制、人席调整/观战身份、开局锁定/终态拒绝；复式路由仅辅助追踪。未确认独立新增问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/friend-room-service.js",
+      "sha256": "5df01561f4b7e0219a1e81ddb83728b7b2653bcec0126e468132d7929d676f18",
+      "lines": 453,
+      "notes": "完整读审。核配置规范化、邀请码/房号、创建和恢复幂等、票据256容量、房主信息、租约、活动比赛归属、取消/踢出/离席确认、4/8座与观战。确认 PF-06-001：复活已有 cancelled participant 缺12人上限校验，平台13人但牌桌运行时拒绝第13票。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/friend-room-service.test.mjs",
+      "sha256": "40b7ea6e4f254fe99c757722b512f2b8a4755864a6b8ee72310bb05c02a44fe0",
+      "lines": 103,
+      "notes": "完整读审并执行通过。纯内存服务/假票据：创建加入恢复、观战12人、新用户超限、房号鉴权与限流、幂等、封禁、开局/关闭/过期。容量断言只有首次新成员加入，没有满员后合法离席旧成员重新加入。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/friend-room.test.mjs",
+      "sha256": "ead60b1b6aeea80bc5ea662bd4891871969cee43e72844c73725d2fc545ad184",
+      "lines": 1290,
+      "notes": "完整分四段读至EOF并执行通过。仅显式test环境/MemoryStore、回环HTTP和合成身份/密钥；覆盖HTTP认证、规范签名票据、生命周期双签名/重放/归属、取消离席闭环、恢复/过期、终局计分/延迟公开、256票据边界。生命周期和终局多为手工合成，不等于全WS牌局/全终场验证；未覆盖PF-06-001。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "PF-06-001",
+      "severity": "P2",
+      "title": "离席成员再次加入绕过平台12人上限，签发牌桌无法接受的观战票",
+      "path": "work/guandan-windows-source/server/platform/friend-room-service.js",
+      "line": 329,
+      "evidence": "admit 的活动参与者>=12检查只在 !participant 分支；已存在且经合法 seat-left 确认的 cancelled participant 走333-358行，以新entryAttemptId复活时不检查总数。启用观战、房间12名当前成员且旧座已占用时，该旧成员获得observer票并写入activeMatchByUser，平台活动人数变13。邀请/房号、普通/复式4种组合均复现。",
+      "validation": "报告内完整内存探针使用真实 PlatformService、MemoryPlatformStore、GameTicketService/Verifier、SpectatorEventService；普通房还经真实 createFriendRoomObserverRuntime.enter 与 createRoomExit.handle 完成初始入/离，再入满12名。第13票密码学和规范字段验证通过，但普通 observerRuntime.js:102 和复式 duplicate-room-admission.js:34 都拒绝，牌桌人数仍12。复式离席用合成left墓碑并向真实平台提交同型seat-left，不声称验证复式退出协调器。两项指定既有测试均通过。",
+      "recommendation": "把从非活动状态转为活动参与者的容量检查收束到新建及cancelled恢复共用路径；维持已活动成员幂等重试/恢复不误扣容量。增加合法离席确认后满员再加入的邀请/房号、普通/复式回归，断言返回FRIEND_ROOM_FULL且不签票、不恢复activeMatchByUser。不要移除牌桌运行时上限防线。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 6,
+    "reviewedLines": 1914,
+    "baseline": "读取当前README/STATUS/coverage，启动时156/629且本批六文件pending；不刷新总清单。",
+    "tests": [
+      {
+        "command": "node work/guandan-windows-source/server/platform/friend-room-service.test.mjs",
+        "result": "passed; friend room service, numeric admission and throttling tests passed"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/friend-room.test.mjs",
+        "result": "passed; authenticated friend-room ticket tests passed; test-only memory/loopback HTTP"
+      }
+    ],
+    "reproduction": {
+      "location": "platform-friend-06.md 的唯一 bash 代码块",
+      "result": "4场景：classic/duplicate × invite/number，platformActive=13、runtimeActive=12、runtimeAdmitsThirteenth=false；首次新成员超限与旧entryAttemptId拒绝对照通过。",
+      "sideEffects": "全合成内存；未启动服务器入口，未建立WS或外部网络，运行时interval在finally dispose；无需写临时文件。"
+    },
+    "limits": [
+      "不是第13人实际观战、越权出牌或隐藏手牌泄漏；实际入桌模块上限生效。",
+      "平台HTTP与生命周期签名路由通过静态调用链和指定既有合成HTTP测试核对；容量探针直接调用同一PlatformService，不声称该探针执行完整HTTP/WS链路。",
+      "普通房真实入/离模块；复式真实入场模块，离席left墓碑为内存适配。外围持久化、广播、连接/已接受动作端口均为内存适配。",
+      "额外ban/off/pending与开局后复活容量专项对照未启动；根线程通知长期目标paused后仅整理已做工作。指定既有测试已包含这些门禁的部分正常/拒绝断言。",
+      "未运行构建/部署/服务器主入口；未读生产环境/真实账号/私有数据，未测试Redis/生产持久化/真WS/真机。"
+    ],
+    "endVerification": "结束时HEAD未变；六份被审文件SHA256与开始记录一致，五处原有dirty文件SHA256完全保持；git status只有原五处修改与docs/audit/。仅apply_patch写本批MD/JSON。"
+  }
+}
+

@@ -1,0 +1,452 @@
+{
+  "batch": "retirement-quality-31",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/migration/merchant/MerchantPageDomain.ts",
+      "sha256": "c20ce609e4aff5b6d9f977da54ebb79809b9278e3a864c577c4d262e766cda33",
+      "lines": 266,
+      "notes": "完整266行。核商户申请/后台/门店/员工/积分页面状态、owner/manager/cashier入口、configured只读阻断、单pendingAction及pageToken/route/disposed迟到守卫。当前玩家路由不引用，保留为迁移代码；不能把客户端角色隐藏视为服务端权限校验。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/ShopContracts.ts",
+      "sha256": "0017598871df46e5615fb51456172579e5deaa21172979623745d4582a6a7e08",
+      "lines": 13,
+      "notes": "完整13行。ShopOrder/ShopGateway退役专用契约，商品只读类型来自当前FrontPage契约；没有混回运行facade。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/merchantGateway.ts",
+      "sha256": "7e0f4185d779a46e39b675dcf109d80e4390d664d22579b74ce7b07dfddf5573",
+      "lines": 198,
+      "notes": "完整198行。核输入长度/枚举/整数限额、跨商户响应拒绝、四种mutation按参数保留不确定幂等键/成功和4xx释放。补探20场景中的16场景和3种foreign列表；旧UI尚未启用，未来上线仍须联测服务端角色与并发。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/shopGateway.ts",
+      "sha256": "32e855c5836725d87dd1e54a9db882bceab99f3f94e5816165701dae2cbe63ad",
+      "lines": 79,
+      "notes": "完整79行。核商品库存整数、价格别名、兑换输入/响应状态和不确定操作键。补探4种失败重试/成功清理；响应未绑定请求商品/数量和SafeInteger边界属于退役恢复前核查点，未发现当前普通商城购买入口。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/spectatorGateway.ts",
+      "sha256": "87a1aa0533141b016d80c70241fd8f65229051fe7eee44c1d21c04d29615f7dc",
+      "lines": 53,
+      "notes": "完整53行。核旧spectate端点、公开事件decoder、终态时间互斥、兼容completed/finished。真实decoder与旧poll policy组合复现completed完成后不停止，但运行assets无消费者，只列迁移关注项。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/platform/tournamentDecoders.ts",
+      "sha256": "98e8960b3da0ecb146488c6ff15065e0625c74bc408e0b224bcfacc01982a2c2",
+      "lines": 1,
+      "notes": "完整1行。仅重导出活动canonical decoder，避免重复模型；没有独立旧实现。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/rules/RuleHelpProjection.ts",
+      "sha256": "05e2e35af89dab8b9a119ff906f06c70a165c6a9eb13230c4949c93a24fac0b2",
+      "lines": 34,
+      "notes": "完整34行。五页浅层字段皆字符串且对象/数组冻结；8组规则flags实际文本一致。固定传统升级介绍不是目前单局/转蛋/复式全规则说明，旧帮助无当前入口，不冒充新玩法文案回归。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/spectator/SpectatorPollingPolicy.ts",
+      "sha256": "9a3946a874715a845618ecd626181419b2a579b72331fc44c018018de5239b11",
+      "lines": 19,
+      "notes": "完整19行。3秒正常/3,6,12秒封顶失败退避；stop仅finished/aborted且timelineComplete。实际已审gateway返回completed不停止，活动好友房观战不使用此策略。"
+    },
+    {
+      "path": "work/guandan-cocos/tsconfig.migration.json",
+      "sha256": "edca1d987d7a9f15ae20f962e971c38de89df96caaaa33cd9ddfbff5d25b7a77",
+      "lines": 11,
+      "notes": "完整11行。独立检查三类迁移域及RetiredPlatformApi/RetiredDevelopmentApis；继承当前Cocos类型/noEmit，include空与显式files；实际noEmit类型检查通过，非Cocos发布包含迁移代码。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/classic-mode-routing-regression.cjs",
+      "sha256": "c954d464575b2722ce33bd4fd5017962b9c1965bdb6698d893b7c674a1b6745a",
+      "lines": 57,
+      "notes": "完整57行。实际LobbyPageDomain原型配合成UI/依赖，3viewport×3模式×12队列按钮与返回来源/紧凑边界。绕过构造器，不是真实触控或匹配服务器。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/cocos-iterable-spread-regression.cjs",
+      "sha256": "d715e9ee6fe8f0bbba6ff722c097573a920af1dddecc903dcb8c1a98b444dc1f",
+      "lines": 60,
+      "notes": "完整60行。类型checker扫描运行/shared源码spread，明确Map/Set/string/call禁止与array/tuple/union/generic对照；现有279文件通过。非语义全诊断/构建验证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/cocos-runtime-reachability-regression.cjs",
+      "sha256": "730320ce8fe1d21956a5379b569a2db8243cbcd7f2020b171b3440a5a3cf1c12",
+      "lines": 92,
+      "notes": "完整92行。从GameScene沿ImportDeclaration检查16必需模块及meta UUID序列化绑定；不遍历export-from/dynamic/require，不能作全图死代码证明。补探转译239资产TS的553引用无归档越界。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/master-ai-policy-regression.cjs",
+      "sha256": "9e824c810d92cc2737481868c032576b17de4b329584f5f2a6c12b0a4427b228",
+      "lines": 72,
+      "notes": "完整72行。多数检查为源码接线；实际AI几手牌验证默认master与按权威team识别队友。原入口读ignored dist，本轮内存redirect当前shared/src后通过；不覆盖已知RP-13-001服务器固定team适配。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/merchant-console-regression.cjs",
+      "sha256": "f37ba020e67163fab0a7ec7c47ff3990221ea422d9b6db2715e162835e154197",
+      "lines": 71,
+      "notes": "完整71行。商户API/展示/路由隔离/只读和迟到守卫均为文本模式检查，不是四种mutation真实行为。补探实际gateway失败重试、invalid/foreign响应与只读dev，未启用商户写入。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/quick-chat-regression.cjs",
+      "sha256": "9a02cc3b993ef299d03b3bc6b1598e91edc5c89e1381d2ae23632cb3fb4e1b46",
+      "lines": 17,
+      "notes": "完整17行。六份运行文本无快捷语标记、托管入口存在；结合239资产引用/21归档音频排除，无真实音频播放或WS包发送实验。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/rule-help-projection-regression.cjs",
+      "sha256": "012bb894cea04a0fcb0c5ead793fcd4f72cae2a9806c84e6bbc90b74ca331d7a",
+      "lines": 34,
+      "notes": "完整34行。实际纯TS投影两种profile，文案A2345/同花顺5.5/三带二与红心配代王边界；补足8种flags，传统静态帮助仍退役。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/spectator-polling-regression.cjs",
+      "sha256": "385648d742dbd51b6c51400f978a32d15cb4a04b15752a5ab189f3654ba0c139",
+      "lines": 70,
+      "notes": "完整70行。实际policy退避/终态和dev增量feed，分别检查finished/aborted与completed却没组合；补探确认MIG-31-C01，只是旧迁移启用风险。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/web-mobile-simulator-regression.cjs",
+      "sha256": "96cf61aa243b80fde892533a147a74c3ed9a2a7b7c1b9f6e02e3a894713fffaf",
+      "lines": 21,
+      "notes": "完整21行。模板/样式/finalizer字符串检查874×402和safe-area替换，不运行DOM，不据此声称所有设备适配正确。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/cocos-built-runtime.cjs",
+      "sha256": "91ea694a00f75c40cb6a1c8a4c385f12cd11328865bb4da246a494957c964d94",
+      "lines": 56,
+      "notes": "完整56行。读取既有System.register构建，VM假引擎/注册缓存/exports setter装载；存在缓存先注册和相对依赖限制，不核build freshness或完整live binding。不单独执行未知构建模块。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/refactor-type-contracts.ts",
+      "sha256": "874f462f053851edf632022a1c113a67a66da76a39740e2555b32f751c9b2609",
+      "lines": 59,
+      "notes": "完整59行。14条负类型约束/能力接口正例。实际tsc通过；内存去expect-error后14语义错误，隔离前面dashboard=null的never收窄后nested readonly两断言仍真实拒绝，不把无关noUnused当覆盖。"
+    },
+    {
+      "path": "asset-library/retired-audio/quick-chat/manifest.json",
+      "sha256": "babb108f20ba3bd0510a0239e4b32206580760aaff9413d31d95075b28437322",
+      "lines": 20,
+      "notes": "完整20行。runtimeAllowed=false及单一快捷语归档元数据；实际ogg25562字节与SHA一致，未执行/加载播放；source文字不等于法律授权复核。"
+    },
+    {
+      "path": "work/guandan-cocos/asset-library/retired-runtime-20260908/manifest.json",
+      "sha256": "cd5ce23f8c2ffbba9aadcbf011e29e62a75f8ce612ed7a4dd8c48286f6aff7c8",
+      "lines": 226,
+      "notes": "完整226行。17原运行路径/20归档音频/6实验室源码与meta快照/2测试fixture。源与meta缺席、音频哈希、快照存在均核验，归档快照未执行亦不计作活动源完整审阅。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/residual-cleanup-result-20260908.json",
+      "sha256": "bad53b5141a7137df5db79e7a3b6621b8e0c926ae7129beb69aa50506e514056",
+      "lines": 22,
+      "notes": "完整22行。历史构建3070654+13433169=16503823，前后差35295一致；明确非隔离A/B，不能当当前包体。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/retirement-package-baseline-20260908.json",
+      "sha256": "a0e0374bb804e862ddb161bd1ebe410b70d3051e831b03c6e15a468b3ca7d179",
+      "lines": 9,
+      "notes": "完整9行。历史Sep8基线3187075+13725337=16912412，mainScript哈希仅历史记录；未重新构建历史HEAD。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/retirement-package-result-20260908.json",
+      "sha256": "a7595a1aec9b47fba1b91775a455eb85338bac6591458bc62b816e9751444a23",
+      "lines": 14,
+      "notes": "完整14行。历史Sep8结果3105949+13433169=16539118、差373294/音频288339；当前ignored build另测，不能把增长/缩小单因果归于退役。"
+    },
+    {
+      "path": "work/guandan-cocos/.gitignore",
+      "sha256": "60f1c31f5b45728121473e950c7ec9df5596f97b08bc33359d5f961b6da061cb",
+      "lines": 25,
+      "notes": "完整25行。排除生成目录/缓存/build/多数profiles，保留微信/web-desktop两个profiles。git check-ignore合成路径验证；已跟踪文件仍需独立审查。"
+    },
+    {
+      "path": "work/guandan-windows-source/.gitignore",
+      "sha256": "c176e68c9dd4dd946c9efb60012876e7eddfd3499625a1c8739df2871145dc19",
+      "lines": 33,
+      "notes": "完整33行。排除.env/.env.*而例外.env.example，var只覆盖具体weapp-rooms/spectator-outbox路径；不是任意server/var或自定义输出位置全覆盖。仅查路径不读真实数据。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/hk-bare-ip-profile.js",
+      "sha256": "86cdcc8d2ab6c9dc1488841b39a1be520a2ffdf44198edf18afbfb7d2bdd08f9",
+      "lines": 58,
+      "notes": "完整58行。显式裸IP测试环境、四密钥分离、Origin/签票/HTTP/WS/JSON存储与端口一致门禁。IP格式函数并未证明全为可公网路由地址；这是开发部署预检，不当生产安全白名单。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/hk-bare-ip-profile.test.mjs",
+      "sha256": "a58dc708aafe2c4bac437812a1ca781087ec2f206aab7144c7b79389829560ce",
+      "lines": 41,
+      "notes": "完整41行。仅synthetic环境对象与203.0.113.42保留地址，依赖config解析无网络/生产env；缺少或危险开关/密钥复用/非JSON等对照实际通过。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/hk-bare-ip-test-preflight.mjs",
+      "sha256": "364fbdb14e710992f7ecc0dcd574d051e22a8bb23eeeff1e7642dfaae020c737",
+      "lines": 5,
+      "notes": "完整5行。调用validator默认process.env并输出路径摘要，未以真实env执行；生产不是此入口。配套synthetic单元测试已跑。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/index.js",
+      "sha256": "449f27d6bb59bb5af49eedfda045da034a8f6698830a847a2eb8e914e1cafd0e",
+      "lines": 3,
+      "notes": "完整3行。旧Socket.IO入口立即抛出退役说明，不监听端口；对应spawn进程仅错误退出。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/legacy-retirement.test.mjs",
+      "sha256": "c8cd85793985c2a95aa924dbd9397571af3ff18ef9599747cdecc05f85e9d75f",
+      "lines": 26,
+      "notes": "完整26行。检查package/README已移除旧React/Socket.IO入口、旧index立即失败；实际运行通过，非新服务器联机测试。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "MIG-31-C01",
+      "classification": "inactive migration reactivation risk, not current production defect",
+      "path": "work/guandan-cocos/migration/spectator/SpectatorPollingPolicy.ts",
+      "line": 12,
+      "title": "旧观战轮询停止策略遗漏 canonical completed",
+      "evidence": "实际DevelopmentSpectatorGateway.getFeed→HttpSpectatorGateway.getFeed保留completed与timelineComplete=true，shouldStopSpectatorPolling返回false；finished/aborted同数据均true。当前239份运行资产TS/553条转译后引用未触及migration/tests/asset-library，未发现当前好友房观战使用此policy。",
+      "recommendation": "保持退役；若未来重启旧公开事件观战，统一terminal枚举并增加gateway→policy组合回归。不可据此宣称当前好友房观战不会停止。"
+    }
+  ],
+  "validation": {
+    "commands": [
+      "cd work/guandan-cocos && node tests/classic-mode-routing-regression.cjs",
+      "cd work/guandan-cocos && node tests/cocos-iterable-spread-regression.cjs",
+      "cd work/guandan-cocos && node tests/cocos-runtime-reachability-regression.cjs",
+      "cd work/guandan-cocos && node tests/merchant-console-regression.cjs",
+      "cd work/guandan-cocos && node tests/quick-chat-regression.cjs",
+      "cd work/guandan-cocos && node tests/rule-help-projection-regression.cjs",
+      "cd work/guandan-cocos && node tests/spectator-polling-regression.cjs",
+      "cd work/guandan-cocos && node tests/web-mobile-simulator-regression.cjs",
+      "cd work/guandan-windows-source/server && node --test hk-bare-ip-profile.test.mjs legacy-retirement.test.mjs",
+      "cd work/guandan-cocos && node node_modules/typescript/bin/tsc --project tsconfig.json --noEmit --incremental false --pretty false",
+      "cd work/guandan-cocos && node node_modules/typescript/bin/tsc --project tsconfig.refactor-tests.json --noEmit --incremental false --pretty false",
+      "cd work/guandan-cocos && node node_modules/typescript/bin/tsc --project tsconfig.migration.json --noEmit --incremental false --pretty false",
+      "cd work/guandan-cocos && node scripts/verify-retirement.mjs --wechat --web",
+      "node docs/audit/2026-09-12/repro/retirement-quality-31.cjs"
+    ],
+    "originalTests": [
+      {
+        "test": "classic-mode-routing-regression.cjs",
+        "exitCode": 0,
+        "output": "Classic mode routing passed: three tabs, 12 queue actions, compact menu bounds and return origin"
+      },
+      {
+        "test": "cocos-iterable-spread-regression.cjs",
+        "exitCode": 0,
+        "output": "Cocos iterable compatibility passed: 279 runtime source files; array/call spread types checked"
+      },
+      {
+        "test": "cocos-runtime-reachability-regression.cjs",
+        "exitCode": 0,
+        "output": "Cocos runtime reachability verified (16 live modules)"
+      },
+      {
+        "test": "merchant-console-regression.cjs",
+        "exitCode": 0,
+        "output": "merchant console static regression checks passed"
+      },
+      {
+        "test": "quick-chat-regression.cjs",
+        "exitCode": 0,
+        "output": "Shortcut chat retired; toolbar trustee replaces its entry"
+      },
+      {
+        "test": "rule-help-projection-regression.cjs",
+        "exitCode": 0,
+        "output": "rule help projection regression checks passed"
+      },
+      {
+        "test": "spectator-polling-regression.cjs",
+        "exitCode": 0,
+        "output": "spectator polling policy and development feed regression checks passed"
+      },
+      {
+        "test": "web-mobile-simulator-regression.cjs",
+        "exitCode": 0,
+        "output": "fixed 874x402 desktop mobile simulator regression checks passed"
+      },
+      {
+        "test": "master-ai-policy-regression.cjs",
+        "exitCode": 0,
+        "mode": "isolated current shared-core/src redirect",
+        "output": "master AI policy regression tests passed"
+      },
+      {
+        "test": "hk-bare-ip-profile.test.mjs",
+        "exitCode": 0,
+        "mode": "synthetic env, no network"
+      },
+      {
+        "test": "legacy-retirement.test.mjs",
+        "exitCode": 0,
+        "mode": "retired child entry exits before binding"
+      }
+    ],
+    "typeChecks": [
+      {
+        "project": "tsconfig.json",
+        "exitCode": 0
+      },
+      {
+        "project": "tsconfig.refactor-tests.json",
+        "exitCode": 0
+      },
+      {
+        "project": "tsconfig.migration.json",
+        "exitCode": 0
+      }
+    ],
+    "probe": {
+      "typescript": "4.9.5",
+      "master": {
+        "passed": true,
+        "sourceRedirects": 1
+      },
+      "gateways": {
+        "retryScenarios": 20,
+        "invalidInputs": 10,
+        "invalidNetworkCalls": 0,
+        "foreignCollections": 3,
+        "readOnlyMethods": 5
+      },
+      "retiredPolling": {
+        "canonicalStatus": "completed",
+        "timelineComplete": true,
+        "stops": false,
+        "finishedAndAbortedControlsStop": true,
+        "classification": "inactive migration reactivation concern, not current friend-room observer defect"
+      },
+      "ruleHelpProfiles": 8,
+      "typeContracts": {
+        "compiler": "4.9.5",
+        "expected": 14,
+        "errors": [
+          {
+            "line": 12,
+            "code": 2540
+          },
+          {
+            "line": 14,
+            "code": 2540
+          },
+          {
+            "line": 16,
+            "code": 2322
+          },
+          {
+            "line": 18,
+            "code": 2740
+          },
+          {
+            "line": 31,
+            "code": 2339
+          },
+          {
+            "line": 33,
+            "code": 2339
+          },
+          {
+            "line": 35,
+            "code": 2540
+          },
+          {
+            "line": 38,
+            "code": 2339
+          },
+          {
+            "line": 40,
+            "code": 2339
+          },
+          {
+            "line": 45,
+            "code": 2322
+          },
+          {
+            "line": 47,
+            "code": 2322
+          },
+          {
+            "line": 49,
+            "code": 2322
+          },
+          {
+            "line": 51,
+            "code": 2322
+          },
+          {
+            "line": 53,
+            "code": 2322
+          }
+        ],
+        "isolatedNestedReadonly": [
+          {
+            "line": 38,
+            "code": 2540,
+            "message": "Cannot assign to 'displayName' because it is a read-only property."
+          },
+          {
+            "line": 40,
+            "code": 2339,
+            "message": "Property 'push' does not exist on type 'readonly { readonly eventId: string; readonly replayId: string; readonly matchId: string; readonly roomId: string; readonly place: number; readonly won: boolean; readonly tournamentId?: string | null | undefined; readonly finishedAt: number; }[]'."
+          }
+        ]
+      },
+      "runtimeBoundary": {
+        "files": 239,
+        "emittedReferences": 553,
+        "forbiddenReferences": [],
+        "unresolvedDynamic": []
+      },
+      "archive": {
+        "quickChatClips": 1,
+        "bytes": 25562,
+        "laboratorySnapshots": 6,
+        "snapshotContentNotExecuted": true
+      }
+    },
+    "retirement": {
+      "removedRuntimeModules": 17,
+      "archivedLicensedClips": 20,
+      "archivedLicensedBytes": 288339,
+      "quickChatClips": 1,
+      "quickChatBytes": 25562,
+      "laboratorySourceAndMetaSnapshots": 6
+    },
+    "existingBuild": {
+      "scope": "read-only current ignored local outputs; no rebuild/freshness or release upload claim",
+      "mainBytes": 3302334,
+      "subpackageBytes": 13743105,
+      "totalBytes": 17045439,
+      "webFiles": 327,
+      "comparedWithHistoricalSep8Baseline": -133027,
+      "interpretation": "current total is 133027 bytes larger than historical 16912412. Not isolated A/B and not a regression attributable to retirement.",
+      "hashes": [
+        {
+          "path": "work/guandan-cocos/build/wechatgame/game.json",
+          "sha256": "f1747c9c38ed61e0efd1fdd0d0a7eefde79d6d49b529a1aff0700a18a4442aae"
+        },
+        {
+          "path": "work/guandan-cocos/build/wechatgame/subpackages/game-assets/config.json",
+          "sha256": "774c02c2d9a466281bdb9f98d3b2b7e41afd3c44d66a797a663c6488b7caec1f"
+        },
+        {
+          "path": "work/guandan-cocos/build/web-desktop/assets/game-assets/config.json",
+          "sha256": "774c02c2d9a466281bdb9f98d3b2b7e41afd3c44d66a797a663c6488b7caec1f"
+        }
+      ]
+    },
+    "harnessCorrections": [
+      "首次负类型探针的CompilerHost工作目录仍是仓库根，165条Cocos类型路径诊断与14条目标诊断混在一起。修正为实际项目cwd后通过；两处TypeScript均4.9.5，不是编译器版本不兼容。没有把该探针错误记为产品问题。",
+      "dashboard=null故意错误赋值会令后面的if分支收窄成never；额外内存移除此赋值后，nested名称确因readonly拒绝，push确因readonly数组拒绝，产品声明正确。"
+    ],
+    "limits": [
+      "新增32 pending文件共1765行；辅助重读的已审配置/验证器/RetiredDevelopmentApis不重复计数。",
+      "商户/兑换/旧公开观战仍为迁移文件，本轮未开放功能或请求真实网络/用户资料。",
+      "类型测试与源码引用检查不能替代真实Cocos构建、微信授权和真机联机。",
+      "现有包读数不是当前源码新鲜度证明，归档音频哈希不替代来源商用许可核查。",
+      "环境忽略规则只覆盖具体路径，不保证自定义数据路径不会被Git跟踪；未读取私人env或实际运行数据。",
+      "其他确认39项问题保持未修复；不将只读审计说成业务优化完成。"
+    ]
+  }
+}

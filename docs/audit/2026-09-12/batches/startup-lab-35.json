@@ -1,0 +1,179 @@
+{
+  "batch": "startup-lab-35",
+  "reviewer": "root",
+  "reviewedAt": "2026-09-13",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scenes/Game.scene",
+      "sha256": "6e16da9fddad30cea1be90741a64a53faffc31172bcc7c0bb19899d98f84e4ca",
+      "lines": 454,
+      "notes": "完整454行。17个序列化对象、25处__id__引用和节点父子关系全部有效；Canvas/Camera/GameRoot与GameScene压缩UUID由既有reachability回归确认。startupTexture完整UUID指向主包纹理subMeta；开发登录/不安全端点false，空端点由运行配置解析。nullable controller引用是代码动态组合，不认作缺组件；3D全局字段默认禁用。辅助metadata非新first-party计数。"
+    },
+    {
+      "path": "work/guandan-cocos/build-templates/web-desktop/style.css",
+      "sha256": "446a7096f803e9172f94dd41d510b9d31072037a1aa09e18e6e9a3b373ca7510",
+      "lines": 79,
+      "notes": "完整79行。只为桌面874×402横屏模拟器固定容器，非自适应手机页面；与index.ejs的desktop-mobile-simulator/画布节点对应。outline/user-select全局重置与固定宽高属于Canvas模拟器限制，未声称网页键盘无障碍合格或真机布局已验收。"
+    },
+    {
+      "path": "work/guandan-cocos/build-templates/wechatgame/first-screen.js",
+      "sha256": "45ac90f32ba9d3ac8851f3ddb191cbc43528e175fdec480b02cbfe7017c2b2a8",
+      "lines": 755,
+      "notes": "完整755行。GL背景cover、进度shader、素材error纯色降级、failure离屏canvas/native modal、单次retry/rebind与end资源删除。10组真实脚本+内存GL/RAF/图片/原生端口通过；正常三阶段串行进度、背景error、两类failure绘制fallback、重试去重/失败重试、WebGL不可用均检。公开setProgress只有一个afterTick槽并发覆盖已复现，当前game.ejs按Promise串行无实际并发来源，记BOOT-35-C01而非当前启动事故。logo/slogan代码存在但useLogo=false未启用；没有真实GPU/后台挂起测试。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/app.js",
+      "sha256": "574fa712e9209b0647dca86e7f0b9d7e5ed11d92185ffcf370879bbb5c4fbeae",
+      "lines": 245,
+      "notes": "完整245行。独立两候选草稿/60步历史、有限数值范围与本地保存、导出JSON/PNG、Canvas2D绘制/热点隐藏/加载超时/状态预览；innerHTML插值来源为固定字段表，用户文本走textContent/Canvas。无真实请求/登录。restored变量无后续消费者和固定示例头像仅是离线工具冗余，不变成正式游戏新功能问题。旧baseline绘制不自动继承新主题，candidate2复用UiFrameStyle。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/baseline-layout.ts",
+      "sha256": "d33227baca24a7fa634d16807add9efeb3fd53b0d80dac98eadb9b9f6a0b3eb2",
+      "lines": 39,
+      "notes": "完整39行。独立历史旧版几何快照，frame中心/Y-up、横向布局与倍率参数；服务器明确转译此文件而非当前运行时LobbyLayoutPolicy。真实HTTP响应逐字等于同版本TS转译结果。不是当前游戏生效几何，不因旧标题/utility布局另记产品回归。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/candidate02.js",
+      "sha256": "72476834ca31a23289a74620e1b6b821e35514f550e39ef653e9832f03de1a75",
+      "lines": 92,
+      "notes": "完整92行。候选02画面/几何、三卡主次、资料180底板、shop70和文字15.4、原图渐隐WeakMap缓存、长名省略/恢复busy门禁。既有几何/安全区/源标记回归通过；示例筹备中不能作为真实赛事状态，正式LP-28-001不在此文件重复计数。未真实Canvas截图/像素验收。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/candidate02.test.mjs",
+      "sha256": "3d638468a06df4f1c2431376a74e036c8c1f1dee9ea3b6dceaa8ec567ca41e44",
+      "lines": 37,
+      "notes": "完整37行。候选尺寸/层级/安全边界/参数无突变实断言与部分源文本匹配，另校模拟流程无网络/旧功能标记；实际执行通过。源码regex不能证明完整DOM、保存恢复/撤销/点击或运行包行为，不将一条成功日志扩大为全交互覆盖。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/flows.js",
+      "sha256": "db3653109d9b7e23745442c30ee29ced81072519c64634acf4d7af2a0d368064",
+      "lines": 36,
+      "notes": "完整36行。本地dialog流程，经典/匹配取消/好友创建加入/示例资料商城，全部明确模拟不生成真实房号；dialog.focus/点击遮罩关闭，房号空值现场提示，文本safeDOM写入。无计时器、网络或真实事务。与生产路由区别明确；未执行原生dialog跨浏览器验收。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/index.html",
+      "sha256": "4e1c1fc9a210b7eb82980f759a794989c80b44315bf3c1b6c02d01f0bf80edd5",
+      "lines": 17,
+      "notes": "完整17行。Chinese/lang/viewport、候选tab组与aria-pressed、Canvas说明、透明热点层、状态live region/标签化控制与原生dialog。明确不连接服务/正式定稿已迁Cocos，避免把本地静态文案当线上功能；未经浏览器/屏幕阅读器实测，不作可访问性通过声明。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/server.mjs",
+      "sha256": "ae1f482766088c37a4a5dd4d0ae520816e6094c665401da5c233de8a202f2e92",
+      "lines": 51,
+      "notes": "完整51行。仅127.0.0.1允许路由/素材/四个shared模块、GET/HEAD、CSP connect-src none/frame-ancestors none/nosniff/no-store；无目录浏览或任意路径read。真实http.Server仅替换listen为自有随机回环端口，32允许GET/HEAD、8非允许/穿越路径404和POST405通过，finally关闭所有连接/监听。未启动当前18742服务/没有外网请求。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/style.css",
+      "sha256": "73e92645468bc404d6e57be393350d832ed63dd1515d2379663cae2b13487d03",
+      "lines": 4,
+      "notes": "完整4个长行（未按行数低估实际内容）。响应式单列面板、Canvas等比预览/叠层热点、focus-visible、reduced-motion与原生dialog限高滚动/light color-scheme；桌面调参工具有小字号/缩小热点，不能当生产移动端44px触控/完整无障碍认证。只读审计未更改视觉。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "BOOT-35-C01",
+      "status": "contract-limitation-not-confirmed-live-defect",
+      "path": "work/guandan-cocos/build-templates/wechatgame/first-screen.js",
+      "line": 527,
+      "summary": "setProgress并发调用只保留最后一个afterTick，早先返回的Promise不再结算。",
+      "evidence": "实际first-screen模块中并行setProgress(.2)/(.4)后执行一帧，仅第二个Promise兑现；串行三阶段的6对照均完成且资源归零。",
+      "currentBoundary": "实际game.ejs从start().then串行调用0/.2/.4/.6/end，没有独立并发调用方，未证明玩家正常启动卡死。",
+      "recommendation": "若将来接入并发下载进度，应使用等待者集合或不依赖每次绘制返回Promise；现阶段保持串行调用契约并增测试。"
+    }
+  ],
+  "validation": {
+    "finalChecks": {"headUnchanged":true,"originalDirtyHashes":5,"reviewedHashes":616,"uniqueIssues":40,"firstParty":"616/629","percent":97.93,"generatedCopies":39,"inventory":"Audit inventory verified: 616/629 first-party files; 39 generated copies.","gitDiffCheck":"passed"},
+    "commands": [
+      "node docs/audit/2026-09-12/repro/startup-lab-35.mjs",
+      "node work/guandan-cocos/tests/cocos-runtime-reachability-regression.cjs",
+      "node work/guandan-cocos/tools/lobby-layout-lab/candidate02.test.mjs"
+    ],
+    "results": {
+      "firstScreen": [
+        {
+          "width": 874,
+          "height": 402,
+          "background": "ok",
+          "stagedProgressAndCleanup": true
+        },
+        {
+          "width": 874,
+          "height": 402,
+          "background": "error",
+          "stagedProgressAndCleanup": true
+        },
+        {
+          "width": 1748,
+          "height": 804,
+          "background": "ok",
+          "stagedProgressAndCleanup": true
+        },
+        {
+          "width": 1748,
+          "height": 804,
+          "background": "error",
+          "stagedProgressAndCleanup": true
+        },
+        {
+          "width": 2560,
+          "height": 1440,
+          "background": "ok",
+          "stagedProgressAndCleanup": true
+        },
+        {
+          "width": 2560,
+          "height": 1440,
+          "background": "error",
+          "stagedProgressAndCleanup": true
+        },
+        {
+          "offscreen": true,
+          "oneRetryPerPendingAction": true,
+          "allResourcesAndListenersReleased": true
+        },
+        {
+          "offscreen": false,
+          "oneRetryPerPendingAction": true,
+          "allResourcesAndListenersReleased": true
+        },
+        {
+          "retryRejectedThenSuccess": true
+        },
+        {
+          "webglUnavailableModal": true
+        }
+      ],
+      "lab": {
+        "allowedGetAndHead": 32,
+        "disallowedPaths": 8,
+        "postRejected": true,
+        "cspBlocksGameConnections": true,
+        "loopbackOnly": true
+      },
+      "scene": {
+        "objects": 17,
+        "references": 25,
+        "parentLinks": true,
+        "startupTextureLinked": true,
+        "developmentOverridesDisabled": true
+      },
+      "progressConcurrency": {
+        "singlePendingResolverObserved": true,
+        "currentGameTemplateSerializesCalls": true
+      }
+    },
+    "existingTests": [
+      "Cocos runtime reachability verified (16 live modules)",
+      "Candidate 02: hierarchy, spacing, safe bounds, independent drafts and mock-only flows passed"
+    ],
+    "limitations": [
+      "GL/RAF/图片/微信和offscreen为内存端口；只验证资源所有权与调用生命周期，不是真实shader/GPU或微信真机。",
+      "实验室server执行真实handler+http.Server，只将监听端口置为自有随机回环端口；所有连接在finally关闭，不涉及已开启预览或生产。",
+      "初次探针对TS转译后的已移除注释做匹配而失败，改为完整转译正文对照后全部通过，首次失败不是产品缺陷。",
+      "UI/UX技能用于触控/反馈/安全区与实验工具/运行界面边界审核，无界面改动或素材生成；原生dialog/浏览器像素未实测。"
+    ]
+  }
+}

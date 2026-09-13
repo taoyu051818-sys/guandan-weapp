@@ -1,0 +1,315 @@
+{
+  "batch": "scene-lifecycle-27",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyCleanupTracker.ts",
+      "sha256": "7688a60ea9b0f87c35f80067834f5a69e4cf50f4258dc0c28af1abe0b0933194",
+      "lines": 34,
+      "notes": "完整34行。核多请求同房的清理集合、乱序结果、超时重复回调和断网best-effort；120请求/843个房间状态观测守恒。请求ID来自实际socket递增，不把非法ID重用或合成同步result算生产缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyCommandSender.ts",
+      "sha256": "afaf8e29f0e280b48091af7b6c7bfbb7a826a32aaaeb003e503e39e90e29da18",
+      "lines": 51,
+      "notes": "完整51行。核player/observer/房主/复式已坐席命令门禁、expectedVersion和transport异常转result；使用当前shared-core源协议跑1584组合，162允许，6种versioned命令准确。不是服务器权限验证替代，包含通用方法可接收而实际调用者未必发送的协议类型。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyConnectionEventCoordinator.ts",
+      "sha256": "71bd1e3792452f02abf6ed87a7f8e781fd1f06f3153d70371895be6eacde8527",
+      "lines": 70,
+      "notes": "完整70行。核matched优先、本地resume身份完整性、watchdog/失败预算顺序、重入失败回平台恢复。32连接/48断连端口组合通过；耗尽分支实际收尾归其他已审owner，未将早return误报为未patch。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/GameScene.ts",
+      "sha256": "2d63afd01e269023057b578c322b8243af9a2be2a422aac76deb83758df9cd2c",
+      "lines": 571,
+      "notes": "完整571行。完成场景组合根逐段审查，含Startup防重复初始化、Inspector复用、hand/hud/overlay/network/clock owner装配、前后台与离桌、safe area、销毁订阅。原有脏文件哈希保留。多数产品逻辑已拆独立模块；不把同scene子节点随销毁释放的匿名button监听推断为活跃泄漏。仅source wiring核查+真实owner试验，不是启动整个Cocos应用。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableNetworkEventBridge.ts",
+      "sha256": "5e8a7c30bc29b89fc6ef193f45f67101f9de8df4639f60bd12757a5aaad13338",
+      "lines": 96,
+      "notes": "完整96行。核12事件精确target配对、mounted/disposed守卫、roomClosed参数保留。100轮挂载/卸载，1200正常转发、1200保留callback与同名event复查；不清第三方监听且卸载后不复活。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableOverlayController.ts",
+      "sha256": "b3c64dcf0c60818d76fdca4d947931505eb06ab33cf141e8c3b512d9bed9a4cc",
+      "lines": 300,
+      "notes": "完整300行。核退出/提示/解散、toast替换和dispose。确认UI-27-001旧弹层resize只更新toast，6组扩宽遮罩漏铺（重开恢复）；UI-27-002表决返回null仍清弹窗，4组异常/重连×同意/拒绝复现。5个真实Tween替换时序及取消通过。没有改布局。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/SceneBackdropController.ts",
+      "sha256": "143b4fb60f14503022b25e5fe465787d683d1b54db19fb61de7e8e8e99c12522",
+      "lines": 169,
+      "notes": "完整169行。核mode/cache/pending/transitionRevision/cover/dispose。确认RESOURCE-27-001：mount首次table加载错误或15秒超时后，仅setMode不再preload；重复5次入桌不重试。用真实GameAssetLoader+合成Bundle/计时复现，显式preload均恢复；4个真实Tween交错/销毁对照正确。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/MatchEndedPresentation.ts",
+      "sha256": "783d97cbef615b0be42c1b42c43a509f3085e9594563b01dfdb4a55132959d7a",
+      "lines": 39,
+      "notes": "完整39行。核复式委托、个人积分排名与队伍胜负/过A/时限/单局文案。48正常团队/原因/视角对照通过；固定IDteam分支在转蛋实际有playerScores而走个人分支，未确认错标动态队伍。数据来自已审合法adapter，不凭空构造缺少viewer积分判生产bug。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/SettlementPresentation.ts",
+      "sha256": "48071f861f7a69c6da54f54d7bea7802e24a4bef65104db881571932c1c3aaef",
+      "lines": 37,
+      "notes": "完整37行。核viewer动态team、去重ready、终场与赛事/转蛋专用内容、八席准备。72组3队伍映射×4viewers×3格式×2终场对照通过。非terminal只读readyCount2/4，独立局无升级贡牌文案；函数由settlement非空phase调用，未将强断言单独视为缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-network-event-bridge-regression.cjs",
+      "sha256": "eb24a077b88994b05bc89e9997d1b9a8b0b8dbb7f379bf910eda8610fb908b8e",
+      "lines": 102,
+      "notes": "完整102行并执行。12事件身份/参数和挂载/卸载防重，静态meta/转译验证；补充100轮直接调用已保留回调验证disposed防线，不仅依赖off后emit为空。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-scene-assembly-regression.cjs",
+      "sha256": "1df5162db6020e261052c3fa6ac91a1d80d63938002334a0fe53e6d137b59ed8",
+      "lines": 115,
+      "notes": "完整115行并执行。实际builder/layout配Cocos节点替身；Inspector复用、重复构建零新增、120%按钮与安全区、HUD接管、开发数据隔离。只用regex核GameScene组合，不等于整个场景端到端；未覆盖运行期modal resize。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-overlay-controller-regression.cjs",
+      "sha256": "0c557b18df266d76f92e09c6942d00a5b2eb5c834c241ac3a81c7b2fe833c879",
+      "lines": 307,
+      "notes": "完整307行并执行。退出/解散/提示/销毁/保留回调，事件端口真删除但Tween即时完成。没有投票send失败、已有弹窗resize；补充probe发现两P3并用真实Tween补齐重复toast替换取消。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/scene-backdrop-controller-regression.cjs",
+      "sha256": "5d7246d1b070dbbe0dfa80240083d9816d60c0db969fb4b9838606c8119d16c7",
+      "lines": 194,
+      "notes": "完整194行并执行。预加载去重、延迟frame到达、cover/释放和dispose后迟到；Tween即时执行，测试主动preload(table)掩盖setMode无重试。补充真实loader错误/超时与Tween交错/销毁对照。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-network-owners-regression.cjs",
+      "sha256": "c25df8f01f4c3017bbe9a416b2864b076dbf01352e01e1f89d64e7f2c841ac0e",
+      "lines": 159,
+      "notes": "完整159行并执行。message元数据门禁/顺序及command/connection正例；commandRequiresExpectedVersion仅模拟play，connection只覆盖两条正常路。补充源协议1584门禁组合、80连接分支，没有把此文件间接加载其他待审模块当覆盖。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "UI-27-001",
+      "severity": "P3",
+      "title": "窗口变宽后，已有弹窗遮罩和输入拦截范围仍是旧尺寸",
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableOverlayController.ts",
+      "line": 54,
+      "evidence": "GameScene.applyResponsiveLayout会调用resize，但此方法只调整finishToast；createModalShade仅创建时设置UITransform/Graphics。退出、普通提示、投票三种弹窗在1280→1565/1792宽度时仍为1280×720，新增285/512宽度没有遮罩。Cocos3.8.8 BlockInputEvents仅拦截节点尺寸内事件，hitTest依contentSize；hand的独立blocksHandInput仍为true。",
+      "validation": "repro/scene-lifecycle-27.cjs overlays.geometry：6复现+6重开恢复；实装BlockInputEvents完整源、NodeEventProcessor/UITransform hitTest片段核查。实际绘图/GPU与底层按钮误触未实测，不称已发生越权或出牌。",
+      "recommendation": "让overlay owner在resize中同步存活modal/dissolve节点尺寸并重画shade/panel，或使用独立全屏遮罩节点；保留投票状态，加入扩宽/缩窄且弹窗不关闭的验收。"
+    },
+    {
+      "id": "UI-27-002",
+      "severity": "P3",
+      "title": "解散表决未成功发送也清掉投票弹窗，失去本次直接重试入口",
+      "path": "work/guandan-cocos/assets/scripts/scenes/TableOverlayController.ts",
+      "line": 242,
+      "evidence": "voteDissolve忽略LobbyController.voteDissolve返回的requestId|null，无条件clearDissolveDialog。实际LobbyCommandSender在socket抛错或roomStatus=rejoining时返回null且未发送；votes[p1]仍pending但按钮被销毁。只恢复ready/guandan:lobby与倒计时不能再现弹框。",
+      "validation": "repro/scene-lifecycle-27.cjs overlays.voteFailures：2失败方式×同意/拒绝4例；未调用发送、保留pending、弹框消失。socket错误仍有result/error反馈，不是所有错误提示也丢失。4个新dissolve-vote消息重开并正常发送对照通过；非服务器计票错误，也不与SL-02-002离线票态恢复问题重复。",
+      "recommendation": "null时保持当前投票框和可重试状态并显示失败反馈；成功排队/服务器确认后再按明确策略收起，必要时用requestId绑定回执。不要只依赖其他人的新投票广播重新触发。"
+    },
+    {
+      "id": "RESOURCE-27-001",
+      "severity": "P3",
+      "title": "牌桌背景预加载暂时失败后，再次入桌不会重新加载",
+      "path": "work/guandan-cocos/assets/scripts/scenes/SceneBackdropController.ts",
+      "line": 82,
+      "evidence": "Startup只保证lobby背景成功；mount对table进行一次preload并将失败转warn。load finally虽清pending，但后续GameScene入桌/等待页只调用setMode→apply，缓存缺frame时直接return，不再preload。资源恢复后该scene仍一直显示lobby背景。",
+      "validation": "repro/scene-lifecycle-27.cjs backdrops.failures：真实GameAssetLoader的Bundle callback error与15,000ms watchdog两例；迟到成功被正确忽略，5次再次入桌共仍2次加载（lobby+table初次），最终frame仍lobby；显式preload(table)两例恢复。合成bundle/timer，无真机或网络故障率结论。",
+      "recommendation": "setMode遇缺frame时启动共享且有界重试的preload，保留现有背景作兜底；采用generation/dispose守卫并避免每帧重试。加入首次加载错误/超时后资源恢复、重复入桌的回归。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/table-network-event-bridge-regression.cjs",
+      "node work/guandan-cocos/tests/table-scene-assembly-regression.cjs",
+      "node work/guandan-cocos/tests/table-overlay-controller-regression.cjs",
+      "node work/guandan-cocos/tests/scene-backdrop-controller-regression.cjs",
+      "node work/guandan-cocos/tests/lobby-network-owners-regression.cjs",
+      "node docs/audit/2026-09-12/repro/scene-lifecycle-27.cjs"
+    ],
+    "result": {
+      "cleanup": {
+        "requests": 120,
+        "roomObservations": 843
+      },
+      "commands": {
+        "cases": 1584,
+        "allowed": 162,
+        "versioned": [
+          "startGame",
+          "play",
+          "pass",
+          "tribute",
+          "returnTribute",
+          "finishTribute"
+        ]
+      },
+      "connections": {
+        "connected": 32,
+        "disconnected": 48
+      },
+      "bridge": {
+        "cycles": 100,
+        "delivered": 1200,
+        "lateChecks": 1200
+      },
+      "overlays": {
+        "geometry": [
+          {
+            "kind": "exit",
+            "width": 1565,
+            "shadeWidth": 1280,
+            "uncoveredWidth": 285
+          },
+          {
+            "kind": "exit",
+            "width": 1792,
+            "shadeWidth": 1280,
+            "uncoveredWidth": 512
+          },
+          {
+            "kind": "notice",
+            "width": 1565,
+            "shadeWidth": 1280,
+            "uncoveredWidth": 285
+          },
+          {
+            "kind": "notice",
+            "width": 1792,
+            "shadeWidth": 1280,
+            "uncoveredWidth": 512
+          },
+          {
+            "kind": "vote",
+            "width": 1565,
+            "shadeWidth": 1280,
+            "uncoveredWidth": 285
+          },
+          {
+            "kind": "vote",
+            "width": 1792,
+            "shadeWidth": 1280,
+            "uncoveredWidth": 512
+          }
+        ],
+        "voteFailures": [
+          {
+            "mode": "throw",
+            "agree": false,
+            "pending": "pending",
+            "dialogPresent": false,
+            "clientErrors": 2
+          },
+          {
+            "mode": "throw",
+            "agree": true,
+            "pending": "pending",
+            "dialogPresent": false,
+            "clientErrors": 2
+          },
+          {
+            "mode": "rejoining",
+            "agree": false,
+            "pending": "pending",
+            "dialogPresent": false,
+            "clientErrors": 0
+          },
+          {
+            "mode": "rejoining",
+            "agree": true,
+            "pending": "pending",
+            "dialogPresent": false,
+            "clientErrors": 0
+          }
+        ],
+        "toastCases": 5
+      },
+      "backdrops": {
+        "failures": [
+          {
+            "failure": "callback-error",
+            "requestsAfterFiveEntries": 2,
+            "displayed": "lobby",
+            "explicitPreloadRecovers": true
+          },
+          {
+            "failure": "timeout",
+            "requestsAfterFiveEntries": 2,
+            "displayed": "lobby",
+            "explicitPreloadRecovers": true
+          }
+        ],
+        "transitionControls": 4
+      },
+      "presentations": {
+        "endCases": 48,
+        "settlementCases": 72
+      },
+      "engineReadBoundary": [
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/ui/block-input-events.ts",
+          "sha256": "89cad5d8266b991e6adf0ba65efa1371abab23b3f9b4654570f21bb03a8e5c6a",
+          "scope": "full source read, contract checked"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/scene-graph/node-event-processor.ts",
+          "sha256": "0ae27f104e34126aa48064d52e08d0485227dda090e22ac71da520d9e8f8f57e",
+          "scope": "hitTest/dispatch excerpts checked; not full-file review"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/2d/framework/ui-transform.ts",
+          "sha256": "6e0f4823865c07c9802622afe2881031398c318cab5cba16a86f4d91e1d45e0b",
+          "scope": "hitTest/dispatch excerpts checked; not full-file review"
+        }
+      ],
+      "loadedTweenEngine": [
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-manager.ts",
+          "sha256": "fe4fef5bc18c27d953e16d4b1b0f962f568ae0f101f3ea82711f366715d0178d"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action.ts",
+          "sha256": "ca33a1a2bb363ab57e3cd48be146afe8c646e46984b773252d8b883fbff1ec36"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween.ts",
+          "sha256": "923522464ca5fbfe4990525f2c9eb7872fdac4f3f9b598210a9886df772a6aec"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/core/algorithm/easing.ts",
+          "sha256": "f9dc0c58134e2e369bbbc9315ca1b77f2951bec91e8366488fb5cb89a4ad2854"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-interval.ts",
+          "sha256": "2ad01c7284f757fa05c8bb0bb6677323f01624da8abd2ea1bc165c5db5c8aaee"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-instant.ts",
+          "sha256": "130b0b5bd824231744f44db1095f05688963b6f9f8c95d779d774a725f3aa09e"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-unknown-duration.ts",
+          "sha256": "0635050f0805f5b660afa30a4bf95fb5bf73f7de110d2c7b22963a76ca62f5c7"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween-action.ts",
+          "sha256": "d2189496bc6798a4fb9f3789c9ae718eb738d307d70ca6f57806b102c369e2b2"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/set-action.ts",
+          "sha256": "5a65e20b670130606ed00cef54a5c0268ad56320368c634caab9106a79045ae8"
+        }
+      ]
+    },
+    "fixtureCorrection": "初次补充探针漏设SpriteFrame替身的isValid，导致dispose计数断言失败；添加真实引擎语义的初始有效状态后重跑通过。这是探针fixture修正，不作为产品缺陷。"
+  },
+  "boundaries": [
+    "仅14个原pending文件计新增（9源文件/5测试，共2244行）；GameAssetLoader、StartupCoordinator、DuplicateTablePresentation、UI工厂/metrics、ui-recovery与residual-cleanup等本轮辅助重读不重复计数。ui-recovery/residual本轮未重跑。",
+    "Cocos9份Tween/Action算法真实转译；节点、图形、资源、socket、scheduler为内存端口。未启动完整Cocos、真机、微信接口或线上服务；投票失败只证明UI恢复缺口，未测服务器真实socket重连计时。",
+    "已读UI/UX技能；modal background interaction检索命中通用焦点条目，dialog dismiss cancel无精确命中，未将其称针对性最佳实践。以产品状态契约和Cocos BlockInputEvents源码为依据，不改布局/风格。",
+    "没有修改业务/既有测试/构建产物，未提交、推送或部署；5原有脏文件及HEAD保持启动基线。全库及边界专项仍未完成。"
+  ]
+}

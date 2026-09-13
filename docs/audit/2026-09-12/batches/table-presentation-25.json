@@ -1,0 +1,432 @@
+{
+  "batch": "table-presentation-25",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/PlayAreaController.ts",
+      "sha256": "a5e9bbc8f2c45f0d3fa6cfc30aa9a3f0b4066f550f535bf9b3312726f413a4d2",
+      "lines": 262,
+      "notes": "完整262行。核最新动作窗口、权威可见前缀、每牌落桌ticket/epoch、Pass寿命去重、回收和resize。实际引擎16组Pass、384座位初始排列通过；真实roomView→路由→恢复→协调器联合12换视角复现UI-25-001，缓存动作未因humanId变化重定位。飞牌/卡图端口合成，未把已核票据取消重复计问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/PlayedCardLayout.ts",
+      "sha256": "d7e792571d7bd4f1225dd287b9db133c9b397e7c4f89e5e9e49d0e8d0e3a2b07",
+      "lines": 27,
+      "notes": "完整27行。核侧边牌扇按张数向内扩张、0.8落地尺寸、安全中心与相邻上下出牌锚点、侧家计时同锚点。36viewport×6张数边缘不动、中央按钮独立居中；常数属于已确认设计，未因固定设计单位自判错位。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableGameHud.ts",
+      "sha256": "986c3b58729e03c7da8ab40822b0b05699525683ff39038d8a036a640277a9ba",
+      "lines": 567,
+      "notes": "完整567行。核mount/reparent、完整render与部分update、注入素材、原操作节点重挂、记牌器拖动/折叠、指针仲裁、工具可见/意图、dispose。实际全HUD及所拥有视图80状态+40稳定重复、3尺寸输入/拖动通过；render末调用toolbar覆盖锁牌高亮，确认UI-25-002。未声称完整引擎UI触摸派发/GPU测试。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableGameHudFoundation.ts",
+      "sha256": "7892f9611089423ef3cc3f27c4f45b4d8a9fbeef56b638441a49ac4101600325",
+      "lines": 235,
+      "notes": "完整235行。核只读DTO/座位与花色默认、统一字号/按钮宽高、绘制与输入端口、透明区域不拦截整operation包络。真实HUD联合使用本模块，绘图替身记录颜色/几何；bindPress依赖Cocos将移出视为CANCEL，不能由直接emit END就断言真实越界触发。基础视图不负责服务端规则。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableHudLayoutPolicy.ts",
+      "sha256": "386794c506b33ff94a66bb447cd7c1d58490affee4d38b9bab7d7e3e0bd3ae6a",
+      "lines": 251,
+      "notes": "完整251行。核viewport归一、最小缩放/安全边、顶栏与侧席、窄屏分行、按钮中心/计时附侧、记牌器首次展开占位及原生胶囊避让。36有限尺寸矩阵及3真实HUD拖动/折叠通过；设计单位不等于微信物理像素，不以极端无效尺寸证明正常设备问题。不是所有内容区域强制互斥。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableLayerOrder.ts",
+      "sha256": "c5f22165cb2d6f69e37d15442cdfabaac4ad207b36fff588803eddc0809d7058",
+      "lines": 8,
+      "notes": "完整8行。核仅提升同父级有效节点顺序、不改变坐标系；既有play-area回归实际调用并验证hand/flight/effect/HUD顺序。重复/空节点只按现有调用数组处理，没有追加业务状态。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableLayoutOverlapAudit.ts",
+      "sha256": "9c9830d1469880aa318d50c9dc987d9af106a7a40398e0cbfc5dbe8ccf839cc1",
+      "lines": 198,
+      "notes": "完整198行。核非有限rect、实际parts裁剪、矩形并集扫描防重复、双区域比例、像素XY独立缩放、severity排序与中文文本。既有80格网+补充250双parts/重叠/裁剪格网对照通过，不改变输入或布局；ratio按区域外框而非牌像素，与已有报告契约一致。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TablePlayActionPolicy.ts",
+      "sha256": "359f2e677af38e58af555abbd029fc0b934649a119199e5fc38868ede911fb2f",
+      "lines": 23,
+      "notes": "完整23行。核先手/空手/压牌三分支、以牌语义+lastPlay+profile为缓存键、不用选牌/锁牌替代真实规则。当前shared-core源104组合/26008子集穷举对照通过；104相同JSON重绘无额外枚举。测试为≤8张牌，不能证明满手最坏性能或全部候选全局完备。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TablePromptPolicy.ts",
+      "sha256": "a0b83bdf16455337d7923bd89911ede1714a0fb84bf2add37515f0837d0faafc",
+      "lines": 31,
+      "notes": "完整31行。核playing例外消息与正常状态静默、trim、贡还/结算交由专属呈现。既有回归覆盖等待/选牌/错误提示；网络错误可由协调器独立toast，不将所有非playing被过滤解读成全阶段断网无提示。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableToolbarLayout.ts",
+      "sha256": "37ee03df5cc31b275ffd9280232ed60ceddc34dc35caca51557599e3eb9de073",
+      "lines": 19,
+      "notes": "完整19行。核字数驱动宽度、同高同基线/统一间距、包含隐藏工具保留空间；末尾无条件drawTableHudButton(false,false)与外层语义绘制冲突，属于UI-25-002同根因，不重复记问题。后续应使布局只管几何，保留绘制状态单一所有者。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableHudDynamicRenderer.ts",
+      "sha256": "20892891c015a2e8666c55ba95426d8dfb90caaa59eb56accfc7fdb109ea8dec",
+      "lines": 143,
+      "notes": "完整143行。核记牌器关闭时整个panel隐藏、fold高为TABLE_BUTTON_HEIGHT而非旧42、public可能花色和自己花色独立、零牌数/未知/有限值、无候选保持浅蓝组件及灰轮廓。联合实际HUD验证95节点稳定；禁用panel可保留旧隐藏几何，探针据实际契约只断言可见高度，不误报。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableHudSeatViewGroup.ts",
+      "sha256": "f1028d2737fd2073cf554f4862e1de59a6906b18d0e3d4b7101ca82e595a9968",
+      "lines": 222,
+      "notes": "完整222行。核四席身份投影、头像优先级/离线色、名字码点截断、侧家/对家下排、点击当前seat玩家而非闭包旧id、生命周期和换父。联合HUD运行真实实现。dispose后ownAvatarHitNode残留只影响复用同实例再bind的未用路径；活动presenter销毁后新建HUD，不升级为实际头像故障。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableHudTurnTimerView.ts",
+      "sha256": "4a9a509a75742d2ae5702394601d4056dc962d59500d9cd688b1b4234e092ed7",
+      "lines": 100,
+      "notes": "完整100行。核timer独立拥有、贴图到来/替换释放、无贴图fallback、剩余秒不夹到周期、只夹圆环比例、显隐和销毁。80HUD状态轮转+初始挂载用真实模块；数值和fallback绘制非实际图片渲染测试，禁止把绘图替身当真机艺术效果。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableHandViewStatus.ts",
+      "sha256": "a58f66f83df01c70b1fe86427bacaf9640faebfda9bf861305cb00dcf3911aa8",
+      "lines": 29,
+      "notes": "完整29行。核队友手牌说明与锁牌/理牌分别显隐、统一下沿锚点、dispose。80状态中实际挂载/渲染，无额外游戏判定；是否显示队友牌仍由上层服务端授权与projector负责。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableHudSuitAvailability.ts",
+      "sha256": "7be7e97b56cd2845e9ed6c822f231a95b96de35b5d4d8a2d446bfc75815cff9d",
+      "lines": 35,
+      "notes": "完整35行。核四种花色灰轮廓每个Sprite只创建一次、开启恢复纹理、不用系统花色字形、尺寸来自现有transform。实际HUD80状态+40重复稳定；动态counter和自己的花色节点不共享状态，避免全灰时整组件消失。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableTributeInfoView.ts",
+      "sha256": "a633e1fe1d459e3e85f2f15a9b5866179c61639978b772181a7ceea1ea30d4ff",
+      "lines": 38,
+      "notes": "完整38行。核贡还方向反转、抗贡/完成/非贡还文案、四码点名字、对家下方非交互label、释放。现有tribute回归47行执行通过，589/720高度不遮操作按钮；说明与座位状态文字仍需真机可读性验收。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/play-area-presentation-regression.cjs",
+      "sha256": "5bb9a5c3ade94f984379e04e89291443d1e772f0a5a39a8eef86e63362272d5c",
+      "lines": 198,
+      "notes": "完整198行并执行。测试真实playArea和layout，CardView/cc绘图与tween队列合成，检查安全中线/扇边、恢复/票据/落前0.8与层级。其tween只记录步骤，不覆盖Pass真实时间线或动态humanId复投影；补充probe使用本机Tween和真实网络链。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-game-hud-regression.cjs",
+      "sha256": "eaa0a3ffcd6235f4801773060c0514b5bfee30b2e43f48463ecb336efe3b86f8",
+      "lines": 418,
+      "notes": "完整418行并执行。大量正则只检查模块边界/常数，部分实际pure layout、public可能性与灰花色renderer；不能把regex消费者的全文件当已审。旧counter测试用了42，与当前折叠69.6不一致，补充probe明确按真实foundation常数验证两态；目前仍通过而非功能失效。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-layout-overlap-audit-regression.cjs",
+      "sha256": "4f6751f0ec78433835f2f40645f83716b98a5c6dc24d39b2cc6eef7ac647342f",
+      "lines": 213,
+      "notes": "完整213行并执行。实际并集面积/边界格式、80格网oracle与真实browser QA bridge放隔离vm，覆盖URLSearchParams缺失/opt-in/替代owner/诊断异常、轮廓空白/隐藏卡/按钮包络；补充250双parts格网通过。读到GameScene不表示整scene已审。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-prompt-policy-regression.cjs",
+      "sha256": "3c9f335a429b24c4b7772b803aeac39b3db31506f10dd1e8f8e8971e10146ad6",
+      "lines": 44,
+      "notes": "完整44行并执行。纯policy转译、正常状态静默与需要动作的例外反馈、贡还/结算专属区边界；不是toast UI/真机API验证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-match-coordinator-regression.cjs",
+      "sha256": "81b84c403f12d96b08e7e7ef8e9d382aab7151bf2d473f40b1385294a48cc003",
+      "lines": 186,
+      "notes": "完整186行并执行。实际协调器/阶段/进度部分实现，Listener/网络bridge/PlayArea/HUD替身；核订阅一次、roomId隔离、recovery语义/关房返回、托管提示和赛事返回。不覆盖原来空playArea替身的动态座位；补充联合probe独立复现。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/table-tribute-info-regression.cjs",
+      "sha256": "da4a08be3841f539ad18ed099d1f024e0fd9af327dd6827c25560174fdef512b",
+      "lines": 47,
+      "notes": "完整47行并执行。实际tribute文案和view/layout，label端口合成；核进贡/还牌方向、抗贡、隐藏、销毁以及两高度与提交按钮分离。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "UI-25-001",
+      "severity": "P3",
+      "title": "观战切换玩家后已落桌牌仍使用旧视角坐标",
+      "path": "work/guandan-cocos/assets/scripts/ui/PlayAreaController.ts",
+      "line": 191,
+      "evidence": "好友房头像点击→watchPlayer→服务端roomView.myPlayerId改变；FriendRoomViewReceiver仅reset网络sync并发recovery。PlayArea.render更新authoritativeHumanId，但同actionKey直接return，未重排节点；resetPresentation只清ticket/显牌，不更新坐标。GameScene.setTableVisible(true)不layout，layoutSeats只布局头像，均不能补救。",
+      "validation": "隔离真实LobbyMessageRouter/FriendRoomViewReceiver/LobbySyncTracker/EffectActionPresentationCoordinator/TableMatchCoordinator/PlayArea链：同一123456房、gameVersion=5、权威playArea未变，12种旧→新视角均保留旧p3出牌坐标。p1→p3时actual(0,165)，expected(0,86)；正常refresh不修复，显式layout恢复。384种初始座位/观众/出牌者对照正确；未连接真实WS/微信。",
+      "recommendation": "将viewer身份纳入布局失效条件：render更新humanId后若变化，重排现有节点或重建投影；保持相同动作不重播动画。为roomView视角切换增加真实PlayArea联合回归，包括有Pass/进行中动画和不改变playArea长度。"
+    },
+    {
+      "id": "UI-25-002",
+      "severity": "P3",
+      "title": "工具条布局覆盖锁牌按钮的可用高亮",
+      "path": "work/guandan-cocos/assets/scripts/ui/TableToolbarLayout.ts",
+      "line": 16,
+      "evidence": "TableGameHud.renderViews:537-539按lockDecision绘制活动色；同函数542随即layoutTableToolbar，后者对每个按钮固定drawTableHudButton(view,false,false)，把活动色覆盖。导致lock/unlock渲染最终与unavailable同色；布局承担了重复视觉状态职责。",
+      "validation": "实际TableGameHud/所有拥有视图/真实Foundation/Toolbar，三决策渲染均为RGBA(17,57,69,240)；直接同Foundation语义绘制lock/unlock应为(159,112,25,246)，unavailable控制一致。恢复/锁牌文字保持正确，未发现因此无法锁定/恢复；Graphics为颜色记录替身，非真机截图。",
+      "recommendation": "让toolbar仅布局或显式接受每个button的active/pressed状态；由唯一渲染入口在布局之后应用语义状态。加完整render/update后的最终颜色断言，不仅检索drawToolButton调用存在。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/play-area-presentation-regression.cjs",
+      "node work/guandan-cocos/tests/table-game-hud-regression.cjs",
+      "node work/guandan-cocos/tests/table-layout-overlap-audit-regression.cjs",
+      "node work/guandan-cocos/tests/table-prompt-policy-regression.cjs",
+      "node work/guandan-cocos/tests/table-match-coordinator-regression.cjs",
+      "node work/guandan-cocos/tests/table-tribute-info-regression.cjs",
+      "node docs/audit/2026-09-12/repro/table-presentation-25.cjs"
+    ],
+    "result": {
+      "responsePolicy": {
+        "cases": 104,
+        "subsets": 26008,
+        "enumerationCalls": 104
+      },
+      "hudInput": 3,
+      "passLifetime": 16,
+      "seatPermutations": 384,
+      "hudLifecycle": {
+        "cases": 80,
+        "maxNodes": 95,
+        "stableNodes": 95,
+        "stableRenders": 40
+      },
+      "geometry": {
+        "cases": 36,
+        "minimumOperationGap": 10.000000000000028
+      },
+      "overlapOracle": 250,
+      "observerReprojection": [
+        {
+          "oldViewer": "p1",
+          "newViewer": "p2",
+          "actual": {
+            "x": 0,
+            "y": 165
+          },
+          "expected": {
+            "x": 463.2,
+            "y": 57.2
+          }
+        },
+        {
+          "oldViewer": "p1",
+          "newViewer": "p3",
+          "actual": {
+            "x": 0,
+            "y": 165
+          },
+          "expected": {
+            "x": 0,
+            "y": 86
+          }
+        },
+        {
+          "oldViewer": "p1",
+          "newViewer": "p4",
+          "actual": {
+            "x": 0,
+            "y": 165
+          },
+          "expected": {
+            "x": -463.2,
+            "y": 57.2
+          }
+        },
+        {
+          "oldViewer": "p2",
+          "newViewer": "p1",
+          "actual": {
+            "x": 463.2,
+            "y": 57.2
+          },
+          "expected": {
+            "x": 0,
+            "y": 165
+          }
+        },
+        {
+          "oldViewer": "p2",
+          "newViewer": "p3",
+          "actual": {
+            "x": 463.2,
+            "y": 57.2
+          },
+          "expected": {
+            "x": 0,
+            "y": 86
+          }
+        },
+        {
+          "oldViewer": "p2",
+          "newViewer": "p4",
+          "actual": {
+            "x": 463.2,
+            "y": 57.2
+          },
+          "expected": {
+            "x": -463.2,
+            "y": 57.2
+          }
+        },
+        {
+          "oldViewer": "p3",
+          "newViewer": "p1",
+          "actual": {
+            "x": 0,
+            "y": 86
+          },
+          "expected": {
+            "x": 0,
+            "y": 165
+          }
+        },
+        {
+          "oldViewer": "p3",
+          "newViewer": "p2",
+          "actual": {
+            "x": 0,
+            "y": 86
+          },
+          "expected": {
+            "x": 463.2,
+            "y": 57.2
+          }
+        },
+        {
+          "oldViewer": "p3",
+          "newViewer": "p4",
+          "actual": {
+            "x": 0,
+            "y": 86
+          },
+          "expected": {
+            "x": -463.2,
+            "y": 57.2
+          }
+        },
+        {
+          "oldViewer": "p4",
+          "newViewer": "p1",
+          "actual": {
+            "x": -463.2,
+            "y": 57.2
+          },
+          "expected": {
+            "x": 0,
+            "y": 165
+          }
+        },
+        {
+          "oldViewer": "p4",
+          "newViewer": "p2",
+          "actual": {
+            "x": -463.2,
+            "y": 57.2
+          },
+          "expected": {
+            "x": 463.2,
+            "y": 57.2
+          }
+        },
+        {
+          "oldViewer": "p4",
+          "newViewer": "p3",
+          "actual": {
+            "x": -463.2,
+            "y": 57.2
+          },
+          "expected": {
+            "x": 0,
+            "y": 86
+          }
+        }
+      ],
+      "lockHighlight": [
+        {
+          "decision": "unavailable",
+          "actual": [
+            17,
+            57,
+            69,
+            240
+          ],
+          "expected": [
+            17,
+            57,
+            69,
+            240
+          ]
+        },
+        {
+          "decision": "lock",
+          "actual": [
+            17,
+            57,
+            69,
+            240
+          ],
+          "expected": [
+            159,
+            112,
+            25,
+            246
+          ]
+        },
+        {
+          "decision": "unlock",
+          "actual": [
+            17,
+            57,
+            69,
+            240
+          ],
+          "expected": [
+            159,
+            112,
+            25,
+            246
+          ]
+        }
+      ],
+      "loadedEngine": [
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-manager.ts",
+          "sha256": "fe4fef5bc18c27d953e16d4b1b0f962f568ae0f101f3ea82711f366715d0178d"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action.ts",
+          "sha256": "ca33a1a2bb363ab57e3cd48be146afe8c646e46984b773252d8b883fbff1ec36"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween.ts",
+          "sha256": "923522464ca5fbfe4990525f2c9eb7872fdac4f3f9b598210a9886df772a6aec"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/core/algorithm/easing.ts",
+          "sha256": "f9dc0c58134e2e369bbbc9315ca1b77f2951bec91e8366488fb5cb89a4ad2854"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-interval.ts",
+          "sha256": "2ad01c7284f757fa05c8bb0bb6677323f01624da8abd2ea1bc165c5db5c8aaee"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-instant.ts",
+          "sha256": "130b0b5bd824231744f44db1095f05688963b6f9f8c95d779d774a725f3aa09e"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-unknown-duration.ts",
+          "sha256": "0635050f0805f5b660afa30a4bf95fb5bf73f7de110d2c7b22963a76ca62f5c7"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween-action.ts",
+          "sha256": "d2189496bc6798a4fb9f3789c9ae718eb738d307d70ca6f57806b102c369e2b2"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/set-action.ts",
+          "sha256": "5a65e20b670130606ed00cef54a5c0268ad56320368c634caab9106a79045ae8"
+        }
+      ]
+    }
+  },
+  "boundaries": [
+    "只写docs/audit/2026-09-12，无产品/测试断言修改、Cocos构建、网络/上线/数据访问。",
+    "16源文件+6测试完整审阅22文件3294行；既有辅助核心/网络/协调器/屏幕与布局模块不重复计数，GameScene和ui-recovery-regression仍未完整审阅。",
+    "模拟节点、UITransform命中和Graphics非真实UI渲染/触控；只复用本机Cocos3.8.8九份Tween算法，不代表全引擎或第三方专项通过。",
+    "Touch Target Size/Touch Spacing技能检索匹配移动端；这里只核统一设计单位与间隔/遮挡逻辑，不将44pt/48dp直接当设计单位判定；未改变视觉方向。",
+    "静态结构测试通过不等于真实联机/真机验收，两项新增均有独立动态复现；剩余第一方和资源/产物/跨模块专项仍继续。"
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "batch": "core-ai-03",
+  "date": "2026-09-12",
+  "repository": "/Users/mac/Documents/Codex/2026-08-02/wo-yi",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewedCount": 7,
+  "reviewedLines": 400,
+  "reviewed": [
+    {
+      "path": "shared-core/src/ai/engine.ts",
+      "sha256": "70507ba7dc71e5d916e1d50c5d244f7e92de185bd342997f326bbcc1d4aa0937",
+      "notes": "完整69行。审查冻结配置、实例RNG/缓存/日志、唯一runner、checkpoint校验/恢复原子性、清理和输出复制。未确认当前生产缺陷；reset清理但不回退RNG。"
+    },
+    {
+      "path": "shared-core/src/ai/candidates.ts",
+      "sha256": "90640e5e167eb2bb55b986f298517d825e003b649704a7d660da02433d6ec59b",
+      "notes": "完整91行。审查结构候选、合法跟牌过滤、LRU/WeakMap、缓存清理及指标。跨级ID-only缓存未reset可复现，但已查生产入口有防线，列C01 concern而非confirmed finding。"
+    },
+    {
+      "path": "shared-core/src/ai/scoring.ts",
+      "sha256": "c3e0dc2c7d7dc5e4f031cd8f4043818cefb030e745b7b169d8c5451a6a325272",
+      "notes": "完整4行。审查CachedPlayInfo类型与三类炸弹判断；未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/ai/resourceProtection.ts",
+      "sha256": "6121c19ec646d2d5db4a3455d92af9af5a945494549dd4ee16769d8b15987b66",
+      "notes": "完整38行。审查自然同点/配分离、部分组损耗、完整/空边界、权重和输入不变。1716组精确oracle通过。"
+    },
+    {
+      "path": "shared-core/src/ai/decisionRunner.ts",
+      "sha256": "0fed95d952adf67898eb9041d2670b1119e7e2caf23cbf65b9e0303bdfbc0549",
+      "notes": "完整59行。审查配置兼容、唯一master、只投影公开座位信息、公开历史/上下文、team-first决策、日志/trace及finally耗时。未确认缺陷。"
+    },
+    {
+      "path": "shared-core/src/hints/handHintPolicy.ts",
+      "sha256": "f7931a469a1b76c1f48ee0e69cebfddb07c215f118641673ab4ec288d05e022a",
+      "notes": "完整98行。审查与托管共用策略、锁牌时实体候选、禁止部分锁组、公开观察/固定seed、排序及损耗。312视图首选一致/合法/不拆锁通过。"
+    },
+    {
+      "path": "shared-core/src/hints/model.ts",
+      "sha256": "73ab6e1def30b1d1a395ecb37c67c578d328c06fc2deb72c8bd5bdc9ea8a2b6e",
+      "notes": "完整41行。审查只读锁组/请求/损耗/排序结果类型，observation排除权威hand/lastPlay/profile；未确认缺陷。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "CORE-AI-03-C01",
+      "status": "reproduced-api-boundary-with-production-mitigation",
+      "title": "ID-only缓存跨级复用需要reset，尚未确认生产入口绕过防线",
+      "path": "shared-core/src/ai/candidates.ts",
+      "line": 56,
+      "evidence": "候选键只有profile和物理ID，命中返回旧Card；辅助ruleMemo也只按ID缓存。打2的heart2/card-14 + spade7/card-6能配成Pair跟66；同engine换打3不reset时仍返回旧Pair，但当前正牌canPlay=false。",
+      "validation": "当前源码内存复现通过：旧级两张候选存在、新级未reset仍存在且权威验证false；reset后0候选。完整可重放代码在同名Markdown。",
+      "productionBoundary": "weapp-match-lifecycle.js:404每次下一局policy.reset；duplicate-auto-policy.js:9每次需决策重建/恢复冷实例。裸worker连续热checkpoint的跨级真实生产调用未确认。",
+      "recommendation": "后续核实全部worker/生命周期复用入口；明确换级reset契约或将牌义/回合代际纳入候选与规则缓存。不得将本条计为已确认生产事故。"
+    }
+  ],
+  "validation": [
+    {
+      "kind": "existing-tests",
+      "cwd": "shared-core",
+      "command": "node_modules/.bin/vitest run --cache=false tests/ai-engine.test.ts tests/ai-team-policy.test.ts tests/ai-strength-hints.test.ts tests/hand-hint-policy.test.ts tests/ai-random.test.ts tests/ai-worker-runtime.test.ts",
+      "result": "6 files / 62 tests passed",
+      "runtime": "Node v26.7.0; Vitest 4.1.10",
+      "startedAtLocal": "2026-09-12 14:33:11 Asia/Shanghai"
+    },
+    {
+      "kind": "ai-hint-public-information-matrix",
+      "views": 312,
+      "levels": 13,
+      "profiles": 2,
+      "selfSeats": 4,
+      "contexts": ["lead", "enemy-lead", "ally-lead"],
+      "seed": "912003 + self seat index",
+      "lockViews": 312,
+      "hiddenFaceReads": 0,
+      "checkpointContinuationChecks": 312,
+      "result": "Hint first equals seeded engine first; actions owned and legal, teammate-yield agrees, locked pairs never partially used, other hand proxies allow length only, input unchanged, cold checkpoint continuation exactly matches original engine and complete checkpoint."
+    },
+    {
+      "kind": "resource-damage-oracle",
+      "cases": 1716,
+      "result": "13 levels × held natural same-rank counts 1..8 × every used count × wildcard use 0..2 matches explicit bomb/group/wildcard formula without input mutation."
+    },
+    {
+      "kind": "checkpoint-atomicity-and-reset",
+      "malformedCheckpoints": 14,
+      "result": "Malformed restore leaves RNG, journal, trace and metrics unchanged. Outward checkpoint/trace clones isolated. Reset clears journal/caches/metrics while preserving current strategy RNG state."
+    },
+    {
+      "kind": "cache-boundary-reproduction",
+      "concernId": "CORE-AI-03-C01",
+      "result": "Reproduced without reset; reset restores correct candidates. Source code only, no dist writes."
+    }
+  ],
+  "supportingReadsNotCounted": [
+    "shared-core/tests/ai-engine.test.ts",
+    "shared-core/tests/ai-team-policy.test.ts",
+    "shared-core/tests/ai-strength-hints.test.ts",
+    "shared-core/tests/hand-hint-policy.test.ts",
+    "shared-core/tests/ai-random.test.ts",
+    "shared-core/tests/ai-worker-runtime.test.ts",
+    "shared-core/src/ai/ruleMemo.ts",
+    "shared-core/src/ai/random.ts",
+    "shared-core/src/ai/checkpoint.ts",
+    "shared-core/src/ai/types.ts",
+    "shared-core/src/ai/workerRuntime.ts",
+    "shared-core/src/ai/team/policy.ts",
+    "shared-core/src/ai/team/journal.ts",
+    "shared-core/src/ai/team/types.ts",
+    "work/guandan-windows-source/server/master-bot-policy.js",
+    "work/guandan-windows-source/server/duplicate-auto-policy.js",
+    "work/guandan-windows-source/server/bot-turn-pacing.js",
+    "work/guandan-windows-source/server/weapp-match-lifecycle.js (partial)",
+    "work/guandan-cocos/assets/scripts/game/LocalHandSelectionController.ts",
+    "docs/audit/2026-09-12/README.md"
+  ],
+  "limitations": [
+    "No confirmed finding does not imply whole-repository correctness or optimal team strategy.",
+    "312 views use fixed targeted hands/public observations, not every real deal.",
+    "Async worker cancellation/generation ownership/deadline orchestration and detailed belief/route/outlook implementation remain other batches; synchronous runner timing is telemetry, not a mobile latency guarantee.",
+    "Only seven reviewed entries count; supporting full/partial reads and tests do not increase this batch's coverage.",
+    "Only batch Markdown/JSON written; parent task merges inventory and coverage."
+  ]
+}

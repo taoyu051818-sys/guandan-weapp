@@ -1,0 +1,69 @@
+{
+  "batch": "data-rating-09",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/state-migrations.js",
+      "sha256": "7e92f0ceab2041afcd43dc7c55f7c752206ffdbc04931fad2e0e2116023ff7da",
+      "lines": 257,
+      "notes": "完整257行。核root clone/additive fallback、四catalog缺项补齐不覆既有项、稳定8位账号碰撞探测/重建索引、rating兼容及去旧elo、缺wallet一次补赠、queue归一化、稳定entryAttemptId、active match index重建及多活动冲突fail-fast。1000人混合legacy探针验证输入保持、反转用户键顺序稳定、500wallet恰一次补建、二次migration fixed point、观战者参与active而bot/history排除。处理旧格式不是任意腐坏schema修复或分布式迁移。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/seeds.js",
+      "sha256": "29ac9c95d9e86ec39390c00e39942fa6c401131f2d229e9220e7dd9678fcb666",
+      "lines": 43,
+      "notes": "完整43行。核8商品、4赛事、2赛季/6任务样例与createEmptyState引用，通过structuredClone隔离不同实例与导出样例。生产runtime缺省确实使用createSeededPlatformState作为fallback，现存closed赛季/自定义商品不覆盖；仍有联调无期限赛季和历史赛事种子。需要后续退役/运营目录与客户端可达性专项确定归属，不凭文件名断言全是测试死代码或立即删除。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/rating.js",
+      "sha256": "3b9307606adba172db0393a7f312ad3622316717bf34eb5fb692fc17c8c8b912",
+      "lines": 122,
+      "notes": "完整122行。核合法rating、先验胜率/经验/base及elo组合、下限、期望差clamp、队伍均分、4人唯一、按同队加减、纯输入、数值输出。512合法四人样本team互换/胜负对照、胜率单调、极端分差互补和重复用户拒绝通过。综合分不守恒是含经验/胜率base的设计；elo offset守恒。没有校准真实胜率或宣称公平最优；未使用自定义坏config作为活动缺陷。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/classic-stakes.js",
+      "sha256": "59c079b8d37f7f3d1f5b0e8274e6c290d13a53aa1b194b811381a2b8e7db4894",
+      "lines": 44,
+      "notes": "完整44行。核从shared-core CLASSIC_QUEUES单一来源取12档、四人唯一/非负safe余额、输家足额、固定配对transfer/零和和不变输入；12档×2胜方×4余额=96合法案例及各自不足拒绝通过。相邻commerce预留底分按active match/participant存在，不能将纯函数不冻结wallet误报；真实多入口消费整合后续核验。极端非运营余额上限未当已确认事故。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/rating-matchmaking.js",
+      "sha256": "35a32999a30c960892d2e659e4fed54c2caa194179ee934efb07bd3fce1671ed",
+      "lines": 38,
+      "notes": "完整38行。核单queue、matching/1至3人、finite score过滤，等待按最早joinedAt分段扩大，按spread/distance/age/ID稳定选桌且输入不变。12个等待档临界/超1及跨底分拒绝、反转列表tie-break和满/已matched排除通过。活动公共队列还受MatchBotFill前置补位影响，不能把单函数105秒扩差等同真实公共用户等待105秒。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/rating-matchmaking.test.mjs",
+      "sha256": "cabc26bf99ae3b969fd1742b76d8191b3a707ae8d4f81e426962fd52bc877ef1",
+      "lines": 97,
+      "notes": "完整97行并运行通过。核base初值、经验、逆风Elo、同分不同场次、12底分映射/零和/余额、按分选桌/跨档禁止及老桌扩差。不是未注册僵尸测试：platform.test.mjs第2行静态import它，默认test:platform和check-server的递归测试登记都覆盖。额外读调用片段不计整份platform.test已审。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 6,
+    "reviewedLines": 601,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/platform/rating-matchmaking.test.mjs",
+        "result": "passed; static-import registered by platform.test.mjs"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/storage-contract.test.mjs",
+        "result": "passed in batch 08, rerun after migration review in batch 09"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/data-rating-09.mjs",
+      "result": "passed: 1000 legacy users; 500 new wallets once; stable identifiers/indexes across key reorder; input isolation and repeat fixed point; ambiguous active matches rejected; 512 rating cases, 96 stake cases and insufficient-balance controls, 12 spread boundaries and tie/order/filter controls"
+    }
+  },
+  "limitations": [
+    "Only six full-read files count, 601 lines; facade/store/core queues already reviewed elsewhere. Runtime seed use, commerce reservation, matchmaking bot-fill and test registration were supporting reads; full account/commerce/matchmaking/platform API integration still pending.",
+    "Pure synthetic-memory function probes, no actual data migrations, runtime startup, external network, Cocos build, changes to bot/game behavior or deployment. Fixed-point tests cover valid historical data, not every malformed schema.",
+    "Rating mathematical invariants do not prove statistical fairness, calibrated win probabilities or optimum pairing. Real public waiting also invokes bot fill, so widened standalone selector is not claimed as current user waiting duration.",
+    "Seeded platform defaults still include historical sample products/tournaments and an active no-expiry integration season. Existing operated records win migration; end-to-end reachability/retirement and production override configuration remain pending boundary work, not a new confirmed defect or deletion authorization."
+  ]
+}

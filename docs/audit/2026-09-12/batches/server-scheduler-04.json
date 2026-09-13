@@ -1,0 +1,87 @@
+{
+  "batch": "server-scheduler-04",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/weapp-operation-scheduler.js",
+      "sha256": "d30faf4d3b026db874cec835c5650094ef4c02a9e7ee3931a9eae30a68766df3",
+      "lines": 49,
+      "notes": "完整49行：按房间FIFO、异房并行、全局exclusive barrier、失败tail隔离、drain捕获新增任务；120项合成任务7次注入失败全部满足队列契约。key按入队时connection.roomId选取的跨入房边界列Q-04-C01，不误报为已证实游戏错误。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-operation-scheduler.test.mjs",
+      "sha256": "39a814a245bdff0a8aee18bd905b5bbb646596edd65907e38a39ece43ba0ceca",
+      "lines": 91,
+      "notes": "完整91行：key分类、异房并发/同房FIFO、global前后屏障、失败不毒化、drain期间新增工作；测试仅内存Promise，无实际服务器。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-runtime-persistence.js",
+      "sha256": "62d26639435c5567f7734b0114a121140567d796cce2905ccdf54a727f80676b",
+      "lines": 44,
+      "notes": "完整44行：脏位/去抖、保存失败重试、精确接受对象确认、停机取消与最终flush；并发替换/新token不被旧快照确认。业务关房失败重试缺口归SP-03-002，不重复。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-expiry-jobs.js",
+      "sha256": "bf77db9909e2b1c5051460081df74a2d027c49157c68c666eb1581de16b3afd7",
+      "lines": 31,
+      "notes": "完整31行：定时触发后排队仍可取消，按房间实例与job代次判存活，finally清理与dispose；只拥有调度租约，业务失败重试由调用方负责，关联SP-03-001/002。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-expiry.test.mjs",
+      "sha256": "cf7f2a55af87fccdcf6c9d1f3af7ca19737c98dc1f945f9bc1b30bddeeb34e6c",
+      "lines": 109,
+      "notes": "完整109行：回调发出与真正执行之间的存活复核、cancel/replace/同号新room、投票自身提交失败的1秒重试和dispose。未覆盖跨整体房间回滚引用变更及关房事务失败，已知SP问题另计。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/durable-file.js",
+      "sha256": "e9bf97fbfad49498f9e3bb00313579a5f8e1b67f71040cc2fcd11ca10807631b",
+      "lines": 137,
+      "notes": "完整137行：同步/异步私有目录/600文件、O_EXCL唯一临时路径、写文件fsync→rename→目录fsync、finally清临时；10组注入操作顺序/失败检查通过。原子替换不意味着跨进程事务或断电实测保证。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-runtime-owners.test.mjs",
+      "sha256": "f4b607133ea57f4e46e61b808e6e9eb285913e855961cc9ff2bf6e2981a078ad",
+      "lines": 174,
+      "notes": "完整174行：去抖/并发acceptance替换/存储恢复/停机final flush、期限清理、metadata默认值独立与迁移幂等、composition静态约束；内存fixture与源文件读取，无生产状态副作用。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/room-state-store.test.mjs",
+      "sha256": "74878818b8c78943f8d7d3e5659bd3dd9d490f3f76bc3aef78c9ee6c4ee63b42",
+      "lines": 85,
+      "notes": "完整85行：mkdtemp合成存储保存/重开/权限/临时文件清理/rename失败保原内容、schema拒绝、进程socket不持久、接受对象精确确认及token别名隔离；finally只清测试临时目录。"
+    }
+  ],
+  "findings": [],
+  "relatedFindings": [
+    "SP-03-001",
+    "SP-03-002"
+  ],
+  "concerns": [
+    {
+      "id": "Q-04-C01",
+      "status": "verification-gap",
+      "title": "入队时房间键与执行时连接房间可能不同，需在完整入口迁移链验证",
+      "path": "work/guandan-windows-source/server/weapp-operation-scheduler.js",
+      "line": 6,
+      "evidence": "helper按connection.roomId而非payload选key，实际weapp-ws:673入队时调用，660-672 task稍后才动态进入duplicate/常规handler。已有global入桌屏障保证前后顺序，但同连接leave A→join B→后续B命令若在join完成前全排队，后续命令可能捕获旧A键。",
+      "validation": "本批仅真实helper探针对照旧/新connection.roomId分别得到room:A/B；120个稳定key任务均符合FIFO与global屏障。没有证实真实handler错乱、越权、重复结算或正常客户端发送此时序。",
+      "recommendation": "继续审查完整入桌和命令入口/每连接代次；若能证明真实触发，应为排队命令绑定目标房间/连接代次并重验，不先列作已确认产品缺陷。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "node --test work/guandan-windows-source/server/weapp-operation-scheduler.test.mjs work/guandan-windows-source/server/weapp-runtime-owners.test.mjs work/guandan-windows-source/server/weapp-room-expiry.test.mjs work/guandan-windows-source/server/room-state-store.test.mjs",
+      "result": "4 pass / 0 fail; runtime owners imports expiry so duplicated checks are not unique coverage"
+    },
+    {
+      "command": "node docs/audit/2026-09-12/repro/scheduler-persistence-04.mjs",
+      "result": "120 jobs incl7 expected failures, FIFO/global exclusion/drain;10 sync/async durable-operation sequences incl injected failures; exact acceptance identity and token alias; enqueue key diagnostic only"
+    }
+  ],
+  "limitations": [
+    "仅8个完整文件计覆盖；其他entry/gateway/composition调用点辅助读取不计。",
+    "文件操作失败用注入API；真实存储既有测试仅临时合成目录，未断电/损坏生产文件。",
+    "snapshot构造或onError回调自身抛错会超出当前正常API契约，未找到真实输入触发，不据此追加缺陷。"
+  ]
+}

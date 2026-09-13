@@ -1,0 +1,1203 @@
+{
+  "batch": "cross-module-41",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "observedAt": "2026-09-12 17:49:45 UTC",
+  "reviewed": [],
+  "findings": [],
+  "scope": "Consolidation and current-source rerun of previously reviewed key chains; no new source coverage or product fixes.",
+  "firstParty": {
+    "reviewed": 629,
+    "total": 629
+  },
+  "generated": 39,
+  "boundary": {
+    "checked": 1167,
+    "total": 1167
+  },
+  "confirmedIssues": {
+    "total": 41,
+    "P2": 17,
+    "P3": 24,
+    "allUnfixed": true,
+    "ids": [
+      "TEST-32-001",
+      "BUILD-03-001",
+      "CORE-CONTRACT-06-001",
+      "RP-13-001",
+      "SL-02-001",
+      "PR-08-001",
+      "TO-11-001",
+      "SE-05-001",
+      "SP-03-001",
+      "SP-03-002",
+      "SD-04-001",
+      "SD-04-002",
+      "SD-04-003",
+      "PS-08-001",
+      "PF-06-001",
+      "CS-01-001",
+      "SA-01-001",
+      "SL-02-002",
+      "PG-17-001",
+      "LP-19-001",
+      "CI-05-001",
+      "CTL-06-001",
+      "AUDIO-15-001",
+      "RESOURCE-06-001",
+      "PG-17-002",
+      "RP-19-001",
+      "FR-21-001",
+      "FR-21-002",
+      "UI-22-001",
+      "UI-25-001",
+      "UI-25-002",
+      "HAND-26-001",
+      "HAND-26-002",
+      "UI-27-001",
+      "UI-27-002",
+      "RESOURCE-27-001",
+      "LP-28-001",
+      "CS-01-002",
+      "CORE-RULES-01-001",
+      "CORE-RULES-01-002",
+      "DOC-39-001"
+    ]
+  },
+  "inputEvidence": [
+    {
+      "path": "docs/audit/2026-09-12/batches/account-profiles-12.json",
+      "sha256": "1720e3f956cb0245157969313bdd34bb21eee696f86bca76a72bb328404267b9"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/account-profiles-12.md",
+      "sha256": "be4f135fb4cb1ca99dd025df8ef7f3fed53c9d0910ca1a3218da19d8f97d3079"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/animation-lifetime-22.json",
+      "sha256": "4b5362b7fbd2e01bdcd9bf71e1a1f6490fdcbea336bdcb13bb1dc1cf22cf899d"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/animation-lifetime-22.md",
+      "sha256": "1b110aa0b5d3d2dfe46d38076db93f45dc02f7b74dd5876dc0398497dc7f2415"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/arrangement-records-37.json",
+      "sha256": "68b5a1c3b0a03dd00d7a43c8c1eb23248fc303122f3d18c19987c34b417b1e89"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/arrangement-records-37.md",
+      "sha256": "1f508fb5ec09f26bc93636d8aaa4d36faf8c54e5fbbe4c461d786ea112c7c0d3"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/asset-pipeline-05.json",
+      "sha256": "0405c6ef456e14536ae6719929db017b9c0f86e73fa385d62bcb49fb4eb38889"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/asset-pipeline-05.md",
+      "sha256": "f7b3ba2f3554d8909cd6b477835ac6361a724dc00753087537d6cdbdc04b1248"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/asset-tools-36.json",
+      "sha256": "8c1f9691d29b20b48451b5e0dfa8602c59b4791f2647c5c0a5ab056a4474c914"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/asset-tools-36.md",
+      "sha256": "557e78385e4f4e863bbb0410092b7f161b211b3b3f7e3d8ed9ee1784ea5a1ceb"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/audio-lifecycle-15.json",
+      "sha256": "3756d2088c07fe195534568cad8a6ceddc397e3d696043847d3829683ca989dd"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/audio-lifecycle-15.md",
+      "sha256": "9d100df5a91c4368f12f1c2e96dd788cce36b3112f5f0feffa49b923002604ea"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/build-boundaries-01.json",
+      "sha256": "faa0f79a2706da9db8a4450fde6c693ea3c640024ee0ad51d497e4134d853bfb"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/build-boundaries-01.md",
+      "sha256": "12e3edd110a1c3390cd94a2a275a261519a48ae4343e25797e698dc242b72c91"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/build-release-03.json",
+      "sha256": "29a4eb462ad7fa89ed741e45fd3383015244c2ccecf8f8f5187a4fd9dd629dd5"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/build-release-03.md",
+      "sha256": "b9ddcd82d741b4333af03a7a34e44232d93e68149be3274cbe6b0546a25b4daa"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-connection-03.json",
+      "sha256": "71e5f0594e5c4ad0da500763167bc47ded01332348edc7e7f1d8bbafcdbdd840"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-connection-03.md",
+      "sha256": "06c43f5a094c9a7372675d26010d02bb0d78256b9e90edaf51149c3ff39ac854"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-foundation-02.json",
+      "sha256": "71c9686486dce5c749b74443782dd82bac43ce1b350cd8eef0c827aab40dcbcd"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-foundation-02.md",
+      "sha256": "8117ff89cb343a60addbf223ea49540d97325b6c4da85319ea6eff05c495d2a6"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-hand-04.json",
+      "sha256": "3d523da140cc81dee67440e157697e6140b75bbdc2749e977343c1ac0e17de0b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-hand-04.md",
+      "sha256": "119fa8c1e564a908be615b7a0b1d1977de9171b9d51f0431bc729dfa40c54ad2"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-input-05.json",
+      "sha256": "71dda4565c976ec8d0f74119a924b48aa0aaea6822e621d2a3db20c9acf63f11"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-input-05.md",
+      "sha256": "f5bd1c8232fb227f417a0a17292d76554077196e7bc1bb38d5869e1256acb8c2"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-network-02.json",
+      "sha256": "365f580ad243c27311fd28b428eb7a92445f314235353add97dade30d3eef451"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-network-02.md",
+      "sha256": "de169ac5e02812e6d39a5c6119aa80251a5e9ac01e0945a2d7e362faba5e4c13"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-presentation-06.json",
+      "sha256": "e391ba6bb24bf0b91997284682df1909862b741a81683fcd81ed6b15577e63bb"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-presentation-06.md",
+      "sha256": "c8e3393cb389b2fdf415834a01115a89f7beb6d6c86ae9ce9cee8b48dc07a86b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-state-01.json",
+      "sha256": "9c3635a177b106e8ec63dd080230aad3725935d24dbcfd71c994db24e3c3c273"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-state-01.md",
+      "sha256": "994dc503302b5edd04e70e877b9aa8c5e875ca7847e98f8c381fa04d22752cb4"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-table-lifecycle-06.json",
+      "sha256": "3eca2f3385a03e2a32c29d1a83e32202b6f6fa1dca29dc1ea53f8d632b92fe0b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-table-lifecycle-06.md",
+      "sha256": "1a25f739c153cecc05a229c44056532b7a8a7bdf1a7a3b50916920c135679702"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-test-quality-30.json",
+      "sha256": "8e70b78db8f01524916fab2da9efb8bc6c91c2f2636e794bdc917a6e8964ded9"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/client-test-quality-30.md",
+      "sha256": "5d201a24e162b749c4cdcb81950a0c12b62cc7b14e392143a64e688fd388c79b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-ai-03.json",
+      "sha256": "8ae506c9429293c4eb500933a68824000a18d97846ed02ec18dd30fb7f881bdd"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-ai-03.md",
+      "sha256": "66557442ab695033eacda45b120d5a46dec8bf1c5db5a0300fd61201c6c3d150"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-contract-06.json",
+      "sha256": "82319741e6f3392496d25fc4ccf6ba7ce5245d121562be074747ef2863484f7e"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-contract-06.md",
+      "sha256": "2bbd8bd7042af86b2b7575cdc82406dd1aa985c9328df52316b470e211483ae5"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-dealing-02.json",
+      "sha256": "402220ee03a3cbfeeda2af88e53010a78daf37befa06b8c40fc5e8ffa238446b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-dealing-02.md",
+      "sha256": "8b7e4e16a18886ab686b85ed29c99653800528c038c3527c2c2eccab6522a5ac"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-rules-01.json",
+      "sha256": "6e296beceee7a1a7e9624a6934b88130345dc3cdfa43f1daf024dcf1f898c8ca"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-rules-01.md",
+      "sha256": "5f45d76d8e39b90739f845b58dd07d49f107aae94de176f499ea857dcb6911c2"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-team-05.json",
+      "sha256": "79c7648c9e12977a94556d7242241f3097166fe0038e5d4dc3ca4ded7a9329a9"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-team-05.md",
+      "sha256": "f2cbeb74be8771b9828fcb704dd9a70289d192e6e6843a89c2e9d7809d5d6010"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-test-quality-29.json",
+      "sha256": "7a8d1c85117f0eeff5a0d0a1b4739c46a9cd3cbe53afdc5954b79e46086d52fa"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-test-quality-29.md",
+      "sha256": "d9052c6d81aecf2c7f97d7b2a98de1ffd68ad0925a2ef7ef00d88fd6751df1ab"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-worker-04.json",
+      "sha256": "b9a909df86560bf8033481cabe7647ece59e72933653633730352eece5d705d1"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/core-worker-04.md",
+      "sha256": "404471dfdb08cba0a3b6f21582d4da250727df19e38587003c1d81b4b575620f"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/data-rating-09.json",
+      "sha256": "2125890cebdb443b1f6a5a9d7d57809c5332d8f8a91d8b2a7996700f96cd6cf4"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/data-rating-09.md",
+      "sha256": "a42a7665042a72bf0bfb3bcd5d382957e1fa9ebe64c44a2601cfeed083fee0cf"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/dependency-boundaries-40.json",
+      "sha256": "742d2124d4b024a4876b4313c59bffafe68b889d730b4f3649e16c8dcbe7ece8"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/dependency-boundaries-40.md",
+      "sha256": "a9edc29645fdda79a1fb9f48286d5002436476b0ccb04129675e14d656608e8d"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/document-baselines-40.json",
+      "sha256": "61f7a9b99a4135c551aea5b167c4c628aeb7ba9ffc42d5da26b714bc178f2948"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/document-baselines-40.md",
+      "sha256": "0772a3eeb40fced61bb24a6ea4ac692e63abe0a4e40e1775f08de39b7a815163"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/document-history-40.json",
+      "sha256": "5bade6d63951c2f6364b15d8b8e391fe159c82b773f64ca9bc862c347606e582"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/document-history-40.md",
+      "sha256": "92b251d111afd27ed2d7e6fd4c5dfd854f79b7ec2ee7c83c566b9e10fbe8438c"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/effect-orchestration-23.json",
+      "sha256": "5c9bb6801fd91d79753f81ed0f4740fe8eb26cb9d3d2f65d1c115607270a3841"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/effect-orchestration-23.md",
+      "sha256": "054d1a14bfc580bcf607dc194ce162a43a14e519c81cd6670bd73601db97794a"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/effect-renderers-24.json",
+      "sha256": "ceceea51d7f436330682d3eba35d08fff0b489ba630e9a9d5db0901b34a437f8"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/effect-renderers-24.md",
+      "sha256": "2b6d6d8b248fcafa3ec9ce5e12ea2cd5a8a89ba62fb0718c62df582b8d716368"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/friend-views-21.json",
+      "sha256": "90e795af4e317eace3ee64e7ced0cd83cf8ec7ad140fbbee40ef54f3505d628a"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/friend-views-21.md",
+      "sha256": "27d6e7bc8b1b815898390d03367014621b4db831719edc594b01e3eaabe2fcc4"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/hand-projection-26.json",
+      "sha256": "aef12f5f1bd1dc20ef2a18020216147dbbe57c7b8426606106dcc0874322e5bc"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/hand-projection-26.md",
+      "sha256": "883f2d515e68f7a01336b4d86c8a6c69363fd60c9d0ad89df77c53e59d49a1d2"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/identity-boundaries-18.json",
+      "sha256": "0da169e75fcfd0c85a023985823b29e1c80eec1197e8bc9401b1e2de56ce59a3"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/identity-boundaries-18.md",
+      "sha256": "35255122478f921421c93a296d105c92fce5abba19659d631149d404e6b50375"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/image-geometry-20.json",
+      "sha256": "92b2f399c4c921f02631ba61e9613f7b5191d03298c3dc3f3f9ab4b68404330d"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/image-geometry-20.md",
+      "sha256": "c8d99ea84773f8bead961c0a6bdfe30fb8732a1108c29c41b3ee7c357e3a39d5"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/matchmaking-accounting-10.json",
+      "sha256": "60928a357821fdd660959ae2bd3ced167cc73c546113c128f7df393ffdcec4ce"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/matchmaking-accounting-10.md",
+      "sha256": "49007d745511bee867ce5a8e8dd9f7125985a63100c41d44c254951ec1a54a1c"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/page-lifecycle-19.json",
+      "sha256": "2320e020085967a752336c7a4e7ac29d9184c8f9e7b3a841f05494d9aad66854"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/page-lifecycle-19.md",
+      "sha256": "b82fe7db74e65c422c755d23e51b3170883c199914e870edc254525ae71d61c7"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/platform-friend-06.json",
+      "sha256": "4fbc97f47358ee9622e307655dfe59ea3dd5f5207bb9e498bd239f1955474624"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/platform-friend-06.md",
+      "sha256": "470c0c74e863638a9c77fadbcaa6272a8920857c494063616234219c5b856757"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/platform-gateways-17.json",
+      "sha256": "4d8b8c7155ce41cd9dff36391c48e5652c05ddcb864608c1e848779ea82d99d0"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/platform-gateways-17.md",
+      "sha256": "ec4a13af3a48b73705ef5a17a1365a288e4ee08d967e0e72b27d6127a536c81a"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/platform-ingestion-08.json",
+      "sha256": "045ee66142d896e0a80c9df0d450834fd9bf27fe2b93c51f383ec13f360a535e"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/platform-ingestion-08.md",
+      "sha256": "8ad33c3e3f6e7d527d10662406f67e460f1509dd59f62a5723121e2e3be09012"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/quality-gates-06.json",
+      "sha256": "6345d85250114b514efd4fa41a069eb389e3833aedd1b929844f2886bdf19a36"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/quality-gates-06.md",
+      "sha256": "f14ff7eb8d6a70edd99a4e47cba92f68f6dd2c73d19d1401ed43028938299c56"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/release-config-34.json",
+      "sha256": "5a8609b1947f8bb064318d11e57edc332b5de6640eeb7261976fa3e5f4ada1ca"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/release-config-34.md",
+      "sha256": "4f21ded278bae8d73d9a5bfb0faa3d1d8f45f84d3548f98516d98171bfaed991"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/report-delivery-07.json",
+      "sha256": "7133bd9e94570256710719931161ec3bfafe6ad6579b96652e6786f6170a1d1a"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/report-delivery-07.md",
+      "sha256": "bfcb6b6f7387aeed12a4c7ec5ba0e27f84e8b82a0faff68bacd632e2b1fbed29"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/resource-boundaries-39.json",
+      "sha256": "60d235aacafa7758cf2a7697e5d0233541146404af9e180cb53bce2f1e97c793"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/resource-boundaries-39.md",
+      "sha256": "5b236afb8fa367441f0b4a24076a2665e3e54e498a7292cf6bb9eb1f0b45234a"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/resource-frames-06.json",
+      "sha256": "925145d844775cff5d68962e962b08c76ddf24ff62014f51670da07381022639"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/resource-frames-06.md",
+      "sha256": "b3667192dc89fde1a943e9cada716cbd08d052c317ed7e5ae2c0e726ca18f00e"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/retirement-quality-31.json",
+      "sha256": "9b64a897d9eb1f966d0eae9d7e7ddc5f115f73cc5841fb0b7a7213cc209b125c"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/retirement-quality-31.md",
+      "sha256": "b1150abb538d676eae10305c74d0fc317afc442b3d7a462f19089efc2fb34d01"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/room-commands-14.json",
+      "sha256": "8418d82d1c157ef8786cbd098007ea331bad719066037895462717560e5b0271"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/room-commands-14.md",
+      "sha256": "2b08f2a1845de01e994f4f337d1ad6614d949f71441bf472a3264a76ad81bdfc"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/route-recovery-16.json",
+      "sha256": "80fc88efda89f01334f6bd41c13a6a19fc762febd1c1445668db685da2f66e63"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/route-recovery-16.md",
+      "sha256": "eca108484199096fceeadcddf60214292215caf2c36c459f17db8f413ca5bbfd"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/runtime-policy-13.json",
+      "sha256": "2f7e88a3154793eaec9a7ca4c84b5f16728666323126f892ddf22caa5902d906"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/runtime-policy-13.md",
+      "sha256": "cf51e50bd4e5e04a44b6af7f88a04d18e7bedbf5c1d97664311a296769d0df12"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/scene-lifecycle-27.json",
+      "sha256": "3c74b4f0fcd453ffe2286feb78a3f982cf1e5dcae94e75b05623996b8f6e05e7"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/scene-lifecycle-27.md",
+      "sha256": "d5ee168aaef5241aed6999cc828b503f6bccc837d263676959c6e71399996b82"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-authority-01.json",
+      "sha256": "2f4c0d74f0bd9f0d0a34f9f46742a8715c32fb5bd54a6b8eb6ee0ce4eb8af918"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-authority-01.md",
+      "sha256": "f7ea323da3b6cb59e9b7e7b958de7f71f37e5ffda627d633ab022cfb56753e99"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-duplicate-04.json",
+      "sha256": "fd59a65a4fdb9c2649f5d4ea52567e9aec7544000c6bb677837bb9fd041cb8ba"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-duplicate-04.md",
+      "sha256": "c9d3295113b69de07bbd05f1b0c7f2b8cd7c71c753074ebe9ab916a3ee205399"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-entry-05.json",
+      "sha256": "24c54f653a0c19b006db61bf91bd544b0b1324f3a19b37544b151de48c8aeca8"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-entry-05.md",
+      "sha256": "0ea4fc498559416ee8c635fec9614f66f870591ab01090645cb842aeef6e76f9"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-integration-quality-33.json",
+      "sha256": "168e60b43544acec94d58912f60671189d8f12bd176e1d18d30a3d3f68fb493b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-integration-quality-33.md",
+      "sha256": "e08069ee05f7cae29f1880c2cb9daab210a988734ac1bb35ef4c05a3d1bc2fd2"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-lifecycle-02.json",
+      "sha256": "783a18b209c0ea9a9816e9807d051a8850a105d62b71227d5794865220a2d529"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-lifecycle-02.md",
+      "sha256": "051b9a319f0982bd9f0507f573932b9491018b337c672ececdb653a80416b12e"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-persistence-03.json",
+      "sha256": "4eb9b4073dcf941d1126c89a19b7c9859e2d2b0eb3c6f5f5ceaad5d32312274b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-persistence-03.md",
+      "sha256": "ffaa10a186173b3ed496b75d75de2f8752030e7ca13ce9ef230f02ce0c72ef37"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-scheduler-04.json",
+      "sha256": "447fd236584c85c74a8910266c2cc2726f29b4516a0ab2eaf9d260a9434b0671"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-scheduler-04.md",
+      "sha256": "4ff05282e407a7d12af437b55ebdbe5d20dd0c6aa4ffbd52170f642d02f7097d"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-test-quality-32.json",
+      "sha256": "392b146d2279769cc447c29314dee612e23dd1dfdf02284817289090a09b2ca8"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/server-test-quality-32.md",
+      "sha256": "3515f1d17a43b02f3d6075294e17359be272c2cd764b7223dd4d8ad2ab77fe4d"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/startup-lab-35.json",
+      "sha256": "ed3426d0b1f6c6a8d2a917d77760d0b85119471d034419566210174bdbbed500"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/startup-lab-35.md",
+      "sha256": "25e659c367e0acf398053d2c19e5337238a7beee0b16c4366a53c02c4a69c483"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/table-presentation-25.json",
+      "sha256": "100de6469c3a18dff1f133bf361e50c459e09e8d70290065551f09a97e9d3401"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/table-presentation-25.md",
+      "sha256": "9efecd8e8f411e240f747db719becd2918b4495fa89d6cb9896fd9757b3e9021"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/team-records-38.json",
+      "sha256": "8b7ee63b96f83e8c1fd37717c151e813f12f343869fc3440f93f9c4ad6bafeb4"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/team-records-38.md",
+      "sha256": "9b28702d0b1505c537e9cfa3dbd4af6baae885dec165a7914184c34b2db95b52"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/tournament-progression-11.json",
+      "sha256": "e3c3e062f4cc99d6daf3cfec0fef3f40d44d00ebb69ae710e1bbd4c4496fb9b3"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/tournament-progression-11.md",
+      "sha256": "40c860186d6d58aca2cb32473ea05f98182f488e8ff412a0156bd4fb4488f393"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/ui-surfaces-28.json",
+      "sha256": "36b50bd539d0722a8f79939b29fed042dff96ade506b174979b1cb77afcc400f"
+    },
+    {
+      "path": "docs/audit/2026-09-12/batches/ui-surfaces-28.md",
+      "sha256": "0b4184ac8e8aa1b16e3ffd59d416ea353439b85b1c5317ad6eb9b25e8cd4b87b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/repro/server-test-preload-32.cjs",
+      "sha256": "424ca6789322482d4f56fe15d389a9a5bb21f92d5985078e71b52af4b1bb855e"
+    },
+    {
+      "path": "docs/audit/2026-09-12/repro/runtime-policy-13.mjs",
+      "sha256": "e64dee253d6046fc05b8862fe92284f6cdfe49b8c141985d08e28bb65579fc3f"
+    },
+    {
+      "path": "docs/audit/2026-09-12/repro/platform-gateways-17.cjs",
+      "sha256": "a7d99131189cf65e978c4b1dfc8772e89153fb413456c2527c812a301033fd74"
+    },
+    {
+      "path": "docs/audit/2026-09-12/repro/tournament-progression-11.mjs",
+      "sha256": "65d6bcd117ba7fb336f675a111613706d81fcd2ad5121777c20e820e6f63554b"
+    },
+    {
+      "path": "docs/audit/2026-09-12/repro/result-roster-08.mjs",
+      "sha256": "0ef13f9688ab187cc41f5de1004fdede967698b639244ab3938e29b963690dbb"
+    }
+  ],
+  "chains": [
+    {
+      "id": "X01",
+      "name": "登录、资料与好友排行",
+      "chain": "微信原生交互 → 授权/票据 → 平台资料 → 大厅/开放数据域",
+      "evidence": "12、18、19、20；28有效/1148非法签名输入、40并发资料/云更新等隔离对照",
+      "findings": "LP-19-001",
+      "reports": [
+        "account-profiles-12",
+        "identity-boundaries-18",
+        "page-lifecycle-19",
+        "image-geometry-20"
+      ],
+      "limit": "账户/授权代际与数据投影已复核；微信真实授权、撤销权限、分享和好友可见范围尚需真机，未读真实好友资料。"
+    },
+    {
+      "id": "X02",
+      "name": "快速匹配及机器人补位",
+      "chain": "大厅选择 → 平台分队/票据 → transport入桌 → 桌内等待 → 开局",
+      "evidence": "10、13、16、32、33；52模式/人数匹配夹具、16并发身份分4桌，签名/断连对照",
+      "findings": "SE-05-001",
+      "reports": [
+        "matchmaking-accounting-10",
+        "runtime-policy-13",
+        "route-recovery-16",
+        "server-test-quality-32",
+        "server-integration-quality-33"
+      ],
+      "limit": "匹配补偿、票据和取消所有权已核；52是匹配场景，不是52场完整真人对局。"
+    },
+    {
+      "id": "X03",
+      "name": "好友房设置、创建与加入",
+      "chain": "表单 → codec → HTTP/平台容量 → 签票 → 游戏准入 → HUD",
+      "evidence": "06、14、17、21；四玩法布尔往返、邀请/房号与12人容量对照",
+      "findings": "PF-06-001、PG-17-001、PG-17-002",
+      "reports": [
+        "platform-friend-06",
+        "room-commands-14",
+        "platform-gateways-17",
+        "friend-views-21"
+      ],
+      "limit": "保留房号和微信分享；长口令UI不应回流。配置false和旧成员容量不一致已复现。"
+    },
+    {
+      "id": "X04",
+      "name": "落座、观战位、换座与添加机器人",
+      "chain": "平台成员 → runtime席位/观战角色 → bot占位 → 权威快照 → 等待页",
+      "evidence": "14、21、33；120换座/1800拒绝、100机器人夹具及四/八席呈现",
+      "findings": "PR-08-001",
+      "reports": [
+        "room-commands-14",
+        "friend-views-21",
+        "server-integration-quality-33",
+        "platform-ingestion-08"
+      ],
+      "limit": "权限及隐藏牌边界有对照；历史成员用于终场映射会污染当前席位，不能只看等待页正确。"
+    },
+    {
+      "id": "X05",
+      "name": "准备、发牌及多房并发",
+      "chain": "准备命令/回执 → 房间队列 → 保存 → 发牌/广播",
+      "evidence": "04、05、13；持久化门禁、48时钟与240设置对照及赛制初始化",
+      "findings": "SE-05-001、SL-02-001",
+      "reports": [
+        "server-scheduler-04",
+        "server-entry-05",
+        "runtime-policy-13",
+        "server-lifecycle-02"
+      ],
+      "limit": "同房顺序不代表跨房事务隔离；已证实全局回滚会清另一房准备回执，尚未证明重复计分。"
+    },
+    {
+      "id": "X06",
+      "name": "牌型与动作权威",
+      "chain": "输入cardIds → ownership/版本 → transition → 保存 → 权威快照",
+      "evidence": "01、02、06、29、33；候选/归属/规则对照及故障变异检出",
+      "findings": "CORE-RULES-01-001、CORE-RULES-01-002、CORE-CONTRACT-06-001",
+      "reports": [
+        "core-rules-01",
+        "core-dealing-02",
+        "core-contract-06",
+        "core-test-quality-29",
+        "server-integration-quality-33"
+      ],
+      "limit": "活动transition与旧兼容API分开；同花顺5.5、红心配不能替王按当前已审规则，不把兼容缺陷外推线上。"
+    },
+    {
+      "id": "X07",
+      "name": "理牌、选择、锁牌与提示",
+      "chain": "本手/公开态 → 简单理牌/锁组 → 输入投影 → 合法提示 → action",
+      "evidence": "04、05、26、30、37；锁组原子性、16组A低错误与对照、104简单理牌样本",
+      "findings": "CI-05-001、HAND-26-001、UI-25-002",
+      "reports": [
+        "client-hand-04",
+        "client-input-05",
+        "hand-projection-26",
+        "client-test-quality-30",
+        "arrangement-records-37"
+      ],
+      "limit": "自动理牌已撤回复杂顺子搜索；手动锁普通顺子仍支持。节点预算/桌面毫秒值不保证手机首次触摸不卡。"
+    },
+    {
+      "id": "X08",
+      "name": "最高档AI、托管与节奏",
+      "chain": "权威队伍/公开信息 → 同一team策略 → 计划持久化 → deadline执行",
+      "evidence": "03、05、13、38；26局2484决策未读暗牌，候选/路线oracle，1216历史记录复算",
+      "findings": "RP-13-001",
+      "reports": [
+        "core-ai-03",
+        "core-team-05",
+        "runtime-policy-13",
+        "team-records-38"
+      ],
+      "limit": "策略共用且样本支持保留reference；转蛋后固定ID校验冲突已复现。概率是启发式、历史调参不是最优证明。"
+    },
+    {
+      "id": "X09",
+      "name": "贡、还、抗贡与期间理牌",
+      "chain": "升级结算 → 贡还阶段 → 候选限制/确认文案 → 原子交换 → 发牌后行动",
+      "evidence": "01、14、25、30、33；真实贡还cardId流程与错误归属变异",
+      "findings": "无新增活动贡还缺陷；见X06测试缺口",
+      "reports": [
+        "core-rules-01",
+        "room-commands-14",
+        "table-presentation-25",
+        "client-test-quality-30",
+        "server-integration-quality-33"
+      ],
+      "limit": "原有TablePhasePresenter/GameScene改动保留；源级确认还牌不等于现有微信包已编入，手机文案/遮挡/理牌需验。"
+    },
+    {
+      "id": "X10",
+      "name": "结算、记分与可靠投递",
+      "chain": "state终局 → event/outbox → 平台roster → 幂等账本/排名 → 结果页",
+      "evidence": "07、08、09、10、33；25并发同事件一次记账、分数/迁移对照",
+      "findings": "PR-08-001、CS-01-002",
+      "reports": [
+        "report-delivery-07",
+        "platform-ingestion-08",
+        "data-rating-09",
+        "matchmaking-accounting-10",
+        "server-integration-quality-33",
+        "client-state-01"
+      ],
+      "limit": "结果通道与观战通道独立；本地统计重复不等于平台重复计分。roster错误导致合法结果拒绝无部分入账。"
+    },
+    {
+      "id": "X11",
+      "name": "下一局与终场",
+      "chain": "终局保存/待收尾 → 四人准备 → 下一局或关闭",
+      "evidence": "02、03、14、33；终场离线、两个保存失败点及终止对照",
+      "findings": "SL-02-001、SP-03-002",
+      "reports": [
+        "server-lifecycle-02",
+        "server-persistence-03",
+        "room-commands-14",
+        "server-integration-quality-33"
+      ],
+      "limit": "四人准备不是无条件再发牌；持久重试需完成业务关闭事务，而非只重写JSON。"
+    },
+    {
+      "id": "X12",
+      "name": "退出、解散、到期与资源释放",
+      "chain": "退出/投票 → 身份/代际 → timer → 关闭持久化 → 平台释放",
+      "evidence": "02、03、04、14、27；rollback timer/双保存点/解散反馈",
+      "findings": "SL-02-002、SP-03-001、SP-03-002、SD-04-002、SD-04-003、UI-27-002",
+      "reports": [
+        "server-lifecycle-02",
+        "server-persistence-03",
+        "server-duplicate-04",
+        "room-commands-14",
+        "scene-lifecycle-27"
+      ],
+      "limit": "临时连接、房间记录、活动额度和投票的所有者应分开；关闭历史不能继续占活动容量。"
+    },
+    {
+      "id": "X13",
+      "name": "弱网、后台与重新进入",
+      "chain": "transport generation → resume凭据/票据 → 游戏恢复 → projection → UI",
+      "evidence": "02、03、04、16、18、19、27、33",
+      "findings": "SD-04-001、CS-01-001、CS-01-002、LP-19-001、RP-19-001",
+      "reports": [
+        "client-network-02",
+        "client-connection-03",
+        "server-duplicate-04",
+        "route-recovery-16",
+        "identity-boundaries-18",
+        "scene-lifecycle-27",
+        "server-integration-quality-33"
+      ],
+      "limit": "拒绝迟到连接的保护存在；桌/视角identity切换不能套用同桌旧版本门禁。真机鸿蒙/系统杀进程仍待验。"
+    },
+    {
+      "id": "X14",
+      "name": "实时/延迟观战及队友视角",
+      "chain": "服务端可见性投影 → 延迟缓冲/roomView → 视角 → 卡牌坐标",
+      "evidence": "01、08、13、21、25、26、33；12视角切换、隐私变异",
+      "findings": "SA-01-001、PS-08-001、CS-01-001、UI-25-001、FR-21-002",
+      "reports": [
+        "server-authority-01",
+        "platform-ingestion-08",
+        "runtime-policy-13",
+        "friend-views-21",
+        "table-presentation-25",
+        "hand-projection-26",
+        "server-integration-quality-33"
+      ],
+      "limit": "公开余牌数字的10张阈值不是公开对手牌面授权。延迟局号、长局离席、跨桌投影分别有缺陷。"
+    },
+    {
+      "id": "X15",
+      "name": "八人复式双桌",
+      "chain": "8席 → 同牌/级数开局 → 各桌独立行动 → 两桌结算屏障 → 累计/下一局",
+      "evidence": "01、04、13、21；四人table核心与双桌协调分离",
+      "findings": "CS-01-001、SD-04-001/002/003、FR-21-001/002",
+      "reports": [
+        "client-state-01",
+        "server-duplicate-04",
+        "runtime-policy-13",
+        "friend-views-21"
+      ],
+      "limit": "采用已确认胜方3/2/1、负方0、两桌累计；固定2或两桌同局共同随机级。未做8部手机整场。"
+    },
+    {
+      "id": "X16",
+      "name": "转蛋与个人累计分",
+      "chain": "每局轮换/抽签 → 动态队伍 → 行动 → 3/6分制 → 个人累计",
+      "evidence": "01、13、14；抽牌/顺时针、冷恢复/机器人/托管8故障场景",
+      "findings": "RP-13-001",
+      "reports": [
+        "core-rules-01",
+        "runtime-policy-13",
+        "room-commands-14"
+      ],
+      "limit": "规则层会换队，但生产bot适配仍固定ID；不能以规则单测通过宣称转蛋完整可玩。"
+    },
+    {
+      "id": "X17",
+      "name": "16人赛事",
+      "chain": "报名/取消/检录 → Latin三轮四桌 → 单副随机级 → 个人分/前8标记",
+      "evidence": "11、19、28；256 roster、72完成序列、异常四桌结束",
+      "findings": "TO-11-001、LP-28-001",
+      "reports": [
+        "tournament-progression-11",
+        "page-lifecycle-19",
+        "ui-surfaces-28"
+      ],
+      "limit": "每轮个人3/2/1/0，前8仅标记晋级；无自动淘汰赛。页面简单不代表跨桌收尾简单，未做16部手机赛事。"
+    },
+    {
+      "id": "X18",
+      "name": "布局、动效、音频、倒计时",
+      "chain": "权威/视角/尺寸变化 → presenter/layout → effect/audio句柄 → dispose",
+      "evidence": "15、20–28、30；实际Cocos3.8.8 Tween与音频方法提取，对照存根",
+      "findings": "CTL-06-001、AUDIO-15-001、UI-22-001、UI-25-001/002、HAND-26-001/002、UI-27-001",
+      "reports": [
+        "audio-lifecycle-15",
+        "image-geometry-20",
+        "animation-lifetime-22",
+        "effect-orchestration-23",
+        "effect-renderers-24",
+        "table-presentation-25",
+        "hand-projection-26",
+        "scene-lifecycle-27"
+      ],
+      "limit": "真实引擎局部算法仍不是真机画面/听测。存在重复状态所有者与布局失效边界，不能只用调用次数测绘制结果。"
+    },
+    {
+      "id": "X19",
+      "name": "首屏、头像/背景、包体与发布",
+      "chain": "源/metadata → 构建配置/模板 → 主分包 → 加载/缓存/失败恢复",
+      "evidence": "03、05、06、27、31、34–40；39副本、438meta、现有包资源对应",
+      "findings": "BUILD-03-001、RESOURCE-06-001、RESOURCE-27-001、DOC-39-001",
+      "reports": [
+        "build-release-03",
+        "asset-pipeline-05",
+        "resource-frames-06",
+        "scene-lifecycle-27",
+        "release-config-34",
+        "startup-lab-35",
+        "resource-boundaries-39",
+        "document-baselines-40",
+        "dependency-boundaries-40"
+      ],
+      "limit": "未构建当前工作树，主包/分包统计仅现存包。完整公告、外部媒体/字体/引擎权利及线上运行时尚有未验证项。"
+    },
+    {
+      "id": "X20",
+      "name": "架构、迁移、死代码与测试",
+      "chain": "分层AST/入口 → 运行/迁移/工具边界 → 行为/变异 → 日期化说明",
+      "evidence": "06、24、29–34、36–40；239模块、62预算、退役/类型及变异对照",
+      "findings": "TEST-32-001、CORE-CONTRACT-06-001、DOC-39-001；兼容问题见X06",
+      "reports": [
+        "quality-gates-06",
+        "effect-renderers-24",
+        "core-test-quality-29",
+        "client-test-quality-30",
+        "retirement-quality-31",
+        "server-test-quality-32",
+        "document-history-40"
+      ],
+      "limit": "活动模块已有职责分离，但静态可达性/文本测试不代表功能全用或抽象正确；迁移/测试夹具不可按名称当僵尸删除。"
+    }
+  ],
+  "reruns": [
+    {
+      "probe": "docs/audit/2026-09-12/repro/runtime-policy-13.mjs",
+      "command": "env -i PATH=/opt/homebrew/bin:/usr/bin:/bin /opt/homebrew/bin/node --require ./docs/audit/2026-09-12/repro/server-test-preload-32.cjs docs/audit/2026-09-12/repro/runtime-policy-13.mjs",
+      "exitCode": 0,
+      "output": "{\n  \"publicOpenings\": 182,\n  \"friendSettings\": 240,\n  \"clocks\": 48,\n  \"timingCases\": 48,\n  \"hiddenViews\": 12,\n  \"drawSeeds\": 52,\n  \"changedDrawTables\": 22,\n  \"rejectedSeats\": 88,\n  \"failedLifecycleCases\": 8,\n  \"controlLifecycleCases\": 4,\n  \"finding\": \"RP-13-001: valid rotated teams rejected by fixed-ID bot adapter; default three retries close room\",\n  \"limitations\": \"Synthetic ports, no real WS/deployment; clockwise settlement manually supplied; seed counts are not population incidence.\"\n}\nAUDIT32_SOURCE={\"entry\":\"runtime-policy-13.mjs\",\"redirects\":6}\n",
+      "interpretation": "assertions reproduced known findings and controls; not a product-fix pass"
+    },
+    {
+      "probe": "docs/audit/2026-09-12/repro/platform-gateways-17.cjs",
+      "command": "env -i PATH=/opt/homebrew/bin:/usr/bin:/bin /opt/homebrew/bin/node --require ./docs/audit/2026-09-12/repro/server-test-preload-32.cjs docs/audit/2026-09-12/repro/platform-gateways-17.cjs",
+      "exitCode": 0,
+      "output": "{\n  \"counterCases\": [\n    {\n      \"format\": \"rounds\",\n      \"requested\": false,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    },\n    {\n      \"format\": \"rounds\",\n      \"requested\": true,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    },\n    {\n      \"format\": \"upgrade\",\n      \"requested\": false,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    },\n    {\n      \"format\": \"upgrade\",\n      \"requested\": true,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    },\n    {\n      \"format\": \"rotating\",\n      \"requested\": false,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    },\n    {\n      \"format\": \"rotating\",\n      \"requested\": true,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    },\n    {\n      \"format\": \"duplicate\",\n      \"requested\": false,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    },\n    {\n      \"format\": \"duplicate\",\n      \"requested\": true,\n      \"submitted\": \"omitted\",\n      \"stored\": \"omitted\",\n      \"hudEnabled\": true\n    }\n  ],\n  \"settingIdentityCases\": [\n    {\n      \"field\": \"dealMode\",\n      \"unnecessaryConflict\": true,\n      \"thirdAttemptRecovered\": true\n    },\n    {\n      \"field\": \"upgradeTarget\",\n      \"unnecessaryConflict\": true,\n      \"thirdAttemptRecovered\": true\n    },\n    {\n      \"field\": \"teamRotation\",\n      \"unnecessaryConflict\": true,\n      \"thirdAttemptRecovered\": true\n    },\n    {\n      \"field\": \"rotatingScoring\",\n      \"unnecessaryConflict\": true,\n      \"thirdAttemptRecovered\": true\n    }\n  ],\n  \"sameSettingsRetryControl\": true,\n  \"concurrent401PostCases\": 24,\n  \"loginCalls\": 1,\n  \"clearCalls\": 1,\n  \"xhrCases\": 5,\n  \"boundary\": \"in-memory HTTP/service/store/HUD ports; no real auth, signature, Cocos rendering or WeChat request\"\n}\nAUDIT32_SOURCE={\"entry\":\"platform-gateways-17.cjs\",\"redirects\":1}\n",
+      "interpretation": "assertions reproduced known findings and controls; not a product-fix pass"
+    },
+    {
+      "probe": "docs/audit/2026-09-12/repro/tournament-progression-11.mjs",
+      "command": "env -i PATH=/opt/homebrew/bin:/usr/bin:/bin /opt/homebrew/bin/node --require ./docs/audit/2026-09-12/repro/server-test-preload-32.cjs docs/audit/2026-09-12/repro/tournament-progression-11.mjs",
+      "exitCode": 0,
+      "output": "{\n  \"tournamentProgress11\": {\n    \"rosterPermutations\": 256,\n    \"uniquePairsPerRoster\": 72,\n    \"roundCompletionOrderCases\": 72,\n    \"completionTransitions\": 288,\n    \"finalCheckInFailureRecovery\": true,\n    \"repeatedLastCheckIns\": 8,\n    \"lastJoinFailures\": 3,\n    \"lastResultFailures\": 3,\n    \"ticketRenewals\": 3,\n    \"rehydrations\": 3,\n    \"realServiceTerminalFixtures\": 12,\n    \"resultAttemptsPerFixture\": 12,\n    \"persistedPlayerRoundRows\": 48,\n    \"finalQualifiedPlayers\": 8,\n    \"withdrawalFailureRecovery\": true\n  }\n}\n{\n  \"tournamentClosure11\": [\n    {\n      \"firstClosedTable\": 1,\n      \"acceptedClosures\": 1,\n      \"rejectedClosures\": 3,\n      \"staleActiveUsers\": 12,\n      \"retriesAndRehydrationStillRejected\": true\n    },\n    {\n      \"firstClosedTable\": 2,\n      \"acceptedClosures\": 1,\n      \"rejectedClosures\": 3,\n      \"staleActiveUsers\": 12,\n      \"retriesAndRehydrationStillRejected\": true\n    },\n    {\n      \"firstClosedTable\": 3,\n      \"acceptedClosures\": 1,\n      \"rejectedClosures\": 3,\n      \"staleActiveUsers\": 12,\n      \"retriesAndRehydrationStillRejected\": true\n    },\n    {\n      \"firstClosedTable\": 4,\n      \"acceptedClosures\": 1,\n      \"rejectedClosures\": 3,\n      \"staleActiveUsers\": 12,\n      \"retriesAndRehydrationStillRejected\": true\n    }\n  ]\n}\nAUDIT32_SOURCE={\"entry\":\"tournament-progression-11.mjs\",\"redirects\":4}\n",
+      "interpretation": "assertions reproduced known findings and controls; not a product-fix pass"
+    },
+    {
+      "probe": "docs/audit/2026-09-12/repro/result-roster-08.mjs",
+      "command": "env -i PATH=/opt/homebrew/bin:/usr/bin:/bin /opt/homebrew/bin/node --require ./docs/audit/2026-09-12/repro/server-test-preload-32.cjs docs/audit/2026-09-12/repro/result-roster-08.mjs",
+      "exitCode": 0,
+      "output": "{\n  \"resultRoster08\": [\n    {\n      \"reuseSeat\": false,\n      \"ordinaryControlAccepted\": true\n    },\n    {\n      \"reuseSeat\": true,\n      \"issue\": \"PR-08-001\",\n      \"actualP2\": \"u1\",\n      \"staleCollision\": [\n        {\n          \"userId\": \"u1\",\n          \"status\": \"playing\"\n        },\n        {\n          \"userId\": \"u4\",\n          \"status\": \"cancelled\"\n        }\n      ],\n      \"rejectedRetries\": 2,\n      \"activeOnlyCounterfactualAccepted\": true\n    },\n    {\n      \"scenario\": \"observer-at-boundary\",\n      \"leftOffsetFromLeaseMs\": 300000,\n      \"bothEventsAccepted\": true\n    },\n    {\n      \"scenario\": \"observer-after-boundary\",\n      \"issue\": \"PS-08-001\",\n      \"lobbyLeaseMs\": 1800000,\n      \"leftOffsetFromLeaseMs\": 300001,\n      \"runtimeObserverRemoved\": true,\n      \"platformObserverRetained\": true,\n      \"nextPlayDeliveryBlocked\": true,\n      \"rejection\": \"FRIEND_SEAT_EVENT_AFTER_LEASE\"\n    }\n  ]\n}\nAUDIT32_SOURCE={\"entry\":\"result-roster-08.mjs\",\"redirects\":3}\n",
+      "interpretation": "assertions reproduced known findings and controls; not a product-fix pass"
+    }
+  ],
+  "manualAcceptance": {
+    "count": 32,
+    "executed": 0,
+    "rows": [
+      {
+        "id": "M01",
+        "environment": "发布候选与设备",
+        "steps": "记录客户端包hash、服务端版本、设备/微信/基础库；开发者工具清缓存重编译后，冷启动与后台唤醒各3次。",
+        "expected": "game.json/分包正常；无本地或未批准域名；最终包确实包含待验修复。",
+        "status": "待构建＋真机",
+        "issues": "BUILD-03-001"
+      },
+      {
+        "id": "M02",
+        "environment": "单机手机／账号",
+        "steps": "首次进入；已有资料进入；拒绝/取消微信资料授权；授权后重入；自主改昵称和头像。",
+        "expected": "随机资料与真实账号绑定一致；取消不阻断游戏、不假称已授权；保存成功才更新，失败可重试。",
+        "status": "待真机",
+        "issues": "LP-19-001"
+      },
+      {
+        "id": "M03",
+        "environment": "双账号好友排行",
+        "steps": "两个有同小游戏数据的测试账号写入综合分后打开好友榜；权限拒绝、空榜、刷新后再进入。",
+        "expected": "只展示平台允许的数据；自己的分数与服务端一致；空/失败可理解，无全量好友读取承诺。",
+        "status": "待微信开放域",
+        "issues": "—"
+      },
+      {
+        "id": "M04",
+        "environment": "经典三入口",
+        "steps": "分别进入经典、不洗牌、连打过A；核开局级数、轮数、发牌规则摘要。",
+        "expected": "经典/不洗牌单副随机级；连打过A按升级流程；不洗牌偏多炸但牌数守恒，不以必然六手验收。",
+        "status": "待真机",
+        "issues": "—"
+      },
+      {
+        "id": "M05",
+        "environment": "匹配与取消",
+        "steps": "开始匹配→取消→马上重试；等待补位；匹配成功同时点返回；切后台再回来。",
+        "expected": "牌桌内等待反馈；同一意图不建多房；取消不误退已经确认的牌局；失败可重试。",
+        "status": "待双端联调",
+        "issues": "SE-05-001"
+      },
+      {
+        "id": "M06",
+        "environment": "四人好友房设置",
+        "steps": "定局/升级/转蛋分别创建；每次改一项，尤其记牌器关、显示比分、时限、发牌；退回再恢复。",
+        "expected": "请求、平台存储、牌桌规则摘要和真实行为一致，false不能变默认true；改规则是新创建意图。",
+        "status": "已知缺陷，修复后验",
+        "issues": "PG-17-001、PG-17-002"
+      },
+      {
+        "id": "M07",
+        "environment": "邀请／六位房号",
+        "steps": "微信分享给测试账号；从卡片冷启动/热启动入房；从房号弹窗加入；输入错误/满房/失效房号。",
+        "expected": "进入对应房间按空位顺序落座；失败提示明确；不出现复制粘贴完整口令页。",
+        "status": "待两台手机",
+        "issues": "PF-06-001"
+      },
+      {
+        "id": "M08",
+        "environment": "四席与八席等待页",
+        "steps": "房主在每个空位添加机器人；普通成员尝试同操作；坐下换座；进入观战位再坐下；解散重建。",
+        "expected": "房主权限生效；席位、准备与队伍一致；观战腾出座位；重复点按不占两个位置。",
+        "status": "待多人联调",
+        "issues": "PF-06-001、SD-04-002"
+      },
+      {
+        "id": "M09",
+        "environment": "普通/叠牌触摸",
+        "steps": "27张平排/多组叠牌；从左中右触点滑选；取消最上牌；选部分/整组；别人出牌时继续选。",
+        "expected": "从触点开始；选中牌整体变灰；普通预选不会被别人动作清掉，锁组只能整组选取。",
+        "status": "待真机触摸",
+        "issues": "CI-05-001"
+      },
+      {
+        "id": "M10",
+        "environment": "理牌与锁牌",
+        "steps": "满手首次一键理牌、复原各30次；锁定合法普通顺子/其他组合再理牌；选已锁组恢复。",
+        "expected": "简单规则理牌；普通顺子交给手动锁牌；没有自动回流复杂搜索；成员守恒、锁组原子选择、名称/高亮准确。记录点击反馈与完整呈现耗时。",
+        "status": "待低性能手机",
+        "issues": "UI-25-002、HAND-26-001"
+      },
+      {
+        "id": "M11",
+        "environment": "权威动作与旧手势",
+        "steps": "按住一张牌未抬手时触发本人超时动作/托管；随后抬手或等待长按。再做他人动作对照。",
+        "expected": "本人权威清理后的旧手势不能重新选牌；他人动作仍允许正常预选；不能额外提交出牌。",
+        "status": "已知缺陷，修复后验",
+        "issues": "CI-05-001"
+      },
+      {
+        "id": "M12",
+        "environment": "牌型规则专用测试房",
+        "steps": "用仅测试环境固定牌验证5张炸弹、同花顺、6张炸弹；A2345；红心配与王；红心配组成点数对子。",
+        "expected": "5张炸弹＜同花顺＜6张炸弹；红心配不能替王；配牌对子播正确点数女声；合法牌不会丢失。",
+        "status": "待隔离测试房＋听测",
+        "issues": "HAND-26-001"
+      },
+      {
+        "id": "M13",
+        "environment": "同花顺指示器／记牌器",
+        "steps": "本手无同花顺；公开出牌逐步消耗某花色；普通级牌形成断点；红心配已用尽；其他人都不足5张。",
+        "expected": "组件不消失，4花色无可能时全灰；记牌器只依据公开库存估计可能性，不读取对手暗牌。",
+        "status": "已知缺陷，修复后验",
+        "issues": "HAND-26-002"
+      },
+      {
+        "id": "M14",
+        "environment": "提示／托管／机器人",
+        "steps": "弱牌、强牌、队友冲刺、两名敌人各≤10张等场景，分别请求提示/主动托管/机器人行动。",
+        "expected": "采用同一最高档公开信息策略；合法牌、对家头游目标；不把有限场景胜率当必胜。常规思考范围0.5–3秒、约10%三倍，deadline可缩短。",
+        "status": "待实战＋隔离统计",
+        "issues": "RP-13-001"
+      },
+      {
+        "id": "M15",
+        "environment": "倒计时",
+        "steps": "最后5秒连续点选/取消选牌；切后台再恢复；到时自动出牌；主动取消托管。",
+        "expected": "秒数以服务端deadline为准；最后5秒音效不漏不重复；无“服务器已自动处理”打断式弹窗。",
+        "status": "已知缺陷，修复后听测",
+        "issues": "CTL-06-001"
+      },
+      {
+        "id": "M16",
+        "environment": "贡／还／抗贡",
+        "steps": "连续升级到单贡/双贡/抗贡；贡牌方与还牌方分别一键理牌、锁组并确认。",
+        "expected": "贡还候选受规则限制；还牌方显示确认还牌；信息在对家下方不挡按钮；交换后牌张总数正确。",
+        "status": "待四端联调",
+        "issues": "CORE-CONTRACT-06-001"
+      },
+      {
+        "id": "M17",
+        "environment": "小局与整场结算",
+        "steps": "完成小局→四人依次准备；完成终场→所有人退出/掉线；重进同一结算。",
+        "expected": "小局待齐才开；终场不继续发牌；再来一场一行且可点；重复恢复不重复统计/积分。",
+        "status": "已知缺陷，修复后验",
+        "issues": "SL-02-001、CS-01-002"
+      },
+      {
+        "id": "M18",
+        "environment": "换座后的终场",
+        "steps": "升级房：成员离席、替补入席再离席、旧成员重新加入，再完成整场。",
+        "expected": "当前四名实际参赛者结果被接受，各计一次；历史离席者不覆盖当前席位或入账。",
+        "status": "已知缺陷，修复后验",
+        "issues": "PR-08-001"
+      },
+      {
+        "id": "M19",
+        "environment": "转蛋连续三局",
+        "steps": "随机抽牌、顺时针两种各打3局；至少1机器人＋1真人托管；第二局切后台/恢复。",
+        "expected": "队伍跟当前席序变化；机器人/托管持续出牌不异常关房；3分制±3/±2/±1，6分制6:0/5:1/4:2累计到个人。",
+        "status": "已知缺陷，修复后验",
+        "issues": "RP-13-001"
+      },
+      {
+        "id": "M20",
+        "environment": "八人复式正常流程",
+        "steps": "8账号两桌，固定2/共同随机级各一场；核同牌/先手、A先结束→看B、B结束→全部准备。",
+        "expected": "两桌同副牌与级数，按实际同位置配牌；各桌完成后才推进；胜方3/2/1、负方0，红蓝累计；不提前泄漏另一桌手牌。",
+        "status": "已知缺陷，修复后8端验",
+        "issues": "CS-01-001、FR-21-001"
+      },
+      {
+        "id": "M21",
+        "environment": "复式重连与尺寸变化",
+        "steps": "复式掉线重连；本桌结束后切另桌；横屏宽→窄→宽；房主解散后原连接加入新房。",
+        "expected": "有效身份恢复；跨桌按钮始终可见；旧牌随视角重排；同连接首次入新房成功。",
+        "status": "已知缺陷，修复后验",
+        "issues": "SD-04-001、SD-04-002、FR-21-002、UI-25-001"
+      },
+      {
+        "id": "M22",
+        "environment": "实时／延迟观战",
+        "steps": "各建实时/延迟一局房，连续打3局；观战者切座位；测试长局超过开房租约后退出。",
+        "expected": "实时只见规则授权信息；延迟第二局看到首局、不出现当前局；退出后后续公开事件不堵塞。",
+        "status": "已知缺陷，修复后验",
+        "issues": "SA-01-001、PS-08-001"
+      },
+      {
+        "id": "M23",
+        "environment": "本人出完及10张阈值",
+        "steps": "本人出完牌→进入队友视角；其他人余牌11→10→9；队友也出完，等待终局。",
+        "expected": "只切至服务端授权视角；10张阈值针对公开余牌信息，不因阈值直接暴露对手牌面；不能代操队友。",
+        "status": "待真机＋权限联调",
+        "issues": "UI-25-001"
+      },
+      {
+        "id": "M24",
+        "environment": "投票解散及失败重试",
+        "steps": "发起解散；一人断线重进；同意/拒绝时模拟发送失败；超时过期再申请。",
+        "expected": "票态恢复pending；发送失败有重试入口；原投票按时结束，新投票不被旧timer清理。",
+        "status": "已知缺陷，修复后验",
+        "issues": "SL-02-002、SP-03-001、UI-27-002"
+      },
+      {
+        "id": "M25",
+        "environment": "持久化故障，限预发布",
+        "steps": "只在独立测试数据目录对开局/终场/关闭的第1和第2保存点注入失败；另房同时操作。",
+        "expected": "恢复后完成完整事务；未提交不广播成功；其他房回执不被回滚；无悬挂身份或closing墓碑占活动额度。",
+        "status": "已知缺陷，待隔离环境",
+        "issues": "SE-05-001、SP-03-002、SD-04-001、SD-04-003"
+      },
+      {
+        "id": "M26",
+        "environment": "十六人赛事正常流程",
+        "steps": "16个测试账号报名、取消报名、再报、检录；完成3轮，每轮4桌单副随机级。",
+        "expected": "三轮换桌正确；个人头/二/三/末3/2/1/0；最终前8仅标记晋级，不自动淘汰赛；自动刷新与按钮布局正常。",
+        "status": "待16端／预发布",
+        "issues": "LP-28-001"
+      },
+      {
+        "id": "M27",
+        "environment": "十六人赛事异常流程",
+        "steps": "在独立测试赛中让首桌异常关闭，再让其余3桌依次/并发关闭并重试回调。",
+        "expected": "赛事暂停保留首因；已分配4桌全部收尾、16人释放，成绩不重复；所有人可重新匹配。",
+        "status": "已知缺陷，修复后验",
+        "issues": "TO-11-001"
+      },
+      {
+        "id": "M28",
+        "environment": "大厅和回放生命周期",
+        "steps": "资料同步时进入赛事/个人中心再返厅；回放播放中后台→前台；入场同时长按按钮。",
+        "expected": "当前菜单同步完成；回放按钮为播放且不自动启动；长按反馈不被入场动画覆盖。",
+        "status": "已知缺陷，修复后验",
+        "issues": "LP-19-001、RP-19-001、UI-22-001"
+      },
+      {
+        "id": "M29",
+        "environment": "画面与触控安全区",
+        "steps": "至少小/中/大横屏各1台；开弹窗后改变尺寸；满27张最高叠组、选中状态、双方出牌、贡还、结算截图。",
+        "expected": "方框/小圆角统一，关键字/数字/点击区不遮挡；对家资料与出牌位置合理；交叠报告仍为告警，不强制挤散牌桌。",
+        "status": "待截图与触控验收",
+        "issues": "UI-27-001、FR-21-002"
+      },
+      {
+        "id": "M30",
+        "environment": "女声音效与取消",
+        "steps": "正常报牌/配牌对子/钢板/倒计时；加载中和已播放时离桌、静音、销毁；再进入。",
+        "expected": "该取消的短音效停止，旧语音不串场；女声一致；男声、快捷语、级牌专属音效不回流。",
+        "status": "已知缺陷，修复后听测",
+        "issues": "AUDIO-15-001、CTL-06-001"
+      },
+      {
+        "id": "M31",
+        "environment": "资源失败恢复",
+        "steps": "独立测试端让头像/背景第一次失败或超时，恢复资源服务后再渲染或入桌。",
+        "expected": "失败可重试、成功缓存复用；旧加载不能覆盖新场景；不会长期留兜底头像/大厅背景。",
+        "status": "已知缺陷，修复后验",
+        "issues": "RESOURCE-06-001、RESOURCE-27-001"
+      },
+      {
+        "id": "M32",
+        "environment": "测试和实际交付包",
+        "steps": "修复前失败对照、修复后回归；串行Cocos构建；核主分包清单、生成源、退役资源、版本与域名；最后微信上传预览。",
+        "expected": "测试不改真实数据；新包与当前源有manifest/hash对应；无实验室/快捷语/男声/复制口令页。在线依赖核验和权利材料单独归档。",
+        "status": "待修复＋构建＋授权发布",
+        "issues": "TEST-32-001、BUILD-03-001、DOC-39-001"
+      }
+    ]
+  },
+  "dependencyBoundary": {
+    "locked": 69,
+    "localMetadataUnique": 46,
+    "localMetadataCopies": 47,
+    "absentOptional": 23,
+    "officialVersionMatch": "DEPENDENCY-40-C01",
+    "fullOnlineAdvisoryVerified": false,
+    "registryAuthenticityVerified": false
+  },
+  "limitations": [
+    "No current Cocos build/upload or production deployment.",
+    "No real WeChat authorization/share/open-data/phone interaction/audio/performance.",
+    "No 8/16-phone full match acceptance.",
+    "No full 69-package online advisory sweep, tarball/signature authenticity, 23 optional license review or media rights chain.",
+    "Boundary checks are not full supplier source review; 51 historical docs targeted excerpts and 6 text snapshots archive only."
+  ],
+  "deliverables": [
+    "FINAL_REPORT.md",
+    "REMEDIATION_PLAN.md",
+    "MANUAL_ACCEPTANCE.md",
+    "CROSS_MODULE_REVIEW.md"
+  ]
+}

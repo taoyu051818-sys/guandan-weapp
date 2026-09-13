@@ -1,0 +1,134 @@
+{
+  "batch": "build-release-03",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/build-templates/.wechatgame",
+      "sha256": "aa7a40502a30690713afa6339435aea30b497bf62170a703202787b7d8d4c022",
+      "lines": 3,
+      "notes": "完整审阅3行：Creator微信模板版本3.8.8；配置本身无逻辑，实际编辑器/构建一致性仍属发布验收。"
+    },
+    {
+      "path": "work/guandan-cocos/build-templates/web-desktop/index.ejs",
+      "sha256": "85c78367c3f3c45963a08272f2748d6413bb69f9b063f7285881c57d51d8433c",
+      "lines": 36,
+      "notes": "完整审阅36行：canvas容器、polyfill/system/application加载顺序与全局错误提示；模板边界检查，不做界面视觉验收。"
+    },
+    {
+      "path": "work/guandan-cocos/build-templates/wechatgame/game.ejs",
+      "sha256": "ebdc1f4384aee19545dea6fcc13e137bb3b58ea682c341174f2decf5ed271595",
+      "lines": 120,
+      "notes": "完整审阅120行：正式域名默认值、平台标记先于adapter、首屏释放再启动引擎、微信系统信息/尺寸适配、失败捕获；同步平台API实际可用性待真机。"
+    },
+    {
+      "path": "work/guandan-cocos/ops/guangzhou/guandan-game.service",
+      "sha256": "08ed3c667ee7838e5a53944f1f313fe3db80a3c214af17dbe5b2f3097e91f8c6",
+      "lines": 24,
+      "notes": "完整审阅24行：非root服务用户、显式EnvironmentFile/WorkingDirectory/ExecStart、Restart与加固、仅数据目录可写；未读取部署私密env或远程systemd实态。"
+    },
+    {
+      "path": "work/guandan-cocos/ops/guangzhou/guandan-platform.service",
+      "sha256": "8b4635787af1b8be565601132f59bd57819cd671cb36f052699d1a3d705b821b",
+      "lines": 24,
+      "notes": "完整审阅24行：平台服务独立入口、最小可写数据路径、重启与隔离参数；静态配置不是线上状态证明。"
+    },
+    {
+      "path": "work/guandan-cocos/ops/guangzhou/guandan.nginx.conf",
+      "sha256": "0c703e90a547abcf4c7eea537bba016739e57c89a1d619905fdde815ef089d7a",
+      "lines": 35,
+      "notes": "完整审阅35行：websocket升级、/guandan/API代理顺序、内部API拒绝与长连接超时；父级TLS/请求体限制未知，不据片段判定漏洞。"
+    },
+    {
+      "path": "shared-core/package.json",
+      "sha256": "10a7cb9840592c150d37b1c2fcaadb755631ec2f5bc54532427f1a45d3defab2",
+      "lines": 17,
+      "notes": "完整审阅17行：私有共享核心包、dist导出、受限清理/编译/检查/回归命令与TypeScript开发依赖。"
+    },
+    {
+      "path": "shared-core/tsconfig.json",
+      "sha256": "d63d7355458c1eb5edcca7af00e2f3fdf39f3ab73166212ead3f839a6499c823",
+      "lines": 15,
+      "notes": "完整审阅15行：ES2020/CommonJS严格类型、src根到dist声明产物；编译目标范围清晰。"
+    },
+    {
+      "path": "work/guandan-cocos/package.json",
+      "sha256": "83cade4377e65eda602caa0de302f6900ce73fd089bc7bfccf5364e0ca7138f1",
+      "lines": 90,
+      "notes": "完整审阅90行：76条脚本构建、CI、架构、发布与退休校验接线；完整Cocos产物验证与纯CI区别，直接node脚本入口存在。"
+    },
+    {
+      "path": "work/guandan-cocos/tsconfig.json",
+      "sha256": "55c315100eca062209e6b9927d67978bf3da7119aff69a82c7a27486a2030bda",
+      "lines": 11,
+      "notes": "完整审阅11行：依赖Creator temp/tsconfig.cocos.json、严格模式与exclude；普通fresh checkout不能取代引擎生成配置。"
+    },
+    {
+      "path": "work/guandan-windows-source/package.json",
+      "sha256": "592ea2f88d56590c69aaa14d2ae58a4c444d9fbc628c8e90f5cd183f1e3197d7",
+      "lines": 30,
+      "notes": "完整审阅30行：18条服务端脚本、pretest共享核心重建、独立lint/check入口及Node>=22约束；未执行start/deploy。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/runtime-client-config.mjs",
+      "sha256": "5b807c33fd8529dab661597c2dc74218925056217cc0a387eef6556a5c1f81f1",
+      "lines": 129,
+      "notes": "完整审阅129行：正式/裸IP测试开关、配置注入/提取和严格微信域策略；确认BUILD-03-001构建/运行时路径校验不同。未使用replaceOrInsert私有helper仅记残留，不单独报产品缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/verify-wechat-build.mjs",
+      "sha256": "566db896d8ed36a602fff29bb2a13a210089f96e5845a74d2c49e27d64a6909a",
+      "lines": 154,
+      "notes": "完整审阅154行：AppID/合法域名开关、资源域/分包/包体/退役标记及交付脚本冒烟；默认检查有清晰边界，未执行真实构建包校验。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/finalize-wechat-build.mjs",
+      "sha256": "65e01d45652028e60020dde05a570b1b54625e74824fc26daca2b2a35fc72eb2",
+      "lines": 33,
+      "notes": "完整审阅33行：模板默认值->环境覆盖->配置注入->读取校验->开放域打包；--check不注入，但与运行时路径策略脱节见BUILD-03-001。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/wechat-built-startup.cjs",
+      "sha256": "3138d4887197b6ab735571847c94aab5e3404e85fe67344daa6594ce044ba491",
+      "lines": 98,
+      "notes": "完整审阅98行：交付System.register模块、屏幕触摸坐标、启动/恢复存根测试；config是fixture而非提取实际game.js，无法覆盖嵌入配置不一致。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "BUILD-03-001",
+      "severity": "P3",
+      "title": "微信构建门禁接受运行时会拒绝的路径，冒烟使用固定地址未覆盖嵌入配置",
+      "path": "work/guandan-cocos/scripts/runtime-client-config.mjs",
+      "line": 73,
+      "evidence": "构建侧校验解析后的协议/host，但路径仅按原始字符串/guandan前缀判断。/guandan/../other、/guandan/%2e%2e/other与/guandan/%2fweapp均通过；实际RuntimeClientConfig->WechatNetworkPolicy拒绝。finalize-wechat-build.mjs:18/30与verify-wechat-build.mjs:87复用此门禁。wechat-built-startup.cjs:9-24使用有效固定config，不读取交付game.js的配置。",
+      "validation": "node docs/audit/2026-09-12/repro/build-config-03.cjs 对实际构建helper和当前TS运行时重复3例，buildAccepted=true/runtimeRejected=true；当前模板默认配置双方均通过。没有构造或运行完整坏包/真实微信端。",
+      "impact": "仅在发布环境误配相应路径时，配置门禁可能显示成功但启动失败；现有默认URL正常，运行时拒绝仍然有效，不是绕过域名限制发起请求。",
+      "recommendation": "统一构建/运行时端点路径策略，增加穿越/编码路径对照测试；交付启动冒烟使用从实际game.js提取的配置，不以固定fixture替代。"
+    }
+  ],
+  "concerns": [
+    {
+      "id": "BUILD-03-BOUNDARY",
+      "severity": "verification-gap",
+      "title": "包配置与构建模板审阅不等于实际发布/线上一致性验收",
+      "evidence": "未运行Cocos构建或finalizer写入；未读取生产env/数据/远程配置；nginx仅片段，systemd静态版本不能推断线上实态。",
+      "status": "留待完整包体/发布边界专项与真机人工清单。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "node docs/audit/2026-09-12/repro/build-config-03.cjs",
+      "result": "passed; three build/runtime mismatch cases reproduced, defaults valid"
+    },
+    {
+      "command": "node tests/runtime-platform-config-regression.cjs",
+      "cwd": "work/guandan-cocos",
+      "result": "passed"
+    },
+    {
+      "command": "read-only direct node script path audit",
+      "result": "shared-core 4 / cocos 76 / server 18 scripts examined, detected direct node file entries all exist; not full shell command semantics"
+    }
+  ]
+}

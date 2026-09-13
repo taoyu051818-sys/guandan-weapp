@@ -1,0 +1,89 @@
+{
+  "batch": "image-geometry-20",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/ProfileImagePicker.ts",
+      "sha256": "e670688697dc8ed03f7011166daccfda4d23eaf9083dc8f5e6fca0754387fed4",
+      "lines": 53,
+      "notes": "完整53行。核显式隐私/相册选择、取消/失败、Web文件10MiB门禁、15秒解码超时、40MP尺寸门禁、256方形居中裁剪/白底/JPEG0.75和88000字符上限、Web blob回收。33个内存图像/错误场景通过；没有真实解码/压缩质量或巨图峰值内存测量。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/DefaultProfileCatalog.ts",
+      "sha256": "56692da27bee1c77bbbd760aa2815e6c50fb05314cb2f9ceb2b9540788b899f0",
+      "lines": 123,
+      "notes": "完整123行，核24项name/avatarUrl/asset目录白名单映射和唯一ID；与服务端tracked catalog字段映射一致，24源图与打包源图SHA256一致。是现有副本一致性，不代表50项都采集成功或肖像/来源授权；未联网获取QQ资料。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/SafeAreaLayout.ts",
+      "sha256": "6e561444fa730c66ab8bab781ec1d2dbf3f3e18a34b4b8b05e20474501096bac",
+      "lines": 176,
+      "notes": "完整176行。核低优先级先缩后隐藏、保留视觉顺序、可保护项最终压缩、矩形优先级/可选轴搜索/夹边/可隐藏策略。500组足够容纳最小像素的横排和矩形fixture通过；保护项空间不足允许相互重叠属显式策略，不宣称任意零宽/极窄区域均无溢出。横排当前实际只见测试/旧契约引用，不制造活动业务缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/ScreenAdapter.ts",
+      "sha256": "67d53694cb95b6e43f9a192e1ff927c8933c73ee328bb6f4dcecdcfddcfd8707",
+      "lines": 59,
+      "notes": "完整59行。核enable/disable按对象解绑、设计坐标与中心坐标/inset转换、Wechat原生控件边界、viewport发布与UITransform尺寸。Cocos3.8.8实装sys.getSafeAreaRect源码返回设计分辨率单位，与这里一致，默认对称保守安全区。16尺寸/inset+绑定周期通过；不是设备safeArea API准确性验证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/UiFrameStyle.ts",
+      "sha256": "9e8d5511fe7ab42aaf7d49d5cdb536eadd527aef88c657eec0d2f2f642e731b7",
+      "lines": 36,
+      "notes": "完整36行。核冻结5种统一角半径、有限正尺寸/scale兜底、上限短边20%、绘制只追加path不改hit范围；2500额外几何组合与既有实际factory回归通过。纯绘制几何不包办主题/路由职责。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableButtonMetrics.ts",
+      "sha256": "93af26290eef320a5964d70d288fc111acb72df2d356793389c122e25f95455b",
+      "lines": 6,
+      "notes": "完整6行。核按钮高/字号1.2比例和Unicode宽度估算、主次最小宽度。设计单位高度69.6，7文案×主次正宽通过；不是微信物理像素或所有消费者确实使用统一高度的全库证明。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/RuntimeUiFactory.ts",
+      "sha256": "12eeae302ead0d2e90d109c6b05823ff4709c3fa0c8b8733f3017ddf7f6a3618",
+      "lines": 338,
+      "notes": "完整338行。核统一文字/底框/按钮/按下取消/disabled/输入、保留自定义宽高、异步图片节点有效性与帧缓存；frame现有回归通过。发现new tween.stop只影响新实例，待实际Tween调度和可见影响验证，记UI-20-C01，不宣称门禁已经停掉同节点旧动画。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/profile-image-picker-regression.cjs",
+      "sha256": "c8c3168145a76834ac061aec33920fc00cd76df175861b5600c2f42cc2cd3bde",
+      "lines": 23,
+      "notes": "完整23行并运行通过。实际picker配fake wx/canvas，覆盖隐私成功/拒绝、取消、中心裁剪/JPEG参数。原测试未覆盖Web资源回收/超时/异常；本批补充33例，仍不是原生相册或真实JPEG效果。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/ui-frame-style-regression.cjs",
+      "sha256": "d6f8d1f4e1b82f1834c52b7146905d4e35049aa65f37caf90c8df63977bee8d4",
+      "lines": 116,
+      "notes": "完整116行并运行通过。实际UiFrameStyle/RuntimeFactory配Cocos存根，覆盖几何、按下/取消/disabled、命中尺寸、shared标签框；全代码roundRect计数+AST禁止局部radius/borderRadius绕过。tween即时写值替身不证明实际停止/并发/缓动持续效果，不能由扫描已过把所有源文件计审。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "UI-20-C01",
+      "title": "按钮反馈创建新Tween再stop，不取消该节点既有Tween",
+      "path": "work/guandan-cocos/assets/scripts/ui/RuntimeUiFactory.ts",
+      "line": 214,
+      "evidence": "RuntimeUiFactory在TOUCH_START/END/CANCEL使用tween(node).stop()。本机Cocos3.8.8 tween.ts中每实例_finalAction初始null，stop:358–365只停止该实例_finalAction；start:329–349也只移除本实例旧action。PageRouter离页另有stopAllByTarget防线。",
+      "status": "确认局部停止机制不等于停止同节点旧Tween，但尚未实测重叠缓动的可见反馈/额外动作后果；不计确认缺陷，不声称真实重复提交/路由抢回。",
+      "next": "在效果/动画批次用真实Tween调度核按钮进入→按下→取消/快速再按的缩放最终态，及延迟onSelect与路由销毁，先证明影响再分级。不能直接stopAllByTarget整个节点而误停其他拥有者动画。"
+    }
+  ],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/profile-image-picker-regression.cjs",
+      "node work/guandan-cocos/tests/ui-frame-style-regression.cjs",
+      "node docs/audit/2026-09-12/repro/image-geometry-20.cjs"
+    ],
+    "result": "2既有测试+探针通过；33图像场景、16ScreenAdapter场景、500横排/矩形样本、2500圆角组合，24默认头像与源哈希一致。",
+    "engineInspection": "只读本机Cocos3.8.8 sys.getSafeAreaRect与Tween.start/stop源码，非引擎文件修改或API联网验证。",
+    "skill": "沿用本轮已读取UI/UX技能核反馈/命中和安全区域；遵守用户不将所有普通区域强制互斥的设计，不修改视觉。"
+  },
+  "limitations": [
+    "9文件完整阅读，共930行；TableHudLayoutPolicy仅消费者辅助读取，未读全不计覆盖。已审sync-default-profiles/WechatCapsule/PageRouter等不重复计数。",
+    "所有图像/相册/浏览器/canvas/计时器/Cocos事件为内存替身，40MP样本是尺寸数值，不是真实大图峰值内存或EXIF剥离实验。",
+    "只读取已跟踪的默认头像作哈希核验，没有读取用户照片、联网/上传、运行有写入效果的同步脚本或构建。",
+    "UI-20-C01独立候选，不与AUDIO-15-001等不同所有者的生命周期缺陷混合。产品行为和原有改动保持不变。"
+  ]
+}

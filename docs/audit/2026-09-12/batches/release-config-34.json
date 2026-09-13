@@ -1,0 +1,186 @@
+{
+  "batch": "release-config-34",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/.creator/default-meta.json",
+      "sha256": "a055ea392102c3878e736c95d7ed508a5a360ebc5107cf8080e748b7a55f6f34",
+      "lines": 12,
+      "notes": "完整12行。默认贴图linear过滤/包围方式为导入默认值，不覆盖单份.meta；未混同于像素资源或现有包设置。"
+    },
+    {
+      "path": "work/guandan-cocos/profiles/v2/packages/web-desktop.json",
+      "sha256": "fa264e808cf2a021f4a6c230e2799f289256b9c19870980ef7d40f82be1f3ba8",
+      "lines": 33,
+      "notes": "完整33行。网页任务使用1280×720与webgl，async polyfill启用；webGPU不启用。只核源码配置，未运行构建。"
+    },
+    {
+      "path": "work/guandan-cocos/profiles/v2/packages/wechatgame.json",
+      "sha256": "ce20b4d541b57ffd60065c748ccd9309f2feca862cabe1cf0a2c750c339f29ab",
+      "lines": 90,
+      "notes": "完整90行。当前微信任务landscapeRight、非远程、非高性能/独立引擎、非debug/sourcemap；旧任务orientation历史不是当前覆盖。appid为公开标识，无读取密钥。"
+    },
+    {
+      "path": "work/guandan-cocos/settings/v2/packages/builder.json",
+      "sha256": "f7fe1ff37b6cddadfcbac811efb4d884fb70afa1589cd24c7aabdd50bef354cd",
+      "lines": 39,
+      "notes": "完整39行。bundleConfigID与assets/game-assets.meta对应；wechat小游戏game-assets为subpackage，非remote。辅助读取已有包settings，确认其仅为旧产物边界，未声称源包新鲜。"
+    },
+    {
+      "path": "work/guandan-cocos/settings/v2/packages/cocos-service.json",
+      "sha256": "887672669553d26fa832248265b2f2197a66c0e295a16d8a82bf9be9d1ab4e89",
+      "lines": 23,
+      "notes": "完整23行。Cocos服务UNKNOW/空services，与项目实际自有平台/微信运行接口区分；不把未启用Cocos服务认作联机故障。"
+    },
+    {
+      "path": "work/guandan-cocos/settings/v2/packages/device.json",
+      "sha256": "93af91e0b90038cedc84d08651f845e1c2e2ae460321c19f083c27a178e451f8",
+      "lines": 3,
+      "notes": "完整3行。设备配置对象为空，没有注入远程地址或用户数据。"
+    },
+    {
+      "path": "work/guandan-cocos/settings/v2/packages/engine.json",
+      "sha256": "451eb89291eb38eb1f727b7ed124503aa4f6f24b27ba9e64454e3d0b5bd20fc6",
+      "lines": 216,
+      "notes": "完整216行。显式includeModules共12项；Spine/DragonBones/粒子/3D等不在活动集合，不能由cache的spine-3.8局部true推断恢复骨骼。引擎websocket关闭不等于JS/wx socket被禁用。"
+    },
+    {
+      "path": "work/guandan-cocos/settings/v2/packages/information.json",
+      "sha256": "9ba933499d0b8c3790aadbf7e9bca2968314226e0a77259e3e37b85344ad7f78",
+      "lines": 23,
+      "notes": "完整23行。表单权限提示和开屏配置是编辑器记录，不能作为素材/许可完成证明；实际发布资格仍需平台/引擎验收。"
+    },
+    {
+      "path": "work/guandan-cocos/settings/v2/packages/program.json",
+      "sha256": "d914f9f19ffe02724337936d8c7907798c8666566902b78243eb1aa8da0baedd",
+      "lines": 3,
+      "notes": "完整3行。程序配置无额外编译钩子/端点；与TS编译版本/锁文件联合核对。"
+    },
+    {
+      "path": "work/guandan-cocos/settings/v2/packages/project.json",
+      "sha256": "a86ca200fb31ef2fa7fce6d89e9a3d776af9ab5155606396063d52ab46476531",
+      "lines": 15,
+      "notes": "完整15行。设计分辨率1280×720与质量选项；未改安全区/布局，也不把分辨率设置当真机渲染证明。"
+    },
+    {
+      "path": "work/guandan-cocos/ops/guangzhou/activate-server-variants.sh",
+      "sha256": "7301a83b912bc6c4e48fd659d1a29103e9aba683d8ab8d3232817dae683b3113",
+      "lines": 82,
+      "notes": "完整82行。当前发布脚本验证releaseID/hash/归档名称白名单、显式web开关、普通/复式活动局门禁、停止后备份与原代码回滚；默认留存凭据，allow-active需显式参数。仅bash语法/必然早拒绝输入测试，未执行stage/activation。归档成员类型/链接目标不被白名单验证，信任已审且hash确认的操作员归档；回滚代码不自动回滚数据，依赖兼容性。smoke继承环境风险与TEST-32-001同类不另列。"
+    },
+    {
+      "path": "work/guandan-cocos/ops/guangzhou/activate-table-polish.sh",
+      "sha256": "f4aff1c9522636443b3cb714b35eb236b8c5aa92bf83f85cd46461f307ece896",
+      "lines": 60,
+      "notes": "完整60行。较旧发布入口，测试/活动局检查范围比variants小，无归档成员白名单/网络请求显式timeout；文档已推荐variants。仅语法和早拒绝输入测试，不据旧脚本推断当前线上使用或活动复式必被中断；后续整合单一发布入口。"
+    },
+    {
+      "path": "work/guandan-cocos/ops/guangzhou/initialize-production-env.mjs",
+      "sha256": "58c7a6f698f9c619c52b42769f91f1ca59f080c9ac4e2a93ac92f39811fe77ba",
+      "lines": 34,
+      "notes": "完整34行。固定production.env独占600写入；存在即保留，不旋转四密钥。内存FS运行两次只写一次/只生成四次，与真实loadPlatformConfig/loadGameSecurityConfig联合验证。微信凭据来自systemd第二个wechat.env，缺省非缺陷；无真实凭据读取/写入。"
+    },
+    {
+      "path": "work/guandan-cocos/ops/guangzhou/verify-deployment.mjs",
+      "sha256": "fc56171430fa0e997f67b67941e055ec03104399ad3db89a71d52b1d6aee173f",
+      "lines": 63,
+      "notes": "完整63行。四HTTP状态、TLS+WS未知无变更命令与不可信Origin403；合成网络运行全部脚本并验证三个失败对照。未知命令不受mutating requestId类型检查，字符串ID不构成已证实失败。只断言generic error，不覆盖错误码/响应相关性、真实wx.login或四机联机；脚本自身最终提示也限定范围。没有真实网络调用。"
+    },
+    {
+      "path": "work/guandan-windows-source/ops/guangzhou/reset-existing-profiles.mjs",
+      "sha256": "0972a90bb6bbe07481981a3712c45e33b89eaab377078bf35deffb0e3153ff18",
+      "lines": 66,
+      "notes": "完整66行。离线显式reset纯函数保护六个资料字段之外所有状态；CLI备份独占/600/校验/fsync/临时rename/manifest。50合成用户+bot/system2个跳过、dry-run不改、apply备份一致及复用备份拒绝通过。源纯对象不改，坏身份/空库拒绝。停服务前提需人工遵守，不扩展成有事务锁的在线迁移；未读真实库。"
+    },
+    {
+      "path": "shared-core/pnpm-lock.yaml",
+      "sha256": "b889e11d540a4f9112cc59ac863ec314a8e675b91b5a2052065dfc6ec79d9406",
+      "lines": 699,
+      "notes": "完整699行。pnpm9锁，TS4.9.5/Vitest4.1.10/Vite8.2.1工具链；69packages/69snapshots/86依赖边闭合，完整SHA512格式，importer与package specifiers一致。跨平台可选原生binding非默认全装；未安装升级或声称无已知漏洞，供应链/许可证专项另核。"
+    },
+    {
+      "path": "work/guandan-cocos/pnpm-lock.yaml",
+      "sha256": "e3c2b328f40b14fd9580549a0d15ec3103ce6089eeea10e99de4e2ed278aedf4",
+      "lines": 24,
+      "notes": "完整24行。仅typescript4.9.5 dev依赖、1package/1snapshot，锁与manifest一致/完整SHA512格式；不据锁存在声称所有本地安装内容可信。"
+    },
+    {
+      "path": "work/guandan-windows-source/pnpm-lock.yaml",
+      "sha256": "17c814b167307942d3609c7b9d916ceddb85839573ab39baa114e30edb132a1a",
+      "lines": 9,
+      "notes": "完整9行。importer空、无第三方包；与服务器package声明一致。服务器通过Node内置模块/仓库共享核心运行，不把空锁视为缺包。"
+    },
+    {
+      "path": "work/guandan-cocos/scripts/fontconfig-cjk.xml",
+      "sha256": "a3739730c24763a4b7d912b10aefbcb89ba5df63eeeb466cc94afc0858427f48",
+      "lines": 15,
+      "notes": "完整15行。离线文档渲染的本机字体配置，包含macOS/Codex runtime字体位置与tmp缓存；无游戏运行入口。跨机器依赖环境属于工具可移植性边界，未写字体缓存/渲染文档。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "finalChecks": {"reviewedHashes":605,"uniqueIssues":40,"coverage":"605/629","generatedCopies":39,"originalDirtyHashes":"5 unchanged","headUnchanged":true,"audit34TemporaryRoots":0,"inventoryCheck":"passed","gitDiffCheck":"passed"},
+    "commands": [
+      "node docs/audit/2026-09-12/repro/release-config-34.mjs"
+    ],
+    "results": {
+      "environment": {
+        "writes": 1,
+        "independentSyntheticKeys": 4,
+        "secondRunPreserved": true,
+        "realConfigAcceptedWithSeparateWechatEnv": true
+      },
+      "profileReset": {
+        "syntheticUsers": 50,
+        "skipped": 2,
+        "dryRunUnchanged": true,
+        "backupVerified": true,
+        "reusedBackupRejected": true,
+        "originalPureInputUnchanged": true
+      },
+      "locks": [
+        {
+          "dir": "shared-core",
+          "packages": 69,
+          "snapshots": 69,
+          "edges": 86,
+          "manifestSpecifiersMatched": true
+        },
+        {
+          "dir": "work/guandan-cocos",
+          "packages": 1,
+          "snapshots": 1,
+          "edges": 0,
+          "manifestSpecifiersMatched": true
+        },
+        {
+          "dir": "work/guandan-windows-source",
+          "packages": 0,
+          "snapshots": 0,
+          "edges": 0,
+          "manifestSpecifiersMatched": true
+        }
+      ],
+      "shell": {
+        "parseChecks": 2,
+        "earlyInvalidArgumentChecks": 4,
+        "activationExecuted": false
+      },
+      "transportProbe": {
+        "syntheticPass": true,
+        "threeFailureControls": true,
+        "unknownCommandNotSubjectToMutationRequestId": true,
+        "actualNetworkCalls": 0,
+        "limit": "Asserts generic error, not error code, request correlation, real login or gameplay"
+      }
+    },
+    "limitations": [
+      "第一次内存VM在同一个context重复声明target导致探针失败，改为每次独立函数作用域后完整通过；不是产品缺陷，首次失败未计入结果。",
+      "未执行发布、systemctl、SSH、真实HTTP/微信授权、Cocos构建、依赖安装升级或真实资料重置。",
+      "依赖图/完整性字段与配置核验不是CVE、许可证、实际tarball内容或运行包新鲜度证明。",
+      "旧发布脚本及archive链接类型、代码回滚后的数据兼容性需发布流程专项/人工检查；未将前置条件缺失等同当前生产事故。"
+    ]
+  }
+}

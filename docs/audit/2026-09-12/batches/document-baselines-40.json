@@ -1,0 +1,195 @@
+{
+  "batch": "document-baselines-40",
+  "reviewer": "root",
+  "reviewedAt": "2026-09-13",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "scope": "17 complete text-document reads plus structural and rendered historical DOCX review, boundary-only; no extra first-party source coverage",
+  "reviewed": [],
+  "boundaryReviewed": [
+    {
+      "path": "README.md",
+      "sha256": "610ba77a74568a12f9da5a68432e740d698134a6d6a8a8e3aaa24f575581efd6",
+      "category": "documentation-boundary",
+      "group": "active-guides",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "活动总入口说明；经典随机单局与真机/部署边界明确，但赛事筹备中文案过时。"
+    },
+    {
+      "path": "docs/AI_TEAM_FIRST_20260910.md",
+      "sha256": "8bbc6aa140e7e9463a83517d29a34c04140f47dff7ff25f60b34105250727ec5",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "当前团队策略设计说明；最高档、公开牌推断、实际耗时×50和10%三倍、性能非硬实时；首轮跑分是历史比较，不代表线上胜率。转蛋固定队伍缺陷沿用RP-13-001。"
+    },
+    {
+      "path": "docs/ARRANGEMENT_INCREMENTAL_20260910.md",
+      "sha256": "b24596cc9f9106c598ee7e4d8fde7411ef0baa440309b8d11bb82c184c47b2d2",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "全文标明退役的分帧方案与旧CPU测量；当前以simple规则为准。"
+    },
+    {
+      "path": "docs/HAND_ARRANGEMENT_20260910.md",
+      "sha256": "3032db97a82f611f837c93435d78b03150c56d0934bb23126da9d084e9aa23bc",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "全文标明退役的整手评分/搜索/普通顺子方案；跑分不是实战胜率，不把旧参数重新应用。"
+    },
+    {
+      "path": "docs/HAND_LAYOUT_SNAPSHOTS_20260910.md",
+      "sha256": "815d89633a2993e5d802aa74cedb6ca602388f77f5d8603743a5be1c8e4f2187",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "全文标明退役的完整快照预热方案；计时不含Cocos渲染/手机分发。"
+    },
+    {
+      "path": "docs/LEGACY_ISOLATION_20260908.md",
+      "sha256": "b6dc823cfcdd82b34969caeb0f85a245d4f08567dcf8f442849ff13ce31f6b9b",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "历史隔离记录；迁出含依赖体积不等于小游戏减包量。测试fixtures、migration及布局工具保留有明确用途，归档不重新读入或执行。"
+    },
+    {
+      "path": "docs/NO_SHUFFLE_SIX_GROUPS_20260910.md",
+      "sha256": "7bfbf87e84580af882fa2300e25a48edc5ef111983ff461bfe6d11b291246eb3",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "退役六手理牌指标；当前不洗牌发牌仍可保留成组算法，但simple理牌不保证六组。历史服务器数据/健康声明没有重新查询或认作本轮在线证据。"
+    },
+    {
+      "path": "docs/SIMPLE_ARRANGEMENT_RESTORE_20260910.md",
+      "sha256": "b7467dea82634b2287ff347071aeb61797cf10b39a1dce69da8dfdb0d79aed7b",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "当前简单规则：不自动组普通顺子，保留手动锁牌；104手/本机性能有明确非真机界限。原用户最新取舍的依据。"
+    },
+    {
+      "path": "docs/TEAM_POLICY_TUNING_20260910.md",
+      "sha256": "90492779e40e006940533116b5359dbeacf1bf932384bd5f78af564660654f44",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "1216局历史调参结论保持reference；与第38批原始记录核验一致，统计区间不支持全局最优或真人胜率。"
+    },
+    {
+      "path": "docs/TEAM_POLICY_TUNING_PROTOCOL_20260910.md",
+      "sha256": "5eecce64a781dea59f400f5a71c3654fc9e65191456f10c9703675794ca082c5",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "离线三阶段调参协议；训练/复赛/holdout分开，固定种子配对，复杂CPU时间不含真人等待。命令没有执行。"
+    },
+    {
+      "path": "docs/WECHAT_HAND_TOOLS_FIX_20260910.md",
+      "sha256": "9756d1f0f51bf006e5787086ff9f072882064164cff1ca2d412ac1eb56b14331",
+      "category": "documentation-boundary",
+      "group": "strategy-history-and-current-baseline",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "历史微信Map迭代器展开兼容修复说明；源码/成品测试与真机界限明确，旧包hash仅历史，不当现有包版本证明。"
+    },
+    {
+      "path": "work/guandan-cocos/README.md",
+      "sha256": "61271e1cf12f062546f8f6049d23079ef5d930f723f6799aaa0016f67cbcdc3f",
+      "category": "documentation-boundary",
+      "group": "active-guides",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "Cocos活动README；同时出现实验室已删/可用矛盾、赛事筹备中与活动控制器冲突、快捷语旧说明。旧名回归仍存在且分别为退役守卫/测试夹具/迁移契约，不能删除。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/RELEASE_ACCEPTANCE_20260910.md",
+      "sha256": "398f68eac5ee287be423fd063b57ec04158ad2b6320fad351d9683447a8419bd",
+      "category": "documentation-boundary",
+      "group": "active-guides",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "当前用户已有未提交验收表，保留原hash；所有项待测。A08仍约0.5–1.5s，实际普通计划0.5–3s及10%三倍，需更新新验收口径，未动原文件。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/RELEASE_READINESS_20260910.md",
+      "sha256": "ff5cd1a017257bd798ec6328f33caccf3c07b5aba561779b21b1798afa71ccc8",
+      "category": "documentation-boundary",
+      "group": "active-guides",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "发布准备约束：串行重建dist、候选包清单不等于可复现构建、回滚代码不回滚用户数据、真实设备/部署验证待做；本轮不执行文档命令。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/陵水掼蛋牌局音效与动效说明.docx",
+      "sha256": "0780f5489d69358a5ff485bee08788c3c91df34d7ed32469b9e19c260b133fa0",
+      "category": "resource-boundary",
+      "group": "historical-docx",
+      "method": "Full OOXML text/relations inspection and all eight rendered pages visually inspected",
+      "conclusion": "历史DOCX版本2026-08-04；结构全文与8页中文渲染/8张嵌入截图已看。旧P0/实验室/金边/快捷语是历史需求；当前增量策略已有独立实现与第23批证据，不新增当前P0。不是当前游戏视觉/音频验收。"
+    },
+    {
+      "path": "work/guandan-windows-source/LICENSE",
+      "sha256": "593b23fc882aa0553246d8b108ec9e87a182412784d7fdc9018310a8556e7585",
+      "category": "documentation-boundary",
+      "group": "active-guides",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "仓库留存Apache-2.0文本和Copyright 2026 dengweiqh；只核对声明存在，不推定其覆盖独立第三方媒体或所有外部作品授权。"
+    },
+    {
+      "path": "work/guandan-windows-source/README.md",
+      "sha256": "15c5a5c4c4028c134bd75e0e9e4c06c0eb626c259e40b7c5715661a3fac0a71f",
+      "category": "documentation-boundary",
+      "group": "active-guides",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "服务器活动README；只依赖Node/localcore、单实例JSON与回滚边界有说明；快捷语白名单和固定p1/p3队伍文案已过时，后者对应既有RP-13-001。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/README.md",
+      "sha256": "8e3ed53fe700945ba18e009983727c45e5b46a7eb5a4cec638254c12dbec0935",
+      "category": "documentation-boundary",
+      "group": "active-guides",
+      "method": "Full text read, date/currentness/commands/primary code claims compared",
+      "conclusion": "平台606行契约全文；鉴权/幂等/claim/outbox/恢复/16人赛事明确，商户只是管理端基础且无多实例事务承诺。好友房章节仍要求完整口令并未介绍已实现的登录用户房号加入；定局/升级之外新增转蛋/复式字段缺少完整示例；不把文档过时当服务不支持。"
+    }
+  ],
+  "findings": [],
+  "findingExtensions": [
+    {
+      "id": "DOC-39-001",
+      "evidence": [
+        "README.md:13",
+        "work/guandan-cocos/README.md:50",
+        "work/guandan-cocos/README.md:85",
+        "work/guandan-windows-source/README.md:127",
+        "work/guandan-cocos/docs/RELEASE_ACCEPTANCE_20260910.md:29",
+        "work/guandan-windows-source/server/platform/README.md:379"
+      ],
+      "impact": "Current guides may direct maintainers toward retired lab/chat/invite clipboard paths or false-fail valid 1.5–3s/rare3x bot timing; executable number-join and tournament paths already exist.",
+      "recommendation": "Keep historical dated documents; update active overview/contract and new acceptance table from current settings/actions. Do not delete useful retirement tests or re-enable retired product functions."
+    }
+  ],
+  "checks": {
+    "sourceUnchanged": true,
+    "originalProductChangesUntouched": true,
+    "docxRender": {
+      "pages": 8,
+      "renderer": "bundled LibreOffice + document skill render_docx.py",
+      "fonts": "Audit-scoped fontconfig uses installed macOS CJK fonts; first missing glyph render rejected, second all pages inspected",
+      "visual": "Chinese text/tables/screenshots readable after font fix; screenshot-era old UI intentionally retained",
+      "limits": "Historical document rendering is not current gameplay UI or audio acceptance"
+    },
+    "runtimePolicyChecks": "Run repro/document-baselines-40.mjs after report exists",
+    "priorEvidence": [
+      "effect-orchestration-23",
+      "runtime-policy-13",
+      "arrangement-records-37",
+      "team-records-38",
+      "retirement-quality-31",
+      "resource-boundaries-39"
+    ]
+  },
+  "limitations": [
+    "No production or credentials queried",
+    "Historical deployment counts, package hashes, test-pass text do not prove current release or smartphone acceptance",
+    "Retained license text is not independent ownership/compliance approval"
+  ]
+}

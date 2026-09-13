@@ -1,0 +1,238 @@
+{
+  "batch": "ui-surfaces-28",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/CoastalUi.ts",
+      "sha256": "66f09ac4de916e842108d3c9dcd574b73d343bf214775c277ba7482e00db64bb",
+      "lines": 75,
+      "notes": "完整75行。核沿海按钮/文字/六类代码图标的构造、字体SHRINK和交互委托；实际TableSettlementView复用此工厂，8组布局/160重复渲染通过。生命周期归父节点和RuntimeUiFactory，不把通用图标分支或局部无dispose直接判为僵尸代码；没有改设计。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/LobbyLayoutPolicy.ts",
+      "sha256": "7113360b2900ae241091535fddf0cad0f65f6f6b3b404e0c37220b61d94d89e8",
+      "lines": 28,
+      "notes": "完整28行。核874×402批准布局、账户180/商城70、不可变设计参数与安全区统一缩放。120组宽高与非对称左右inset，六区域均在安全区且保持比例/入口间距；不是所有极端屏幕的穷举或真机截图。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/LobbyMenuView.ts",
+      "sha256": "b143f9df544977a00d7edf7502116eae61b03f85e40943e19d44e9a3f58aa5b5",
+      "lines": 93,
+      "notes": "完整93行。核裁切比例/25片商城渐隐、SpriteFrame释放/异步取消和赛事入口。36组素材尺寸/缩放/裁切，468切片释放、40取消后迟到回调无新增；确认LP-28-001，卡片硬编码筹备中与实际可报名入口矛盾。仅内存绘制，无真实GPU资源峰值结论。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/PlayerSeatController.ts",
+      "sha256": "784c9fa8d5b0a052fa15e23c32ab4d7371e3572964046961e83a202cca65734d",
+      "lines": 129,
+      "notes": "完整129行。核队伍标签、剩余<=10/名次替代、出牌原点、回合pulse取消、离线恢复token。120组团队/视角/张数/名次及恢复回调通过。虽然主HUD隐藏其旧Graphics/SeatText，TableMatchCoordinator仍使用connectionStatus与出牌原点，不能退役整个组件。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/StartupLoadingOverlay.ts",
+      "sha256": "e3f03af4fbf23f01a33fdb8a69ba9d734e994576bc163ce6ec9e567c4d5309c6",
+      "lines": 283,
+      "notes": "完整283行。核背景cover/安全区、进度钳制、GD-S01–04对应重试/重新进入、单击去重、fade/dispose完成。6组overlay与真实StartupCoordinator的6组初始化/失败/重试/销毁链通过；onReady仅一次，初始化失败不原地重复装配。节点/加载/重启为合成端口。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/TableSettlementView.ts",
+      "sha256": "4955097bea671362f855397b8910932ce1b9bd0484b0f64bcaa9a44c0ff26eda",
+      "lines": 54,
+      "notes": "完整54行。核结果内容JSON key去重、四行身份/准备、code point截名与SHRINK、自适应scale和clear。8种宽度/单双行内容，每种20次稳定渲染无节点增长；内容变化只保留新面板，重复clear通过。来自合法四人投影，不以任意大数组捏造溢出。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-artwork-regression.cjs",
+      "sha256": "58009a18d25f881b1631003d8f7de6955f71f145ffc4c2bef720c5176d968ef9",
+      "lines": 57,
+      "notes": "完整57行并执行。检查真实LobbyMenuView搭配简化cc/资源端口的cover crop、单调渐隐、字体和销毁；补充真实GameAssetLoader及36组尺寸/40迟到完成。既有替身销毁语义不代替Cocos GPU。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-aug30-restore-regression.cjs",
+      "sha256": "f2e8775279462e458061b9ff92342e12e184c09af13413c1b6ed0aeee3e8e52a",
+      "lines": 41,
+      "notes": "完整41行并执行。核旧版素材哈希、布局入口和当前服务边界。第34行要求赛事真实open，第37行同时要求筹备中，均通过；作为LP-28-001测试固化过时文案的证据，不单列第二缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-layout-policy-regression.cjs",
+      "sha256": "4da4174c64feb50a81519cb145f8e4868d7caa943ee79a17f07a65779ba47910",
+      "lines": 38,
+      "notes": "完整38行并执行。核批准几何、统一缩放、本地预览边界；补120组合非对称inset/尺寸，不将严格浮点相等断言失败当产品变化。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-redesign-regression.cjs",
+      "sha256": "f2898b5ae6e1ef9e212010ef0a520d01e7b91ac55aad64962c93d5428ebb393c",
+      "lines": 255,
+      "notes": "完整255行并执行（尾段重读至EOF）。核大厅结构/入口、资料与辅助页的静态约束；大量源码正则与纯函数检查不等于完整页面运行。补实际LobbyPageDomain→赛事controller报名链，保留已审相关owner的既有问题而非重复计数。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-refinement-regression.cjs",
+      "sha256": "5b061b9f66e4b837133891ae949f6f789125d8cedd4e6e0f0e3ed6a2886e0157",
+      "lines": 147,
+      "notes": "完整147行并执行。核原素材/尺寸、文案层次、按钮边界/对比度和匹配路由约束；补足生命周期与实际赛事交互。不凭静态风格测试证明所有状态美观或真机无遮挡。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/foreground-text-style-regression.cjs",
+      "sha256": "ee29091e416c33f1f65158391e3b68a777c5da4484013e0b12d2b2b5dc5ca60f",
+      "lines": 58,
+      "notes": "完整58行并执行。核前景字体与轻描边规范的源约束；Coastal/Lobby各自字体策略按已有批准风格保留。没有把样式正则覆盖当作Cocos实绘验收。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/match-ended-presentation-regression.cjs",
+      "sha256": "0f7c81900919d51e315e374140ba9e3369dcae0edf83ca9354e5db35993d19bf",
+      "lines": 76,
+      "notes": "完整76行并执行。核终局胜负/赛制说明和相应源约束；生产MatchEndedPresentation已在第27批计覆盖，不因本测试执行重复计数。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/runtime-emoji-regression.cjs",
+      "sha256": "e2f684f263f575d5eeda7f699c5132655a90fa0a31e381274ef7f03bbc01719b",
+      "lines": 46,
+      "notes": "完整46行并执行。核运行时emoji替代/代码图标与相关源约束；读取扫描范围及排除条件，不把字符扫描通过当成全部图标可达性或字体兼容证明。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "LP-28-001",
+      "severity": "P3",
+      "title": "已开放赛事的大厅入口仍硬编码显示“筹备中”",
+      "path": "work/guandan-cocos/assets/scripts/ui/LobbyMenuView.ts",
+      "line": 73,
+      "evidence": "renderLobbyEntries对所有tournament卡片固定绘制筹备中。实际LobbyPageDomain:179→FrontPageController:164→TournamentCenterController.open接入固定16人赛事；在合法open的免费赛事响应下，页面可免费报名并进入确认检录，而大厅状态仍暗示不可用。lobby-aug30-restore-regression.cjs:34、37同时要求真实open和旧筹备中文案，既有测试仍绿。",
+      "validation": "repro/ui-surfaces-28.cjs tournament：真实LobbyPageDomain/renderLobbyEntries/RuntimeUiFactory点击，经实际Cocos3.8.8 Tween进入真实TournamentCenterController/Model；合法合成赛事API响应免费报名，执行enroll后变确认检录。视图绘制和API均为内存端口；证明条件下的功能/文案冲突，不声称当前线上一定有开放赛事，也未访问线上或真实报名。",
+      "recommendation": "入口采用不承诺实时状态的中性描述（如16人积分赛），或由同一赛事可用性模型驱动；素材/布局保留测试与业务状态文案测试分离，补open/closed/failed状态入口与详情一致性。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/lobby-artwork-regression.cjs",
+      "node work/guandan-cocos/tests/lobby-aug30-restore-regression.cjs",
+      "node work/guandan-cocos/tests/lobby-layout-policy-regression.cjs",
+      "node work/guandan-cocos/tests/lobby-redesign-regression.cjs",
+      "node work/guandan-cocos/tests/lobby-refinement-regression.cjs",
+      "node work/guandan-cocos/tests/foreground-text-style-regression.cjs",
+      "node work/guandan-cocos/tests/match-ended-presentation-regression.cjs",
+      "node work/guandan-cocos/tests/runtime-emoji-regression.cjs",
+      "node work/guandan-cocos/tests/ui-recovery-regression.cjs",
+      "node docs/audit/2026-09-12/repro/ui-surfaces-28.cjs"
+    ],
+    "existingTests": [
+      {
+        "test": "lobby-artwork-regression.cjs",
+        "exitCode": 0,
+        "output": "Lobby artwork: cover crop, monotonic fade, exact typography and load/disposal passed"
+      },
+      {
+        "test": "lobby-aug30-restore-regression.cjs",
+        "exitCode": 0,
+        "output": "August 30 lobby source, original artwork and current service boundaries verified"
+      },
+      {
+        "test": "lobby-layout-policy-regression.cjs",
+        "exitCode": 0,
+        "output": "Lobby shared geometry: approved 874×402 geometry, uniform scaling and local-only boundary passed"
+      },
+      {
+        "test": "lobby-redesign-regression.cjs",
+        "exitCode": 0,
+        "output": "lobby redesign regression checks passed"
+      },
+      {
+        "test": "lobby-refinement-regression.cjs",
+        "exitCode": 0,
+        "output": "Lobby refinement passed: approved art/footprints, copy hierarchy, button bounds, contrast and match route"
+      },
+      {
+        "test": "foreground-text-style-regression.cjs",
+        "exitCode": 0,
+        "output": "foreground text style regression tests passed"
+      },
+      {
+        "test": "match-ended-presentation-regression.cjs",
+        "exitCode": 0,
+        "output": "match-ended presentation regression checks passed"
+      },
+      {
+        "test": "runtime-emoji-regression.cjs",
+        "exitCode": 0,
+        "output": "runtime emoji regression checks passed"
+      }
+    ],
+    "auxiliaryTests": [
+      {
+        "test": "ui-recovery-regression.cjs",
+        "result": "PASS; 已在第16批完整审阅，此次重读执行不重复计数"
+      }
+    ],
+    "result": {
+      "geometryCases": 120,
+      "artwork": {
+        "cycles": 36,
+        "slices": 468,
+        "freedFrames": 468,
+        "lateCompletions": 40,
+        "cancelWarnings": 40,
+        "minCropCoordinate": -2.842170943040401e-14
+      },
+      "startup": {
+        "overlayCases": 6,
+        "coordinatorCases": 6
+      },
+      "seats": 120,
+      "settlements": {
+        "cases": 8,
+        "stableRenders": 160
+      },
+      "tournament": {
+        "menuLabel": "筹备中",
+        "destination": "tournament-center",
+        "availableAction": "免费报名",
+        "afterEnrollment": "确认检录",
+        "source": "valid synthetic free fixed16 response; no production API or GPU"
+      },
+      "loadedEngine": [
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-manager.ts",
+          "sha256": "fe4fef5bc18c27d953e16d4b1b0f962f568ae0f101f3ea82711f366715d0178d"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action.ts",
+          "sha256": "ca33a1a2bb363ab57e3cd48be146afe8c646e46984b773252d8b883fbff1ec36"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween.ts",
+          "sha256": "923522464ca5fbfe4990525f2c9eb7872fdac4f3f9b598210a9886df772a6aec"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/core/algorithm/easing.ts",
+          "sha256": "f9dc0c58134e2e369bbbc9315ca1b77f2951bec91e8366488fb5cb89a4ad2854"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-interval.ts",
+          "sha256": "2ad01c7284f757fa05c8bb0bb6677323f01624da8abd2ea1bc165c5db5c8aaee"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-instant.ts",
+          "sha256": "130b0b5bd824231744f44db1095f05688963b6f9f8c95d779d774a725f3aa09e"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-unknown-duration.ts",
+          "sha256": "0635050f0805f5b660afa30a4bf95fb5bf73f7de110d2c7b22963a76ca62f5c7"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween-action.ts",
+          "sha256": "d2189496bc6798a4fb9f3789c9ae718eb738d307d70ca6f57806b102c369e2b2"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/set-action.ts",
+          "sha256": "5a65e20b670130606ed00cef54a5c0268ad56320368c634caab9106a79045ae8"
+        }
+      ]
+    },
+    "fixtureCorrection": "初次补充探针以严格相等比较缩放长宽比，并要求浮点裁切坐标绝对非负，触发数值舍入（最小-2.842170943040401e-14）而非几何越界。分别采用1e-12比例/1e-7坐标容差后重跑通过；只改审计探针，未改产品或原测试，不列产品缺陷。"
+  },
+  "boundaries": [
+    "新增14个原pending文件（6UI源文件662行、8测试718行，共1380行）；StartupCoordinator、GameAssetLoader、RuntimeUiFactory、LobbyPageDomain/FrontPageController、TournamentCenterController/Model、TableMatchCoordinator/Hud/Snapshot/Phase等辅助重读不重复计数。",
+    "加载本机Cocos3.8.8九份实际Tween/Action算法，复用第22批已审loader前缀；节点/绘制/帧/Bundle/事件/排程/重启/赛事API为显式合成端口。40取消告警出于取消完成回调与替身销毁顺序，未判为资源泄漏或游戏错误。",
+    "UI/UX技能用于选择加载错误恢复与清楚下一步反馈检查；检索loading error recovery命中通用Error Recovery。ARIA/form项不适用Cocos，不引入DOM要求，不改界面。",
+    "全部既有测试通过不替代平台状态/微信真机/GPU实测，没有构建或读取真实用户数据。未改业务/产品测试、提交、推送、部署；全量和跨模块/资源边界仍未完成。"
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "batch": "friend-views-21",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomSettingsPresenter.ts",
+      "sha256": "834032f83ff3b33e2110c958d68b68ddc83fa37aacf5008cfcacf5e09b906c99",
+      "lines": 263,
+      "notes": "完整263行。核草稿复制、四玩法/两tab、显式级牌2–A、自定局数、切页代际门禁、局部视图销毁与滚动位置保存、固定创建/加入入口；补充32次旧回调/重绘与496个可见schema选项对照。表单不自己持有HTTP忙态，真实Domain立即转等待页并有平台代际补偿，不凭这里缺busy字段判重复开房。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomFormUi.ts",
+      "sha256": "ee3b0d7add5c64dfbd8215604e8ba392cefecc2864b3ac3f278de7c04f9526bb",
+      "lines": 42,
+      "notes": "完整42行。核固定footer双按钮间距、Mask视口与top-anchor内容、竖向ScrollView及无弹性；真实Cocos触控滚动/裁切像素未跑，引擎存根只验证构造数据。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomModeTabs.ts",
+      "sha256": "98603c81c7c8685cbbdcef6ef91b980ecfac55f8085b27879f37f2f658e419c8",
+      "lines": 21,
+      "notes": "完整21行。核4模式当前态禁重复选择、几何与外层guard调用；模式能力由共享policy提供，未增加假入口。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomNumberModal.ts",
+      "sha256": "4d73084d8f689eb4111013720331b2706ac64455aca75df0d74ba2e2b9e69a7e",
+      "lines": 53,
+      "notes": "完整53行。核六位房号与前导0、trim、数字输入、模态阻断、键盘/触摸一次性关闭后提交、取消失效、输入框blur/disable和Tween释放。11补充输入场景与既有完整创建/重试流程通过；无真实微信键盘或好友邀请发送。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomRulesModal.ts",
+      "sha256": "bc615f360fe8abc46b97379e2c8430316dd1e539e03787db25f50a86a70a422d",
+      "lines": 74,
+      "notes": "完整74行。核规则四topic、模态去重、关闭/切topic移除旧树、计分表来自数据层、长文内容高度和固定footer。16topic×尺寸构造场景通过；文字真实测量和GPU渲染尚未验收。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomRuleContent.ts",
+      "sha256": "a05c0aec3c0a67a41b841eb33e0a5b6e70e3619806588997a6483077839c3aed",
+      "lines": 44,
+      "notes": "完整44行。核定局/升级/转蛋/双桌术语与共享VARIANT_SCORE_ROWS，复式负方0、转蛋正负3分与6分、抽牌/轮换/同牌对应和不洗牌重新成组说明。没有将文本说明视为全部服务行为通过，已知自动换队/延迟观战问题保持独立。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomWaitingPresenter.ts",
+      "sha256": "a4a61adb82de9df511ae26683b749939eb3fe02fb9f034989dda76d1d92753d3",
+      "lines": 166,
+      "notes": "完整166行。核普通四席相对位置、空位机器人/坐下、站起、房主/观战/开局待确认按钮与准备/邀请居中，入桌进度与错误反馈。既有24准备时序、四人权限矩阵及邀请测试通过；普通等待头像使用fallback，未假称已经显示各真人头像。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/DuplicateRoomWaitingView.ts",
+      "sha256": "48d5c9ec036a26cd0eee512b46e6ae5f12e147025b16fa178a672bce36ba9209",
+      "lines": 76,
+      "notes": "完整76行。核八席A/B反向红蓝排序、房主增删/补齐bot、普通玩家坐下/站起、准备/开始/待确认和规则入口。既有8个宽度/房主/pending场景通过；服务端继续承担权限/在线及开局校验，不把canStart摘要等同于最终授权。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyModels.ts",
+      "sha256": "ef0f3d013fb1d24bb37dc341d83356f446b1df75d2a0d9b0f678b9b0591e2cdb",
+      "lines": 305,
+      "notes": "完整305行。核初始化/清房共享defaults、缺省/显式null元数据投影、合法版本、trustee/readiness/scoreboard/duplicate和终场清截止。输入多数已经过路由解析，正常观战既有回归通过；辅助畸形未知字段不构造线上来源结论。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/DuplicateRoomModel.ts",
+      "sha256": "37464cdaa9f9fbd818aba659b89ec787d014e5e952f9d34c6ecd0a9aadfaf745",
+      "lines": 37,
+      "notes": "完整37行。核八席唯一/人数/类型、局数/比分范围与深复制，18合法/坏字段场景通过；未验证每个direction文本/桌色拓扑，只由服务器正常投影保证，未据此确认恶意服务端风险。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/DuplicateTablePresentation.ts",
+      "sha256": "631dd0c5fd757b30adb2fc2107dc80ff0a945ff3482fa9b97a177e133528c034",
+      "lines": 14,
+      "notes": "完整14行。核桌别和红蓝胜负/时限文案。确认FR-21-001：实时HUD优先调用此函数，无scoreVisibility入参，复式结算显示设置不生效；转蛋对照遵守。时限胜负不等同于正常轮限。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/DuplicateTableStatusView.ts",
+      "sha256": "98721e531ba6793380942ded2f8a029b3f4c3be3dc408be514fd6b126051fcb5",
+      "lines": 22,
+      "notes": "完整22行。核本桌结束/旁观门禁和跨桌只读操作。确认FR-21-002：缓存仅d，resize既不主动调用该视图，随后相同d也跳过；3身份/1565→960尺寸保持旧x642.5，摘要改变才恢复x340。没有GPU/手机旋转验证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/friend-room-settings-presenter-regression.cjs",
+      "sha256": "0755aa86cb93c872df98ea32fe47d80ac006e5224d571d20a9d4d8b681699575",
+      "lines": 741,
+      "notes": "完整741行，运行通过。核presenter/number modal/Domain测试，真实产品模块配MockCC/网络；历史defaultSettings用40秒不同于当前20，补充探针替换测试fixture为实际DEFAULT20，不改产品源码。现有runtime-settings只做regex，waiting依赖fake geometry不能证明实际字体/触控。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/friend-room-observer-regression.cjs",
+      "sha256": "ffba549655f1eefcedfcd33da60a4b3a4aca61ed5acd9b282acc12c18590531a",
+      "lines": 64,
+      "notes": "完整64行，运行通过。实际router/model/sender配内存端口，核房间身份、observer角色、延迟时钟、recovery-only和观战禁止手牌/站立房主管理权限、退休页不存在。假state不是完整牌局有效性证明。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/friend-room-runtime-settings-regression.cjs",
+      "sha256": "946c0264723e8a17b8784fa5e61805e7a47de23e028ae08d8fa79a06b728bb1a",
+      "lines": 47,
+      "notes": "完整47行，运行通过。规则/记牌器/牌序/移除快捷语等接线regex断言，无运行房间/牌局；因此未覆盖复式优先标签忽略hidden和尺寸缓存，不能据通过认定端到端配置生效。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "FR-21-001",
+      "severity": "P3",
+      "title": "复式进行中比分忽略“结算显示”设置",
+      "path": "work/guandan-cocos/assets/scripts/scenes/DuplicateTablePresentation.ts",
+      "line": 3,
+      "endLine": 6,
+      "evidence": "FriendRoomSettingsPolicy给复式提供score-visibility并生成hidden。TableHudPresenter.ts:147直接优先duplicateTableLabel(d)，仅备用projectTableModeLabel收到hidden；此函数无条件输出红蓝累计分。server duplicateSnapshot保留roomSettings及累计scores，正常轮间得分不会清空。",
+      "validation": "node docs/audit/2026-09-12/repro/friend-views-21.cjs：实际policy→实际TableHudPresenter→实际DuplicateTablePresentation，playing第二局比分3:1，hidden/live均输出‘复式 A桌 · 红 3 : 蓝 1’；实际转蛋投影hidden/live两对照分别隐藏/显示个人分。",
+      "recommendation": "把比分可见性作为共享HUD投影输入，复式/转蛋按同一策略在进行中隐藏；结算保留真实比分。补上两种模式、两个设置、playing/settlement的行为测试。",
+      "boundary": "仅显示契约缺陷，累计计分/服务端权限未因此改变；分数不是隐藏手牌。内存HUD绘制端口，不是真机截图。"
+    },
+    {
+      "id": "FR-21-002",
+      "severity": "P3",
+      "title": "复式跨桌观战按钮在窗口变窄后仍留在旧位置",
+      "path": "work/guandan-cocos/assets/scripts/scenes/DuplicateTableStatusView.ts",
+      "line": 10,
+      "endLine": 19,
+      "evidence": "signatures仅JSON.stringify(d)，没有viewport/insets。GameScene.applyResponsiveLayout:554–561更新普通HUD和tableMatch.refresh，不重新布局此独立root；后来同d元数据重绘亦提前return。TableGameHud只重布局它自有节点，不移动这个附加root。",
+      "validation": "实际renderDuplicateTableStatus配内存Node/UI：p1/p3本桌已结束及未入席观战3例，1565×720→960×720后按钮x仍642.5，宽204左缘540.5超出新右界480；即使再传同内容d也无更新。改变ready触发重建后x340正确。",
+      "recommendation": "分离内容更新与layout，尺寸事件必调用布局；或签名纳入viewport/insets并补resize调用。测试同数据不同尺寸、同数据节点已销毁、换桌和普通playing不显示。",
+      "boundary": "依赖窗口/安全区变化，不是固定尺寸首次加载必现；已确认设计坐标越界与可达调用链，未做真实浏览器GPU/折叠屏/手机旋转测试。不能与CS-01-001跨桌版本门禁合并为同一根因。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/friend-room-settings-presenter-regression.cjs",
+      "node work/guandan-cocos/tests/friend-room-observer-regression.cjs",
+      "node work/guandan-cocos/tests/friend-room-runtime-settings-regression.cjs",
+      "node docs/audit/2026-09-12/repro/friend-views-21.cjs"
+    ],
+    "result": "3既有入口通过；496选项有效性/往返、32草稿重绘/代际、11房号、16规则topic/尺寸、18摘要规范化，以及3尺寸缺陷复现和4比分显隐案例通过。",
+    "skill": "已完整读取UI/UX技能并检索form validation feedback，核显式输入标签、提交反馈、取消/去重和状态布局；无UI改动。"
+  },
+  "limitations": [
+    "15文件共1969行完整阅读。既有已审Policy/Domain/GameScene/HUD/服务器projection/actions仅辅助链路复核，不重复计数。",
+    "复现重用已读既有测试的纯class/compiler前缀，改的是测试fixture默认值20秒和Mock补充方法，不改产品模块；生成variant文件只作已审共享源的对应模块加载。",
+    "所有新增测试节点/绘制/屏幕/网络为内存替身，无创建真实房间、发送邀请、微信权限、真机输入/裁切、Cocos构建、资料上传、Git或部署写入。初次探针缺matchFormat依赖失败，补全harness依赖后完整运行通过，未计为产品问题。"
+  ]
+}

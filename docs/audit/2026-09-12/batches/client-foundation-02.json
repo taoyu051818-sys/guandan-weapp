@@ -1,0 +1,123 @@
+{
+  "batch": "client-foundation-02",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/session/GameSession.ts",
+      "sha256": "d46dacacdcecb98d38932ded8f3b5dff8ba8367435ea33e7ff2bae51320fd24e",
+      "lines": 95,
+      "notes": "完整审阅95行：会话状态与本地存储、观战者不计对局、女声限制、统计写入。恢复重复统计归入已有CS-01-002，不重复计数。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/session/GameSessionModel.ts",
+      "sha256": "3b8c0a7c0d2bf45f998c65fc3f47eb5a3550dbaeeff563d4b51909603b106452",
+      "lines": 140,
+      "notes": "完整审阅140行：存储白名单、路由/房间身份不恢复、数值/枚举归一化、历史字段退役；隔离畸形缓存断言通过。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/RoundRecord.ts",
+      "sha256": "dff1ba0f89709cf7605509a288c9a24253978b0d2c39051a758d27730795df22",
+      "lines": 23,
+      "notes": "完整审阅：优先完整playHistory，否则playArea；按规则统计同花顺/炸弹/王炸且按玩家过滤，类型为内部契约。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/DataSnapshot.ts",
+      "sha256": "14278bfe96796b5f978fb7a73d80af082f94ccb4cbc9b866ff35d6b5708d6149",
+      "lines": 17,
+      "notes": "完整审阅：仅JSON DTO拷贝与递归冻结，核查生产调用以普通对象为主；不可用于循环对象/引擎节点/Date。深拷贝及嵌套冻结断言通过。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/RuntimeClientConfig.ts",
+      "sha256": "cbb72cb66477650fc2fbe8a10c9f39ef36f9a181a48c7e3c59c3f98fa02d4e52",
+      "lines": 94,
+      "notes": "完整审阅：注入版本/类型/协议、微信强制正式配置、拒绝开发开关与本地回退、浏览器localhost限定；既有与隔离检查通过。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/NetworkEndpoint.ts",
+      "sha256": "a29e1e28218e47930ec5a176bed7eb4bf75af89b1558aad4a9cfd12789092cf6",
+      "lines": 46,
+      "notes": "完整审阅：无DOM URL依赖的绝对地址解析、DNS/IPv4/IPv6/端口/凭据/转义限制；不是通用WHATWG URL实现，严格子集有意为之。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/WechatNetworkPolicy.ts",
+      "sha256": "37298383ea886219bf2e3c7a46bf3ddf701eb0c9e331f8683c7cb96e81c1159e",
+      "lines": 31,
+      "notes": "完整审阅：严格固定host及/guandan边界，禁端口/hash/路径穿越/嵌套编码；无实际对外请求的拒绝断言通过。不宣称替代微信平台合法域名配置。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/WechatLoginProvider.ts",
+      "sha256": "e0783af457ed8931f8fd10ef83c9438a9a237dd3b8395acc938b4e9e4dea1925",
+      "lines": 54,
+      "notes": "完整审阅：不可用/同步异常/超时/空code/失败/重复回调一次结算；安全内存回调复验通过。未验证真实微信端授权。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/GameAssetLoader.ts",
+      "sha256": "5d08431d96104f2707ac5e9729bf8b13bdf942738551ba91d63b2c8e03657b47",
+      "lines": 200,
+      "notes": "完整审阅：单飞bundle promise、进度异常隔离、超时/取消/AbortSignal清理与迟到结果忽略；资源归属仍由Cocos bundle/cache管理，现有存根测试通过。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/residual-cleanup-regression.cjs",
+      "sha256": "f20efec254e024fbc5e286b3117906b98a66df78ea83904538e40480220b8fd0",
+      "lines": 108,
+      "notes": "完整审阅：内存存储的迁移/观战统计隔离/服务端唯一出牌权；用dist核心，不证明任意现产物新鲜度，前轮已核同步及CI。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/runtime-platform-config-regression.cjs",
+      "sha256": "4de809725262a77ad6e2bb0e4509e56f051f6265b9b03abf7e55a1b1019a5c94",
+      "lines": 193,
+      "notes": "完整审阅：注入/部署开关/合法地址/拒绝构造网络连接与模板静态约束；XHR/WebSocket使用存根，不写正式包或外部服务。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/service-lifecycle-regression.cjs",
+      "sha256": "bf820220f5c187624c966791948b008084295b6f2d206023d26af19d7bb9e0e5",
+      "lines": 104,
+      "notes": "完整审阅：资产与登录超时/取消/迟到回调；毫秒定时存根测试，非设备时序保证。发现无消费者MockNode测试夹具但无产品影响，作为低价值残留备注。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/wechat-runtime-compatibility-regression.cjs",
+      "sha256": "5a9f1b39cbdb54c81149c7432847437cae13f69cd2cf0d3843cda1042ddd3b6b",
+      "lines": 167,
+      "notes": "完整审阅：vm隔离缺失/坏URL全局、启动96%阶段、端点/传输、恢复存储、错误分类；启动素材与渲染为存根，非真机验收。"
+    }
+  ],
+  "findings": [],
+  "relatedFindings": [
+    "CS-01-002"
+  ],
+  "concerns": [
+    {
+      "id": "FOUNDATION-BOUNDARY-02",
+      "severity": "verification-gap",
+      "title": "存根验证不证明微信原生网络/授权、Cocos资源时序和真机缓存恢复",
+      "status": "留待构建/真机验收；不视为新增缺陷"
+    }
+  ],
+  "validation": [
+    {
+      "command": "node tests/residual-cleanup-regression.cjs",
+      "cwd": "work/guandan-cocos",
+      "result": "passed"
+    },
+    {
+      "command": "node tests/runtime-platform-config-regression.cjs",
+      "cwd": "work/guandan-cocos",
+      "result": "passed"
+    },
+    {
+      "command": "node tests/service-lifecycle-regression.cjs",
+      "cwd": "work/guandan-cocos",
+      "result": "passed"
+    },
+    {
+      "command": "node tests/wechat-runtime-compatibility-regression.cjs",
+      "cwd": "work/guandan-cocos",
+      "result": "passed"
+    },
+    {
+      "command": "node docs/audit/2026-09-12/repro/client-foundation-02.cjs",
+      "result": "passed against current TypeScript source, no network or user storage"
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "batch": "identity-boundaries-18",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/crypto.js",
+      "sha256": "972709bb2559809250c91800bd17a8cabb8cbf03469009795f4aee829fa407d2",
+      "lines": 238,
+      "notes": "完整238行。核固定HMAC/常时比较、access/game目的与受众、时效、机器人席位、canonical好友规则/租约/观察者、jti消费绑定深拷贝及限额清理；签名回调独立密钥/窗口。28合法票、1148拒绝（含逐字符损坏/重用/绑定错/字段错误/过期）、22签名对照通过。不是无界消费缓存或真实密钥轮换证明。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/platform.test.mjs",
+      "sha256": "4973c0ffc62d740d266727f41e985bbf817f53b3593fe28339be0b80d9dfa6fb",
+      "lines": 1021,
+      "notes": "完整1021行分四段读到EOF并运行通过；间接rating-matchmaking测试此前已审不重复计数。实际临时回环HTTP、test合成账户/票据/签名/事件/商城与旧赛事、临时JSON持久/迁移/rename故障、fake Redis/Wx。真实mkdtemp根在finally只删除自建数据；没有启动游戏WS/访问真实用户。终局等fixture人工注入，不是随机完整对局；固定16全赛程由此前独立测试核验。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/WechatProfileProvider.ts",
+      "sha256": "6136982409fce91cbf343fd512e9124cc097248ca3b37646cfed046e1b61a797",
+      "lines": 58,
+      "notes": "完整58行。核打开编辑器后即挂原生按钮、授权结果只接纳一次、deny可重试、hide保留/销毁阻止迟到回调、无静默隐私弹窗。既有回归及3组合探针通过；不验证当前SDK实际原生弹窗或后台声明。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/WechatProfileResult.ts",
+      "sha256": "c2271fbd5310370fdc35bd02b41296784ada9cb17d76fa4a643e4734e678e2cd",
+      "lines": 30,
+      "notes": "完整30行。核仅显示名和头像白名单、userInfo/rawData兜底、限制16KiB原始JSON和24个Unicode码点、拒绝控制字符/非指定HTTPS头像host、错误脱敏；不转发openid/加密session字段。qlogo路径是否覆盖未来SDK返回需真机核验，不根据假数据断言全部API兼容。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/WechatProfileSync.ts",
+      "sha256": "21884a8aef3fbaa2288be8b98579ea04fd18c1f09654a15b9a1ab9374bc9b787",
+      "lines": 64,
+      "notes": "完整64行。核privacy+scope已授权才getUserInfo、4秒watchdog、取消代际/allowed门禁、30秒去重和generated/saved不被自动覆盖。新增3阶段×2取消原因6例零保存，超时后迟到不继续后续API；不是登录时自动弹窗授权。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/WechatFriendRanking.ts",
+      "sha256": "ba00770ef20451fe742aa5f170440457c16b63767c4d38715150c2db6605dfe0",
+      "lines": 75,
+      "notes": "完整75行。核好友scope显式授权、silent不弹窗、单次回调/10秒超时、按用户与整数分数去重、串行云存储及取消代际。40队列取消零写、40同分请求一写；已经提交原生API后的实际写不能由cancel撤回，未承诺反向撤销。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/services/ProfileSaveCoordinator.ts",
+      "sha256": "4ef8657fcc5f31e65403ee713cf32a8c6f288d369a5408c8339e37b7281ad164",
+      "lines": 38,
+      "notes": "完整38行。核保存快照、共享tail串行、expectedUserId排队前校验、只有最新revision发布、失败重新读已确认资料且不发布失败草稿。40保存严格串行且只发布最后一份；实际client的登录代际另有门禁，未将替身强行换账号制造的未证实竞态当线上缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/profile-save-order-regression.cjs",
+      "sha256": "f8981e52c56f370db7246143bc87d35aa2c29102da9889b5b0358da3941ee4c0",
+      "lines": 124,
+      "notes": "完整124行并运行通过。真实modal保存/关闭/队列逻辑配inert Cocos节点与可控auth；验证草稿不上传、原生结果自动保存、关闭仍确认成功、旧/新保存顺序及失败恢复/账号隔离。render和微信按钮被替换，off为空不能证明实际事件解绑。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/wechat-friend-ranking-regression.cjs",
+      "sha256": "9700c1937ee38d49fa309558f28f6740fd2fb58dd2bcd509e98e539b86a6e134",
+      "lines": 133,
+      "notes": "完整133行并运行通过。授权/本人成绩、开放域排序/分页/迟到回调/图像清理、真实modal配可变children数组；主域不读好友记录的源码断言有边界。fake wx/Canvas，不发真实分数或读取好友；无GPU和真实权限状态证明。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/PlayerCenterPageDomain.ts",
+      "sha256": "6aaed36b90f7a804bccb8f62b61bb554c8dfc5e6c6178df01b97d4a187ae7a9c",
+      "lines": 158,
+      "notes": "完整158行。核dashboard与wallet分别settle、page token失效、profileLoaded、资料重排、真实season任务/领取单飞/返回流程。存在活动赛季任务入口，不能将其因无独立文件误报退役；服务端人工合成任务领取验证通过，页面像素/完整点击链未实测。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/ProfileEditorModal.ts",
+      "sha256": "27e4a52cc3e7acb65707eaab6509eb1808fc2279f9f0159faf7201bcc09b9394",
+      "lines": 171,
+      "notes": "完整171行。核草稿/保存/取消生命周期、图片/授权迟到代际、共享保存队列、hide/show原生控制、reflow同步输入、浮层缩放与按钮坐标。既有modal回归通过；未审ProfileImagePicker实现，不将调用其存根算完整图片上传/裁剪覆盖。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRankingModal.ts",
+      "sha256": "b561ecd5c5d605fc3f9b2edd56da7ed5b25285d0e8ab1adbc77b1d8d0491fce4",
+      "lines": 95,
+      "notes": "完整95行。核显式授权→本人真实分数→云同步→开放域canvas、取消/页面代际、失败反馈、刷新/权限入口、hide关闭、children拷贝销毁和Tween停止。正常同步后的画面与SDK UI不属存根测试保证。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/lobby-profile-polish-regression.cjs",
+      "sha256": "bb4dfd38207879f6877c170730e82e82fa4f589232b0dc18dbf18ebd8f970c63",
+      "lines": 83,
+      "notes": "完整83行并运行通过。真实LobbyPlayerProfilePresenter与layout policy配节点存根；4视宽×2inset校验180缩放底/点击安全区/字号与数据新鲜度，另3个资料文本对照。不是Cocos裁剪/字体观感或设备安全区最终验收。"
+    },
+    {
+      "path": "work/guandan-cocos/build-templates/wechatgame/openDataContext/index.js",
+      "sha256": "20ddb450cdc5a254b23f1038dbe4c65b87227cee254be595f2cc490cc7c39dc2",
+      "lines": 42,
+      "notes": "完整42行。核只接friend-ranking动作、revision/active/loaded门禁、10秒fail、关闭清数据/画布/时钟、分页不覆盖错误。真实脚本在VM中既有测试通过；不向主域或服务器post朋友记录。"
+    },
+    {
+      "path": "work/guandan-cocos/build-templates/wechatgame/openDataContext/ranking-model.js",
+      "sha256": "dd317f851d4b83f071e3b99cb4557fc9d7cdc9df3f8cd7c9c60c9a8ee371d13d",
+      "lines": 23,
+      "notes": "完整23行。核原生朋友列表去重/整数KV过滤、降序/同分同名次、移除openid后交renderer、每页5项及空列表。当前分数格式为自有key整数，不能宣称读懂其他游戏或所有扩展KV。"
+    },
+    {
+      "path": "work/guandan-cocos/build-templates/wechatgame/openDataContext/ranking-renderer.js",
+      "sha256": "5a1cb94f1249f816df0f3eaf4143283c512123384c36e136f6126add81f136d4",
+      "lines": 53,
+      "notes": "完整53行。核5条分页、Unicode昵称截断、头像缓存/失败兜底、revision阻迟到重绘、clear释放引用。fake canvas确认迟到头像不重绘；头像网络失败刷新时clear才能重试属当前用户刷新流程，不扩大为永久缓存缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/WechatFriendCanvas.ts",
+      "sha256": "2d076acd70b91e7f0535eaf3744f88cf884cadfa4832c9132c7de51d23352b81",
+      "lines": 53,
+      "notes": "完整53行。核只将sharedCanvas作为texture而非读取好友字段、100ms刷新active节点、dispose清timer/发送close/断sprite/销毁3资源。构造失败/GPU分配与原生桥寿命未做实机故障注入，不以存根宣称无资源泄漏。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/profile-capsule-regression.cjs",
+      "sha256": "f1c7c7b1830fa516616503d0e5d356ecf259c750107d64e47a76ebba0ba7734a",
+      "lines": 109,
+      "notes": "完整109行并运行通过。真实授权provider/readSync、24码点/URL验证与nativehide/show/dispose、超时/去重/编辑取消、capsule几何及源码契约；全部微信API替身，不能以它证明真实平台返回头像。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/ui/WechatCapsuleLayout.ts",
+      "sha256": "dceed60310a5dfb5082dfa0e26a70ddc0dd455914c1a9857ec10677d8b3ffab7",
+      "lines": 33,
+      "notes": "完整33行。核CSS像素→Cocos中心原点转换、原生bounds合理性/异常兜底、12单位间距、空间不足下移及重复reflow稳定。尺寸来自合理viewport；没有触及普通牌桌重叠强制布局。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/scenes/front-pages/LobbyPlayerProfilePresenter.ts",
+      "sha256": "33c282bfcfd18f9a231580283b9bf8c4d4e1db4d7e249ecb50a04e5675f6dea0",
+      "lines": 60,
+      "notes": "完整60行。核单个透明底、数据新鲜度placeholder、昵称按码点截断、积分值、头像独立编辑与整组个人中心入口、统一layout缩放。既有8几何组合通过；UI只审核契约，不改变已确认视觉。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node work/guandan-windows-source/server/platform/platform.test.mjs",
+      "node work/guandan-cocos/tests/profile-save-order-regression.cjs",
+      "node work/guandan-cocos/tests/wechat-friend-ranking-regression.cjs",
+      "node work/guandan-cocos/tests/profile-capsule-regression.cjs",
+      "node work/guandan-cocos/tests/lobby-profile-polish-regression.cjs",
+      "node docs/audit/2026-09-12/repro/identity-boundaries-18.cjs"
+    ],
+    "result": "五个既有入口和补充探针exit0；平台测试间接rating-matchmaking亦通过。无新增确认问题。",
+    "counts": {
+      "validTickets": 28,
+      "ticketRejections": 1148,
+      "signatureCases": 22,
+      "wxVerifierCases": 8,
+      "cancelledProfileReads": 6,
+      "nativeControls": 3,
+      "orderedProfileSaves": 40,
+      "cancelledScoreWrites": 40,
+      "sameScorePublishRequests": 40
+    }
+  },
+  "limitations": [
+    "只审阅/写审计目录；原五处修改未动，无构建/提交/部署。",
+    "平台既有测试实际临时回环HTTP+test memory并mkdtemp合成存储，finally只删除其自建临时根；fake Redis及Wx，不连接外网或真实用户。",
+    "补充签名为固定合成secret、时间与原生回调存根。已审代码的签名检查不是当前线上key/配置检查；不输出token、openid、session_key或真实用户资料。",
+    "新增20文件2661行；FrontPageController只读若干调用片段，ProfileImagePicker/mountProfileAvatar等被测试注入，不计完整审阅。",
+    "本批对弹窗/后台/按钮仅按既已加载UI技能检查生命周期与反馈一致性，未改变布局；授权SDK可用性/隐私后台/微信桥/Canvas GPU/真机视觉与听觉不在本轮验证范围。",
+    "GameTicketVerifier消费缓存有限额和进程内寿命；未声称永久全局去重。真实房间回执/续票/持久化已在其他批审阅，额外跨进程容量极限待综合链路复核。"
+  ]
+}

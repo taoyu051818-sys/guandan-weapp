@@ -1,0 +1,96 @@
+{
+  "batch": "matchmaking-accounting-10",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/matchmaking-service.js",
+      "sha256": "66dc8383d1931f078043c90216fa969394cb01784e7e92566b7ca0fca9159690",
+      "lines": 341,
+      "notes": "完整341行。核队列索引清洗、单活动匹配、join/getStatus/cancel事务、未入桌期限、matched→playing、固定赛事分配/重新发票、普通模式/底分/评分入口和view只返本人票。52公共模式×人数场景、16并发加入、错用户拒绝、取消临界和恢复链验证。固定16人分支完整读过，但完整赛事流程另需专项，不用公共排队测试代替。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/matchmaking-service.test.mjs",
+      "sha256": "70a681274e5997032553c6f1da870524541b46dbd766090af9593a96deb91238",
+      "lines": 175,
+      "notes": "完整175行并运行通过。四真人匹配/到期取消、3秒±1ms、真人/机器人计数和名称一致、签名bot元数据、恢复票和重复join、不同公共赛制隔离/后到新桌、取消后不补、赛事不补。ticket、friendroom部分用存根；本批补真实facade/store/ticket跨模块对照，非真实WS/手机。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/match-bot-fill.js",
+      "sha256": "d2b52aaa49e667b8ca47acfbdda17ffbe98889c08bc4af5c12aed0a635523615",
+      "lines": 105,
+      "notes": "完整105行。核3秒最早真人期限、仅quick/12公共档补位、签名bot绑定、系统用户/钱包/评级创建、匹配原子完成及队列移除。实际PlatformService真实票据验证1/2/3真人补位与4真人不补、一次persist失败整个副本回滚、恢复只建一组bot。公共bot为system账号，和好友房friendbot不造账号契约不同；未因此误判同一问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-match-bot-seats.js",
+      "sha256": "4ceb4ae9ec98f4788f8d636e918d9dfc8fceef95f8364a4891d6023f0b8c1a3a",
+      "lines": 31,
+      "notes": "完整31行。核只有match claims提取bot座位、按固定p1..p4顺序比较、正式匹配首席排除、签名绑定缺失不保留bot、机器人不占socket/resume/jti。真实createRoomMetadata与130张正常签名入桌票的映射一致；本模块不独立验签，未将辅助schema过滤当作验签。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-match-bot-seats.test.mjs",
+      "sha256": "aa84f0afb3b4969f0100209784de6580f2672e8c08e3af28a4f98900ad53da2a",
+      "lines": 41,
+      "notes": "完整41行并运行通过。p1首席保留、带绑定bot清socket/resume/票据、错binding拒绝、非正式好友房保留旧bot兼容。合成room数据不代表真机联机；补充跨平台票据/metadata检查。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/game-stats.js",
+      "sha256": "cba00dab8f5e3a6cd5ebd828b2f4922731492ea4317206d7f7ada5473ac4dc7e",
+      "lines": 81,
+      "notes": "完整81行。核4席独立统计、仅接收权威动作调用、Bomb/Rocket/可配置StraightFlush、play/pass/贡还/超时托管累积；结果输出过滤牌型且计数99/9999边界、结果ID含match/round与spectator fence。排行/users/teamLevels为引用，由调用方reporter.stage快照；不把builder称深冻结。观察入口pending/stage相邻使用，未找到独立可证变异缺陷。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/game-stats.test.mjs",
+      "sha256": "9cedd7e4f4199299a03bb0c5e6d735f09099f4ff8059a37b1a7b479ee85f3e96",
+      "lines": 53,
+      "notes": "完整53行并运行通过。覆盖3炸类型/关闭同花顺计炸、超时/托管/贡还、统计副本及结果事件ID/最终序号；新增52种组合票据到结果/平台计分关联。人工ranking fixture不代表真实打完52局。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/commerce-service.js",
+      "sha256": "d31c98bfc0354c672d15a4af425f785cf5ca1ff7d28d1d782e460cc5f8dbea75",
+      "lines": 124,
+      "notes": "完整124行。核底分reserved从活动match/participant派生、wallet view、catalog读、quantity/expectedPrice、own商品/wallet与safe数、库存和可用积分、canonical幂等及order+ledger+stock单事务。真实平台并发匹配/兑换两种入队顺序都只许一个先成功，20次相同兑换只扣一次，persist失败全回滚。运营商城展示/履约/商品来源另需边界审查。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/commerce-service.test.mjs",
+      "sha256": "8b6ac3024e04b2e81dcc3ae43c5e59db265907ddf16eae165c909f3c8bfb0ebf",
+      "lines": 68,
+      "notes": "完整68行并运行通过。底分预留、兑换幂等/改体拒绝、缺商品/继承键不污染、坏数/溢出/钱包错归属fail-closed、合法零价。内存synthetic state；未查询线上商品或消费真实积分。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 9,
+    "reviewedLines": 1019,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/platform/matchmaking-service.test.mjs",
+        "result": "passed; synthetic state only"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-match-bot-seats.test.mjs",
+        "result": "passed; synthetic state only"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/game-stats.test.mjs",
+        "result": "passed; synthetic state only"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/commerce-service.test.mjs",
+        "result": "passed; synthetic state only"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/matchmaking-accounting-10.mjs",
+      "result": "passed: 52 public modes/human counts, 130 verified tickets, metadata/bot mapping/recovery and result accounting, 16 humans four tables, atomic bot-fill failure/retry/expiry, two cancellation boundaries, two purchase-vs-match serial orders, 20 same-key purchases once"
+    }
+  },
+  "limitations": [
+    "Only nine full-read files, 1019 lines. Runtime metadata/entry/result/outbox were supporting reads already reviewed; crypto tickets and fixed tournament dependencies are not counted as full review by importing them.",
+    "Manual clocks, memory persistence and unused loopback endpoint string; no actual socket/HTTP server, deployment, real user data or product changes. Terminal result fixture checks mapping/accounting, not 52 games played by rules or bots.",
+    "Public queue bots create per-match system accounts with wallets; friend-room bots instead avoid platform accounts. This is an intentional model distinction in current code; retention/visibility must be checked with full account and catalog boundaries.",
+    "Fixed tournament branch was fully read but public queue probes do not prove full 16-player progression/rejoin. Full tournament suite and lifecycle remain a separate audit subgroup.",
+    "Unknown/corrupt stored values are tested at existing guarded commerce boundaries; the task does not modify or invent automatic production repair. Public matching cancellation at assignment is intentionally rejected; both 2999/3000ms documented controls pass."
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "batch": "room-commands-14",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/friend-room-bots.js",
+      "sha256": "8ac71cd2c06d0131bfc498308d4519211023e185f1f29adad36f6f613a9c442c",
+      "lines": 15,
+      "notes": "完整15行。核好友/公共房机器人开关、仅好友票据房生成server-owned随机identity、移除清映射，不创建wallet/token/socket。100轮真实lobby增删、100唯一ID与resumeTokens不变通过；legacy无票据分支不赋用户ID，与上游bot识别约定一致。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/friend-room-members.js",
+      "sha256": "2631d9352a61d91633843617f7512655de91c50a3ad68f4bcff5373e3eec14f1",
+      "lines": 60,
+      "notes": "完整60行。核成员身份与可变席位分离、房主跟user不跟p1、token/index移位、站起清席位、空位/机器人/已开始拒绝、公开metadata不带令牌。120排列/模式、1800无副作用拒绝对照；不把物理座位映射误作认证身份。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/friend-room-observer.test.mjs",
+      "sha256": "b065ffc6f9760c38d97377ead9c95bfe6a7f87461764426a301d7de0ab3f339e",
+      "lines": 74,
+      "notes": "完整74行并运行通过。换座/房主不随p1转移、四种秒延时临界/四视角redaction和clone、round-delay和平台roster对照。原delayed-roundfixture把roundSequence作当前局，不能覆盖SA-01-001的生产已完成局数语义，不因原测试绿撤销已确认问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-game-command-handler.js",
+      "sha256": "a7bed617dc580013f6e5854855a986380e4810149cfc90d8d0e5a37bc6bf69b0",
+      "lines": 170,
+      "notes": "完整170行。核16种游戏命令、派生playerIn而非payload actor、阶段/托管/贡还owner门禁、四人准备、手动托管计时、解散同意路径及action executor提交。补充确认SP-03-002同类影响存在于closeApprovedVote:27-39，两提交任一步失败后只保存恢复，无完成关闭任务；列linkedEvidence不重复计数。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-command-gateway.test.mjs",
+      "sha256": "52dd0a3e9d8e1a4a2feb58e76ccf5ed355757b96d64a3fb2ef962cea8c053ef1",
+      "lines": 98,
+      "notes": "完整98行并运行，通过import同时执行完整recovery测试。核分发/request ID/list/unknown、容量拒绝在mutation前和他房pending不全局封锁。版本/身份端口为存根，不以该文件代替真实协议鉴权；补64生命周期门禁指令组合。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-command-router.test.mjs",
+      "sha256": "b43c183b2dcf1a02df6df1cdc98acd7a620d7bafbb5a279c7c6abc9fd3535e5e",
+      "lines": 19,
+      "notes": "完整19行并运行。核路由类型注册/顺序、未知类型、handled sentinel、重复注册拒绝；没有通过return值推定具体业务已成功。真实router参与关闭失败补充probe。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-command-recovery.test.mjs",
+      "sha256": "85450012059c37dfbf20d77afa05602da0476bd28f65f88bed9f1a9b377da43f",
+      "lines": 170,
+      "notes": "完整170行，经gateway测试入口运行通过。真实gateway/store/publisher/handler/exit配内存端口，覆盖托管/ready/最后ready和退出保存恢复、host-close两个保存点、自动重试/销毁/同号替换；退出有专用completion不代表投票关闭也具备完成机制，新增probe补此差异。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-entry-command-handler.test.mjs",
+      "sha256": "b340f4eb375e4a7e039e92d9d158f8928db4cf463292a403b2077d90b4243136",
+      "lines": 41,
+      "notes": "完整41行并运行。仅createRoom回执容量保留失败fixture，确认零建房/零consume/零release；不能以这41行推定entry票据/所有创建流程全覆盖，主entry源码在早期批次另审。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-accepted-action-store.test.mjs",
+      "sha256": "4e6eb88049c5dadae34b37509bd1b40f8f2babd47865f70b12c193167c139695",
+      "lines": 43,
+      "notes": "完整43行并运行。核pending容量硬边界、只逐出durable、token换键不增条目、pending start索引迁移、delete及除外键、response/completion clone。保留键语义不自动解决调用者forget完成流程。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-action-executor.test.mjs",
+      "sha256": "f3af9a7104b6d1ed5422c0a90fcb37f6153a2025fcb92e0bc27f610627afc0a3",
+      "lines": 68,
+      "notes": "完整68行并运行。10自动/手动×命令分支按记录/结算/arm/accept或persist/发布顺序执行，拒绝无mutation、终局pending、发布失败标actionCommitted。dispatch/结算为fixture，不是真实规则出牌，规则和runtime13另有实际engine对照。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-publisher.test.mjs",
+      "sha256": "ab632c6770c24669867b1a23679ccaa2f3a924fc32875a625ee2245fda368410",
+      "lines": 113,
+      "notes": "完整113行并运行。核阶段优先、每收件人隐牌、gameStartPending显式清、入口深拷贝、capabilities/member/deadline、出完队友视角及重连。publisher生产模块此前已审；不把projection断言当作微信绘制验收。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-runtime-recovery.test.mjs",
+      "sha256": "1e16a2b669ac0d789a252456979216b55701286e6bb20bc6a47aaf86e006d9b0",
+      "lines": 81,
+      "notes": "完整81行并运行。未配置不load、已配置惰性房恢复/墓碑过期过滤/acceptance清pending/host计时和调用顺序；filePath仅字面字段，load/save为内存。活跃状态checkpoint/tribute/closing恢复在其他批次有辅助验证，不能据此测试宣称全恢复路径完成。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-match-lifecycle.test.mjs",
+      "sha256": "1aa5a4a5f00f2a0f99d48d2669e06120e48897fc58e66041383f014ed3cb0b65",
+      "lines": 289,
+      "notes": "完整289行并运行，import另跑已审pacing。人工计时保留deadline/totalDeadline和移房销毁、fixture终局单局/过A/赛事、真实下一局不洗牌/级牌恢复、2次动作异常关房与持久错误不消耗动作异常预算。nextRound真实core而settleThroughAction仍是dispatch存根；没有复盖转蛋合法换队，RP-13-001保留。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "relatedFindings": [
+    {
+      "id": "SP-03-002",
+      "kind": "additional-confirmed-trigger-not-new-count",
+      "path": "work/guandan-windows-source/server/weapp-game-command-handler.js",
+      "line": 27,
+      "endLine": 39,
+      "evidence": "closeApprovedVote设置closingReason后先commit，删除房间后第二commit；首次失败未建立回执/完成任务，第二次失败恢复room但删回执，只有persistRuntimeState。真实gateway同requestId重发在closingReason门禁拒绝。真实底层写重试成功不执行finalize；四真人路径原投票expire仅清vote仍不能解关房。",
+      "validation": "2种全员同意来源（1真人3bot propose / 四真人最后同意）×2失败位置=4例；真实game handler/gateway/runtime persistence/expiry，内存save仅失败一次；保存恢复和3次原请求重试后均保留房间/closingReason、无finalize无回执，四真人投票expiry后同样。2个未故障对照正常accept+finalize。",
+      "boundary": "不新增问题编号，与既有SP-03-002共享关闭事务只恢复存储不恢复业务完成根因；新证据独立指出另一实现路径。可由重启或其他关闭路径恢复，不称永久卡死。未真实网络/磁盘断电/线上房间。"
+    }
+  ],
+  "validation": {
+    "reviewedFiles": 13,
+    "reviewedLines": 1241,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/friend-room-observer.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-command-gateway.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-command-router.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-entry-command-handler.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-accepted-action-store.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-room-action-executor.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-room-publisher.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-runtime-recovery.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/weapp-match-lifecycle.test.mjs",
+        "result": "passed; gateway imports command-recovery; lifecycle imports previously reviewed pacing"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/room-commands-14.mjs",
+      "result": "passed: 120 seating/mode permutations, 1800 invalid/no-mutation checks, 100 bot add/remove cycles with 100 unique identities, 64 phase-barrier cases; existing SP-03-002 extended by 4 vote-close write-failure cases and 2 success controls."
+    }
+  },
+  "limitations": [
+    "Only 13 full-read files count; existing supporting source/modules not double-counted.",
+    "Fixtures bypass real authentication and physical clocks intentionally; admission/identity security is not proven by synthetic playerIn/request-validator ports.",
+    "No test changes, product code changes, deletion, build, deployment, real user data or external request.",
+    "Original observer delayed-round unit fixture differs from production sequence semantics; SA-01-001 remains confirmed.",
+    "Copy-pasted closure implementation shares prior completion-retry omission; linked extension counted once globally."
+  ]
+}

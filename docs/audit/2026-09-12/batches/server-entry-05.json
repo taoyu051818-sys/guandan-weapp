@@ -1,0 +1,71 @@
+{
+  "batch": "server-entry-05",
+  "reviewer": "audit_server_authority + root (root completed finalization and independently re-read all four files)",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/weapp-ws.js",
+      "sha256": "e536594e970446c5ace0a34b42a07b76ce61eb808488c3f7695cf8f105527b81",
+      "lines": 811,
+      "notes": "完整811行：根线程与子审查均完整读；组合根依赖/配置注入、公开事件映射、身份/票据/关闭记录、共享回执Map、按房队列与全局断连、平台副作用持久恢复、三类handler路由、启动恢复和停机。没有import整个模块触发真实配置/服务器；原样提取enqueueCommand在内存验证SE-05-001。已有SL/SP/SD调用链只关联不重复。Q-04-C01入队键边界仍未证实独立业务错误。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-lobby-command-handler.js",
+      "sha256": "243622761d02096ade7098ba8b0b58ebdb5c74ab98c2aeb10f1e5126742d4cbf",
+      "lines": 159,
+      "notes": "完整159行：房主/匹配/四席准备、平台start确认与持久化分支、准备切换、踢人撤销身份与bot设置；实际gateway/lobby内存探针确认开局失败跨房清回执后原准备请求再次改变准备状态。未绕过身份或扩展为积分重复。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-game-start-coordinator.js",
+      "sha256": "b07e55fb49611f5332e1ec5dd1e48f74881b73dcb82baadb42ba71518438fd44",
+      "lines": 306,
+      "notes": "完整306行：claim/event幂等、重连宽限、平台错误分类、意图/确认/最终落盘顺序、按房timer持有和dispose。168/185-186行最终失败用全局Map快照回滚，跨房正常并行时抹去后来的回执，确认SE-05-001。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-game-start-coordinator.test.mjs",
+      "sha256": "d81e374689b64dbcf7c92276f966db0375bfa4bc8e6cc90be2223d55960d08de",
+      "lines": 142,
+      "notes": "完整142行：合成内存rooms/timer/commit、机器人占席、prepare幂等、claim标记保存失败原子回退、最终正常顺序和remove/dispose；根线程执行1测试通过。现有失败注入只在persistClaimedStart，不覆盖finalize跨房回执竞争。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "SE-05-001",
+      "severity": "P2",
+      "title": "一房开局保存失败的全局回执回滚，抹掉另一房已成功准备操作的记录",
+      "path": "work/guandan-windows-source/server/weapp-game-start-coordinator.js",
+      "line": 185,
+      "evidence": "finalizeClaimedStart在168行快照全局acceptedActions；await commitClaimedStart失败后185-186清空整个Map再恢复旧快照。weapp-ws按房间并行，另一房可在保存等待期间成功登记/保存/确认准备操作。其回执不在旧快照中，被整表回滚删除；后续相同请求无法从Map命中，合法准备指令重新执行。",
+      "validation": "根线程重跑MD完整无网络探针：真实enqueueCommand源函数、scheduler/gateway/router/lobby/coordinator/acceptedStore/runtimePersistence，顺序内存save第3次注入失败；B准备已成功保存并收到actionAccepted，但live回执被A开局失败清掉。B取消准备后再发原ID的setLobbyReady，再次ready=true。原expectedVersion通过真实validator（lobby没有state，不适用游戏版本门禁）。6次写入调用，无生产存储或真实连接。",
+      "recommendation": "把开局事务回滚限于该事务拥有的回执/预留项，按对象或代次确认后恢复，禁止回滚其他房间的全局新增内容；或为全局回执事务提供符合并发模型的所有权。加入开局最终落盘失败与其他房间成功操作同时发生的回归。"
+    }
+  ],
+  "concerns": [
+    {
+      "id": "Q-04-C01",
+      "status": "verification-gap-follow-up",
+      "note": "完整入口确认key在入队捕获、执行时重新读connection归属，仍未证明跨入房键变动本身导致错误。SE-05-001为不同独立根因，不用其代替Q的证明。"
+    },
+    {
+      "id": "CN-02-C01",
+      "status": "verification-gap-follow-up",
+      "note": "未获得同连接主动旧生命周期包独立生产者复现；当前publication/事务同房顺序和transport门禁仍是防线，完整平台发布链后续再审。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "node --test work/guandan-windows-source/server/weapp-game-start-coordinator.test.mjs",
+      "result": "root执行1 pass/0 fail；仅合成内存计时器和源码读取。"
+    },
+    {
+      "command": "从server-entry-05.md提取唯一node --input-type=module探针运行",
+      "result": "agent与root均退出0：otherRoomReceivedAcceptance=true,otherRoomReceiptErased=true,readyAfterSameRequestReplay=true,writes=6；synthetic third save fails日志为有意注入。"
+    }
+  ],
+  "limitations": [
+    "子审查最终报告阶段中断，根线程重新完整读4文件、复跑已有证据并完成JSON/MD；不依赖未交付结论。",
+    "共享核心dist是当前服务器真实依赖，与源同步门禁由前批另验；本探针未重新构建。",
+    "只证明相同合法准备请求重复改变状态，不推断重复结算/积分、越权或线上事故。",
+    "未执行整个weapp-ws入口、没有读取生产env/秘密/真实房间/外部数据；不做公网请求或线上写入。"
+  ]
+}

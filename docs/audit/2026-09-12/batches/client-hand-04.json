@@ -1,0 +1,80 @@
+{
+  "batch": "client-hand-04",
+  "reviewer": "audit_client_state",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandWorkspace.ts",
+      "sha256": "7933b8e72136538dcfb82c1f2158ced235693a16bb73083702babf564d6f8532",
+      "notes": "完整204行；审查权威手牌语义签名、roundId复用隔离、恢复失效、理牌baseline生命周期、整组/部分/混合锁决策和变更后重投影。真实类探针确认跨局清锁、同局重连保留合法锁、缺卡/牌面/规则改变释放失效锁、智能还原不复活已移除牌、退出清空。仅辅助核验观战与恢复调用链，不重复计CS-01-001。未确认新增缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandGroupingState.ts",
+      "sha256": "7328f1883fff4e9096144aa49624576162cfd95d5ced8134315533477f585918",
+      "notes": "完整264行；审查深拷贝、值相等、单位排序/去重、组成员唯一归属、无效ID/手工锁/自动组/同点栈归一化和释放位置。核对权威同步显式releaseInvalidManualLocks=true，以及恢复快照来自workspace有效baseline的生产调用。快照修改不影响内部状态、部分移除和规则切换探针通过；未确认新增缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandHintProtectionProjector.ts",
+      "sha256": "67f7e4b4db6456c46c311e41d20d8626ca1196f06a25dfdd814fd00dd395533d",
+      "notes": "完整74行；审查实际手牌ID映射、锁组优先分类、合法组合分类及hint权限委托。真实提示引擎返回2项候选，锁定对子均全用或不用；pending/托管/贡还/结算/他人回合均不提交提示。straight-flush归structured目前仅影响damage诊断字段，核心rankHintMoves并不按该字段做策略排序，不误报策略降级。未确认新增缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandGrouping.ts",
+      "sha256": "53ae92b1e7b6f3ad85272a19972d536d2ee705014688182d3de0f8a9b899a285",
+      "notes": "完整590行；审查构造/reset/权威同步、锁组合法性、每成员整组选择、松散栈底部选择、建议与自动分组对锁牌排除、同点重组、拆组/移动/排序、默认还原/快照拒绝过期ID、原子commit与revision。直接applySuggestion/restoreSnapshot未加额外外部防御不作生产问题：实际workspace使用已验证入口/有效baseline。对应7项回归及独立状态探针通过；未确认新增缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandDragSelectionPolicy.ts",
+      "sha256": "b8153ffddbcf7b242554cff92e424e1c7e3db7d125247e42187dbc5954db7621",
+      "notes": "完整103行；审查起始卡反向目标、6px阈值、长按激活、一次物理卡claim、pointer门禁、点按替代、取消和8px采样。真实CardView→HandController→policy回归及取消后迟到move/end/hold探针通过。策略无权威手牌上下文，辅助渲染器对代次变更是否需取消见CH-04-C01，未升级成确认缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/game/HandGroupPresentationCache.ts",
+      "sha256": "1518d45867f1746ef0fe63c0e66174332a1bc5660470fd2ee965a093359f124a",
+      "notes": "完整45行；审查实际牌面与规则键、布局分支、组徽章与区域分类、返回徽章拷贝、64项淘汰及回合clear。探针确认炸弹变对子不会复用炸徽章、外部改label不污染缓存、90个键后容量64、clear归零。未确认新增缺陷。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "CH-04-C01",
+      "status": "unconfirmed-production-sequence",
+      "title": "辅助渲染器在可交互手牌更新时可能继续消费旧手势",
+      "path": "work/guandan-cocos/assets/scripts/ui/HandController.ts",
+      "line": 118,
+      "evidence": "render在118-123行更新选择和interactive，仅interactive=false时取消policy；本批HandDragSelectionPolicy.ts:80-86会将尚未取消的旧触点end转换为起始卡点按。真实HandController.render+CardView事件方法、内存几何存根中，a触点start→移除另一张b的权威手牌render(仍interactive=true且selection=[])→a触点end，得到旧tap选择a；插入interactive=false render的对照得到[]。辅助TableMatchCoordinator.ts:78-85普通渲染不传代次，165-169恢复仅invalidate workspace。",
+      "validation": "MD含完整可复制合成探针，已执行退出0。仅确认组件在注入该事件顺序时的行为；Cocos调度、设备输入/网络恢复时序和是否应保留连续预选尚未端到端确认，不计P级发现。显式cancel、托管/pending/观战等非交互render路径会取消，本批不声称这些路径有缺陷。",
+      "recommendation": "后续完整审查HandController及桌面渲染接线时，确认权威手牌或phase变更但interactive持续true的真实场景；用存活起始CardView重放TOUCH_START→恢复/超时状态更新→TOUCH_END或长按回调。若交互契约要求旧选择事务失效，传入权威代次并同时取消手势和长按；不要对每次普通选择/倒计时render一律取消。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "ui-ux-pro-max skill complete read; python3 /Users/mac/.codex/skills/ui-ux-pro-max/scripts/search.py \"dragging movements cancellation\" --domain ux",
+      "result": "按原功能契约核查点按替代、取消和起点；未将网页WCAG机械套到原生游戏，未重设计界面或修改美术。"
+    },
+    {
+      "command": "node tests/{hand-grouping-regression,hand-group-badge-regression,straight-flush-grouping-regression,selection-regression,simple-hand-arrangement-regression,table-hand-interaction-controller-regression,hand-touch-coordinates-regression}.cjs (逐个执行)",
+      "result": "已检查源码和typescript支持模块为本地只读/内存转译，7项全部退出0。selection未请求web build。simple-hand-arrangement包含104样本，Node耗时不代表手机性能。"
+    },
+    {
+      "command": "Markdown探针A：真实workspace/grouping/hint engine/drag policy/cache",
+      "result": "退出0；整组选牌/部分锁/混选、缺卡/改面/改规则/跨局复用ID/同局恢复/退出、提示2候选不拆锁、提示权限、取消后迟到输入及缓存隔离/64上限全部断言通过。"
+    },
+    {
+      "command": "Markdown探针B：真实HandController.render与CardView事件，复用现有测试的内存Cocos/几何存根",
+      "result": "退出0；旧触点在持续interactive=true更新后toggled=[a]，阻塞render对照toggled=[]；保留为未确认生产时序concern。"
+    },
+    {
+      "command": "Node crypto SHA-256 + git rev-parse/status/diff核验",
+      "result": "6目标文件hash登记并于报告落盘后复核；HEAD不变，产品差异仍是原5处dirty，未修改产品/测试/全库清单。shasum因环境C.UTF-8 locale失败，改用Node crypto。"
+    }
+  ],
+  "scope": {
+    "reviewedFiles": 6,
+    "reviewedLines": 1280,
+    "newConfirmedFindings": 0,
+    "unconfirmedConcerns": 1,
+    "excludedAlreadyReviewed": ["HandInteractionState.ts", "HandInteractionPolicy.ts", "LocalHandSelectionController.ts"],
+    "limitations": "辅助调用链与测试仅用于交叉验证，不计完整已审；无设备/浏览器UI验收，无线上请求、构建、部署或提交。CS-01-001权威身份根因不重复计数。"
+  }
+}

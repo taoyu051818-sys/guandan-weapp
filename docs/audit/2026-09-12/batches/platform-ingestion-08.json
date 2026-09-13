@@ -1,0 +1,135 @@
+{
+  "batch": "platform-ingestion-08",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/spectator-domain.js",
+      "sha256": "dbe02e9379b80768a557a3cc4b59e6b3886b65845fef1fa535d3b1fbd01dabf8",
+      "lines": 281,
+      "notes": "完整281行。核13种公开事件的分型字段白名单、safe序号/时间/牌面、DTO所有权、match时间锚点、关闭原因、定局/转蛋分数、公开记录和终态/延迟围栏。确认PS-08-001：seat-left无条件按lobby lease拦截进行中观战者离席；额外13类有效/未知字段及nested clone对照通过。兼容publicTimeline与当前stream分开评估，不把历史fallback的弱校验当当前生产新缺陷。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/spectator-event-service.js",
+      "sha256": "c836d6346f398377927bd2ff13affade5c61b8a4e67d66463f9b930a52a01ef7",
+      "lines": 365,
+      "notes": "完整365行。核receipt+feed+生命周期单事务、canonical重复/改体拒绝、连续序号、已结算尾部补写、开局过期提交后返回错误、赛事entry-timeout特殊确认、签名好友房实际roster、观战者释放及配置终局/机器人边界。实际PlatformService+MemoryStore故障/并发/fence验证通过；PS-08-001在前置domain时间门禁挡住正常observer释放，后续同match reporter队头阻塞。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/spectator-domain.test.mjs",
+      "sha256": "2b8f817513cf5e88b3563fbb9f898a57a991fcb0beafaf8ad0a46866e3ff13b6",
+      "lines": 98,
+      "notes": "完整98行并运行通过。既有测试涵盖game-start、delay clamp、生命周期早界、未知字段、公开脱敏、延迟终态、spectator off及legacy字符串rank净化；未覆盖live observer超lobby lease，新增隔离正反边界探针补足。测试数量不能当所有13型组合覆盖。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/spectator-event-service.test.mjs",
+      "sha256": "70105c94a27720234295af51f2f62ac52219da06a833c597da7d497422079a46",
+      "lines": 94,
+      "notes": "完整94行并运行通过。核模块拆分断言、重复/乱序/错room/未知字段及异常回滚；好友roster隐藏、转蛋积分、签名bot准入及不可变live seats。markPlaying为测试存根，不足以证明晚到start不复活；新增实际facade验证。未覆盖历史座位碰撞和超过租约的live observer离席。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/game-result-service.js",
+      "sha256": "7f070ea34b9b2ddfd8172700e50f0c0e6567023312edccf0167dda4814160cfb",
+      "lines": 300,
+      "notes": "完整300行。核四席唯一/头游胜方/时间/final序号、match与赛事绑定、每场一次/事件canonical幂等、wallet/stats/rating/daily/history/season/replay单事务和已完成尾部事件归档。确认PR-08-001：从含cancelled历史的participants直接构造seat map覆盖真实开局席位。实际core终局fixture→buildGameResultEvent正确payload两次遭拒；无部分计分。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/game-result-service.test.mjs",
+      "sha256": "704f1eade4975b38243d00cc275bf50c4216b87cb6ae33854526239ed1b623fa",
+      "lines": 96,
+      "notes": "完整96行并运行通过。四人基础收益/统计/评级/归档及重排canonical、同场多result拒绝、签名friendbot不产生平台账号正确。缺历史换座参与者场景；新增真实入/离/再次入桌探针。基础quick fixture与线上所有场次不同，未宣称16人/复式全面结算覆盖。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/service.js",
+      "sha256": "78f0b86b8283185b06b00fad154a01eedc6506a55ef42be96a83eb2d78ea35ff",
+      "lines": 452,
+      "notes": "完整452行。核composition ports委派、仍自持dashboard/season tasks/read views、幂等领任务、本人replay准入、公共feed查询及延迟、expiry事务入口和start/result facade。实际facade验证入场/释放/开局/结算，结果先于尾部公开事件也能按围栏补全；HTTP签名仅辅助追踪不算本文件覆盖证明。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/storage.js",
+      "sha256": "7441cfe11e59d036dba4b353f0f0997719363c22555addf9771009caccd9df7c",
+      "lines": 168,
+      "notes": "完整168行。核Memory写FIFO/draft clone/persist后换state/read等待及返回隔离，JsonFile严格读错与migration persist、durable端口及Redis prototype懒加载。故障注入验证真实业务事务无partial commit、队列可恢复。单进程JSON/Redis原型限制显式记录，不称分布式事务已具备；未访问生产存储或读配置。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/storage-contract.test.mjs",
+      "sha256": "0f8bf2cf92931751f5824fa744d623279d660e4770ee7833a42db4b9d38786db",
+      "lines": 82,
+      "notes": "完整82行并运行通过。legacy migration保持输入/自定义字段/账号去重/幂等；write queue FIFO、等待reader、clone隔离、persist和mutator失败回滚、mock Redis懒迁移。内存及mock Redis，无外部服务；migration实现仅依赖执行不计已审。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/state-collections.js",
+      "sha256": "35b1e5511de87c44f4147eda2a17c1c28e2fc47cb88c47a8e468478d685e6e94",
+      "lines": 12,
+      "notes": "完整12行。核统一映射集合与ledger初始化，调用者拿store规范化后的snapshot，不独立承担外部state/schema校验。调用链引用已核，无多套event collections变异；未发现新增独立缺陷。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/errors.js",
+      "sha256": "e08464c25d54ae6999301e4755512968f6e3487581829373a606d3bb280393ad",
+      "lines": 16,
+      "notes": "完整16行。核PlatformError默认400/details及badRequest/notFound/forbidden/conflict工厂的code/status映射；所有本批拒绝用实例错误码或消息断言。HTTP序列化/日志隐私不在这16行内，需另外审。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "PR-08-001",
+      "severity": "P2",
+      "title": "已离席历史成员覆盖实际开局席位，合法升级赛结算被拒绝",
+      "path": "work/guandan-windows-source/server/platform/game-result-service.js",
+      "line": 78,
+      "evidence": "resolveMatch 对 participants 仅过滤 item.seat，未排除 cancelled 历史记录；Object.fromEntries 后项覆盖前项。实际好友房 u1 占 p2→离席→u4 占 p2→离席→u1 重入后，开局 roster.p2=u1，participants 中稍后的 u4 仍为 cancelled/p2；正确 userIdsBySeat.p2=u1 被第79行拒绝。",
+      "validation": "node docs/audit/2026-09-12/repro/result-roster-08.mjs：实际 PlatformService、签名票据、FriendRoomObserverRuntime、RoomExit 完成正常成员往返；真实 shared-core 三次PLAY从人工终局fixture产生升级目标6获胜，buildGameResultEvent生成实际结果。正常对照通过；换座分支连续两次失败，完整平台state未变；只在隔离内存去除历史后同一结果接受且重复幂等，四当前玩家各统计一次，历史u4零次。",
+      "recommendation": "结果验证使用开局确认的权威四人roster或明确活动参赛记录，并验证每个席位唯一；历史参与者另行保留，不能与当前席位混用。补换座/离席/重入/旧记录顺序及机器人替代回归。不要在UI清历史来掩盖平台结果绑定问题。"
+    },
+    {
+      "id": "PS-08-001",
+      "severity": "P2",
+      "title": "长局观战者离席误用大厅租约，造成同场观战事件队列阻塞",
+      "path": "work/guandan-windows-source/server/platform/spectator-domain.js",
+      "line": 210,
+      "evidence": "validateSpectatorEventMatchTime 对全部 seat-left 要求 event.at≤friendRoomExpiresAt+300000，未区分已playing。FriendRoomService.hasExpired 明确允许开局后超过原lobby lease；SpectatorEventService 允许playing observer离开。时间前置门禁先拒绝实际RoomExit生成的有效观战者离席事件。",
+      "validation": "同一隔离探针：默认lobby lease 1800000ms。第五人开局前入观战，已playing后原lease+300000ms离开及后续play均成功；+300001ms离开时实际room已移除observer，但平台拒绝FRIEND_SEAT_EVENT_AFTER_LEASE并保留playing成员及activeMatch。实际SpectatorEventReporter+JsonSpectatorOutboxStore连续试发seat-left（第2次挂起后受控stop），后续play零次发送、两条outbox保留。无真实HTTP/磁盘/玩家数据。",
+      "recommendation": "将开房租约检查限制于未开局席位生命周期；进行中观战者退出改按当前match状态、身份/席位绑定及适用的开始时间检查。保留重放/序号/时钟保护，并测试租约±1ms、长局观战退出、重复回执、正常后续事件和被拒绝在座玩家离席。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 11,
+    "reviewedLines": 1964,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/platform/spectator-domain.test.mjs",
+        "result": "passed; reviewed synthetic-memory test"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/spectator-event-service.test.mjs",
+        "result": "passed; reviewed synthetic-memory test"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/game-result-service.test.mjs",
+        "result": "passed; reviewed synthetic-memory test"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/storage-contract.test.mjs",
+        "result": "passed; reviewed synthetic-memory test"
+      }
+    ],
+    "probes": [
+      {
+        "command": "node docs/audit/2026-09-12/repro/result-roster-08.mjs",
+        "result": "passed: two findings plus normal roster and exact lease/skew boundary controls; 2 rejection retries, no partial result, retained observer and reporter head blocking proven"
+      },
+      {
+        "command": "node docs/audit/2026-09-12/repro/platform-ingestion-08.mjs",
+        "result": "passed: 13 valid event-type clones and unknown-field rejections, 2 atomic persistence failure points, 25 concurrent same-result submissions settle once, result-before-tail plus delay/final fence, late start duplicate and post-result cleanup"
+      }
+    ]
+  },
+  "limitations": [
+    "Only the 11 complete-read files count. Friend-room roster/settings/lifecycle and reporter producers are supporting reads covered in prior batches; HTTP routes/crypto/state-migrations not counted from fragments or execution.",
+    "Result reproducer uses actual runtime entry/exit and rules transitions from a manually constructed legal terminal fixture, not a full random multi-round match. Sockets, delivery completion and persistence adapters are memory ports; no live server, HTTP HMAC validation, deployment, disk failure or phone validation.",
+    "PR-08-001 is confirmed for upgrade friend-room ranking result accounting; configured round-limit/rotating match-ended and duplicate custom accounting are not claimed affected. PS-08-001 blocks the same-match public event channel, not proven to stop card turns or the separate ranking-result channel.",
+    "Facade/store audit does not mean account/merchant/tournament domains or their endpoints have all been reviewed. Redis remains a documented single-instance prototype. Public legacy result timeline fallback has weaker compatibility normalization; no active producer mismatch promoted as a new finding.",
+    "No product modifications, build/generation, git mutations, real data access, network callbacks or usage-credit reset. Original five dirty files preserved. Agents remain unavailable; root independently completed this subgroup."
+  ]
+}

@@ -1,0 +1,541 @@
+{
+  "batch": "effect-renderers-24",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectDesignSystem.ts",
+      "sha256": "3026128f74bc1065383b1cd4a274ce6671478940027731e3612490d681207823",
+      "lines": 261,
+      "notes": "完整261行。核冻结调色/层级/字号/时间线/画质预算、新Color不共享、level归一化与风格映射。既有design回归通过，真实renderer的18组合活动节点峰值≤声明上限；globalNodeLimit是数据预算而非全局硬限，未推断任意并发都被此数字限制。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/CardBlastReaction.ts",
+      "sha256": "0f2ff3ef43709d008875fe1df77e115d529ad0ff97d386cbdcd3166cdd6f9ab7",
+      "lines": 124,
+      "notes": "完整124行。核专属反应wrapper不改layout、target按Node去重/过滤隐藏失效、固定key变化/距离方向、replacement先归一、cleanup一处、强度差别。6直接反应测试和Controller完整取消/40复用通过；在renderer父handle结束时收尾，不把个别节点提前destroy导致自身handle待父取消误报永久泄漏。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectPrimitives.ts",
+      "sha256": "bd101bf79388506c5e6bb59b73a109ef25cc3335e4e47ffcfab34a6c2524cb57",
+      "lines": 111,
+      "notes": "完整111行。核响应式root初始化、WeakMap层级排序、递归stopTree覆盖components、固定字样/outline helper及空dimmer。实际renderer调用root/layer/stopTree并验证清理；旧label/dimmer无活动引用，列退役候选不删除。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/BombEffectRenderer.ts",
+      "sha256": "7db2ff9bf20962b029176746ecbfcae277341ba7b16d26e2118d88559ede3afa",
+      "lines": 526,
+      "notes": "完整526行。核Sprite-only素材预载、缺body仍按时提交冲击语义、贝塞尔/拖尾与node池、frame先绑定再active、粒子/烟/碎片分配预算、sound/impact/震动异常边界、所有子句柄取消和root销毁。18画质/张数、36取消、14失败综合矩阵覆盖此类与六炸，40复用无活动节点残留；画像美术质量未验收。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/SixBombRenderer.ts",
+      "sha256": "8d7d2b4dfe2dd40f3eca650e0edcd768e9a1eb0bd9b74a338de73b256a58c2dd",
+      "lines": 293,
+      "notes": "完整293行。核恰6张门禁、full需6素材/reduced需3、真实卡牌飞行后冲击、不重复画六牌、dim/core/ring/粒子分层、时长上限和shake/reactioncleanup。Controller真实联合测试通过，missing必需层安全退化。六炸使用居中画面冲击层，不能仅因未按target局部定位断言位置bug；待视觉状态验收。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectAssetCatalog.ts",
+      "sha256": "ae4ca9c0e3ce26c190201a4f1e84b5aec6f2c1083f31d05edfbdebc52a7c5dc1",
+      "lines": 226,
+      "notes": "完整226行。核9当前素材+5只候选+39拒绝记录、许可/来源字段边界、构造register前全量校验无半写、resolve与可加载resourcePath区分/质量门禁。9真实PNG文件哈希/325564字节一致，候选/拒绝无runtimePath；不能由声明的CC0/MIT字符串替代上游授权或导入来源验证。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/LegacyCoordinateAdapter.ts",
+      "sha256": "8699d5ca958cee765bc2f2c73426cd6df6865ba40d839cce579f1e4691e9396a",
+      "lines": 93,
+      "notes": "完整93行。核contain/cover/stretch、center/top-left反变换、大小/长度/worldlocal与目标sizefallback、正数检查。600有限值往返通过；当前只有Controller构造后放context，实际Bomb/Six未用映射方法，作为无活动消费者适配器候选，非当前出牌定位故障。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/effect-design-system-regression.cjs",
+      "sha256": "d387aa4d09b5d84639d1aef649dceb8a1a0995a9baf7b0d50f74929af5ef7e74",
+      "lines": 169,
+      "notes": "完整169行并执行通过。真实design+primitives配MockCC，调色freeze、画质/层级/字体、root尺寸、stopTree都核；仍专门保留旧文字/dimmer helper测试，测试经过不等于存在产品入口。actual renderer行为由独立审计probe提供。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/legacy-effect-assets-regression.cjs",
+      "sha256": "525984c93d7b68f63000cc6b5308c187be830475c09ca076b784961da38fc42b",
+      "lines": 84,
+      "notes": "完整84行并执行通过（明确source not available）。本地default verifier只读目录扫描/许可copy哈希，测试可选硬编码外部旧checkout不存在因而未做strict-source。运行前完整复读既有verify脚本266行、不重复计审；移除LEGACY_EFFECT_SOURCE_ROOT继承避免误读外部配置，未外网访问。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "retirementCandidates": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectPrimitives.ts",
+      "line": 81,
+      "symbol": "createOutlinedEffectLabel",
+      "evidence": "assets源码/引用检索仅定义；完整活动Bomb/Six renderer不导入，design回归仍调用。相关字号token也由此旧接口消费。",
+      "recommendation": "单独整改时删除闲置helper与专属测试，先审其它typeScale引用再删token，不连带移除root/layer/stopTree。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/EffectPrimitives.ts",
+      "line": 104,
+      "symbol": "createEffectDimmer",
+      "evidence": "固定返回null；运行时无调用，只有design回归验证null。真实六炸使用自己的位图dimmer，不依赖此函数。",
+      "recommendation": "可在退役整改移除空接口和断言，保留六炸的真实位图层。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/effects/LegacyCoordinateAdapter.ts",
+      "line": 18,
+      "symbol": "LegacyCoordinateAdapter",
+      "evidence": "Controller创建实例后放到EffectRenderContext；完整两活动renderer无legacyCoordinates映射调用，无其他assets使用。",
+      "recommendation": "后续可移除未消费的context能力与实例，并决定将通用转换留测试工具或删除；不要把活动普通飞牌world/local转换一起删掉。"
+    }
+  ],
+  "validation": {
+    "commands": [
+      "node work/guandan-cocos/tests/effect-design-system-regression.cjs",
+      "env -u LEGACY_EFFECT_SOURCE_ROOT node work/guandan-cocos/tests/legacy-effect-assets-regression.cjs",
+      "node docs/audit/2026-09-12/repro/effect-renderers-24.cjs"
+    ],
+    "result": {
+      "renderMatrix": [
+        {
+          "quality": "full",
+          "count": 4,
+          "impactAt": 0.30833333333333346,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 23,
+          "peakNodes": 25,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "full",
+          "count": 5,
+          "impactAt": 0.30833333333333346,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 23,
+          "peakNodes": 25,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "full",
+          "count": 6,
+          "impactAt": 0.43333333333333385,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 26,
+          "peakNodes": 31,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "full",
+          "count": 7,
+          "impactAt": 0.30833333333333346,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 33,
+          "peakNodes": 35,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "full",
+          "count": 8,
+          "impactAt": 0.30833333333333346,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 45,
+          "peakNodes": 47,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "full",
+          "count": 10,
+          "impactAt": 0.30833333333333346,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 45,
+          "peakNodes": 47,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "reduced",
+          "count": 4,
+          "impactAt": 0.24999999999999997,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 4,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "reduced",
+          "count": 5,
+          "impactAt": 0.24999999999999997,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 4,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "reduced",
+          "count": 6,
+          "impactAt": 0.37500000000000033,
+          "busy": [],
+          "peakPooled": 2,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "reduced",
+          "count": 7,
+          "impactAt": 0.24999999999999997,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 4,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "reduced",
+          "count": 8,
+          "impactAt": 0.24999999999999997,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 4,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "reduced",
+          "count": 10,
+          "impactAt": 0.24999999999999997,
+          "busy": [
+            true,
+            false
+          ],
+          "peakPooled": 4,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "off",
+          "count": 4,
+          "impactAt": 0,
+          "busy": [],
+          "peakPooled": 0,
+          "peakNodes": 0,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "off",
+          "count": 5,
+          "impactAt": 0,
+          "busy": [],
+          "peakPooled": 0,
+          "peakNodes": 0,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "off",
+          "count": 6,
+          "impactAt": 0,
+          "busy": [],
+          "peakPooled": 0,
+          "peakNodes": 0,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "off",
+          "count": 7,
+          "impactAt": 0,
+          "busy": [],
+          "peakPooled": 0,
+          "peakNodes": 0,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "off",
+          "count": 8,
+          "impactAt": 0,
+          "busy": [],
+          "peakPooled": 0,
+          "peakNodes": 0,
+          "time": 1.9999999999999953
+        },
+        {
+          "quality": "off",
+          "count": 10,
+          "impactAt": 0,
+          "busy": [],
+          "peakPooled": 0,
+          "peakNodes": 0,
+          "time": 1.9999999999999953
+        }
+      ],
+      "cancellationCases": 36,
+      "missingAssets": [
+        {
+          "count": 4,
+          "quality": "full",
+          "missing": [
+            "bomb.body"
+          ],
+          "peakPooled": 18,
+          "peakNodes": 20,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 8,
+          "quality": "full",
+          "rejectAll": true,
+          "peakPooled": 0,
+          "peakNodes": 2,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "full",
+          "missing": [
+            "bomb.hot-core"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "full",
+          "missing": [
+            "bomb.spark-streak"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "full",
+          "missing": [
+            "common.impact-ring"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "full",
+          "missing": [
+            "bomb.noise"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "full",
+          "missing": [
+            "common.flame"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "full",
+          "missing": [
+            "common.smoke"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "reduced",
+          "missing": [
+            "bomb.hot-core"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "reduced",
+          "missing": [
+            "bomb.spark-streak"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "reduced",
+          "missing": [
+            "common.impact-ring"
+          ],
+          "peakPooled": 0,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "reduced",
+          "missing": [
+            "bomb.noise"
+          ],
+          "peakPooled": 2,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "reduced",
+          "missing": [
+            "common.flame"
+          ],
+          "peakPooled": 2,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        },
+        {
+          "count": 6,
+          "quality": "reduced",
+          "missing": [
+            "common.smoke"
+          ],
+          "peakPooled": 2,
+          "peakNodes": 6,
+          "time": 1.9999999999999953
+        }
+      ],
+      "frameOwnershipCases": 2,
+      "repeatedUse": {
+        "loops": 40,
+        "pooledSteady": 73,
+        "peakPooled": 45,
+        "peakNodes": 47,
+        "time": 63.99999999999701
+      },
+      "reactionCases": 6,
+      "coordinateCases": 600,
+      "assets": {
+        "manifestEntries": 53,
+        "bundled": [
+          {
+            "id": "common.flame",
+            "bytes": 49857,
+            "sha256": "366678a08a7d22ebb87baa7b42005aaaeb0fd51ab751f2d4e7c9edfa61a33e38"
+          },
+          {
+            "id": "common.impact-ring",
+            "bytes": 65336,
+            "sha256": "925b8ac284436f74f9cadf0ecd058da1c08fba65c098e4e34fd220603022f02e"
+          },
+          {
+            "id": "common.smoke",
+            "bytes": 97568,
+            "sha256": "2db2f69874cdb1e5203f2f86803d5debde30402590cf50a810afaba882184616"
+          },
+          {
+            "id": "bomb.body",
+            "bytes": 33093,
+            "sha256": "7ad5d3ecc4715e5bc9809b161b7707809631dc6769c56e5c77f20e951b29ebef"
+          },
+          {
+            "id": "bomb.trail",
+            "bytes": 11561,
+            "sha256": "d5ef21587ab4248dc55d60475f9adfa769dc146d0c5ab14fb4e1574ebbfc9949"
+          },
+          {
+            "id": "bomb.hot-core",
+            "bytes": 41229,
+            "sha256": "bf79dac949bc0ec4f6b2111d926a56a169669beba0199b3041e8ca68237bf4c5"
+          },
+          {
+            "id": "bomb.spark-streak",
+            "bytes": 4030,
+            "sha256": "d17636715dd07c3fdd14aad510f4e6ad2abced7fd4354496b9a699f5c168383d"
+          },
+          {
+            "id": "bomb.debris",
+            "bytes": 7514,
+            "sha256": "10da753e1a9168bf147b0917d254220981642d5a7bac9ce85bccf6dd6ac04f5c"
+          },
+          {
+            "id": "bomb.noise",
+            "bytes": 15376,
+            "sha256": "bcfe8996bbdbf24e79f308dce6ef8673befaa8baf8afceabbb2059b11a9cc359"
+          }
+        ],
+        "candidates": 5,
+        "denied": 39
+      },
+      "engineSources": [
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-manager.ts",
+          "sha256": "fe4fef5bc18c27d953e16d4b1b0f962f568ae0f101f3ea82711f366715d0178d"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action.ts",
+          "sha256": "ca33a1a2bb363ab57e3cd48be146afe8c646e46984b773252d8b883fbff1ec36"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween.ts",
+          "sha256": "923522464ca5fbfe4990525f2c9eb7872fdac4f3f9b598210a9886df772a6aec"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/core/algorithm/easing.ts",
+          "sha256": "f9dc0c58134e2e369bbbc9315ca1b77f2951bec91e8366488fb5cb89a4ad2854"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-interval.ts",
+          "sha256": "2ad01c7284f757fa05c8bb0bb6677323f01624da8abd2ea1bc165c5db5c8aaee"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-instant.ts",
+          "sha256": "130b0b5bd824231744f44db1095f05688963b6f9f8c95d779d774a725f3aa09e"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/actions/action-unknown-duration.ts",
+          "sha256": "0635050f0805f5b660afa30a4bf95fb5bf73f7de110d2c7b22963a76ca62f5c7"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/tween-action.ts",
+          "sha256": "d2189496bc6798a4fb9f3789c9ae718eb738d307d70ca6f57806b102c369e2b2"
+        },
+        {
+          "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/tween/set-action.ts",
+          "sha256": "5a65e20b670130606ed00cef54a5c0268ad56320368c634caab9106a79045ae8"
+        }
+      ]
+    },
+    "skill": "沿用本轮UI/UX Cancellable State Transitions审查原则，实际执行Cocos取消/清理与语义回调，无设计或产品修改。"
+  },
+  "limitations": [
+    "9文件完整1,887行，Controller/queue/registry/ghost pool等此前完整审阅不重复计数。UI层次与坐标矩阵只提供Node平移端口，不是真实Canvas/GPU/选牌/微信弱网。",
+    "直接运行当前EffectController+BombEffectRenderer+SixBombRenderer+CardFlight+CardBlastReaction+TransientEffectNodePool与本机Tween算法；仅卡牌图像GhostPool、纹理加载、sound/haptic/Node/组件端口为内存；没有修改任何被审源码来通过探针。",
+    "统计47峰值是每1/120秒抽样的top/flight动态节点数，不含table/cardreaction固定节点，不是字节内存或全库budget硬限。40轮缓存稳定73节点不是任意长期运行内存泄漏否证。",
+    "9素材哈希符合代码记录，但strict-source未执行；CC0/MIT归属仅核所存文本/路径，不给法律授权保证，不缩减后续第三方/资源/发布边界。",
+    "三个退役候选是维护机会，不新增P2/P3事故或功能入口断言，不等于授权删代码；既有31确认问题仍未修复。"
+  ]
+}

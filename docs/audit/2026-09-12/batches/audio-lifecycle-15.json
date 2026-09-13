@@ -1,0 +1,119 @@
+{
+  "batch": "audio-lifecycle-15",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/audio/ActionVoiceGate.ts",
+      "sha256": "184674cee9347813d845bc3dfc583f3635b588c0f80ee0af6b94c730ccf67d1d",
+      "lines": 15,
+      "notes": "完整15行。核action最新代际、1800ms包边截止与显式invalidate；1800/1801和连续begin对照通过。该门禁只管尚未提交引擎的回调，并不拥有已发出的oneShot，不以此单模块正确推导整条播放链可取消。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/audio/AudioProfiles.ts",
+      "sha256": "ad6ea2886a6da4747d58ad91e99e93fc2122fe1d70c95eca772f60e316f09df7",
+      "lines": 105,
+      "notes": "完整105行。核9事件、6倒计时、冻结配置/variants、legacy映射、三条退役路由和降级层。既有回归和补充冻结/有效数值检查通过。资源来源、素材授权描述仅登记，不因常量评论或文件hash测试宣称商用权利已审核。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/audio/CocosAudioController.ts",
+      "sha256": "6532206873190d1f8a732fdcf31a94d6aa460f19ca0e8ca5cd13aa73144cdfe2",
+      "lines": 236,
+      "notes": "完整236行。核BGM独立source、mode/setting代际、dispose、asset cache与女性语音过滤/节流。确认AUDIO-15-001：74-78的stop控制不了226处playOneShot；实装3.8.8引擎410/430方法执行复现6个生命周期/加载阶段组合，应用asset阶段3个门禁对照正常。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/audio/OptionalAudioAssetCache.ts",
+      "sha256": "b05688d50fb4cdf6bc74e86b825cda477ffa8e319beeb729b93b71fed0933327",
+      "lines": 88,
+      "notes": "完整88行。核可恢复/永久缺失分类、500/1500重试、5秒冷却、inflight合并、同步callback句柄、先失效后取消、销毁不唤醒。既有测试和10例补充探针（20并发listener/同步异步/三次失败/冷却边界/取消）通过。未将无生产者证据的listener抛异常或任意路径增长认定业务缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/audio/PlayVoiceProfiles.ts",
+      "sha256": "e087ad80c4e3196ec4e2a15bced3dc8158718decf042e2f88a7c8858442de292",
+      "lines": 86,
+      "notes": "完整86行。核15物理单/对点数、8种特殊类型、红心配对子按natural/resolution播对应值与王替代拒绝。完整既有audio-effects回归通过。消费权威PlayAction，不把手工不合法action可绕过牌型验证认作本模块规则越权。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/audio-effects-regression.cjs",
+      "sha256": "e9328d6327aea3b367c8e4e73743c8bb1120b3956278d4cb45720756dde08150",
+      "lines": 395,
+      "notes": "完整395行并运行通过，未用--require-build。核真实TS profile/controller contract、女声/红心配点数、退役路由、48条语音与BGM来源hash/缺失条目、现有effects源码匹配断言。含大量字符串断言和资源存在性，不等于引擎声道取消、GPU效果、素材商用授权或当前微信发布包包含源码。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/audio-lifecycle-regression.cjs",
+      "sha256": "7d21b7743177652a1ebbfdc343ec4ac0c89732987650eb1399b2acd33db09321",
+      "lines": 129,
+      "notes": "完整129行并运行通过。真实controller/cache配存根AudioSource，覆盖退役级牌音、钢板、女性过滤、延时发牌替换与asset迟到。stopCount>=4只证明调用stop，不能证明playOneShot已停止；AUDIO-15-001探针以实际引擎方法补足缺口。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/audio-recovery-regression.cjs",
+      "sha256": "d9f05bb6699887b7ed52daf231e1d8363df354fe497267d19aa03e82961b3906",
+      "lines": 116,
+      "notes": "完整116行并运行通过。核cache重试/重复旧callback、latest-wins/过牌同lane、迟到音静默、BGM重试/模式切换/静音和dispose。合成端口在可选资源完成时立即记录播放，缺少Cocos内部第二层异步；不因测试通过否认AUDIO-15-001。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/support/audio-controller-harness.cjs",
+      "sha256": "79904eaaf8cca66958d32d21a16014977f8fc18f78a41f61e1404f6883cf49a2",
+      "lines": 62,
+      "notes": "完整62行。核人工时钟有界推进、真实cache/gate/controller注入、unexpected import拒绝、模拟GameAssetLoader取消同步callback。AudioSource.playOneShot只是push，stop只置playing=false，未真实模拟oneShot对象生命周期；测试替身能力边界记录在AUDIO-15-001而不另计问题。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUDIO-15-001",
+      "severity": "P3",
+      "title": "离桌/静音/销毁取消不到已提交引擎的短音效，并可在取消后才启动",
+      "path": "work/guandan-cocos/assets/scripts/audio/CocosAudioController.ts",
+      "line": 74,
+      "endLine": 78,
+      "evidence": "playFirstAvailable:213-227在可选asset回调检查epoch后调用effectSource.playOneShot。当前Cocos3.8.8 AudioSource.playOneShot:430-452单独异步loadOneShotAudio再play，不把对象赋到source._player；AudioSource.stop:410-420只停止regular _player。故取消时效只覆盖第一层可选资源加载，提交引擎后的pending/active oneShot仍存活。GameScene:508-511隐藏牌桌明确调用cancelTransientPlayback；applySettings:133-139静音和onDestroy:48-56也依赖同一路径。",
+      "validation": "隔离probe从本机3.8.8 audio-source.ts AST提取未经改写的stop/playOneShot方法并转译，与真实CocosAudioController/OptionalAudioAssetCache联动；3边界（隐藏牌桌/音效静音/销毁）×2阶段（引擎加载待完成/已播）共6例均plays=1、stops=0、manager仍跟踪。取消前尚在GameAssetLoader阶段3例均零引擎load；普通clip.stop/自然播放2对照正常。已通过的既有lifecycle回归只断言stop调用次数。",
+      "recommendation": "将需要随牌桌/设置/组件取消的语音与短音效放到可持有、可停止的声道抽象中，覆盖引擎加载完成前后的同一播放代际；不要用AudioSource.stop承诺取消playOneShot。选用公共可控AudioSource.clip/play生命周期或明确支持取消的适配器，保持BGM独立；新增包含第二层异步与已播停止的契约测试，再做微信真机试听。",
+      "boundary": "确认的是本机实际3.8.8方法的生命周期语义和调用链，不是模拟器/微信真机已听见的线上事故；音频后端、manager容量及系统自动播放政策使用内存端口。自然播放结束会释放记录，不称永久内存泄漏。未改变产品音频、引擎或资源。"
+    }
+  ],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 9,
+    "reviewedLines": 1232,
+    "existingTests": [
+      {
+        "command": "node work/guandan-cocos/tests/audio-effects-regression.cjs",
+        "result": "passed; no build requested"
+      },
+      {
+        "command": "node work/guandan-cocos/tests/audio-lifecycle-regression.cjs",
+        "result": "passed; no build requested"
+      },
+      {
+        "command": "node work/guandan-cocos/tests/audio-recovery-regression.cjs",
+        "result": "passed; no build requested"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/audio-lifecycle-15.cjs",
+      "result": "passed; 6 issue cases, 3 asset-stage cancellation controls, 2 normal controls, 10 cache cases, action-gate exact deadline and 9 frozen profiles/11 countdown inputs"
+    },
+    "supportingEngine": {
+      "path": "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/Resources/resources/3d/engine/cocos/audio/audio-source.ts",
+      "sha256": "dc903119f1eda1e3af897d8f79be136196f1b1ae960614a0e1cc414c2743e7ea",
+      "methods": [
+        {
+          "name": "stop",
+          "line": 410
+        },
+        {
+          "name": "playOneShot",
+          "line": 430
+        }
+      ],
+      "coverage": "supporting installed third-party methods only; not included in first-party count or full third-party review"
+    }
+  },
+  "limitations": [
+    "Only these 9 full-read first-party files counted; auxiliary GameScene/helper/engine source not newly counted.",
+    "No actual browser/WeChat/GPU/audio-device execution; exact engine methods retain their original bodies with synthetic backend ports.",
+    "No downloading or true upstream/license validation; audio hashes checked by existing test are not proof of authorization or packaged-build freshness.",
+    "No product edits, build, git, deployment, real identities or network activity."
+  ]
+}

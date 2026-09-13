@@ -1,0 +1,134 @@
+{
+  "batch": "core-team-05",
+  "reviewer": "/root/audit_core_rules",
+  "date": "2026-09-12",
+  "repository": "/Users/mac/Documents/Codex/2026-08-02/wo-yi",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewedCount": 9,
+  "reviewedLines": 711,
+  "coverageBaseline": { "reviewedFirstParty": 128, "totalFirstParty": 629, "updatedAt": "2026-09-12T07:01:51.629Z" },
+  "reviewed": [
+    {
+      "path": "shared-core/src/ai/team/belief.ts",
+      "sha256": "b0500afb3019aaf30e2be188c480b53e1786187fa7cbfa0522a59f9d2d07932a",
+      "notes": "完整114行。逐项检查本手/公开历史/当前出牌按物理ID去重和按牌面扣除双副库存，过牌时历史剩余数/收轮/后来出牌回填，最多3条过牌软证据，共同无放回采样和12/32样本上限，概率平滑/公开不可能为0、局部缓存与复制。coverage是已知库存比例，不是校准置信度；historyComplete标记未直接参与运算。未确认生产缺陷。"
+    },
+    {
+      "path": "shared-core/src/ai/team/handRoute.ts",
+      "sha256": "9f163ec4ed46ab5cf5f5acbe39ea0a4f707131a366129896c59a296e9266d525",
+      "notes": "完整123行。检查按相同牌面归并的计数位图、剩余容量减法、候选去重/单牌后备、pivot分支完备性、memo/greedy、exact传播、1600/350节点及32/12分支上限。物理输入上限27张保证32位位图可用；不把>31张非法API输入当生产场景。26个9张手牌和348个出牌后状态与独立子集分割oracle一致。"
+    },
+    {
+      "path": "shared-core/src/ai/team/handStrength.ts",
+      "sha256": "28a59c0a2b7357f5e17b40948b08efcf6e98efb88f5da212d09b6936ed8f877c",
+      "notes": "完整48行。检查自然炸弹按点数只计一次、路线炸弹/同花顺不直接叠加重复控制、王/配/高牌、紧凑度与strong/balanced/weak、对家<=10张时的support和close边界，以及战术权重单一最高档。数值属于启发式，不将不够激进或保守等主观偏好报缺陷。"
+    },
+    {
+      "path": "shared-core/src/ai/team/holdingShapes.ts",
+      "sha256": "5a5cb469143577ef4b84405c7b29c01861e95b492e74e193838f889b940d3ac4",
+      "notes": "完整100行。检查每类型/长度最大能力摘要，红心配不能替王、天然级牌不能入序列、三带二资源分配、炸弹/四王、同花顺5.5、A2345开关、纯自然同花顺不能兼普通顺、完整手牌响应条件。1014手牌/92517结构候选与权威getPlayInfos摘要精确一致；20100聚合能力比较通过。"
+    },
+    {
+      "path": "shared-core/src/ai/team/journal.ts",
+      "sha256": "c56a97e5fbb7fbe6fbeee7eed6073bc63088418c051e24a83a5ca254ccde63fb",
+      "notes": "完整61行。检查v1可缺省、8条/60000字符和嵌套数值/ID/type界限，JSON复制隔离，输入校验完成后原子替换，roundId变化清空和reset。2484个实际决策日志均可校验；19类非法恢复不改旧日志。诊断记录不参与后续策略输入，服务端checkpoint位于room/table而非state投影，未发现发送journal的活动路径。"
+    },
+    {
+      "path": "shared-core/src/ai/team/parameters.ts",
+      "sha256": "e778436d5f7993c5288f87d8f67c3a96009b7a042b94fccf3a2fd92f1da1c1cf",
+      "notes": "完整23行。核对九项正有限冻结参数、policy引用及hint/托管共用，实验覆盖只出现在scripts/support。未运行调参/复制构建脚本，也未独立复核注释内历史竞赛统计。无运行时配置入口切换低档策略。"
+    },
+    {
+      "path": "shared-core/src/ai/team/policy.ts",
+      "sha256": "37bfea80f59b7aad3e7d9d17031b75d59335e9097749fdcd59ef88c59047b49c",
+      "notes": "完整151行。检查合法候选契约、终手100优先于让牌、对家控制让牌、单张敌人高可信安全反超例外、保留开局炸弹/急迫门槛/拆炸惩罚、路线资源牌力联动、近分层内softmax、排名/日志和逐决策局部缓存。26局2484次当前engine输出均合法且结算，全部公开信息投影，1次真实保护对家分支。没有据启发式胜率宣称最优。"
+    },
+    {
+      "path": "shared-core/src/ai/team/tableOutlook.ts",
+      "sha256": "3e8a478b744d00da86e2a1c1284d6e5215edbc5516f0b44156229529bcf52d83",
+      "notes": "完整33行。核实际席序、零手牌过滤、先到头游停止贡献、对家/敌家概率与reach递推、控制值钳制。真实belief满足0<=finish<=beat<=1，324概率和108 outlook边界检查通过，既有先对家/先敌家必出完测试通过；这是近似估计而非完整对抗树。"
+    },
+    {
+      "path": "shared-core/src/ai/team/types.ts",
+      "sha256": "d35603e5d5faf6cb78644b178f6ee8d4d11a407c4846c61cdd501ca4f35e76f7",
+      "notes": "完整58行。核PublicSeat只含id/team/count、Observation只含本手与公开状态、route exact含义、team-first-place记录/有限概率诊断结构。类型本身不是安全校验；真实decisionRunner及server适配器先裁剪对手手牌，现场提示也只构建公开座位信息。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": [
+    {
+      "kind": "existing-tests",
+      "cwd": "shared-core",
+      "command": "node_modules/.bin/vitest run --cache=false tests/ai-team-model.test.ts tests/ai-team-policy.test.ts tests/ai-team-parameters.test.ts tests/ai-strength-hints.test.ts tests/ai-engine.test.ts tests/hand-hint-policy.test.ts",
+      "result": "6 files / 66 tests passed",
+      "runtime": "Node v26.7.0; Vitest 4.1.10",
+      "startedAtLocal": "2026-09-12 15:05:59 Asia/Shanghai"
+    },
+    {
+      "kind": "holding-shapes-and-partition-oracle",
+      "reproduction": "Markdown probe 1",
+      "shapeHands": 1014,
+      "structuralMoves": 92517,
+      "aggregateCapabilityChecks": 20100,
+      "partitionHands": 26,
+      "partitionStates": 1864,
+      "afterMoveChecks": 348,
+      "maxPlannerNodes": 109,
+      "result": "13 levels x 2 profiles; random sizes1..27 plus targeted wildcards/natural groups. Max(type,length,value) exactly equals authoritative getPlayInfos over legal structural candidates. Aggregation checks preserve holdingCanBeat capability. Independent 9-card all-subset partition oracle agrees in turns and singles with exact=true."
+    },
+    {
+      "kind": "source-engine-through-authoritative-transition",
+      "reproduction": "Markdown probe 2",
+      "games": 26,
+      "decisions": 2484,
+      "hiddenFaceReads": 0,
+      "validatedJournals": 2484,
+      "maxPlannerNodes": 350,
+      "maxJournalBytes": 12546,
+      "reasons": { "opening_keep_control": 26, "team_exit_route": 762, "preserve_bomb_control": 293, "teammate_yield": 488, "no_playable": 610, "finish_hand": 64, "feed_ally_or_plan_exit": 65, "deny_enemy_finish": 175, "protect_ally_from_finish": 1 },
+      "result": "13 levels x 2 profiles; all rounds settle via real transition, all selected cards owned/legal and every pass has a target. Other player hand proxies expose length only. Not a win-rate benchmark or proof of optimal strategy."
+    },
+    {
+      "kind": "belief-and-journal-boundary",
+      "reproduction": "Markdown probe 3",
+      "probabilityChecks": 324,
+      "outlookChecks": 108,
+      "rejectedJournalRestoresAtomic": 19,
+      "result": "Complete synthetic public inventory: duplicate lastPlay unchanged, input unchanged, probabilities finite and finish<=beat, exhausted joker response zero. Journal retains newest8, isolates returned copies, rejects19 malformed restores atomically, resets for new roundId/undefined legacy input/reset. Synthetic inventory is not represented as a legally replayed history; probe2 provides real histories."
+    },
+    {
+      "kind": "scope-and-integrity",
+      "result": "Nine files were pending at128/629 baseline; actual complete line count711 corrects task estimate811. Final source SHA256, HEAD and five original dirty hashes rechecked. Only assigned audit MD/JSON written; parent owns manifest/coverage."
+    }
+  ],
+  "supportingReadsNotCounted": [
+    "docs/audit/2026-09-12/README.md",
+    "docs/audit/2026-09-12/STATUS.md",
+    "docs/audit/2026-09-12/coverage.json (metadata and selected entries)",
+    "shared-core/package.json",
+    "shared-core/tests/ai-team-model.test.ts",
+    "shared-core/tests/ai-team-policy.test.ts",
+    "shared-core/tests/ai-team-parameters.test.ts",
+    "shared-core/tests/ai-strength-hints.test.ts",
+    "shared-core/src/ai/decisionRunner.ts (previously reviewed source/call references)",
+    "shared-core/src/hints/handHintPolicy.ts (policy call and observation portion)",
+    "shared-core/src/lib/legalMoves.ts (candidate enumeration portion)",
+    "shared-core/src/lib/deck.ts (deck and shuffle portion)",
+    "shared-core/src/lib/engine.ts (constructors/transition references)",
+    "shared-core/src/lib/dealing.ts",
+    "work/guandan-windows-source/server/master-bot-policy.js",
+    "work/guandan-windows-source/server/game-session-projection.js",
+    "work/guandan-windows-source/server/duplicate-room-projection.js",
+    "work/guandan-windows-source/server/weapp-room-publisher.js (payload building portion)",
+    "work/guandan-cocos/assets/scripts/game/LocalHandSelectionController.ts (hint observation portion)"
+  ],
+  "limitations": [
+    "No confirmed new finding does not establish optimal tactics, calibrated probabilities or total repository correctness.",
+    "historyComplete is carried in the observation but not directly consumed; actual belief.coverage is required/unseen inventory coverage. Active normal bot and hint callers supply public history; existing truncated-history fallback does not qualify as proof of a wrong override. No separate defect claimed merely because the flag is unused.",
+    "finishedPlayers is not itself used by the model; zero public hand counts exclude finished seats. Normal authoritative callers keep these consistent. No malformed-seat/order API misuse is called a production incident.",
+    "Rule/candidate cross-level caching remains existing CORE-AI-03-C01 in the outer engine; team modules recreate local belief/planner/resolution caches per decision and journal diagnostics are not strategy inputs.",
+    "Only9 target files count as this batch's full review. Tests and supporting source reads do not expand coverage. Three probes use source in memory, no dist/build updates or external services.",
+    "No product fixes, commits, publishing, networking writes, real user data or secret configuration access. Parent refreshes coverage."
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "batch": "core-contract-06",
+  "reviewer": "/root/audit_core_rules",
+  "date": "2026-09-12",
+  "repository": "/Users/mac/Documents/Codex/2026-08-02/wo-yi",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewedCount": 9,
+  "reviewedLines": 898,
+  "coverageBaseline": { "reviewedFirstParty": 156, "totalFirstParty": 629, "updatedAt": "2026-09-12T07:15:06.232Z" },
+  "reviewed": [
+    {
+      "path": "shared-core/src/index.ts",
+      "sha256": "f4297c36201a0ae872df4a50f7e5f0f4831f148df125bae0d9b0ec27f35ba422",
+      "notes": "完整18行。逐项检查18组重导出覆盖规则/权威transition/赛制/贡还/AI/worker/protocol/hints，无重复绑定错误或初始化运行器副作用；源tsc --noEmit通过。真实导入确认旧可变tribute四个API不暴露，自动还贡API仍在；不得以barrel暴露兼容函数推断主流程正在使用旧逻辑。"
+    },
+    {
+      "path": "shared-core/src/lib/ai.ts",
+      "sha256": "5b90ba72d89a26550197bd112407adbe622e050cb4fbbcc2554acac0e593e479",
+      "notes": "完整1行。是../ai的纯兼容重导出，运行时键集合及createAIEngine/runAiTurns绑定与主AI入口相同；没有第二套策略或独立全局实例。旧simulation及外层缓存边界仍沿用既有报告。"
+    },
+    {
+      "path": "shared-core/src/protocol.ts",
+      "sha256": "b45d549102de85b40275070f35a27ba136a156d15f4f1c06ff0ce2126eb7507b",
+      "notes": "完整170行。核31项mutating/6项versioned分类、RoomIntent与权威actor/round边界、HiddenCard/ViewerState/事件与phase映射、正安全requestId/非负安全version及missing/stale分支。578+578数值矩阵和真实gateway/router/game-handler/session/core探针通过，客户端伪造actor/round/revision不进入权威命令。类型不是网络安全验证；复式有独立运行器和验证，不把其扩展命令未列共享表当漏鉴权。"
+    },
+    {
+      "path": "shared-core/tests/context-resolution.test.ts",
+      "sha256": "09a5c44d34f1b42347b19171413dfa052bc065df5146d6a0cdf6877f0a0dc746",
+      "notes": "完整201行、5个测试。核Tube/Plate上下文差异经transition记录、三带二最小足够解释与diagnose/event/state一致、炸弹5.5及8/9/10张四王边界、两配花色解释。测试用局部合成手牌，末项分别测试同花和混花两手，不等价于枚举单手所有歧义；没有声称全牌型穷举覆盖。"
+    },
+    {
+      "path": "shared-core/tests/engine-transition.test.ts",
+      "sha256": "0a8cacbd856b7f80ddd231df13c7d5cf239a2e2c9fdd3433062432c6d0ba4b61",
+      "notes": "完整146行、5个测试。核owned出牌一次revision/事件顺序、5类失败且原状态不变、三次pass返还领牌、出完者对家接风、双下单命令原子结算。不是所有phase/actor/tribute坏输入或整局测试；本批另用真实普通网关补充10条拒绝和伪造actor/round隔离。"
+    },
+    {
+      "path": "shared-core/tests/turn-immutability.test.ts",
+      "sha256": "d1823fb1901cef2234063a3d3035e87443ae2b62b9d7d0bef2a9ad19ea37c295",
+      "notes": "完整117行、2个测试。核事件牌数组/牌值/基础resolution与各state记录分离，playArea与history/trick/last隔离，settlement操作返回/提交态/事件的levels、streaks、rank分离。范围是所触及字段，不将其理解为任意所有嵌套属性/全部历史快照深冻结证明。"
+    },
+    {
+      "path": "shared-core/tests/round-meta-authority.test.ts",
+      "sha256": "aaf314479c460fb18455dc336068710cf27c848f0517abfa53c826c42a24b41c",
+      "notes": "完整51行、2个测试。核prepare写入fromTribute和isAntiTribute对应状态、入口移除四个旧可变贡还API且保留automaticReturnCard。构造settled状态验证prepare，不是从首局一直玩到贡还；抗贡值与返回status一致，不单独穷举各抗贡触发组合。"
+    },
+    {
+      "path": "shared-core/tests/variant-rules.test.ts",
+      "sha256": "3159c6c603f3874d8f340f09a23fc8a432d7ff9d97b221a9cfaea7078562f9fe",
+      "notes": "完整71行、4个测试。核3套记分行、配置拒绝、东固定三轮轮转/身份手牌不换、52配对标记及两同牌同持有者、6个记分/JSON恢复/prepare个人积分延续。createGame使用未固定随机牌，但被断言的不变量与随机分布无关；不是对复式平台结算/实时入桌的集成测试。"
+    },
+    {
+      "path": "shared-core/tests/match-format.test.ts",
+      "sha256": "b31fbcb62d6218100540b96f2a9c5dba76585402b37dca397057c8324a4dbd6a",
+      "notes": "完整123行、9个测试。核个人排名出第三名、关口6/10/A、A三败复位/攻击队归属、13桶随机映射及非法随机值、39组独立局积分、下一局级数/免贡/固定等级和旧配置。102行错误事件名导致免抗贡事件断言不能检出真实事件，确认为CORE-CONTRACT-06-001，仅测试质量P3。随机均匀测试验证13桶映射，不是统计随机性证明。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "CORE-CONTRACT-06-001",
+      "severity": "P3",
+      "title": "独立局免抗贡回归断言使用不存在的事件名，漏检真实抗贡事件",
+      "path": "shared-core/tests/match-format.test.ts",
+      "line": 102,
+      "evidence": "断言搜索event.type === 'ANTI_TRIBUTE'，但GameEvent实际名称为ANTI_TRIBUTE_DECLARED（shared-core/src/lib/engine.ts:142），真实prepare在shared-core/src/lib/tribute.ts:177发出该名称。因此即使独立局结果错误包含真实抗贡事件，当前免抗贡事件断言仍通过。",
+      "validation": "Markdown探针1先用真实core升级抗贡prepare产生{type:'ANTI_TRIBUTE_DECLARED',mode:'double'}，仅在内存向独立局prepare结果追加此事件，并执行原目标it完整测试体：6个原断言仍通过；仅在内存把旧名替换成真实名后同一变异被拒绝。正常未变异测试也通过，产品文件未修改。",
+      "recommendation": "另行修复时将事件名改为ANTI_TRIBUTE_DECLARED，或断言完整允许事件列表；保留一个能检出不应出现抗贡事件的回归/变异对照。测试配置只转译、不类型检查test文件，应考虑对测试单独做类型检查。",
+      "impactBoundary": "当前确认的是测试回归漏检能力缺口，不是当前业务独立局错误抗贡、错误发牌或线上事故。其他独立局state/tribute/roundMeta断言仍有效。"
+    }
+  ],
+  "concerns": [],
+  "validation": [
+    {
+      "kind": "existing-tests",
+      "cwd": "shared-core",
+      "command": "node_modules/.bin/vitest run --cache=false tests/context-resolution.test.ts tests/engine-transition.test.ts tests/turn-immutability.test.ts tests/round-meta-authority.test.ts tests/variant-rules.test.ts tests/match-format.test.ts",
+      "result": "6 files / 27 tests passed",
+      "runtime": "Node v26.7.0; Vitest 4.1.10",
+      "startedAtLocal": "2026-09-12 15:21:25 Asia/Shanghai"
+    },
+    {
+      "kind": "source-typecheck",
+      "command": "shared-core/node_modules/.bin/tsc --noEmit -p shared-core/tsconfig.json",
+      "result": "passed; tsconfig includes src/**/*.ts only, so this does not typecheck the six test files; no build or declaration output."
+    },
+    {
+      "kind": "test-only-in-memory-mutation",
+      "reproduction": "Markdown probe1",
+      "finding": "CORE-CONTRACT-06-001",
+      "result": "Original targeted test body executes6 assertions and passes both baseline and injected real-named anti-tribute event. In-memory corrected name rejects the mutant. Minimal expect adapter implements the exact three used assertion methods; not represented as a full Vitest mutation run."
+    },
+    {
+      "kind": "protocol-and-production-chain-memory-probe",
+      "reproduction": "Markdown probe2",
+      "requestIdChecks": 578,
+      "expectedVersionChecks": 578,
+      "rejectedGatewayInputsWithoutMutation": 10,
+      "result": "Source exports/compat bindings match and retired exports absent. Real gateway/router/game-handler/game-session/core chain rejects invalid IDs/versions/cards/observer/updateState/unknown; successful payload spoofing playerId/roundId/expectedRevision still commits p1,round3,revision8 and advances to p2. Memory send/storage/room ports; no real server entry, socket, disk persistence or private data."
+    },
+    {
+      "kind": "scope-integrity",
+      "result": "All9 files pending at156/629 baseline; actual898 lines replaces approximate996. Source SHA256 and original5 dirty hashes plus HEAD rechecked at completion. Only assigned MD/JSON added, parent owns inventory/coverage/STATUS."
+    }
+  ],
+  "supportingReadsNotCounted": [
+    "docs/audit/2026-09-12/README.md",
+    "docs/audit/2026-09-12/STATUS.md",
+    "docs/audit/2026-09-12/coverage.json (metadata/selected entries)",
+    "shared-core/tsconfig.json",
+    "shared-core/src/lib/engine.ts (GameEvent definitions/call references)",
+    "shared-core/src/lib/tribute.ts (event generation references)",
+    "work/guandan-windows-source/server/weapp-command-gateway.js",
+    "work/guandan-windows-source/server/weapp-command-router.js",
+    "work/guandan-windows-source/server/weapp-lobby-command-handler.js",
+    "work/guandan-windows-source/server/weapp-game-command-handler.js",
+    "work/guandan-windows-source/server/game-session.js",
+    "work/guandan-windows-source/server/weapp-protocol.test.mjs",
+    "work/guandan-windows-source/server/weapp-ws.js (router/gateway/enqueue portions)",
+    "work/guandan-windows-source/server/duplicate-room-runtime.js (request-id/dispatch portion)",
+    "work/guandan-windows-source/server/duplicate-room-model.js (playDuplicate portion)",
+    "work/guandan-cocos/assets/scripts/network/LobbyCommandSender.ts"
+  ],
+  "limitations": [
+    "One confirmed P3 is a test assertion blind spot only. No new production gameplay/security defect is claimed.",
+    "Readonly and union types are not runtime trust enforcement; actual ordinary gateway/handler/session derive actor and round. Unknown shared-protocol types returning null are still rejected by actual routing.",
+    "Duplicate rooms split before the ordinary gateway and independently require positive safe requestIds. Their current optional expectedVersion behavior is not treated as a new issue without a demonstrated bad business outcome; fillBots/watchTable absence from shared table alone is not an authentication finding.",
+    "Tests use constructed state/ranking where specified. Their green status is not a complete-play, malformed-input, deep-freeze or probability-distribution proof beyond actual assertions.",
+    "Prior compatibility defects CORE-RULES-01-001/002 and cache concern CORE-AI-03-C01 are not duplicated.",
+    "No product/test assertion edits, generated files, builds, commits, deployment, secrets or real user data. Test mutations exist only within isolated memory scripts."
+  ]
+}

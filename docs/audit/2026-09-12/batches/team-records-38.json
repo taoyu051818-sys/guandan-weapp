@@ -1,0 +1,228 @@
+{
+  "batch": "team-records-38",
+  "reviewer": "root",
+  "reviewedAt": "2026-09-13",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "docs/TEAM_POLICY_BENCHMARK_20260910.json",
+      "sha256": "c630f77125cca91b2c8e0378d089ebe95a60147d9a1d59c53963ac8eb1f460ab",
+      "lines": 12407,
+      "bytes": 388626,
+      "notes": "完整阅读三阶段元数据、十组参数/场景/汇总及1216条七字段游戏明细（分段按0..1215读取，无省略hash）；核对生产参数和既有跑分/选择/汇总实现。该文件是历史离线数据而非线上策略或真实用户记录。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "commands": [
+      "node docs/audit/2026-09-12/repro/team-records-38.mjs"
+    ],
+    "results": {
+      "passed": true,
+      "games": 1216,
+      "actions": 91633,
+      "cases": [
+        {
+          "stage": "screen",
+          "name": "exit",
+          "games": 64,
+          "wins": 36,
+          "actions": 4796,
+          "paired95": {
+            "lower": 0.453125,
+            "upper": 0.671875,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 0.9851620845234261
+        },
+        {
+          "stage": "screen",
+          "name": "control",
+          "games": 64,
+          "wins": 30,
+          "actions": 4760,
+          "paired95": {
+            "lower": 0.375,
+            "upper": 0.5625,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.0520483731730061
+        },
+        {
+          "stage": "screen",
+          "name": "support",
+          "games": 64,
+          "wins": 35,
+          "actions": 4855,
+          "paired95": {
+            "lower": 0.5,
+            "upper": 0.59375,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.091445794013018
+        },
+        {
+          "stage": "screen",
+          "name": "pressure",
+          "games": 64,
+          "wins": 34,
+          "actions": 4750,
+          "paired95": {
+            "lower": 0.4375,
+            "upper": 0.609375,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.1068054552347697
+        },
+        {
+          "stage": "screen",
+          "name": "reserve",
+          "games": 64,
+          "wins": 28,
+          "actions": 4858,
+          "paired95": {
+            "lower": 0.34375,
+            "upper": 0.53125,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.1120583047856312
+        },
+        {
+          "stage": "screen",
+          "name": "precise",
+          "games": 64,
+          "wins": 30,
+          "actions": 4850,
+          "paired95": {
+            "lower": 0.359375,
+            "upper": 0.578125,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.0472598745834723
+        },
+        {
+          "stage": "screen",
+          "name": "balanced",
+          "games": 64,
+          "wins": 31,
+          "actions": 4847,
+          "paired95": {
+            "lower": 0.40625,
+            "upper": 0.5625,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.1149559819605521
+        },
+        {
+          "stage": "finalist",
+          "name": "exit",
+          "games": 128,
+          "wins": 63,
+          "actions": 9853,
+          "paired95": {
+            "lower": 0.421875,
+            "upper": 0.5625,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.0362162967498878
+        },
+        {
+          "stage": "finalist",
+          "name": "support",
+          "games": 128,
+          "wins": 63,
+          "actions": 9723,
+          "paired95": {
+            "lower": 0.4609375,
+            "upper": 0.515625,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.0354505986438327
+        },
+        {
+          "stage": "holdout",
+          "name": "support",
+          "games": 512,
+          "wins": 263,
+          "actions": 38341,
+          "paired95": {
+            "lower": 0.49609375,
+            "upper": 0.53125,
+            "unit": "paired-deal",
+            "method": "percentile-bootstrap",
+            "iterations": 10000
+          },
+          "p95Ratio": 1.0151362424669894
+        }
+      ],
+      "sameTranscriptPairs": 252,
+      "stageSeedRanges": [
+        [
+          2700000,
+          2700031
+        ],
+        [
+          3100000,
+          3100063
+        ],
+        [
+          3700000,
+          3700255
+        ]
+      ],
+      "recomputedPairedConfidenceIntervals": 10,
+      "originalReporterExactBytes": true,
+      "rejectedMutations": [
+        "wins",
+        "paired-team",
+        "parameter-hash",
+        "stage-seed"
+      ],
+      "productionParametersMatch": true,
+      "writes": "captured memory only; no file output",
+      "limitations": [
+        "No historical game replay or raw timing samples.",
+        "Decision digests do not independently prove hidden-hand isolation or move legality.",
+        "Historical codeHash fingerprints policy.js only, not the full dependency tree.",
+        "Classic five-level first-finisher simulation, not no-shuffle/rotation/duplicate/tournament or real-player win rate."
+      ]
+    },
+    "limitations": [
+      "只重算历史记录，未重跑1216局，未重新构建core或Cocos。历史原始动作/单次耗时未保存，动作摘要不能独立证明合法性、暗牌隔离或耗时分位点。",
+      "代码hash只覆盖编译后的policy.js文本JSON摘要；相同hash不证明整个依赖树、当前工作树与历史执行完全相同。",
+      "场景频次为动作边际计数，不是各场景胜率、联合场景覆盖率或真人水平证明；模拟只覆盖经典五级且头游即停。",
+      "正式九个倍率仍全部为1；候选没有独立统计胜出。不得从历史报告推导全局最优、手机流畅度或已部署新鲜度。",
+      "首次探针在VM数组与宿主数组之间使用strict deepEqual导致原型差异失败；只调整隔离断言为JSON数据比较后全数通过，未记为业务缺陷。"
+    ],
+    "finalChecks": {
+      "headUnchanged": true,
+      "originalDirtyHashes": 5,
+      "reviewedHashes": 629,
+      "uniqueIssues": 40,
+      "firstParty": "629/629",
+      "percent": 100,
+      "generatedCopies": 39,
+      "inventory": "Audit inventory verified: 629/629 first-party files; 39 generated copies.",
+      "gitDiffCheck": "passed"
+    }
+  }
+}

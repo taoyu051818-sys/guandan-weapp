@@ -1,0 +1,899 @@
+{
+  "batch": "document-history-40",
+  "reviewer": "audit_docs_tail40",
+  "reviewedAt": "2026-09-13",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "scope": "81 documentation-boundary items only: 4 architecture-and-contract-docs, 77 historical-notes. Full-document reading is not new first-party source review; historical excerpts and archive scans are not full manual review. No product changes/tests/builds/deployments or external access.",
+  "reviewed": [],
+  "boundaryGroups": {
+    "architecture-and-contract-docs": {
+      "files": 4,
+      "method": "Read ARCHITECTURE, CODE_HEALTH, CODE_FILE_INVENTORY and feature-acceptance-matrix completely; compare selected currentness assertions against existing manifest, current source excerpts and prior audit evidence.",
+      "conclusion": "Active architecture/acceptance references contain confirmed stale AI, recovery-persistence, retirement and source-inventory statements. Extend existing DOC-39-001 only; no new issue count."
+    },
+    "historical-notes": {
+      "files": 77,
+      "method": "20 full-document reads, 51 dated-history boundary excerpt reviews and 6 text-source archive boundary scans. Every selected file independently SHA-256 checked; all 62 parsed repo-local relative Markdown links exist; 3 aug30 snapshots match their documented Git blob IDs.",
+      "conclusion": "History, proposals, retired UI/code snapshots, offline layout tooling, migration boundaries, operations records and runtime specs distinguished. Historical builds/deployments are not current evidence; no historical feature was restored or external/private data inspected."
+    }
+  },
+  "methodCounts": {
+    "full-document-read": 24,
+    "historical-boundary-excerpts": 51,
+    "archive-boundary-excerpts": 6
+  },
+  "totalBytes": 521708,
+  "boundaryReviewed": [
+    {
+      "path": "work/guandan-cocos/art-source/ui-recovery/aug30-baseline/LobbyPageCatalog.ts.txt",
+      "sha256": "05534bb3e85282336aa0a63c48291e6106998836d1a363a39c047821fc05e41a",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 1816,
+      "method": "archive-boundary-excerpts",
+      "notes": "archive-boundary-excerpts: 8月30日目录文本快照，旧模式列表非当前入口；Git blob与恢复说明一致。"
+    },
+    {
+      "path": "work/guandan-cocos/art-source/ui-recovery/aug30-baseline/LobbyPageDomain.ts.txt",
+      "sha256": "3ffdc2310748e74fc338c08a2da9134676c535daf048d5de0051244ecbc91e95",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 25353,
+      "method": "archive-boundary-excerpts",
+      "notes": "archive-boundary-excerpts: 8月30日大厅域快照，旧ClipboardService引用不属活动依赖；Git blob与恢复说明一致。"
+    },
+    {
+      "path": "work/guandan-cocos/art-source/ui-recovery/aug30-baseline/LobbyPlayerProfilePresenter.ts.txt",
+      "sha256": "b7c6bdfb30b4ac9b515120858a23469025e933e3bb66e30a18af19d2bd054a9e",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 7530,
+      "method": "archive-boundary-excerpts",
+      "notes": "archive-boundary-excerpts: 8月30日资料展示快照，旧本地身份算法非当前平台身份；Git blob与恢复说明一致。"
+    },
+    {
+      "path": "work/guandan-cocos/art-source/ui-recovery/rejected/LobbyLandingView.ts.meta.txt",
+      "sha256": "bba9755ff23a6eeadf140bd0a62f25817339c0ebfe5ca6f55a50b04da90a6831",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 172,
+      "method": "archive-boundary-excerpts",
+      "notes": "archive-boundary-excerpts: 归档metadata文本，正文JSON已读，imported=false；非活动.meta。"
+    },
+    {
+      "path": "work/guandan-cocos/art-source/ui-recovery/rejected/LobbyLandingView.ts.txt",
+      "sha256": "d13c10a509fc9006ef81d302516e72e234dc120b524bae21953a383eb7cae917",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 7182,
+      "method": "archive-boundary-excerpts",
+      "notes": "archive-boundary-excerpts: 首行标注Rejected 2026-09-06、outside runtime、do not re-enable；只核归档内容/入口。"
+    },
+    {
+      "path": "work/guandan-cocos/art-source/ui-recovery/rejected/lobby-landing-regression.cjs.txt",
+      "sha256": "6dd38450688f0237066132af8a47e7725b167e8d3d08953b12e5462c4007a613",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5503,
+      "method": "archive-boundary-excerpts",
+      "notes": "archive-boundary-excerpts: 首行标注历史测试而非活动验收门禁；未执行旧测试或审阅全部源逻辑。"
+    },
+    {
+      "path": "work/guandan-cocos/asset-library/retired-audio/level-card/README.md",
+      "sha256": "becf0bef8a5932eab570cfb5b2c7edfd2c73945f96c615cf4c7859717aaf3a57",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 491,
+      "method": "full-document-read",
+      "notes": "full-document-read: 9月8级牌音效退役README，原路径/哈希/meta/禁止自动启用明确。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/ARCHITECTURE.md",
+      "sha256": "e990fdfac414b5cabcff2ead47de1c70cc8766894ba9ac308d8b5edf919f447c",
+      "category": "documentation-boundary",
+      "group": "architecture-and-contract-docs",
+      "bytes": 32712,
+      "method": "full-document-read",
+      "notes": "full-document-read: 当前架构指导混有旧AI模块/36副本、快捷语、不持久化恢复凭证及退役页面热点；DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/CODE_AUDIT_AUDIO_PROFILE_FIXES_20260908.md",
+      "sha256": "ababa64621a2173a746921ed221e4e830d163a255d40f2b05e2231b67b1b0347",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4454,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日音频/资料抽查修复记录；旧通过结果不覆盖第15批短音效取消缺陷，真机待验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/CODE_AUDIT_FOLLOWUP_FIXES_20260908.md",
+      "sha256": "f38a144145e83e891e3b34566ca811e65f1e600e7a7a69ff01a3d2a319b288c7",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4946,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日抽查及storage拆分；明确非全仓安全审计、未部署/上传，325文件数字仅该轮。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/CODE_AUDIT_RECOVERY_FIXES_20260908.md",
+      "sha256": "8ffe9e180257b40dff4d7d6fec2b0ac1fc3aa8cb07f8d686d2c5d9c5a3c0d2e8",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4709,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日入桌/退出/回执恢复；本地丢包fixture非公网，328文件/包体为历史。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/CODE_FILE_INVENTORY.md",
+      "sha256": "b26011ba597e14b7c3801b802098f5ad5675c7389a8ca1db8eaf56fa1615ba10",
+      "category": "documentation-boundary",
+      "group": "architecture-and-contract-docs",
+      "bytes": 42147,
+      "method": "full-document-read",
+      "notes": "full-document-read: 全文319条文件行表已读；24路径消失、69当前同范围路径未列；当前239客户端TS/40coreTS/85serverJS。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/CODE_HEALTH.md",
+      "sha256": "2d4b53603cfa8ea275d9ed56b1f8484c7e1230300cbd64ec100bfd93379559a6",
+      "category": "documentation-boundary",
+      "group": "architecture-and-contract-docs",
+      "bytes": 10534,
+      "method": "full-document-read",
+      "notes": "full-document-read: 9月8日审查有范围限制，但当前计数/undo/master热点已过期；保留历史包体/测试结论，不作现行健康保证。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/CODE_SMELL_FIXES_20260908.md",
+      "sha256": "a5cfb323c412ca853eb0b2f209e042d239a3570c9781ddbb08a4c0a917dc5ec7",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4229,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日抽查修复；明确未提供跨房持久化隔离，旧测试不排除后续审计缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/EFFECTS_AND_TESTING.md",
+      "sha256": "d0b10c5e3193d700cefdd84012c4a8d6060c2d2003e7dd50b40209f3440e6034",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 11357,
+      "method": "full-document-read",
+      "notes": "full-document-read: 活动参考仍写逢人配/流光/流程VFX/设置/实验室及旧React/原微信构建；现行非炸弹只保留飞牌/报牌。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/FRIEND_ROOM_OBSERVER_20260908.md",
+      "sha256": "6128b667591419c9fa663432cbc4dd29b9cde9471c2b9dae2668e06a3e490cd3",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5373,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日观战/换座交付；本机15秒与可控时钟、三端配套及真机待验明确，不排除SA-01-001等。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/MORE_FEATURE_RETIREMENT_PLAN.md",
+      "sha256": "b5c52524c675c1db37a42bf201fd724df9afebbd7b8ecdd5aa7f492612b56993",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3829,
+      "method": "full-document-read",
+      "notes": "full-document-read: 8月7日计划把更多/设置/人机/旧缓存当应保留入口；被9月8日清理取代，不据此恢复。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/RESIDUAL_CLEANUP_20260908.md",
+      "sha256": "ceb71bd0c6b2e9da7572d861d18d1ed02dfcceb725de4aa221a34ef25e651a0f",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 6698,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日17文件退役与RoundRecord报告；历史包体/哈希、mock和未上传范围清楚，JSON证据链接存在。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/RESPONSIBILITY_SPLIT.md",
+      "sha256": "2346e6194f1914c5e93c403424e80d1be41b444094dc43dc07dad19edbc5ac78",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4247,
+      "method": "full-document-read",
+      "notes": "full-document-read: 9月8日第一批拆分；旧行数/预算与贡还动效接口只属当轮，非现行接口保证。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/RESPONSIBILITY_SPLIT_PHASE2.md",
+      "sha256": "7c7a3705a8bb4875c461e1aa044dc8bba9c7873742f61fbe686eeafb8f4d5eae",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5859,
+      "method": "full-document-read",
+      "notes": "full-document-read: 9月8日第二批拆分；真机待反馈/未部署后端清楚，旧React尚未分家已被后续隔离取代。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/RETIREMENT_PACKAGE_AUDIT_20260908.md",
+      "sha256": "eff9cf9c8fbcacd4295e32188596e7db09336f767aa6d0567d3b042eb4ca366d",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 9007,
+      "method": "full-document-read",
+      "notes": "full-document-read: 3行明确上一轮记录；实验室/音频退役有效，快捷语仍存/赛事toast属于9月9日更新前历史。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/VFX_DESIGN_SYSTEM.md",
+      "sha256": "6095c70b966a38c46bebb7187ccb19e49d61f5fd5ad6a4d6e4f071b9a7d8be61",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 6377,
+      "method": "full-document-read",
+      "notes": "full-document-read: 活动规范保留颜色/预算/Graphics禁令；EffectLab验收和非炸弹/流程运行映射已过时。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/classic-modes-no-shuffle-20260910.md",
+      "sha256": "e863fd7cc96e534967606d7724861ab9722527f0dac6eb8d5d00728fc9abb6c6",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4932,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月10日三模式/不洗牌交付；后端配套、构建模拟和手机待验分开，旧模式名非第四入口。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/commercial-ui-asset-inventory.md",
+      "sha256": "9214b5005d63f73692a272e8be59a919806840491a7ed3d98bb221fd00f10de7",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 7127,
+      "method": "full-document-read",
+      "notes": "full-document-read: 8月31日素材决策；不访问Downloads来源，候选非当前assets；授权合图仍受SOURCE-39-C01限制。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/counter-nicknames-20260908.md",
+      "sha256": "fb06cd4d133e1254f3768b94e07795334c71eb6825480a0457a9ea174b3f04f5",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2908,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日机器人网名/公开同花顺上界；非暗牌或概率，后续HAND-26-002误亮仍未修。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/default-profiles-20260910.md",
+      "sha256": "02cea20885b5d017b31839a7f4e65ffc63c26836a853c4f746363df4e2e0f99f",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3801,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月10日默认资料/上传记录；50请求范围不等于50成功素材，权利/真机待验保留，不访问QQ/UAPI。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/duplicate-eight-seat-20260909.md",
+      "sha256": "60125a380b7b3dbaeb2181cd8513a920fe66380c40141f69ca6fcb8314ad8fb7",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4176,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9日八席双桌本地交付；多端发布/真机待验清楚，跨桌需求不排除CS-01-001等。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/effect-lab-fixtures.md",
+      "sha256": "39738a7d455a1965609be584d703bddfc58fa80641e608e1635d575b224873bd",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5556,
+      "method": "full-document-read",
+      "notes": "full-document-read: 3行明确9月8日实验室完整退役；DEV/UI/控制台段仅历史，固定牌留在测试，不恢复产品入口。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/engineering-quality-20260910.md",
+      "sha256": "792dd94d195ce6361d2b768be6612db65ba31e4c842e0053830eebb3764e0ec5",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3565,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月10日排名/时钟/行为回归记录；不代表真机、容量或发布，未重跑或改变门禁。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/feature-acceptance-matrix.md",
+      "sha256": "604e63317480ec7975b51d7f592e1d612a9569053def533f5408d0fadb3096f5",
+      "category": "documentation-boundary",
+      "group": "architecture-and-contract-docs",
+      "bytes": 15486,
+      "method": "full-document-read",
+      "notes": "full-document-read: 8月5日矩阵仍列undo/redo、EffectLab、快捷语/男声和旧任务/HTTP观战UI；7秒补位已变3秒。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/friend-room-bot-buttons-20260909.md",
+      "sha256": "1e50713731433da8d2ae49be423dc6fe064abb0d79c27f7d14163cad26f43c28",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3581,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9日逐席机器人及release记录；不查询当前线上/备份，微信真实按钮与联网仍待验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/friend-room-direct-table-20260909.md",
+      "sha256": "1c1fece7a625eb44e14514c6482d3277711fae289404bd7a6183533064375d86",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2645,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 3行说明后续恢复六位房号弹窗；仅创建为上一阶段，长口令仍退役。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/friend-room-invite-20260908.md",
+      "sha256": "da8212d6f1acba7c76083b08b86f05100ca4f73c17c384c3ee756849a9bc4864",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4234,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日机器人/换座未做为历史，后续bot/number/duplicate已推进；分享仍仅wx替身。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/friend-room-number-and-variants-20260909.md",
+      "sha256": "a8270f74dc683bbcfdb57e8a240f042c9eefc7651bd84d3bef42b0305d5a69a3",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5025,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9日房号阶段记录；八席未实现被后续variant/duplicate文档取代，非当前能力缺失。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/friend-room-settings-20260908.md",
+      "sha256": "5a8854c2abd6d3ff2519a005eb2d0d3bcd8ddfbb0cf3f4d78efb49e08a920173",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5808,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8日经典设置与未决参考图；转蛋/复式待定是历史，不以设置已接通排除PG-17-001。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/friend-room-variant-rules-20260909.md",
+      "sha256": "b80d41da68154f20ec300987a9e9b021a86f7b588acf2881dff2b645d1cb8660",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4041,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 3行有八席已实现更新；旧未实现仅历史，转蛋自动换队RP-13-001仍未修。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/gameplay-audio-effects-spec.md",
+      "sha256": "3fdfae215aee76bb8ea911a41c56b21c7ed33d7b6cf4c7867e0eeb352efb2a6c",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 15451,
+      "method": "full-document-read",
+      "notes": "full-document-read: 8月4旧基线局部更新至9月7；单机定庄/非炸弹VFX/级牌声/实验室建议与当前不符。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/guangzhou-wechat-deployment.md",
+      "sha256": "bffc260093d465a5e3ef7afa1cb62423074aba637be3dcd99e8adf13b32240c0",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 11964,
+      "method": "full-document-read",
+      "notes": "full-document-read: 9月5部署加9月6/7补记；命令仅阅读，release/健康/包体仅历史，单实例与真机限制有效。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/hand-centering-20260906.md",
+      "sha256": "3a95169461ac42c80487067293df6b4f31570ff0d4e43c6896b1ce344030c8bf",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4000,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6撤销强制分区；保留遮挡告警及小屏缩放非触控限制，不把固定局当当前入口。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/hand-group-labels-20260908.md",
+      "sha256": "1c64cac49ef6b3be62fc72984b3849415d8a60fb1d394ade3209ae8d51fdde38",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2638,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8标签与wildcard退役；声音/meta包外与当前AudioProfiles一致，真机读字/听测待验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/hand-lock-selection-20260910.md",
+      "sha256": "78a971f4da0e3fde2e4efc6598229e6d27a5bd4e464d0277c8a2fd2da0a38bc1",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4218,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月10锁牌/模型收口；浏览器内存状态非真机，不排除UI-25-002按钮高亮缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/hand-touch-origin-fix-20260906.md",
+      "sha256": "6bc2ae5ba4eb314ad4d8b6199e88b0e47bfd7b96d98c5b8b08238ec67a68cb68",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3417,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6触摸投影修复；模拟投影非鸿蒙真机，可进大厅不代表全部操作通过。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/hong-kong-bare-ip-test.md",
+      "sha256": "7c919a19d2d71c94b0ea7bdd1fd7cb899db05a04796afb6afa4423060d04f24b",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3886,
+      "method": "full-document-read",
+      "notes": "full-document-read: 开发裸IP说明仅测试账号/端口收尾；75行7秒已为3秒，未执行部署或放宽配置。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/in-game-abstraction-20260910.md",
+      "sha256": "ed8843e12bfc3c8ca8c4fb8bbacde2bde56792ae516686455eb1657895f34ae0",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2914,
+      "method": "full-document-read",
+      "notes": "full-document-read: 14行明确HandGroupingHistory/meta/undo/redo退役；31行旧赛事超预算后续已修，不新计。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/legacy-absorption-inventory.md",
+      "sha256": "3d76f20cbda6be2c4bec495563df4ca049a31efbcde5fc78d7394b6e9172bb89",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 35834,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 8月4/5/7旧工程吸收；读章节/日期/状态/退役/限制段，非417行全文；男声/undo/聊天/实验室已过时。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/legacy-effect-migration.md",
+      "sha256": "49ed6f744fc31fb218f4c99a7a27a22463ccf66c523c00431556064b61cc7885",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5927,
+      "method": "full-document-read",
+      "notes": "full-document-read: 5 allowed/39 rejected/0 runtime与39批证据一致；EffectLab验收/旧流程VFX运行描述过时。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/lobby-approved-cocos-20260907.md",
+      "sha256": "f3adccd2b93ab29a4166384b8552db37373b7e4ead867ccf098850b5deea24f2",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2805,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7候选02迁入；脚本条件skip/隔离浏览器不当线上或真机，覆盖旧候选。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/lobby-aug30-restoration-20260906.md",
+      "sha256": "0b42f436a86cd960da657571df46453a37b4ea8a4f8da006e8c14cd127082b0e",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2902,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6恢复记录；3份文本Git blob复算全符，不虚构8月30提交，拒绝设计txt在包外。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/lobby-flow-polish-20260906.md",
+      "sha256": "e2bc0695fbe1831e3ecf656d2f2caff4fd62e0e3e783c284649f9674eeaae543",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5512,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6大厅/匹配候选；像素差及受控异步非完整真机，未重建微信/部署，旧网址不作活动服务。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/lobby-motion-20260907.md",
+      "sha256": "76d6a4830862b12ccd42b5974b910e9ec47151c462653d0d65b714cc8f89a36b",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4076,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7轻动效；骨骼未交付、预览禁网络且手机帧率/耗电未验，不误作业务成功。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/lobby-profile-release-20260908.md",
+      "sha256": "b545e9568bf7829d57dd846a4fe47bc38a3af192058ef53c5b388730ebefa75a",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4001,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8赛事仅toast被9月9赛事中心取代，资料授权真机未验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/lobby-reference-layout-20260906.md",
+      "sha256": "f49663ea3e23ccf439651c32e39bafe5509b99be943f60b069188f3b7bd65673",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3916,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6参考方案后被恢复/approved覆盖；不据旧设置/更多说明重启退役功能。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/lobby-refinement-20260906.md",
+      "sha256": "01941ff1cb30b0544a732c1a67502e19d1232788a8a727f6cfed0a8cc46bf2e7",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4784,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6审美候选；DPR缩图/模拟器CSS恢复与未微信部署明确，不作当前手机版本。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/niuma-audio-import.md",
+      "sha256": "6085fed5f4532735b8299101b8493eec77268ee476bba68fce23c9626517e220",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3986,
+      "method": "full-document-read",
+      "notes": "full-document-read: 女声/男声/快捷语退役边界基本清楚，但36行仍要求OGG快捷语和五按钮听测，和13/17行自相矛盾。DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/profile-preselection-polish-20260907.md",
+      "sha256": "463743eb3358f5f8fc6db1c0ac7e38624ed29e8444bd45760922103867a4938a",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5608,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7资料/快捷语/预选；聊天9月9退役，主动授权和浏览器样例不能当真机。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/random-level-friend-room-20260907.md",
+      "sha256": "8562830dce6fd8e9756fbd208d890fad740d62d802f9b08bb14638f3719c787a",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5944,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7旧quick/classic全随机单局范围被9月10三模式扩展，非当前模式全集；需双端发布。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/remaining-card-count-20260907.md",
+      "sha256": "eccf87f93acd0d839f51f2b829ae8ee4c029bac6b393c482d10ba6c48f16b109",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 1826,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7公开余牌10阈值；显示样本非真实出牌到阈值，不涉及隐藏牌或重新发牌。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/server-variants-release-20260909.md",
+      "sha256": "70c7543703e8ff5ce0bbf370535a3359a1bb27ac3bb29cac6d13d89ad99b9416",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2795,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9授权服务端release历史；不查询当前生产/备份，转蛋/复式多人手机待验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/side-clock-release-20260907.md",
+      "sha256": "135314ff41aae12c20aa3a4fcc0e12a9bbd0676cb58d0e67db5e15635037c09b",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4110,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7时钟/匹配节奏；自动/构建模拟/手机/客户端更新分开，线上状态本批未复验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/table-card-polish-20260908.md",
+      "sha256": "7a3891f42c087a818ed4091bcdf5b62a4ce56b2640bbfd6fa619f2c1a7a1a286",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2479,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8记牌器/牌面；375px非横屏目标，样例已清除，真机读字/触控待验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/table-controls-20260909.md",
+      "sha256": "af99308d5c1168f5b3715f7763eb3d4810e556c05aa21edfac696b30fcd45092",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2334,
+      "method": "full-document-read",
+      "notes": "full-document-read: 9行聊天UI/协议/音频全退役与当前守卫一致；19行release仅历史，本批未查线上。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/table-matching-20260908.md",
+      "sha256": "8b231dd96fa290ddc486c5c2236545acf0b6880e7c13b873820b99532316f19c",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3380,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月8桌内匹配；读实现/示例/发布边界，真实排队/取消/后台仍待手机。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/table-polish-20260910.md",
+      "sha256": "fbc3878225ca842e65928fd59502115ff7d57d10fd30476a19f2d39cbd9f44dc",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 1890,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 5行500–1500ms与当前500–3000ms及10%三倍不符，历史调速DOC-39-001扩展。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/table-polish-bot-pacing-20260907.md",
+      "sha256": "0992934e3bf9075105398dd63d2ad32686a73d03b14996d423409c387e3ed751",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5465,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7层级/节奏；浏览器失败不冒称截图通过，微信包/服务发布分离，非当前时序保证。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/table-seat-flight-polish-20260907.md",
+      "sha256": "35f03673176e77ef00ee141732cffcaa9961d046a7f72d47367d5b67f70a6967",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4121,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7座位/80%飞牌；mock/告警/真机待验分开，不排除UI-25-001动态视角缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/teammate-view-20260907.md",
+      "sha256": "167b1b9b599ead9b55412afe60c0dba0b1da7ec3e84acb0308b36843af0472d1",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4498,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7队友视角；旧视觉任务暂停不控制本轮审计；固定局/裁切画面非四端手机。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/tournament-center-20260909.md",
+      "sha256": "2a02b223e944bbb68e7520a2f68e1c1a9783c35dd0d6b2682678d73cb5902da4",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 3403,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9免费16人三轮赛事取代旧toast；签名结果fixture非16手机全流程，TO-11-001未修。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/tournament-polish-20260910.md",
+      "sha256": "2bdca0629493e1982828b28015f33139e57b0ac46820b1d6c9a3a181c5de9e79",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2160,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月10赛事刷新/取消；素材/自动1秒同步属于当轮，未上传/未16手机验收。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/tribute-controls-20260909.md",
+      "sha256": "6469c06cec6a900cd855d5184274437a53e4febfe8201a9ff8201cd19132d560",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2402,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9贡还/级牌；防御性规则强化与上线分开，红心配听测/贡还手机待验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/ui-frame-system-20260909.md",
+      "sha256": "914b05943f11840f595623e17cd552c61124ba11fd1fc19f3e83e61de4455e21",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2872,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9统一UiFrameStyle约定；38行快捷语弹层是退役前历史截图，非活动入口。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/ui-product-polish-plan.md",
+      "sha256": "16d91d1194b54f93cbfada327e0febf8a008949d4b70de420750cc191c3924e8",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 6266,
+      "method": "full-document-read",
+      "notes": "full-document-read: 9月5待实施方案；不当已实现或新增授权，7秒及旧页面安排被后续交付取代。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/ui-recovery-20260905.md",
+      "sha256": "d4ff0dbb9f6857dfbc595e392af046d64d95287e88df4a8d03dbffa8a85927df",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 8131,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月5恢复历史；外部tar不读取/恢复，不整包覆盖；7秒/平面选牌是当轮状态。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/visual-flow-polish-tracker-20260906.md",
+      "sha256": "24eab4b437aa2b3332e2042c60a79b1c5260bc931f871ce54f8d4030f6b46334",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 19637,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6开始/9月7暂停旧视觉任务；定向段落非180行全文，旧automation及历史active不控制automation-2。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/wechat-friend-ranking-20260909.md",
+      "sha256": "45c079f2c28cc156720453c330c6070e473e3d08ad20f7356d668595865955f8",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 4663,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 同小游戏/上传键条件清楚；浏览器无真实好友，不核后台或好友数据，sharedCanvas手机待验。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/wechat-match-recovery-fix-20260907.md",
+      "sha256": "c3569f5df99e6264234a2f32eaa5156eed551897e97d24b6d04f65c35ab56fcc",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 6272,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月7继续牌局修复；无URL/crypto包内mock非真机，新包须重取且未自动上传。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/wechat-profile-friend-room-fix-20260909.md",
+      "sha256": "02f81e0a339820bd3d0252f2f8525d6fea089108b5446cf532337637bacb0cb8",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5378,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月9资料/字段与旧线上版本冲突记录；非手机唯一根因，真实授权待验，当前release未查询。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/wechat-startup-layout-audit-fix.md",
+      "sha256": "3448368b87f416aae608b1ee7546ee4063f098531f101a9b074ef7b55d6b8488",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 2117,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月5启动/布局修复；手机重测未代办，无上传/服务器操作，本批仅证据边界。"
+    },
+    {
+      "path": "work/guandan-cocos/docs/wechat-startup96-compatibility-fix-20260906.md",
+      "sha256": "e90ae035295244014fcf44fe9a051fe4a4dab7d35ea68a4f8064c121144e27d2",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 5534,
+      "method": "historical-boundary-excerpts",
+      "notes": "historical-boundary-excerpts: 9月6条件URL复现不证明设备唯一根因；工具可见不算真机，无上传/部署。"
+    },
+    {
+      "path": "work/guandan-cocos/migration/README.md",
+      "sha256": "c958313774bfbe4b5da262a1d7a57a11bbaac1188cf1ef9b018b52941997bda3",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 597,
+      "method": "full-document-read",
+      "notes": "full-document-read: 迁移源码禁止.meta/assets导入，恢复须产品入口/所有权/测试/包体验收，非当前运行功能。"
+    },
+    {
+      "path": "work/guandan-cocos/tools/lobby-layout-lab/README.md",
+      "sha256": "c49d8c9ed9c07fe5866d1c5dd425514b01cc09249ce227d246dc24c92a55b3d4",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 6622,
+      "method": "full-document-read",
+      "notes": "full-document-read: 离线Canvas布局工具，候选02复用正式几何，01/原版仅历史；回环只读/模拟业务不进游戏，不与退役EffectLab混淆。"
+    },
+    {
+      "path": "work/guandan-windows-source/docs/existing-profile-reset-20260910.md",
+      "sha256": "8a4ab218ca198323c0611da2eec96be56377fd942930facaf0fa15f79a2f8077",
+      "category": "documentation-boundary",
+      "group": "historical-notes",
+      "bytes": 1563,
+      "method": "full-document-read",
+      "notes": "full-document-read: 3普通用户/99跳过的历史授权重置；不读生产/备份，13行禁止无新请求重跑与全库恢复覆盖后来数据。"
+    }
+  ],
+  "checks": [
+    {
+      "method": "Read-only fs/SHA-256 of exact manifest paths",
+      "result": "81/81 current hashes match manifest; 0 changed paths."
+    },
+    {
+      "method": "Parsed inline Markdown relative link existence within repository, excluding external/absolute URLs and anchors",
+      "result": "62/62 target paths exist; not a complete link/anchor/network verification."
+    },
+    {
+      "method": "git hash-object without -w on 3 archived baseline text files",
+      "result": "LobbyPageDomain=22a2971a52e07598c6d3e72207f0e1e9830a52cf; LobbyPlayerProfilePresenter=19edb54d7c5aa136fa450d9a49a29eef26ae7cc2; LobbyPageCatalog=2b634bcb6b019b02d5f7d35a95042ba606b0787d. Exact agreement with lobby-aug30-restoration-20260906.md:11-15."
+    },
+    {
+      "method": "Static rg on assets/settings/profiles for archived recovery roots, rejected module name and snapshot name",
+      "result": "No matches (exit 1 is normal no-match), consistent with nonruntime txt location and prior source graph audit; not a fresh build/bundle proof."
+    },
+    {
+      "method": "Parse 319 old inventory path rows; compare current manifest .ts/.js directory sets and read-only path existence",
+      "result": "24 old rows absent, 69 current paths unlisted. Current same directory/suffix counts: client 239, core 40, server 85, total 364. Generated client entries still not distinct first-party source coverage."
+    }
+  ],
+  "findings": [],
+  "findingExtensions": [
+    {
+      "id": "DOC-39-001",
+      "severity": "P3",
+      "title": "Extend stale documentation evidence to active architecture, acceptance, inventory and audiovisual guidance; count remains 41 total issues",
+      "evidence": [
+        {
+          "path": "work/guandan-cocos/docs/ARCHITECTURE.md",
+          "lines": [
+            35,
+            44,
+            89,
+            143,
+            149,
+            163,
+            269,
+            271
+          ],
+          "detail": "Old policyOverrides/fallback/runtimeIntel ownership and 36 copies; shortcut chat; assertion resume tokens are never persisted; old retired page hotspots. Current ai/engine.ts:8,21-29 uses team journal and a single highest policy; LobbyController.ts:104,407-409,470-480 and LobbyResumeSession.ts:53-70 persist/restore normalized resume records."
+        },
+        {
+          "path": "work/guandan-cocos/docs/CODE_FILE_INVENTORY.md",
+          "lines": [
+            13,
+            14,
+            15,
+            129,
+            232,
+            246
+          ],
+          "detail": "211/37/71 dated table versus 239/40/85 current sets, including now-absent HandGroupingHistory/ChatController/QuickChatPolicy. 319 rows = 295 existing + 24 absent; 364 current = 295 listed + 69 unlisted. CODE_HEALTH.md:9-11,63-70 repeats old scale/hotspots."
+        },
+        {
+          "path": "work/guandan-cocos/docs/feature-acceptance-matrix.md",
+          "lines": [
+            27,
+            31,
+            34,
+            35,
+            36,
+            37,
+            38
+          ],
+          "detail": "States 7s bot fill and implemented undo/history, fixed playable labs, chat/male voices. Current match-bot-fill.js:6 is 3_000; round-view-boundary-regression.cjs:47-48 and quick-chat-regression.cjs:5-11 explicitly guard removals; retirement manifest/source guard plus batch31/39 substantiate no EffectLab runtime."
+        },
+        {
+          "path": "work/guandan-cocos/docs/EFFECTS_AND_TESTING.md",
+          "lines": [
+            19,
+            20,
+            43,
+            48,
+            49,
+            50,
+            71,
+            73
+          ],
+          "detail": "Current-facing special/flow VFX and legacy build instructions outlive retirement. Current EffectProfileResolver.ts:23-25 maps all non-bomb impact VFX to normal flight/voice; AudioProfiles.ts:78-86 explicitly retires wildcard/straight-flush extra audio."
+        },
+        {
+          "path": "work/guandan-cocos/docs/VFX_DESIGN_SYSTEM.md",
+          "lines": [
+            5,
+            68,
+            69,
+            70,
+            71,
+            72,
+            73,
+            98
+          ],
+          "detail": "EffectLab acceptance and non-bomb/flow mappings must be separated into retired/conceptual guidance, not restored from prose."
+        },
+        {
+          "path": "work/guandan-cocos/docs/niuma-audio-import.md",
+          "lines": [
+            13,
+            17,
+            36
+          ],
+          "detail": "36 still requests testing one OGG shortcut and five buttons, conflicting with same-file 13/17 complete shortcut retirement."
+        },
+        {
+          "path": "work/guandan-cocos/docs/gameplay-audio-effects-spec.md",
+          "lines": [
+            3,
+            6,
+            28,
+            29,
+            35,
+            37,
+            76,
+            84,
+            91,
+            170,
+            179
+          ],
+          "detail": "August historical build is partially updated but retains 'unified baseline' language with local grouping, retired special effects and wildcard audio; current runtime status needs a retirement/supersession banner."
+        },
+        {
+          "path": "work/guandan-cocos/docs/hong-kong-bare-ip-test.md",
+          "lines": [
+            75
+          ],
+          "detail": "7s fill expectation conflicts with current 3_000ms constant. table-polish-20260910.md:5 also states obsolete 500-1500ms pacing; current bot-turn-pacing.js:4-5 has 500-3000ms base plus 10% threefold thinking delay."
+        }
+      ],
+      "recommendation": "In a separately authorized documentation change, refresh current guidance from existing source inventories, replace retired feature acceptance with removal guards, and add dated supersession banners to old delivery records. Do not modify product/tests or revive retired features for prose compliance.",
+      "validation": "All listed documentation lines read; selected source assertions independently read/compared. Existing runtime tests were only read, not rerun. No external facts or current production claims inferred."
+    }
+  ],
+  "concerns": [],
+  "limitations": [
+    "51 historical records were reviewed by targeted title/date/headings/content/currentness/retirement/acceptance-limitation excerpts, not complete line-by-line manual review.",
+    "6 archived source snapshots were checked for hash, provenance/content marker and nonruntime boundary, not audited as full first-party executable source. One 9-line metadata snapshot happened to be read in full; it remains classified under the archive method.",
+    "Historical test passes/build sizes/release directories/health requests and device observations were not independently reproduced. No current source-to-package freshness, mobile UX/audio, media rights or upstream blob assurance added.",
+    "No HTTP requests, downloads, credentials, private configs, real user stores, deploy/reset/build/test commands, package installation or mutations outside the two authorized report files.",
+    "Two guessed auxiliary filenames in a read-only rg call were absent; corrected by rg discovery to actual round-view-boundary-regression.cjs and verify-retirement.mjs. This diagnostic lookup miss was not a product finding."
+  ]
+}

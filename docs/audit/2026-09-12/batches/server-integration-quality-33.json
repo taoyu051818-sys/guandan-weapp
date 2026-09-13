@@ -1,0 +1,260 @@
+{
+  "batch": "server-integration-quality-33",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/weapp-friend-ticket.smoke.mjs",
+      "sha256": "0c6101ad0bec8b061e6f241143075a1c87fdb623aa31836b15023aa2df5043a5",
+      "lines": 720,
+      "notes": "完整720行。签名friend票据/entryAttempt、短票与长租约、离席回执/撤销世代、踢人替补、全员准备、慢平台claim+SIGKILL重启、首次开局落盘失败、pending精确恢复、旧JTI/旧token/错用户席位/关闭墓碑。原测试本地隔离通过；撤销检查内存删除由其error响应期限检出。collector为合成ACK，没有真实平台账户或微信调用。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-terminal-lifecycle.smoke.mjs",
+      "sha256": "f20ef09964ca1358bc7320018d491f5d3375683271669510945c38e8c258b9cd",
+      "lines": 1094,
+      "notes": "完整1094行。8个子场景：局数终场、普通局准备、过A、总时限、平台拒绝开局、claim中掉线、已确认claim崩溃恢复与宽限超时。真实临时JSON/WS/HTTP collector、定点失败注入和停服后合成终局快照；终局落盘前广播内存故障被原断言直接检出。并非随机完整升级场；没有覆盖SL-02-001等全员离线自动准备与待收尾交叉。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-round-state.smoke.mjs",
+      "sha256": "b9a3ccea721c37afdd1e090feb7142a4937256460e6a9850ae5541ae70fba7c3",
+      "lines": 394,
+      "notes": "完整394行。确定性随机种子+加速回合，连续超时托管/取消、离线到期；两副单张领出/其余pass完整局，局间ready/离线恢复、双贡顺序/双方选择隐藏/动态recipient/自动还贡、断线接替/解散投票、抗贡。原脚本通过，canonical贡牌ID泄露内存变异被原断言检出。seed固定和短deadline不等于全部牌型、机器人策略或WAN覆盖；未单独审计计算性能。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-ws.smoke.mjs",
+      "sha256": "d512729d31604598f81cb30deff8676028ce5570b27114ab9e53911b9fa43f17",
+      "lines": 425,
+      "notes": "完整425行。动态回环端口、原Math.random导入seed、客户端state注入拒绝、跨连接entry幂等、四席ready/踢人/取消、版本/身份/手牌隐藏、重复动作及正文冲突、四席单牌链、token轮换/精确重放、旧聊天拒绝/安全退出保位。原测试通过；手牌泄露断言和正文冲突响应超时均检出内存变异。finally原脚本未await子进程退出，审计runner补充owned group清理；不新增与TEST-32-001同类独立问题。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "finalChecks": {
+      "inventory": "586/629; 39 generated copies; --check passed",
+      "reviewedHashes": "all 586 matched; no duplicate file or issue ids",
+      "baseline": "HEAD and all five original dirty-file hashes unchanged",
+      "format": "git diff --check passed",
+      "cleanup": "12 fixed test ports free; zero audit33 temporary roots"
+    },
+    "commands": [
+      "node docs/audit/2026-09-12/repro/server-tests-33.mjs friendTicket terminal",
+      "node docs/audit/2026-09-12/repro/server-tests-33.mjs roundState websocket",
+      "node docs/audit/2026-09-12/repro/server-tests-33.mjs privateHand replayConflict privateTribute",
+      "node docs/audit/2026-09-12/repro/server-tests-33.mjs durablePublish revokedTicket"
+    ],
+    "results": [
+      {
+        "name": "friendTicket",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 12174,
+        "stdout": "weapp signed friend-ticket integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-friend-ticket.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "terminal",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 24159,
+        "stdout": "weapp terminal lifecycle integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-terminal-lifecycle.smoke.mjs\",\"redirects\":2}\n"
+      },
+      {
+        "name": "roundState",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 6836,
+        "stdout": "weapp round-state integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-round-state.smoke.mjs\",\"redirects\":1}\n"
+      },
+      {
+        "name": "websocket",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1040,
+        "stdout": "weapp websocket integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-ws.smoke.mjs\",\"redirects\":1}\n"
+      },
+      {
+        "name": "durablePublish",
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1795,
+        "stdout": "",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-terminal-lifecycle.smoke.mjs\",\"redirects\":2}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: round-limit 安全落盘前不得广播 roundEnded\n\n1 !== 0\n\n    at runRoundLimit (file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-terminal-lifecycle.smoke.mjs:460:12)\n    at async file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-terminal-lifecycle.smoke.mjs:1077:3 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 1,\n  expected: 0,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.7.0\n",
+        "mutationHits": [
+          {
+            "id": "durablePublish",
+            "file": "weapp-match-lifecycle.js",
+            "entry": "weapp-ws.js",
+            "replacements": 1
+          },
+          {
+            "id": "durablePublish",
+            "file": "weapp-match-lifecycle.js",
+            "entry": "weapp-ws.js",
+            "replacements": 1
+          }
+        ],
+        "mutationDetected": true
+      },
+      {
+        "name": "revokedTicket",
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 7125,
+        "stdout": "",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-friend-ticket.smoke.mjs\",\"redirects\":2}\nfile:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-friend-ticket.smoke.mjs:214\n  const timeoutError = new Error(`等待 ${type}/${requestId ?? '*'} 超时`)\n                       ^\n\nError: 等待 error/9 超时\n    at file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-friend-ticket.smoke.mjs:214:24\n    at new Promise (<anonymous>)\n    at waitMessage (file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-friend-ticket.smoke.mjs:213:68)\n    at sendAndWait (file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-friend-ticket.smoke.mjs:238:20)\n    at expectError (file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-friend-ticket.smoke.mjs:243:54)\n    at file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-friend-ticket.smoke.mjs:363:36\n\nNode.js v26.7.0\n",
+        "mutationHits": [
+          {
+            "id": "revokedTicket",
+            "file": "friend-room-observer-runtime.js",
+            "entry": "weapp-ws.js",
+            "replacements": 1
+          }
+        ],
+        "mutationDetected": true
+      },
+      {
+        "name": "privateHand",
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1022,
+        "stdout": "",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-ws.smoke.mjs\",\"redirects\":1}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: 不应向 p1 泄露 p2 手牌\n\n'Big' !== undefined\n\n    at file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-ws.smoke.mjs:260:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 'Big',\n  expected: undefined,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.7.0\n",
+        "mutationHits": [
+          {
+            "id": "privateHand",
+            "file": "game-session-projection.js",
+            "entry": "weapp-ws.js",
+            "replacements": 1
+          }
+        ],
+        "mutationDetected": true
+      },
+      {
+        "name": "replayConflict",
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 3950,
+        "stdout": "",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-ws.smoke.mjs\",\"redirects\":1}\nfile:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-ws.smoke.mjs:49\n  const timer = setTimeout(() => reject(new Error(`等待 ${type} 超时`)), 3000)\n                                        ^\n\nError: 等待 error 超时\n    at Timeout._onTimeout (file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-ws.smoke.mjs:49:41)\n    at listOnTimeout (node:internal/timers:685:17)\n    at process.processTimers (node:internal/timers:618:7)\n\nNode.js v26.7.0\n",
+        "mutationHits": [
+          {
+            "id": "replayConflict",
+            "file": "weapp-command-gateway.js",
+            "entry": "weapp-ws.js",
+            "replacements": 1
+          }
+        ],
+        "mutationDetected": true
+      },
+      {
+        "name": "privateTribute",
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 3061,
+        "stdout": "",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-round-state.smoke.mjs\",\"redirects\":1}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: 未完成双贡不得通过 canonical state 泄露选择 ID\n\n'card-53' !== null\n\n    at file:///Users/mac/Documents/Codex/2026-08-02/wo-yi/work/guandan-windows-source/server/weapp-round-state.smoke.mjs:238:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 'card-53',\n  expected: null,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.7.0\n",
+        "mutationHits": [
+          {
+            "id": "privateTribute",
+            "file": "game-session-projection.js",
+            "entry": "weapp-ws.js",
+            "replacements": 1
+          },
+          {
+            "id": "privateTribute",
+            "file": "game-session-projection.js",
+            "entry": "weapp-ws.js",
+            "replacements": 1
+          }
+        ],
+        "mutationDetected": true
+      },
+      {
+        "name": "friendTicket",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 10916,
+        "stdout": "weapp signed friend-ticket integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-friend-ticket.smoke.mjs\",\"redirects\":2}\n",
+        "mutationHits": [],
+        "mutationDetected": null
+      },
+      {
+        "name": "terminal",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 24322,
+        "stdout": "weapp terminal lifecycle integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-terminal-lifecycle.smoke.mjs\",\"redirects\":2}\n",
+        "mutationHits": [],
+        "mutationDetected": null
+      },
+      {
+        "name": "roundState",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 6047,
+        "stdout": "weapp round-state integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-round-state.smoke.mjs\",\"redirects\":1}\n",
+        "mutationHits": [],
+        "mutationDetected": null
+      },
+      {
+        "name": "websocket",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "elapsedMs": 1119,
+        "stdout": "weapp websocket integration passed\n",
+        "stderr": "AUDIT32_SOURCE={\"entry\":\"weapp-ws.smoke.mjs\",\"redirects\":1}\n",
+        "mutationHits": [],
+        "mutationDetected": null
+      }
+    ],
+    "summary": {
+      "newFiles": 4,
+      "lines": 2633,
+      "baselineRuns": 8,
+      "uniqueOriginalEntrypoints": 4,
+      "terminalSubscenarios": 8,
+      "sourceMutations": 5,
+      "detected": 5
+    },
+    "safety": {
+      "node": "v26.7.0",
+      "typescript": "4.9.5",
+      "source": "current shared-core/src; original test bodies and product files unchanged",
+      "isolation": "allowlisted PATH/TMPDIR/test/loopback; inherited state/endpoints cleared, nested source preload and endpoint/path checks. fixed ports prechecked; only own process-group lifecycle controlled.",
+      "fixtures": "fresh mkdtemp for each run; collectors and credentials are synthetic, no real account stores or external callbacks. temporary room snapshot edits are original test fault fixtures.",
+      "mutations": "Node registerHooks replaces one uniquely matched statement per selected module in memory; explicit preload forwarded to allowed server child; record confirms load in actual weapp-ws.js; neither original source nor original tests altered.",
+      "cleanup": "First privateHand mutant run reached teardown kill EPERM after child exit; its result was not counted. runner now checks group existence before signaling; ps showed no remaining audited servers, sole audit hit file and empty directory were validated and removed. Retry and all subsequent runs completed; post-mutation baseline four tests passed again. No product defect inferred from harness teardown."
+    },
+    "limits": [
+      "Four entries twice passed is not eight different suites; terminal contains eight subscenarios, not eight full matches.",
+      "Five selected source mutations are not a full mutation-coverage percentage, fuzzing, production capacity or security certification.",
+      "privateHand/privateTribute/durablePublish detected by original AssertionError. replayConflict/revokedTicket detected by original expected-error message deadline; not runner 300s timeout. Diagnostics would benefit from an immediate unexpected-response assertion.",
+      "Signed collectors validate signatures/response shapes but are not actual platform service end-to-end account settlement.",
+      "Synthetic persisted late-round fixtures are not complete real gameplay through all ranks.",
+      "Inherited process.env and stale global-version helper patterns already recorded as TEST-32-001/QT-32-C01; do not duplicate findings.",
+      "Previously confirmed SL-02-001/SL-02-002/SP-03-001/SP-03-002/SE-05-001 etc are not disproved by normal-path smoke success.",
+      "No Cocos build, browser render, real device, production deployment, restart, commit or push."
+    ]
+  }
+}

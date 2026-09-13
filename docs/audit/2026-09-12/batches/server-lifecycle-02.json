@@ -1,0 +1,57 @@
+{
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-metadata.js",
+      "sha256": "56ade1625aff00c5dd9cad048c8221401f8c5ce70bcf5cf3ebb0735f8975a119",
+      "notes": "完整逐行审阅130行；初始值、票据/席位、机器人元数据、归一化与恢复默认。roundSequence初值交叉引用SA-01-001，不重复计数。SL-02-002复现使用真实元数据工厂。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-match-lifecycle.js",
+      "sha256": "1bffcb60cc99fe9b6de4585ac45b401a2b9c0bb595ede37b39521b5ebe619819",
+      "notes": "完整逐行审阅457行；结算/终场/下一局、自动动作决策与回滚、持久收尾重试、离线准备、定时器释放。确认SL-02-001；现有对应测试通过。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/weapp-room-publisher.js",
+      "sha256": "7bec1adc995a3f69c029798c0fdcae3a31875b36af7145c84048690803d3ead8",
+      "notes": "完整逐行审阅190行；席位身份投影、重连/贡还/终局消息、复制隔离、观察者采样接线。对应测试通过；SL-02-002使用真实publisher验证返回票态。未确认新增手牌泄露。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/friend-room-observer-runtime.js",
+      "sha256": "0980edea7dc2e4c6136d3747ce6139136a176295f12a52ac04a97efdfc1235f2",
+      "notes": "完整逐行审阅157行；观战/坐席角色、快照延迟、成员授权、凭证恢复与重放、令牌轮换、落盘/发布。确认SL-02-002恢复遗漏；SA-01-001仅引用。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/duplicate-room-actions.js",
+      "sha256": "77171995e44200ff7340e7e4555ab1ec1e088878babfdb2853303a64e4bebcab",
+      "notes": "完整逐行审阅90行；房主配置、准备/撤销、八席和两桌屏障、换桌与只读、退出、终场事件。辅助追查draft事务与真实牌局执行；本地复式runtime测试通过。未确认新增问题。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/duplicate-room-projection.js",
+      "sha256": "43936d39c9a7756d365a8dcf5a8b463b53f6749f4438ef618b432e71c3b8b2da",
+      "notes": "完整逐行审阅72行；本桌/跨桌观看身份、单席手牌、延迟历史、公共分数/终场信息、历史保留。本地复式测试通过。跨桌客户端生命周期问题引用CS-01-001，不重复计数；未确认新增跨桌手牌泄露。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "SL-02-001",
+      "severity": "P2",
+      "title": "离线准备绕过终场与结算收尾屏障，覆盖应保留的结算状态",
+      "path": "work/guandan-windows-source/server/weapp-match-lifecycle.js",
+      "line": 419,
+      "evidence": "418-424行只以roundResult/isGameWon检查离线准备，缺少matchEnded/pendingRoundFinalization保护。391-415行实际重新发牌并经96-102行清空roundResult。weapp-ws.js:710-723在断连清座后直接调用markOfflineReady并持久化，731行可发布roundPrepared；weapp-room-exit.js:60-66也用于已终场退出。四真人固定局数终场后全部退出会产生第N+1副；持有pendingRoundFinalization时全部未准备真人断连则提前发牌，收尾提交新状态和旧pending结果，原结算state被覆盖。consumeRoundSettlement:229-231在非终场将无连接席位/机器人自动准备，终场全清false；终场复现不假设机器人会断连。",
+      "validation": "已确认，Node v26.7.0进程内运行生产createRoomOpeningState、shared-core settleMatchState、markOfflineReady、prepareNextRound、finalizePendingRound，持久与发布依赖仅内存捕获。终场2局后变state.roundId=3/phase=playing/roundResult=null，同时matchEnded.roundsPlayed=2；首局pending收尾期间离线后变roundId=2，随后内存提交捕获round=2/phase=playing/pending=true。发布回调参数也错位，但四席断连后真实publisher没有玩家接收者，因此不声称已向真人发送混搭消息，未验证仍在线观察者影响。完整可复制代码见同名Markdown。对应现有测试通过，不覆盖此条件；没有生产故障注入。",
+      "recommendation": "统一离线与显式准备的资格门禁，终场拒绝发牌；pending收尾期间只登记离线状态，收尾成功后再评估准备；底层prepareNextRound再次保护终场/未完成收尾。增加四真人终场退出以及持久收尾重试期间断连的跨层测试。"
+    },
+    {
+      "id": "SL-02-002",
+      "severity": "P2",
+      "title": "启用观战的好友房重连没有恢复离线票态，客户端无法继续投票",
+      "path": "work/guandan-windows-source/server/friend-room-observer-runtime.js",
+      "line": 133,
+      "evidence": "weapp-ws.js:631-633将观战开启的好友房入桌先交给friendObservers.enter，坐席玩家也走该分支。断连weapp-ws.js:716把未投票状态改offline，260-263的restoreOfflineDissolveVote已在599行注入。friend-room-observer-runtime.js:133-152恢复坐席、提交并响应，却未调用恢复函数/发布票态；对照weapp-entry-command-handler.js:190-194、249-254正常分支均恢复pending。TableOverlayController.ts:201-207遇到当前玩家非pending票态会关闭投票框。",
+      "validation": "已确认。以真实metadata、publisher、friend observer runtime建立spectator=live、p2投票offline的内存房间并有效token重连，断言坐席恢复且令牌已轮换，roomRejoined.dissolveVote.votes.p2仍offline、restoreOfflineDissolveVote调用次数为0；全部通过。Markdown含独立无网络复现。投票UI影响依据明确源码条件确认，未跑真机；原始服务端投票命令并非被授权拒绝。",
+      "recommendation": "恢复已坐席好友成员时复用原入桌处理器的离线票态恢复职责，落盘前offline→pending，落盘后广播票态；覆盖本地token、平台恢复票据、幂等重放及不同观战配置。"
+    }
+  ],
+  "concerns": []
+}

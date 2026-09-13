@@ -1,0 +1,42 @@
+{
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyMessageRouter.ts",
+      "sha256": "b30a60ecc23d440ba9c202c7eba8e51147305f6abc6a7000594bf766e62dd42b",
+      "notes": "完整逐行审阅207行；各消息事件的当前房间/ready/cleanup门禁，metadata版本与gameVersion去重顺序，入桌legacy版本适配，贡还/结算分流，恢复副作用，终止房间事件。四项相关回归通过。CS-01-001的跨桌恢复问题已知且不重复计数；人工乱序roomView边界单列CN-02-C01，未确认新增独立缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbySyncTracker.ts",
+      "sha256": "dede2da6789b23d27b5e3da9c99c434ffd75885edb016575093a29217372164a",
+      "notes": "完整逐行审阅100行；room version单调性与按事件类型去重，gameVersion/effectCursor、恢复原因、room-event去重和reset。额外进程内断言覆盖同版本不同类型、旧metadata、重复/旧gameVersion、清理后新房间基线。processedRoomEvents随房间生命周期保留，未证明实际资源问题，不硬列缺陷。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/FriendRoomViewReceiver.ts",
+      "sha256": "7dc66eae83045903e657e94ae8383e414d6c34dc64f93cb245710b65dd4fc8c6",
+      "notes": "完整逐行审阅28行；合法角色/视角ID、当前房间门禁，玩家/观战/复式桌切换及等待结束时同步基线重置，room metadata字段投影。交叉引用已知CS-01-001，不新增同根因发现。viewRevision未作为新鲜度门禁的边界见CN-02-C01。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyResumeSession.ts",
+      "sha256": "b58795a67da13923b132cf55135db8f7f50ed58b487b10b21e1ac1c9d254075b",
+      "notes": "完整逐行审阅81行；version、WS端点、房间号、p1-p4本地席位、token/matchId长度，白名单存储投影，损坏记录/读写异常及清理。检查端点解析和LobbyController冷热恢复接线；额外验证有效往返、7种字段错误、3种损坏JSON形状、读写删除全部抛错。未读取真实localStorage或用户凭证；未确认问题。"
+    },
+    {
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyResumeConnectionWatchdog.ts",
+      "sha256": "de9b318bd81833d4f6f9e0a6494edb0156f52d0928c9834f00a4c4d91625bfbe",
+      "notes": "完整逐行审阅49行；30秒期限、6次断连上限、start/clear generation隔离、一次性耗尽及pending生命周期。核验LobbyController成功/销毁/清房clear接线与ConnectionEventCoordinator失败计数。额外断言旧timeout不能取消新周期、耗尽不重复通知；未确认问题。"
+    }
+  ],
+  "findings": [],
+  "concerns": [
+    {
+      "id": "CN-02-C01",
+      "status": "unconfirmed-production-trigger",
+      "title": "roomView的强制恢复分支没有独立新鲜度门禁；真实迟到顺序尚未证明",
+      "path": "work/guandan-cocos/assets/scripts/network/LobbyMessageRouter.ts",
+      "line": 136,
+      "evidence": "FriendRoomViewReceiver.ts:26始终以reconnect调用applyEntrySnapshot；本文件133行先patch角色/视角，134行applyEntryMetadata不把旧版本拒绝结果传回，136行forceRecovery继续产生状态包。FriendRoomViewReceiver未消费服务端viewRevision。人工依次注入同房同视角roomView(v10)再roomView(v9)时，输出state gameVersion为[10,9]，metadata gameVersion仍为10。",
+      "validation": "仅证明输入边界行为，不算已确认产品缺陷：没有找到当前有序WebSocket和服务器发布调用链实际产生这种同视角乱序旧roomView的条件，未证明用户可见状态回退；canonical GameManagerProjection还有自己的revision门禁。异桌受信恢复的不同版本不能按普通旧包处理，相关既有缺陷已记CS-01-001。",
+      "nextCheck": "后续审阅CocosSocketClient及服务器observer/roomView异步发布时，检查跨连接generation和晚到同视角发布；若确有真实顺序，使用authority+viewRevision区分新的受信视角恢复与旧view包，并增加跨层回归。当前不建议仅按gameVersion拒绝所有恢复包。"
+    }
+  ]
+}

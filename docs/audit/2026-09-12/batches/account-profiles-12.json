@@ -1,0 +1,109 @@
+{
+  "batch": "account-profiles-12",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-windows-source/server/platform/account-service.js",
+      "sha256": "71422ec5396d0321a103c8e190c0d67503d9d1e6716db699f39c465ec90f9a8b",
+      "lines": 239,
+      "notes": "完整239行。核新账号/旧账号/自定义资料优先级、8位账号与索引冲突回退、40次同身份并发只建一次、80个同候选碰撞后唯一分配、欢迎积分一次、持久失败/签票后置失败重试、Unicode昵称、上传内容保存/替换与公开DTO不返原图。HTTP资料约束在profile-avatar，不把直接service的宽松legacy调用误报为外部路径。账号认证使用合成token端口，不借此计crypto已审。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/account-service.test.mjs",
+      "sha256": "33a28508790d31523c8949e79dbf4cd6a21f22dab8a6bbe9b85f14872e967465",
+      "lines": 50,
+      "notes": "完整50行并运行通过。既有同device幂等、账号/积分/公开分数、昵称24Unicode code points、登录截断不拆surrogate、保存后登录不覆盖。issue/verify为存根；新增并发与故障探针补事务边界，非真实微信身份授权。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/profile-avatar.js",
+      "sha256": "03b86e6e48617139720a37024d94e34a1457a25a6f54936013d9ef1338073285",
+      "lines": 59,
+      "notes": "完整59行。核资料patch昵称/头像类型、既有asset/default/upload分支、微信头像代理URL校验、不跟随重定向、8秒请求signal、512KB流限、PNG/JPEG头、20条10分钟缓存和失败不缓存。以进程内fetch替代验证TTL精确边界、FIFO容量和失败恢复；不是实际网络时延、完整像素解码或当前微信API政策核查。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/profile-avatar.test.mjs",
+      "sha256": "15609a8b0ff7f97f6652ba99b6f4722ba73c0ada7458b55b9a27cd6b48dc5069",
+      "lines": 20,
+      "notes": "完整20行并运行通过。URL/昵称不合约拒绝、注入fetch零调用、PNG头、错误内容及513KB拒绝。测试使用内存Response无外部请求。补边界和真实默认cache分支；原测试注入fetch会绕cache，不能以其证明缓存。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/profile-upload.js",
+      "sha256": "a14dfae8b02253b383b55fd442e51c3458e26b0365b5007f222987019711d0e9",
+      "lines": 37,
+      "notes": "完整37行。核规范data URI/base64、64KB、PNG IHDR与JPEG SOF头宽高、1..256维度和字节SHA形成内容地址。额外25组PNG宽高边界通过；这是头部尺寸约束，不是PNG CRC或JPEG解码器，不将synthetic头部fixture描述为可渲染图像。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/default-profile-upload.test.mjs",
+      "sha256": "b7205db271f4ee974e8acebcec89badbce5cb35680afc688a54c6406a8287fb7",
+      "lines": 62,
+      "notes": "完整62行并运行通过。真实捆绑默认目录读/类型、上传内容地址、默认稳定和替换释放、失败不半写、公开payload不带字节；本地临时HTTP合成authenticate与memory真实AccountService上传/取图，finally关服。未访问微信/QQ，也不是线上资料操作。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/default-profiles.js",
+      "sha256": "876d45d7c01697e5b9496bcebe4717ead3656872cc2e6858f4471c5a125597e2",
+      "lines": 19,
+      "notes": "完整19行。核bundled catalog导入时校验、数组与条目冻结、random/stable hash选择、明确profile ID到文件的数据URI；只按静态目录读取且游戏运行无上游API。500个合成room与stable profile调用一致；素材/catalog逐项来源与许可证另属边界，不以模块import计catalog已审。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/player-nicknames.js",
+      "sha256": "c0fec6855c35ae31eb4c868958bae85fc0ed0661694ea4d4ff2d726a52b362d9",
+      "lines": 27,
+      "notes": "完整27行。核基于default库的唯一昵称集合、按稳定身份/attempt取名、四席内重复避让、旧botDisplayNames纠正和重连保留、头像按名称映射。500合成房间四名字各不重复且恢复稳定；metadata另行保留isBot，不将显示名称混为身份授权。"
+    },
+    {
+      "path": "work/guandan-windows-source/scripts/import-default-profiles.mjs",
+      "sha256": "94b5af6af7d61a84b1a4ed49977fb47d09a5e65c30a5cfbf537f15ee67c5411b",
+      "lines": 41,
+      "notes": "完整41行，仅静态审阅不执行。一次性读取连续50个QQ资料与对应头像；已有id跳过、控字符清理、24字、头像主机/身份匹配、128KB输出、图片magic、每次6秒、429停止与缺失id目录记录。会网络请求并写生产资源目录，不属于本轮可运行只读检查。导入成功率/真实第三方额度/来源授权不做推断，资源边界待核。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/merchant-service.js",
+      "sha256": "6088f21485f773e0d33012c4f7d03ee4592b06a729b2ba8b94f4c89b8314d2ee",
+      "lines": 201,
+      "notes": "完整201行。核商户pending/active、负责人/员工分支、创建店幂等、员工角色、店归属、接受者排除、1..1000积分、商户日上限、receipt+wallet+ledger同事务。合成已审批记录20次重复grant一次、6次并发竞争剩余额度准确、persist失败全回滚。getConsole总额仅最近50条，日界用进程本地时区；运营统计含义/时区和多商户membership约束尚未证实，不凭假定报线上缺陷。"
+    },
+    {
+      "path": "work/guandan-windows-source/server/platform/merchant-service.test.mjs",
+      "sha256": "d0325a95a580f8456488951cb8d4377ec369f372ce474455ef429f8fd65d3425",
+      "lines": 74,
+      "notes": "完整74行并运行通过。pending禁止开店、active fixture开店幂等与变体冲突/并发、收银员发分/自家人拒绝、grant幂等、console与账本、旧receipt丢店fail-closed。角色审批用内存fixture，不是自动批准真实商户；额外失败回滚与日额并发验证。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": {
+    "reviewedFiles": 11,
+    "reviewedLines": 829,
+    "existingTests": [
+      {
+        "command": "node work/guandan-windows-source/server/platform/account-service.test.mjs",
+        "result": "passed; synthetic memory or loopback-only HTTP, no external fetch"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/profile-avatar.test.mjs",
+        "result": "passed; synthetic memory or loopback-only HTTP, no external fetch"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/default-profile-upload.test.mjs",
+        "result": "passed; synthetic memory or loopback-only HTTP, no external fetch"
+      },
+      {
+        "command": "node work/guandan-windows-source/server/platform/merchant-service.test.mjs",
+        "result": "passed; synthetic memory or loopback-only HTTP, no external fetch"
+      }
+    ],
+    "probe": {
+      "command": "node docs/audit/2026-09-12/repro/account-profiles-12.mjs",
+      "result": "passed: 40 same-identity logins, 80 additional identities, 81 unique account ids and initial ledgers, atomic create/profile failures and postcommit issue retry; 4 unicode boundaries; 500 nickname/recovery fixtures; exact cache TTL/capacity/retry; 5 proxy response and 25 upload dimension cases; 20 idempotent grants and concurrent daily cap/rollback"
+    }
+  },
+  "limitations": [
+    "Only 11 full-read files counted; HTTP/facade/FrontPageGateway supporting references not covered solely by this work. Profile source catalog, binary assets and rights/source correspondence remain boundary checks.",
+    "Import script is not run: it performs external queries and writes bundled resource files. No QQ or WeChat calls and no production user data accessed; test outputs omit bundled display names.",
+    "Image header/size checks are not complete image decoding, moderation or actual rendering. Injected Response/fetch and synthetic clocks do not establish real network timeout behavior.",
+    "Merchant HTTP operations remain registered, but no active Cocos merchant page found in targeted callsite search. Whether this is intended external API or retired capability needs whole-boundary analysis, not an automatic zombie-code claim.",
+    "getConsole.grantedPoints covers only its latest 50 returned grants, daily limits use process-local midnight, and merchantContext prioritizes owned merchant over employment. Without an established multi-merchant/statistical/timezone contract these observations are not promoted to confirmed defects.",
+    "Audit artifacts only; no fixes, deletion, deployment or actual registration/grants."
+  ]
+}

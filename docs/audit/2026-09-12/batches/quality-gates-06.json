@@ -1,0 +1,104 @@
+{
+  "batch": "quality-gates-06",
+  "reviewer": "root",
+  "head": "1d58999dc6e5455b049e1643660bbba3deee1406",
+  "reviewed": [
+    {
+      "path": "work/guandan-cocos/scripts/check-architecture.mjs",
+      "sha256": "17ff7f83f2779395c92aa8370b38820633b5ddafe891225f2c7f3a389f4cdaa1",
+      "lines": 294,
+      "notes": "294行全读。TS AST提取import/export/type/literal dynamic依赖，metadata必备/uuid唯一/孤儿、migration/分层/开发适配器边界、runtime DFS环、cc依赖传递闭包、CI strict/unused与纯模块roots、根测试注册、62行数预算。18组真实检查器内存叠加探针正常/错误对照符合预期。CommonJS require/非字面量dynamic import不建模，当前assets TS无这类生产依赖；不以该工具证明任意运行时可达性或不存在死代码。"
+    },
+    {
+      "path": "work/guandan-cocos/tests/architecture-regression.cjs",
+      "sha256": "0ad8f0aca6fd2c745e71215f47fdb2df9337a3470c59af8f81fb2b7acce94e4a",
+      "lines": 350,
+      "notes": "350行全读。核源文件/meta存在、固定版式/构建/资源及职责抽取正则、前台/牌桌生命周期接线文本、退役约束、真实健康检查子进程和unused选项。只有health子进程执行相应扫描；其余多数是源文本约束，不是行为/时序/渲染测试。独立运行通过；安全只读子进程来源已在前批审阅。末尾shop断言在输出成功文字之后仍能使退出非0，脚本成功判据须exitCode而非日志。"
+    },
+    {
+      "path": "scripts/verify-team-parameter-harness.mjs",
+      "sha256": "d3f3ffbe855c36ad614b34ab9ebf7fe4a16f0e6b783162f7481030ead051d37b",
+      "lines": 55,
+      "notes": "55行全读。两个隔离模块树参数分离/原dist不变、隐藏手牌访问代理、配对自对弈哈希/互补胜负、4场影子权威transition与public-history一致；可选旧dist 5级逐步decision/trace/checkpoint相等。通过内存文件系统/独立CJS缓存树执行真实默认harness；无旧dist因而未跑可选5场迁移基线，不误报已覆盖。"
+    },
+    {
+      "path": "scripts/support/team-policy-benchmark.mjs",
+      "sha256": "c63edf465fe61f2e630f125256fc16546a83871d5edc6d2c65d35511b3e94c7c",
+      "lines": 123,
+      "notes": "123行全读。loadExperiment只替换冻结参数模块、cp每树隔离、代码hash仅policy.js；publicPlayers封闭其他人hand读、context显式级牌/公开history、直到头游停止、候选归属/重复/合法校验、同牌换边、自愿shadow transition/legacy状态一致、整对bootstrap。真实当前dist小样本harness/benchmark执行通过；没有重新选参，temp和copy被内存Map代替。legacy facade已知缺陷不重复。"
+    },
+    {
+      "path": "scripts/support/team-policy-experiments.mjs",
+      "sha256": "711623d128d60cbe101dfe629db7ca2dc910f47245e657dcb1447e61cbf2af04",
+      "lines": 27,
+      "notes": "27行全读。reference+7实验权重同9键、freeze、0..3界限、三段不同种子、头游目标与confidence/耗时/合法性/首炸阈值。它只在离线scripts被消费，不是运行时低档策略；4既有用例核配置/种子/选择。"
+    },
+    {
+      "path": "scripts/support/team-policy-selection.mjs",
+      "sha256": "bc850b5013e3109f00c08bf5eca2418de37e9bdb4d7628799efc7f432fb39f11",
+      "lines": 17,
+      "notes": "17行全读。非法/首手炸/1.5倍P95剔除；胜率、P95、权重偏移稳定排序；独立paired下限严格>0.5才替换，否则保留reference。既有4用例和实际报告重汇总正确。输入来自自有跑分JSON，函数不是任意不可信数据schema；不将可构造malformed object当线上漏洞。"
+    },
+    {
+      "path": "scripts/team-policy-benchmark.test.mjs",
+      "sha256": "2554e501f0e2a74567d19ea5a158159177511ef89352c09bda9e4dcb88b655bc",
+      "lines": 39,
+      "notes": "39行全读、4测试。完整核8参数对象/同键/正有限/种子互斥，排序优先级/慢和非法拒绝，独立下限边界/首炸，配对自对弈固定区间。未测试生成全流程/样本warm-up或统计校准；另补真实模块内存集成及归档重汇总。"
+    },
+    {
+      "path": "scripts/benchmark-team-ai.mjs",
+      "sha256": "a43537e204303717c62d673fb7d83e3965edc8ae5f6078c8335c12ba00f31456",
+      "lines": 65,
+      "notes": "65行全读。旧离线基线CLI样本/seed检验、同牌两队对弈到首游、当前/旧engine区分、合法性/首炸/耗时记录。直接传state.players而非opaque代理，且归属/重复未独立断言，不代替新版严格harness。当前代码同版本2对4场自对照结果严格1:1，无非法，未用未知外部baseline；不能证明旧未提供engine不窥牌。"
+    },
+    {
+      "path": "scripts/benchmark-team-parameters.mjs",
+      "sha256": "a6b5372b6ff8836729355487de53544cd01f8b5f4afd9e0832128cb86351fb43",
+      "lines": 65,
+      "notes": "65行全读。CLI正整数/上限/候选唯一白名单、隔离module树、按seed交错候选和换队、正式helper断言、场景/CPU与pair数据、固定bootstrap，显式output可写且未执行真实文件写。2候选2对8场真实compiled core在内存环境完成；旧归档stage参数与records重验，非本轮重新调优。"
+    },
+    {
+      "path": "scripts/report-team-parameters.mjs",
+      "sha256": "a4b90eb4b18106340ec7a28cbf3e6892d4e9728c76e42de8fee438f0f876ad27",
+      "lines": 51,
+      "notes": "51行全读。三阶段名/固定样本seed/codeHash、opponent/parameterHash、game/pair数量/胜数/耗时行动数、每seed两队、前二/最终候选、一套holdout与fallback。内存合成合法/错误stage/坏配对seed/错parameterHash均按契约；重新汇总真实1216条历史records与原summary完全相同，另外以当前bootstrap重算全部10结果区间相同。汇总器信任输入timing/CI而不自行重跑游戏，不等同取证完整性或当前全库commit证明。"
+    }
+  ],
+  "findings": [],
+  "concerns": [],
+  "validation": [
+    {
+      "command": "node work/guandan-cocos/scripts/check-architecture.mjs",
+      "result": "239 modules / 62 budgets passed"
+    },
+    {
+      "command": "node work/guandan-cocos/tests/architecture-regression.cjs",
+      "result": "passed; static text/existence plus health subprocess, not Cocos runtime behaviour"
+    },
+    {
+      "command": "node --test scripts/team-policy-benchmark.test.mjs",
+      "result": "4 tests passed"
+    },
+    {
+      "command": "node docs/audit/2026-09-12/repro/architecture-gates-06.cjs",
+      "result": "18 memory-overlay scenarios: baseline, 12 rejection cases, 3 type-only positive controls, 2 explicitly unmodelled syntax boundary controls. No source/metadata/config writes."
+    },
+    {
+      "command": "node docs/audit/2026-09-12/repro/benchmark-contracts-06.cjs",
+      "result": "4 isolated virtual module trees; real default verifier 4 shadow self-play games plus legacy self-control4 and parameter sample8 games. Parameters/modules remain isolated; report validity controls and actual archived1216 record aggregation + 10 paired confidence recalculations match. Zero real FS copies/writes; no pre-extraction baseline argument."
+    }
+  ],
+  "scope": {
+    "reviewedFiles": 10,
+    "reviewedLines": 1086
+  },
+  "limitations": [
+    "All 10 files completely read; supporting source/doc/config references do not add coverage. No current production defect found in this target set; existing audit findings remain open.",
+    "AST architecture checker models static ESM/type/literal import(), not CommonJS require or variable dynamic import. Current assets/scripts search found neither dependency form; memory counterexamples document scope, not a current runtime finding.",
+    "Most architecture-regression assertions are source-text existence/shape tests. Passing them is not evidence of correct callbacks, true Cocos layout, deep type safety or full dead-code absence.",
+    "Legacy benchmark-team-ai passes full players; newer parameter harness publicPlayers disallows other hand contents and asserts ownership/duplicate IDs. Do not use old CLI as hidden-information evidence for an arbitrary baseline.",
+    "Benchmarks run against current existing shared-core/dist, without rebuilding; in-memory aliases substitute cp/mkdtemp/require-cache trees and outputs. ESM import.meta URL and local require binding lowered for audit CJS wrapper; production algorithms unchanged.",
+    "Historical JSON revalidation is arithmetic/protocol consistency, not rerunning1216 games, calibrated real-player probabilities, historical timing reproducibility or whole-build commit provenance. codeHash covers policy.js only.",
+    "Optional comparison against pre-extraction dist not executed because no such controlled baseline was supplied. No product/parameter changes, output report overwrites, installs, network, build/deploy or real data access."
+  ]
+}
