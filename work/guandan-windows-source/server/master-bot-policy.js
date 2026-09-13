@@ -6,7 +6,6 @@ const { createAIEngine, getRuleProfile, ruleProfileKey } = require('../../../sha
 export const MASTER_BOT_DIFFICULTY = 'master'
 
 const seats = ['p1', 'p2', 'p3', 'p4']
-const teamForSeat = seat => (seat === 'p1' || seat === 'p3' ? 'teamA' : 'teamB')
 
 export const roundMetaForAI = value => {
   if (value == null) return null
@@ -20,12 +19,15 @@ const validateTable = (state, playerId) => {
   if (!seats.includes(playerId)) throw new Error('机器人席位无效')
   const player = state?.players?.[playerId]
   if (!player || !Array.isArray(player.hand)) throw new Error('机器人席位状态缺失')
-  const expectedTeam = teamForSeat(playerId)
-  if (player.team !== expectedTeam) throw new Error(`机器人席位 ${playerId} 的队伍数据无效`)
-  if (!seats.every(seat => state.players?.[seat]?.team === teamForSeat(seat))) {
+  const order = state.turnOrder
+  if (!Array.isArray(order) || order.length !== seats.length || new Set(order).size !== seats.length || !order.every(id => seats.includes(id))) {
+    throw new Error('牌桌轮次顺序无效')
+  }
+  const teams = order.map(id => state.players?.[id]?.team)
+  if (!teams.every(team => ['teamA', 'teamB'].includes(team)) || teams[0] !== teams[2] || teams[1] !== teams[3] || teams[0] === teams[1]) {
     throw new Error('牌桌队伍数据无效')
   }
-  return { player, expectedTeam }
+  return { player, expectedTeam: player.team }
 }
 
 export const createRoomBotPolicy = ({

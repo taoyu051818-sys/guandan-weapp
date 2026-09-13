@@ -99,7 +99,7 @@ describe('independent level matches', () => {
     expect(result.state).toMatchObject({ phase: 'playing', currentLevel: 7, teamLevels: { teamA: 7, teamB: 7 }, tribute: null, roundMeta: null, roundId: ended.roundId + 1 })
     expect(result.state.players.p1.hand).toHaveLength(27)
     expect(Object.values(result.state.players).flatMap(p => p.hand).filter(c => c.isLevelCard).every(c => c.rank === 7)).toBe(true)
-    expect(result.events.some(event => event.type === 'ANTI_TRIBUTE')).toBe(false)
+    expect(result.events.some(event => event.type === 'ANTI_TRIBUTE_DECLARED')).toBe(false)
     expect(ended.currentLevel).toBe('A')
   })
   it('rejects a changed fixed level and preserves upgrade behavior and optional tribute', () => {

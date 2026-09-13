@@ -106,6 +106,7 @@ export class LobbyController extends Component {
   private endpoint = ''
   private resumeToken: string | null = null
   private activeMatchId: string | null = null
+  public get matchIdentity (): string | null { return this.activeMatchId }
   private entryGeneration = 0
   private pendingRoomEntry: PendingRoomEntry | null = null
   private readonly connectionEvents = new LobbyConnectionEventCoordinator({

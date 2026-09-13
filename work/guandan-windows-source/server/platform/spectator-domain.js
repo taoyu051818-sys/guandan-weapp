@@ -201,13 +201,14 @@ export const validateSpectatorEventMatchTime = (event, match) => {
   const createdAt = Number(match.createdAt)
   const matchedAt = Number(match.matchedAt)
   const startedAt = Number(match.startedAt)
-  const anchor = spectatorPostStartTypes.has(event.type) && Number.isSafeInteger(startedAt)
+  const playingObserverExit = event.type === 'seat-left' && match.kind === friendRoomKind && match.status === 'playing' && event.playerId === 'observer'
+  const anchor = (spectatorPostStartTypes.has(event.type) || playingObserverExit) && Number.isSafeInteger(startedAt)
     ? startedAt
     : (event.type === 'game-start' && Number.isSafeInteger(matchedAt) ? matchedAt : createdAt)
   if (Number.isSafeInteger(anchor) && event.at < anchor - spectatorMatchClockSkewMs) {
     throw badRequest('SPECTATOR_EVENT_BEFORE_MATCH', '观战事件时间早于对应牌局生命周期')
   }
-  if (event.type === 'seat-left') {
+  if (event.type === 'seat-left' && !playingObserverExit) {
     const roomExpiresAt = Number(match.friendRoomExpiresAt)
     if (Number.isSafeInteger(roomExpiresAt) && event.at > roomExpiresAt + spectatorMatchClockSkewMs) {
       throw badRequest('FRIEND_SEAT_EVENT_AFTER_LEASE', '好友房离席事件时间晚于房间租约')

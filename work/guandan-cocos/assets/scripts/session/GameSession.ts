@@ -62,13 +62,15 @@ export class GameSession extends Component {
     this.commit()
   }
 
-  public recordRound (winner: Team, wasFirst: boolean, bombCount: number, recent?: Omit<RecentMatch, 'finishedAt' | 'winnerTeam'>, actualTeam?: Team): void {
+  public recordRound (winner: Team, wasFirst: boolean, bombCount: number, recent?: Omit<RecentMatch, 'finishedAt' | 'winnerTeam'>, actualTeam?: Team, recordKey?: string): void {
     if (this.snapshot.isObserver) return
+    if (recordKey && this.snapshot.recordedRoundKeys.includes(recordKey)) return
     const previous = this.snapshot.playerStats
     const myTeam: Team = actualTeam ?? (this.snapshot.myPlayerId === 'p1' || this.snapshot.myPlayerId === 'p3' ? 'teamA' : 'teamB')
     const didWin = winner === myTeam
     this.snapshot = {
       ...this.snapshot,
+      recordedRoundKeys: recordKey ? [...this.snapshot.recordedRoundKeys, recordKey].slice(-256) : this.snapshot.recordedRoundKeys,
       ...(recent ? { currentLevel: recent.currentLevel, teamLevels: { ...recent.teamLevels } } : {}),
       playerStats: { ...previous, gamesPlayed: previous.gamesPlayed + 1, wins: previous.wins + Number(didWin), bombsPlayed: previous.bombsPlayed + Math.max(0, Math.floor(Number.isFinite(bombCount) ? bombCount : 0)), firstPlaceFinishes: previous.firstPlaceFinishes + Number(wasFirst), elo: Math.max(0, previous.elo + (didWin ? 16 : -12)) },
       recentMatch: recent ? { finishedAt: Date.now(), winnerTeam: winner, ...recent } : this.snapshot.recentMatch,

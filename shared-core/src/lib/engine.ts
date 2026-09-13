@@ -245,6 +245,7 @@ export const dealNextRound = (previous: EngineState, level: Rank, dealer: Player
     },
   }), {} as Record<PlayerId, Player>)
   return {
+    ...(previous.matchFormat ? { matchFormat: { ...previous.matchFormat } } : {}),
     currentLevel: level,
     ruleProfile: previous.ruleProfile,
     players,
@@ -273,7 +274,9 @@ const legacyAdvance = (state: EngineState): EngineState => {
     const next = nextActivePlayer(state, state.currentTurn)
     return next ? { ...state, currentTurn: next } : state
   }
-  const lastIndex = state.playArea.map(action => action === last).lastIndexOf(true)
+  // The last non-pass action is the winner even after JSON persistence has
+  // severed object identity between playArea and lastValidPlay.
+  const lastIndex = state.playArea.map(action => action.type !== PlayType.Pass).lastIndexOf(true)
   const passes = state.playArea.slice(lastIndex + 1).filter(action => action.type === PlayType.Pass).length
   const alive = ids.filter(id => state.players[id].hand.length > 0)
   const required = alive.length - (state.players[last.playerId].hand.length > 0 ? 1 : 0)

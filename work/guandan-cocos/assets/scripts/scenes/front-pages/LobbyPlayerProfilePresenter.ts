@@ -24,7 +24,8 @@ export class LobbyPlayerProfilePresenter {
   public render (ui: RuntimeUiFactory, layout: LobbyLayout): void {
     const { player, wallet, platformConfigured } = this.dependencies
     const profile = player.profile ?? player.dashboard?.user
-    const name = platformConfigured && !profile ? '账号同步中' : profile?.displayName.trim() || '陵水玩家'
+    const pendingName = player.loadedAt > 0 && !player.loading ? '同步未完成' : '账号同步中'
+    const name = platformConfigured && !profile ? pendingName : profile?.displayName.trim() || '陵水玩家'
     const characters = Array.from(name)
     const displayName = characters.length > 5 ? characters.slice(0, 4).join('') + '…' : name
     const points = platformConfigured && !wallet.fresh ? '--' : String(Math.max(0, Math.round(wallet.value.points)))

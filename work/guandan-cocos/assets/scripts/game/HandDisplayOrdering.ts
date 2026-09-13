@@ -140,9 +140,6 @@ export const sortHandDisplayUnits = (
   return resolved.map(item => ({ ...item.unit, cardIds: item.unit.cardIds.slice() }))
 }
 
-const wildcardUsageByCardId = (usages: readonly WildcardUsage[] | undefined): ReadonlyMap<CardId, WildcardUsage> =>
-  new Map((usages ?? []).map(usage => [usage.cardId, usage]))
-
 /** Canonicalises cards inside a downward stack without mutating the rule hand. */
 export const arrangeHandGroupCardIds = (
   hand: readonly Card[],
@@ -156,7 +153,7 @@ export const arrangeHandGroupCardIds = (
   const cards = hand.filter(card => requested.has(card.id))
   if (cards.length !== requested.size || requested.size !== cardIds.length) return distinctStableCardIds(cardIds)
   const resolution = resolvePlay(cards, ruleProfile)
-  const usageById = wildcardUsageByCardId(resolution?.wildcardUsages)
+  const usageById = new Map<CardId, WildcardUsage>((resolution?.wildcardUsages ?? []).map(usage => [usage.cardId, usage]))
   const suitIndex = new Map(options.suitOrder.map((suit, index) => [suit, index]))
   const semanticValue = (card: Card): number => usageById.get(card.id)?.representedValue ??
     getArrangementRankValue(card, options.levelRank)
@@ -164,11 +161,12 @@ export const arrangeHandGroupCardIds = (
   const suitDifference = (left: Card, right: Card): number =>
     (suitIndex.get(semanticSuit(left)) ?? ALL_SUITS.length) - (suitIndex.get(semanticSuit(right)) ?? ALL_SUITS.length)
   const deterministicTie = (left: Card, right: Card): number => suitDifference(left, right) || compareText(left.id, right.id)
-
+  // Straight-flush strength encodes bomb class, not the sequence endpoint.
+  const aceLow = cards.some(card => semanticValue(card) === 14) &&
+    cards.every(card => semanticValue(card) === 14 || semanticValue(card) <= 5)
   return cards.slice().sort((left, right) => {
     const type = resolution?.type
     if (type === PlayType.Straight || type === PlayType.StraightFlush || type === PlayType.Plate || type === PlayType.Tube) {
-      const aceLow = resolution?.maxValue === 5
       const leftValue = aceLow && semanticValue(left) === 14 ? 1 : semanticValue(left)
       const rightValue = aceLow && semanticValue(right) === 14 ? 1 : semanticValue(right)
       return leftValue - rightValue || deterministicTie(left, right)

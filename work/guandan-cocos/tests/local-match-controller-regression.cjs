@@ -530,7 +530,7 @@ assert.doesNotMatch(managerSource, /\.runAiTurn\(/, 'GameManager must delegate A
 assert.doesNotMatch(managerSource, /public (?:phase|tribute|settlement):/, 'lifecycle projections must not remain independently writable public fields')
 assert.match(managerSource, /private projection: GameManagerProjection/, 'one immutable projection must own lifecycle and progression fields')
 assert.match(managerSource, /applyServerState[\s\S]*this\.networkSnapshots\.applyServerState\(state, hint\)/, 'GameManager must delegate complete network snapshot handling')
-assert.match(networkSnapshotSource, /projectAuthoritativeState\(this\.ports\.getProjection\(\), state, fallback\)/, 'one projector must own phase, tribute, settlement, progression, and version gating')
+assert.match(networkSnapshotSource, /projectAuthoritativeState\(this\.projectionBaseline\(\), state, fallback\)/, 'one projector must gate versions within a validated authority baseline')
 assert.match(networkSnapshotSource, /const authoritativeScores = match\.phase === 'playing' \? null : match\.scores/, 'legacy playing state must not masquerade as post-settlement canonical scores')
 assert.match(networkSnapshotSource, /current\.scores\[result\.winnerTeam\] \+ Math\.max\(0, result\.levelUp\)/, 'legacy network settlements must preserve negative A-failure level deltas without subtracting cumulative scores')
 assert.match(networkSnapshotSource, /!this\.recordedRoundKeys\.has\(roundKey\)[\s\S]*this\.ports\.recordRound/, 'network settlement statistics must be idempotent by room and protocol event')

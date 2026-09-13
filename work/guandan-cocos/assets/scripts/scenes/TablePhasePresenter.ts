@@ -62,6 +62,11 @@ export class TablePhasePresenter {
     }
     if (snapshot.actionPending) return
     if (snapshot.phase === 'tribute') {
+      const confirmLabel = controls.confirmTribute?.getComponentInChildren(Label)
+      if (confirmLabel) {
+        confirmLabel.string = snapshot.tribute?.phase === 'returning' ? '确认还牌' : '确认贡牌'
+        confirmLabel.enableWrapText = false
+      }
       if (session.snapshot.isMultiplayer && (lobby.snapshot.deadlinePlayerId !== humanId || lobby.snapshot.trustees?.[humanId])) return
       const ready = Boolean(snapshot.tribute?.isAntiTribute || snapshot.tribute?.phase === 'done')
       const node = ready

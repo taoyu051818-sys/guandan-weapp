@@ -33,4 +33,4 @@ NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-bgm.mjs
 
 脚本先核对 Git 提交、MIT 全文和旧代码文案/路由，再导入资源；同名运行时文件哈希不一致时会停止，不覆盖本地改动。缺失的 Cocos `.meta` 使用确定性 UUID 创建。女声与男声分别记录在 `third_party/licenses/niuma-client-cocos-audio.json`、`third_party/licenses/niuma-client-cocos-male-audio.json`；背景音乐另记在 `third_party/licenses/niuma-client-cocos-bgm.json`，MIT 全文保存在 `third_party/licenses/NiuMa-client-cocos-MIT.txt`。
 
-自动测试只能确认语义映射、资源存在、哈希和静音/降级路径。发布前仍需用手机扬声器与耳机逐项听测，重点检查这一条 OGG 快捷语在 Web、微信小游戏和真机上的解码、响度与完整句尾，并确认另外五个按钮不会误播；同时检查三种“不要”的节奏、倒计时顺序、炸弹事件音效与报型人声是否互相遮蔽。背景音乐还需听测首尾循环接缝、长时间响度、前后台切换以及是否压住报牌语音。
+自动测试只能确认语义映射、资源存在、哈希和静音/降级路径。发布前仍需用手机扬声器与耳机听测女声点数、对子、钢板、三种“不要”、倒计时顺序及炸弹音效叠层；退出、静音、切后台时不得有迟到声音。快捷语和男声只做防回流检查，不恢复按钮或 OGG 听测入口。背景音乐另验循环接缝、响度、前后台切换和报牌可辨度。

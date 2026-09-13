@@ -2,7 +2,7 @@
 
 这是微信小游戏主客户端。它不复用 React / Electron UI；只复用根目录 `shared-core` 的规则、结算、进贡和 AI。
 
-广州腾讯云服务器已部署到 <https://api.yutechhn.cn/guandan/>，微信 AppID 为 `wxa79bf8bc567765a1`。配置、构建复现、密钥边界、部署检查与尚待完成的微信真机验收见 [`docs/guangzhou-wechat-deployment.md`](docs/guangzhou-wechat-deployment.md)；下一轮大厅/牌桌流程收束见 [`docs/ui-product-polish-plan.md`](docs/ui-product-polish-plan.md)。网页只是外观预览，不代替真实微信登录。
+正式配置域名为 `https://api.yutechhn.cn/guandan/`，微信 AppID 为 `wxa79bf8bc567765a1`。配置与历史部署步骤见 [`docs/guangzhou-wechat-deployment.md`](docs/guangzhou-wechat-deployment.md)；当前功能、退役边界与验收口径见 [`docs/CURRENT_CAPABILITIES.md`](docs/CURRENT_CAPABILITIES.md)。文档不证明服务器当前版本或健康状态；网页预览不代替真实微信登录。
 
 ## 打开方式
 
@@ -37,22 +37,22 @@ npm run verify:wechat-build
 
 - 两副牌完整开局、AI 回合和合法出牌；
 - 选牌上移、手牌响应式排布；
-- `ScreenAdapter` 监听 `canvas-resize`，用真实可视尺寸和安全区重新布局牌桌、手牌、座位、操作区和快捷语，并重绘背景；
+- `ScreenAdapter` 监听 `canvas-resize`，用真实可视尺寸和安全区重新布局牌桌、手牌、座位、操作区及托管入口，并重绘背景；
 - `assets/game-assets/backgrounds/lobby-lingshui-coast-v1.jpg` 是菜单和大厅的海滨背景，`assets/game-assets/backgrounds/table-perspective-blue-v2.jpg` 是对局牌桌背景；两者会按页面状态淡入切换，并由 `ScreenAdapter` 以等比 cover 方式适配横屏尺寸和安全区；
 - `CardSkinResolver` 用 36 张项目授权牌面组件和 1 张 NiuMa MIT 牌底组合 54 种单副牌面；手牌、桌面牌和飞牌特效只使用这一条经典 PNG 渲染链路，共用同一帧缓存。全部牌面在大厅初始化前预加载，缺图时停留在资源重试页，不再切换为文字牌面；
-- 统一 `EffectController`：规则语义解析、L0-L3 强度、四方飞牌、对象池、牌型标签、逢人配、炸弹/同花顺/天王炸、胜负升级和跳过动画；
+- 统一 `EffectController`：规则语义解析、强度、四方飞牌、对象池及炸弹表现；非炸弹牌型以飞牌和一次女声报牌为准，不恢复级牌专属声、光环和已退役流程特效；
 - `AudioProfiles` 统一局开始、发牌、出牌、三种不要、0–5 倒计时、关键牌型与胜负的语义音频映射；报牌仅使用女声（NiuMa、授权单张 5 女声和钢板 TTS），资源缺失会安全回退或静默；
 - 手牌已加入错峰发牌、固定尺寸的选中/锁定反馈和重排过渡；选中、锁定与堆叠均不改变卡牌缩放或层级；正式桌面牌先显示，装饰特效不阻塞输入、AI 或网络消息；震屏仅作用于 `GameTableShakeRoot`，HUD 和返回按钮保持稳定；
 - 特效控制器保留「完整 / 精简 / 关闭」质量配置和震动策略，但没有玩家设置页或实验室入口；断线重连和跨局恢复只显示最终状态，不重放历史大特效；联机倒计时严格读取服务端 `turnDeadlineAt`，连续超时、主动托管和断线托管都由服务端权威驱动；
 - 局间由四个座位分别准备/取消准备；返回入口区分安全退出和全员解散投票，投票拒绝、超时与断线恢复都有明确状态；
 - 手牌排列、锁组与一键理牌分别由 `HandWorkspace`、`HandDisplayOrdering`、`HandGrouping` 和展示层负责；排序仅改变显示 cardId，不修改权威手牌。高牌组可以进入中间，不强制左右分区；重叠以报告告警处理，不自动把元素挤开。
 - 「提示」先由 shared-core 生成合法候选，再按当前锁组和理牌组评估拆牌损伤：只要存在替代选择就不部分拆锁组，并依次保护天王炸、炸弹、组合牌、三张和对子；同等候选优先保留红桃级牌。提示只替换本地选中 cardId，实际出牌仍由同一规则内核及联机服务端复核；
-- 开发构建的「固定牌局 · 音效/动效实验室」提供固定开局、逢人配/炸弹手牌、炸弹压制，以及所有牌型、贡还、结算和倒计时 fixture；固定牌局结算不会写入战绩；
+- 固定牌局 fixture 仅在包外自动测试中使用，开发版和发行版均不提供游戏内实验室；
 - 大厅头像/资料栏进入个人中心，显示真实账号、积分和平台数据；当前文案为“我的对局”。微信头像昵称通过平台允许的用户交互流程设置，不使用假同步状态。
 - 对局记录与公开事件播放器保留独立实现，按服务端 sequence 去重排序；只能读取授权的公开事件，不推断未公开手牌。开发示例不作为玩家大厅入口。
-- 商户、赛事管理和旧 HTTP 观战接口已移入 `migration/platform`，不再注册到玩家网关、不进入 Cocos 包；服务端商户数据与能力不在本次收束范围内；
+- 商户、商城下单和旧 HTTP 观战界面留在包外迁移边界；16 人积分赛通过正式 `TournamentCenterController` 与平台网关接入，管理后台不因此开放；
 - 匹配等待进入牌桌背景，使用轻量三牌洗牌循环和取消入口。补位时限由服务端配置，机器人使用固定网名库；所有赛事队列仍按实际服务端策略处理，不伪造在线人数或 ETA。Web Desktop 用 `874×402` 设备框模拟移动横屏；底层设计坐标和安全区由 Cocos 适配。
-- 玩家大厅已移除测试用途的“更多”、玩法说明和设置页；旧赛事页面只保留“筹备中”提示。实验室连同开发开关后的入口也已删除，固定手牌仅在 `tests/fixtures` 中用于回归。
+- 玩家大厅已移除测试用途的“更多”、大厅玩法说明和设置页；赛事入口展示 16 人积分赛。好友房保留模式规则介绍；实验室连同开发开关后的入口已删除。
 - `CocosSocketClient` 断线重连、四席轮转与服务端权威的出牌/不要/贡还/下一局协议；
 - Cocos 原生音频控制层统一管理语音与播放生命周期；当前报牌只使用女声。已停用的级牌专属提示音、出牌电子音和旧视觉效果不得通过兜底逻辑重新启用。
 
@@ -69,7 +69,7 @@ Web Desktop 从 `localhost` 或 `127.0.0.1` 打开时会只在运行时采用 `w
 - 局域网开发：填入 `ws://电脑局域网IP:3002/weapp`；
 - 线上微信小游戏：填入已备案且配置为合法域名的 `wss://你的域名/weapp`。
 
-服务端位于 `work/guandan-windows-source/server/weapp-ws.js`。它负责房间、状态脱敏、出牌/不要、贡还、下一局和快捷语广播；Cocos 客户端只发送操作意图。
+服务端位于 `work/guandan-windows-source/server/weapp-ws.js`。它负责房间、状态脱敏、出牌/不要、贡还、下一局和托管；快捷语协议已退役，Cocos 客户端只发送操作意图。
 
 ### 平台 API、商城、商户与比赛匹配
 
@@ -82,7 +82,7 @@ Web Desktop 从 `localhost` 或 `127.0.0.1` 打开时会只在运行时采用 `w
 | `platformAllowInsecureEndpoint` | 仅本机/局域网 HTTP 联调临时打开 | 必须关闭，Bearer Token 只允许发送到 HTTPS |
 | `platformAllowInsecureGameEndpoint` | 本机默认可接受 `ws://127.0.0.1`；局域网真机联调需要临时打开 | 必须关闭，匹配返回的 `GAME_ENDPOINT` 必须是 `wss://` |
 
-除本机 Web 预览回退外，`platformEndpoint` 留空时只提供明确的本地只读预览，不进行真实兑换或匹配；配置地址后启用账号、钱包、玩家资料、我的对局、匹配和好友房接口。商城仅展示商品预览，不提供兑换下单接口。赛事按钮目前只提示“筹备中”，不会启动旧赛事页或报名请求。商城下单、商户、固定 16 人赛事及旧 HTTP 观战的契约实现和测试保留在 `migration/platform`，不是当前玩家客户端功能；服务端数据和未来业务能力没有删除。好友房实时／延迟观战继续通过正式好友房协议运行，与退役的旧观战页面无关。`lobbyEndpoint` 用于好友房直连，平台匹配以签名票据返回的 `gameEndpoint` 为准。
+除本机 Web 预览回退外，`platformEndpoint` 留空时只提供明确的本地只读预览，不进行真实兑换或匹配；配置地址后启用账号、钱包、玩家资料、我的对局、匹配、好友房和 16 人赛事接口。商城仅展示商品预览，不提供兑换下单接口。商城下单、商户和旧 HTTP 观战界面的迁移实现不是玩家入口；好友房实时／延迟观战通过正式好友房协议运行。`lobbyEndpoint` 用于好友房直连，平台匹配以签名票据返回的 `gameEndpoint` 为准。
 
 局域网真机联调示例（把 `192.168.1.10` 换成开发电脑地址；两个服务共享票据、结算和观战事件密钥，其中结算密钥与观战密钥必须不同）：
 
@@ -133,7 +133,7 @@ NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-audio.mjs
 NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-bgm.mjs
 ```
 
-两条脚本校验上游 MIT 全文、固定 revision、旧文案数组和音频索引路由：女声及流程音效包含 48 个白名单 MP3 与 1 个逐字一致的 OGG，背景音乐独立导入；生成 Cocos `.meta` 和 SHA-256 清单。男声导入脚本已经退役，不能恢复到运行资源。其余快捷语以及 `feiji.mp3`、`yapai.mp3`、旧 `dealcard.ogg` 均明确排除。完整说明见 `docs/niuma-audio-import.md`。
+两条脚本校验上游 MIT 全文、固定 revision 和音频索引路由：运行女声及流程音效共 48 个 MP3，背景音乐独立导入；生成 Cocos `.meta` 和 SHA-256 清单。男声导入脚本、全部快捷语和 OGG 报语音已退役，不能恢复到运行资源；`feiji.mp3`、`yapai.mp3`、旧 `dealcard.ogg` 均排除。完整说明见 `THIRD_PARTY.md`。
 
 ## 自动验收
 

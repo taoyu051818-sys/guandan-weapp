@@ -70,7 +70,7 @@ export function renderLobbyEntries (ui: RuntimeUiFactory, layout: LobbyLayout,
     if (tournament) {
       lobbyArtwork(card, 'TournamentArtwork', entry.art, { x: r.width / 2 - 35.5 * s, y: 0, width: 61 * s, height: r.height - 10 * s }, .74)
       lobbyLabel(ui, '赛事', -r.width / 2 + 40 * s, r.height / 2 - 25 * s, 21, 70 * s, s, card)
-      lobbyLabel(ui, '筹备中', -r.width / 2 + 42 * s, r.height / 2 - 47 * s, 12, 75 * s, s, card, new Color(89, 110, 115), 0, false)
+      lobbyLabel(ui, '16人积分赛', -r.width / 2 + 42 * s, r.height / 2 - 47 * s, 12, 75 * s, s, card, new Color(89, 110, 115), 0, false)
     } else {
       const footer = (entry.kind === 'classic' ? 54 : 48) * s
       lobbyArtwork(card, 'EntryArtwork', entry.art, { x: 0, y: footer / 2 - s, width: r.width - 4 * s, height: r.height - footer - 2 * s }, .74)

@@ -4,6 +4,7 @@ import { Node, Vec3 } from 'cc'
 import type { PlayerId } from '../core/generated'
 import type { GameSnapshot } from '../game/GameManager'
 import { TeammateHandProjector } from '../game/TeammateHandProjector'
+import { HandGestureEpoch } from '../game/HandGestureEpoch'
 import type { LobbyNetworkResult, LobbySnapshot, NetworkMatchEnded, NetworkRoundEndedPacket, NetworkRoundPacket, NetworkStatePacket } from '../network/LobbyController'
 import { tableHintToast } from '../ui/TablePromptPolicy'
 import { TablePhasePresenter } from './TablePhasePresenter'
@@ -24,6 +25,7 @@ export class TableMatchCoordinator {
   private readonly networkEvents: TableNetworkEventBridge
   private readonly phasePresenter: TablePhasePresenter
   private readonly teammateHand = new TeammateHandProjector()
+  private readonly handGestureEpoch = new HandGestureEpoch()
 
   public constructor (private readonly dependencies: TableMatchCoordinatorDependencies) {
     this.phasePresenter = new TablePhasePresenter(dependencies)
@@ -82,6 +84,9 @@ export class TableMatchCoordinator {
       handProjection.hand, handProjection.playSelectedCardIds, handProjection.sortOrder, !session.snapshot.isObserver && handProjection.interactive,
       handProjection.displayCardIds, handProjection.groups, handProjection.lockedCardIds,
       !teammate,
+      this.handGestureEpoch.update(snapshot.state, humanId, snapshot.phase, JSON.stringify([
+        session.snapshot.roomId, humanId, session.snapshot.isObserver, lobby.snapshot.duplicate?.watching,
+      ])),
     )
     const entranceCompletion = hand.consumeEntranceCompletion()
     if (entranceCompletion) effects.waitForPresentation(entranceCompletion, () => hand.finishEntrances())
@@ -137,7 +142,11 @@ export class TableMatchCoordinator {
     }
   }
 
-  public refresh (): void { if (this.latest && !this.disposed) this.render(this.latest) }
+  public refresh (): void {
+    if (this.disposed) return
+    this.dependencies.renderDuplicateStatus?.()
+    if (this.latest) this.render(this.latest)
+  }
 
   public handleTableHidden (): void { this.lastPresentedHint = '' }
 

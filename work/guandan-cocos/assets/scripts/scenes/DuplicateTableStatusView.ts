@@ -7,13 +7,14 @@ import { duplicateButton } from './front-pages/DuplicateRoomWaitingView'
 const signatures = new WeakMap<Node, string>()
 export const renderDuplicateTableStatus = (parent: Node, screen: ScreenAdapter, lobby: LobbyController, snapshot: LobbySnapshot): void => {
   const d = snapshot.duplicate
-  const signature = JSON.stringify(d)
-  if (signatures.get(parent) === signature) return
+  const home = d?.slots.find(s => s.seat === d.mySeat)?.table ?? 'A'
+  const visible = Boolean(d && d.phase === 'playing' && (!d.mySeat || d.tables[home] === 'settled'))
+  const signature = JSON.stringify([d, screen.viewport])
+  const previous = parent.getChildByName('DuplicateTableStatus')
+  if (signatures.get(parent) === signature && (!visible || previous?.isValid)) return
   signatures.set(parent, signature)
-  parent.getChildByName('DuplicateTableStatus')?.destroy()
-  if (!d || d.phase !== 'playing') return
-  const home = d.slots.find(s => s.seat === d.mySeat)?.table ?? 'A'
-  if (d.mySeat && d.tables[home] !== 'settled') return
+  previous?.destroy()
+  if (!d || !visible) return
   const root = new Node('DuplicateTableStatus'); parent.addChild(root)
   const ui = new RuntimeUiFactory(root), watching = Boolean(d.watching)
   duplicateButton(ui, watching ? '返回本桌' : '查看另一桌', screen.safeRightX(140), screen.safeBottomY(144), 204, new Color(43, 119, 105),

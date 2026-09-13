@@ -42,6 +42,7 @@ class MockUITransform {
   }
 }
 class MockGraphics {
+  clear () { this.lastRect = null; this.lastRoundRect = null }
   rect (...args) { this.lastRect = args }
   roundRect (...args) { this.lastRoundRect = args }
   fill () {}
@@ -264,6 +265,55 @@ assert.equal(dissolveDialog.isValid, false)
 lobbyEvents.emit('guandan:dissolve-vote', { vote: null, outcome: 'expired' })
 assert.equal(finishToast.getComponent(MockLabel).string, '解散投票已超时，牌局继续')
 
+// UI-27-001: resizing an open dialog changes its scrim/hit bounds in place.
+for (const kind of ['exit', 'notice', 'vote']) {
+  controller.clearDialogs(); controller.resize(viewport)
+  if (kind === 'exit') controller.requestLeave()
+  else if (kind === 'notice') controller.showNotice('保留标题', '保留内容')
+  else lobbyEvents.emit('guandan:dissolve-vote', { vote: lobby.snapshot.dissolveVote, outcome: null })
+  const name = { exit: 'ExitTableDialog', notice: 'DevelopmentDialog', vote: 'DissolveVoteDialog' }[kind]
+  const dialog = findNode(root, name), children = [...dialog.children]
+  for (const [width, height] of [[1565, 720], [960, 540], [1792, 828], [1280, 720]]) {
+    controller.resize({ ...viewport, width, height, halfWidth: width / 2, halfHeight: height / 2, safeLeft: 30, safeRight: 16, safeTop: 24, safeBottom: 12 })
+    assert.strictEqual(findNode(root, name), dialog, 'resize must not replace current dialog or votes')
+    assert.deepEqual(dialog.getComponent(MockUITransform).contentSize, { width, height })
+    assert.deepEqual(dialog.getComponent(MockGraphics).lastRect, [-width / 2, -height / 2, width, height])
+    assert.ok(dialog.getComponent(MockGraphics).lastRoundRect, 'panel frame must survive shade redraw')
+    assert.deepEqual(dialog.children, children)
+    assert.equal(controller.blocksHandInput, true)
+  }
+  findNode(dialog, kind === 'exit' ? 'StayButton' : kind === 'notice' ? 'DevelopmentClose' : 'DissolveRefuse').emit(MockNode.EventType.TOUCH_END)
+  assert.equal(dialog.isValid, false, 'resizing retains the legitimate modal action handlers')
+}
+// UI-27-002: exercise the actual sender for both transport failure and rejoining.
+const { loadTs } = require('./support/load-typescript-module.cjs')
+const protocol = loadTs(path.resolve(projectRoot, '../../shared-core/src/protocol.ts'))
+const { LobbyCommandSender } = loadTs(path.join(projectRoot, 'assets/scripts/network/LobbyCommandSender.ts'), { '../core/generated/protocol': protocol })
+const originalVote = lobby.voteDissolve
+for (const failure of ['throw', 'rejoining']) for (const agree of [false, true]) {
+  controller.clearDialogs()
+  const sent = [], errors = []
+  const snapshot = { roomId: 'synthetic-room', roomStatus: failure === 'rejoining' ? 'rejoining' : 'ready', roomRole: 'player' }
+  let disconnected = failure === 'throw'
+  const sender = new LobbyCommandSender({ snapshot: () => snapshot,
+    client: () => ({ send: (...args) => { if (disconnected) throw new Error('synthetic disconnected'); sent.push(args); return 9 } }),
+    emitResult: e => errors.push(e), reportError: e => errors.push(e) })
+  lobby.voteDissolve = choice => sender.roomIntent('dissolveVote', { agree: choice })
+  lobbyEvents.emit('guandan:dissolve-vote', { vote: lobby.snapshot.dissolveVote, outcome: null })
+  const dialog = findNode(root, 'DissolveVoteDialog')
+  const button = findNode(dialog, agree ? 'DissolveAgree' : 'DissolveRefuse')
+  button.emit(MockNode.EventType.TOUCH_END)
+  assert.equal(sent.length, 0); assert.equal(lobby.snapshot.dissolveVote.votes.p1, 'pending')
+  assert.equal(dialog.isValid, true); assert.equal(controller.blocksHandInput, true)
+  assert.match(finishToast.getComponent(MockLabel).string, /发送失败.*重试/)
+  disconnected = false; snapshot.roomStatus = 'ready'
+  button.emit(MockNode.EventType.TOUCH_END)
+  assert.equal(sent.length, 1); assert.equal(sent[0][1].agree, agree)
+  assert.equal(dialog.isValid, false)
+  button.emit(MockNode.EventType.TOUCH_END)
+  assert.equal(sent.length, 1, 'a repeated queued click after successful submission cannot send a second vote')
+}
+lobby.voteDissolve = originalVote
 controller.requestLeave()
 const retainedLeaveNode = findNode(root, 'LeaveButton')
 const retainedLeaveHandler = retainedLeaveNode.handlers.get(MockNode.EventType.TOUCH_END)[0]

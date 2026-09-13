@@ -43,7 +43,11 @@ export class ReplayPageDomain {
     void this.refreshReplayDetail(replayId, returnPage, token)
   }
 
-  public handleApplicationHide (): void { this.stopReplayPlayback(false) }
+  public handleApplicationHide (): void {
+    if (this.isDisposed()) return
+    this.stopReplayPlayback(false)
+    if (this.dependencies.router.current === 'replay-detail') this.reflow()
+  }
   public stop (): void { this.stopReplayPlayback(true) }
   public destroy (): void { if (!this.destroyed) { this.stop(); this.destroyed = true } }
   public reflow (): void {

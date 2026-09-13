@@ -124,14 +124,16 @@ export class PlayAreaController extends Component {
       Tween.stopAllByTarget(node)
       const count = this.authoritativeActions[this.actionIndexes.get(id) ?? -1]?.cards.length ?? 1
       node.setPosition(this.positionFor((this.seatOrder.indexOf(id) - this.seatOrder.indexOf(this.authoritativeHumanId) + 4) % 4, count))
-      if (!node.getChildByName('PassText')) node.setScale(settledScale)
+      node.setScale(node.getChildByName('PassText') ? Vec3.ONE : settledScale)
     })
   }
 
   public render (actions: PlayAction[], humanId: PlayerId = 'p1', lastValidPlay: PlayAction | null | undefined = undefined): void {
+    const viewerChanged = humanId !== this.authoritativeHumanId
     if (actions.length < this.authoritativeActions.length) this.expiredPassKeys.clear()
     this.authoritativeActions = actions.slice()
     this.authoritativeHumanId = humanId
+    if (viewerChanged) this.layout(this.viewport)
     if (lastValidPlay === null) this.visibleActionStart = actions.length
     else {
       let lastPlayIndex = -1

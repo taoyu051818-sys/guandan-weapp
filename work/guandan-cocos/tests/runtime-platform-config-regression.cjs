@@ -132,6 +132,7 @@ async function main () {
     'unapproved.example', 'api.yutechhn.cn.evil.example', 'user@api.yutechhn.cn', 'api.yutechhn.cn:443', 'api.yutechhn.cn:3003']
   for (const [field, protocol] of [['platformEndpoint', 'https:'], ['lobbyEndpoint', 'wss:']]) {
     const invalidUrls = ['', `${protocol}//api.yutechhn.cn/guandan-other`, `${protocol}//api.yutechhn.cn/guandan#fragment`,
+      ...['/../other', '/./weapp', '/%2e%2e/other', '/%2fweapp', '/%5cweapp', '/%25weapp', '/bad%', '/white space', '/back\\slash'].map(suffix => `${protocol}//api.yutechhn.cn/guandan${suffix}`),
       `${protocol}//api.yutechhn.cn/api/v1/health`, `${protocol === 'https:' ? 'http:' : 'ws:'}//api.yutechhn.cn/guandan`,
       ...forbiddenAuthorities.map(authority => `${protocol}//${authority}/guandan`)]
     for (const url of invalidUrls) {

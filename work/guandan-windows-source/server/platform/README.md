@@ -378,7 +378,7 @@ Content-Type: application/json
 }
 ```
 
-客户端分享/复制时必须传递完整 `invitePayload` 或 `inviteText`。`inviteText` 以第一个 `.` 分隔六位展示号和 base64url 邀请密钥；六位 `roomId` 只用于定位，绝不是认证凭证。`inviteCode`、`invitePayload` 和 `inviteText` 都应按短期秘密处理，不能写入分析日志、公开观战 DTO 或错误消息。
+微信邀请卡片通过分享载荷传递完整 `invitePayload`，客户端不展示复制/粘贴完整口令界面。房号弹窗另走已登录的 `POST /api/v1/friend-rooms/join-by-number`，提交六位 `roomId` 与本次 `entryAttemptId`，由服务端校验房间容量、状态和成员资格并签发入席票据。六位房号只是定位符，不是身份认证。兼容 `inviteText` 以第一个 `.` 分隔房号和邀请密钥；`inviteCode`、`invitePayload`、`inviteText` 均属短期秘密，不能写入分析日志、公开观战 DTO 或错误消息。
 
 访客加入时从分享内容解析两个字段并同时提交：
 

@@ -32,6 +32,8 @@ const ACTION_LABELS: Readonly<Record<Exclude<NetworkDeadlineAction, 'play'>, str
 /** Owns the table turn clock state, server-deadline projection and tick lifecycle. */
 export class TableTurnClockController {
   private remainingSeconds = 0
+  private warningDeadline = ''
+  private readonly warnedSeconds = new Set<number>()
   private snapshot: GameSnapshot | null = null
   private humanId: PlayerId = 'p1'
   private disposed = false
@@ -57,6 +59,8 @@ export class TableTurnClockController {
   reset (): void {
     if (this.disposed) return
     this.remainingSeconds = 0
+    this.warningDeadline = ''
+    this.warnedSeconds.clear()
     this.snapshot = null
     this.dependencies.label.node.active = false
     this.dependencies.label.string = ''
@@ -82,10 +86,17 @@ export class TableTurnClockController {
       this.dependencies.isMultiplayer(), this.now())
     const label = this.dependencies.label
     label.node.active = clock.turnVisible
-    const previous = this.remainingSeconds
     this.remainingSeconds = clock.turnSeconds
-    if (warn && clock.turnVisible && this.remainingSeconds !== previous
+    const warningDeadline = JSON.stringify([lobby?.roomId, this.snapshot.phase, lobby?.turnDeadlineAt, lobby?.deadlinePlayerId, lobby?.deadlineAction])
+    if (warningDeadline !== this.warningDeadline) {
+      this.warningDeadline = warningDeadline
+      this.warnedSeconds.clear()
+    }
+    // Selection/metadata renders may update the text first; only warning ticks
+    // consume the audio marker, independently of the most recently drawn second.
+    if (warn && clock.turnVisible && !this.warnedSeconds.has(this.remainingSeconds)
       && this.remainingSeconds > 0 && this.remainingSeconds <= 5) {
+      this.warnedSeconds.add(this.remainingSeconds)
       this.dependencies.playCountdown(this.remainingSeconds)
     }
     const deadlinePlayerId = lobby?.deadlinePlayerId

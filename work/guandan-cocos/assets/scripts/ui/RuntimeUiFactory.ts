@@ -1,4 +1,4 @@
-import { Color, EditBox, Graphics, Label, Node, Sprite, SpriteFrame, Texture2D, UIOpacity, UITransform, Vec3, tween } from 'cc'
+import { Color, EditBox, Graphics, Label, Node, Sprite, SpriteFrame, Texture2D, UIOpacity, UITransform, Vec3, tween, type Tween } from 'cc'
 import { drawUiFrame, type UiFrameKind } from './UiFrameStyle'
 import { loadGameAsset } from '../services/GameAssetLoader'
 
@@ -63,7 +63,16 @@ export const applyForegroundTextStyle = (
  * and game orchestration from owning drawing details.
  */
 export class RuntimeUiFactory {
+  private readonly scaleTweens = new WeakMap<Node, Tween<Node>>()
+
   public constructor (private readonly root: Node) {}
+
+  /** Cancel only this factory's scale owner; unrelated node motion stays live. */
+  private animateScale (node: Node, motion: Tween<Node>): void {
+    this.scaleTweens.get(node)?.stop()
+    this.scaleTweens.set(node, motion)
+    motion.start()
+  }
 
   public get parent (): Node { return this.root }
 
@@ -204,20 +213,20 @@ export class RuntimeUiFactory {
     opacity.opacity = 0
     node.setScale(new Vec3(0.96, 0.96, 1))
     tween(opacity).delay(delay).to(0.2, { opacity: 255 }).start()
-    tween(node).delay(delay).to(0.22, { scale: Vec3.ONE }, { easing: 'backOut' }).start()
+    this.animateScale(node, tween(node).delay(delay).to(0.22, { scale: Vec3.ONE }, { easing: 'backOut' }))
     this.makeInteractive(node, onSelect)
     return node
   }
 
   public makeInteractive (node: Node, onSelect: () => void, pressedScale = 0.96): void {
     node.on(Node.EventType.TOUCH_START, () => {
-      tween(node).stop().to(0.06, { scale: new Vec3(pressedScale, pressedScale, 1) }).start()
+      this.animateScale(node, tween(node).to(0.06, { scale: new Vec3(pressedScale, pressedScale, 1) }))
     })
     node.on(Node.EventType.TOUCH_END, () => {
-      tween(node).stop().to(0.08, { scale: Vec3.ONE }).call(onSelect).start()
+      this.animateScale(node, tween(node).to(0.08, { scale: Vec3.ONE }).call(() => { if (node.isValid && node.activeInHierarchy) onSelect() }))
     })
     node.on(Node.EventType.TOUCH_CANCEL, () => {
-      tween(node).stop().to(0.08, { scale: Vec3.ONE }).start()
+      this.animateScale(node, tween(node).to(0.08, { scale: Vec3.ONE }))
     })
   }
 
@@ -264,15 +273,15 @@ export class RuntimeUiFactory {
     opacity.opacity = 0
     node.setScale(new Vec3(0.9, 0.9, 1))
     tween(opacity).to(0.18, { opacity: 255 }).start()
-    tween(node).to(0.2, { scale: Vec3.ONE }, { easing: 'backOut' }).start()
+    this.animateScale(node, tween(node).to(0.2, { scale: Vec3.ONE }, { easing: 'backOut' }))
     if (style.disabled) return node
     node.on(Node.EventType.TOUCH_START, () => {
       draw(true)
-      tween(node).stop().to(0.06, { scale: new Vec3(0.96, 0.96, 1) }).start()
+      this.animateScale(node, tween(node).to(0.06, { scale: new Vec3(0.96, 0.96, 1) }))
     })
     const release = (): void => {
       draw(false)
-      tween(node).stop().to(0.08, { scale: Vec3.ONE }).start()
+      this.animateScale(node, tween(node).to(0.08, { scale: Vec3.ONE }))
     }
     node.on(Node.EventType.TOUCH_END, release)
     node.on(Node.EventType.TOUCH_CANCEL, release)

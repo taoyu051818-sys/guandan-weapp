@@ -3,6 +3,7 @@ import { normalizeFriendRoomSettings } from '../friend-room-settings.js'
 import { canonicalJsonFingerprint, matchesJsonFingerprint } from './canonical-json.js'
 import { PlatformError, badRequest, conflict, notFound } from './errors.js'
 import { FriendRoomNumberLimiter } from './friend-room-number-limiter.js'
+import { assertFriendRoomMemberCapacity } from './match-participants.js'
 
 const seats = ['p1', 'p2', 'p3', 'p4']
 const seatsFor = match => match.roomSettings?.format === 'duplicate' ? [...seats, 'p5', 'p6', 'p7', 'p8'] : seats
@@ -326,7 +327,7 @@ export class FriendRoomService {
         const occupiedSeats = new Set(match.participants.filter(item => ['matching', 'matched'].includes(item.status) || (item.status === 'cancelled' && !item.ticketRevokedAt && Number(item.expiresAt) > now)).map(item => item.seat))
         const seat = (match.status !== 'playing' && seatsFor(match).slice(1).find(candidate => !occupiedSeats.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')
         if (!seat) throw conflict('FRIEND_ROOM_FULL', '好友房席位已满')
-        if (match.participants.filter(item => ['matching', 'matched', 'playing'].includes(item.status)).length >= 12) throw conflict('FRIEND_ROOM_FULL', '房间人数已满')
+        assertFriendRoomMemberCapacity(match)
         participant = { userId, status: 'matching', seat, entryAttemptId: safeAttemptId, joinedAt: now }
         match.participants.push(participant)
       } else {
@@ -340,6 +341,7 @@ export class FriendRoomService {
         }
       }
       if (participant.status === 'cancelled') {
+        assertFriendRoomMemberCapacity(match)
         const occupiedByOthers = new Set(match.participants.filter(item => item !== participant && (['matching', 'matched', 'playing'].includes(item.status) || (item.status === 'cancelled' && !item.ticketRevokedAt && Number(item.expiresAt) > now))).map(item => item.seat))
         if (match.status === 'playing' || !seatsFor(match).slice(1).includes(participant.seat) || occupiedByOthers.has(participant.seat)) {
           const nextSeat = (match.status !== 'playing' && seatsFor(match).slice(1).find(candidate => !occupiedByOthers.has(candidate))) || (match.roomSettings.spectator !== 'off' && 'observer')

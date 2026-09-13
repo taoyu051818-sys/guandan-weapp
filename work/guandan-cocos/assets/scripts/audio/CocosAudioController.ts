@@ -6,6 +6,7 @@ import { RETIRED_AUDIO_ROUTES, resolveAudioEvent, resolveAudioProfile, resolveCo
 import { resolvePlayVoiceProfile } from './PlayVoiceProfiles'
 import { OptionalAudioAssetCache } from './OptionalAudioAssetCache'
 import { ActionVoiceGate } from './ActionVoiceGate'
+import { TransientAudioChannels } from './TransientAudioChannels'
 
 const { ccclass, property } = _decorator
 export type BgmMode = 'lobby' | 'battle'
@@ -23,7 +24,7 @@ export class CocosAudioController extends Component {
   @property(AudioSource)
   public bgmSource: AudioSource | null = null
 
-  private effectSource: AudioSource | null = null
+  private readonly effects = new TransientAudioChannels(() => this.node)
   private readonly assets = new OptionalAudioAssetCache<AudioClip>((path, done) => loadGameAsset(path, AudioClip, done))
   private readonly actionVoices = new ActionVoiceGate()
   private disposed = false
@@ -39,7 +40,6 @@ export class CocosAudioController extends Component {
 
   protected onLoad (): void {
     if (!this.session) this.session = this.getComponent(GameSession)
-    this.effectSource = this.getComponent(AudioSource) ?? this.addComponent(AudioSource)
     this.ensureBgmSource()
     this.session?.events.on('guandan:session', this.applySettings, this)
     this.applySettings()
@@ -53,7 +53,6 @@ export class CocosAudioController extends Component {
     if (this.bgmSource) this.bgmSource.clip = null
     this.assets.dispose()
     this.pendingBgmAssets.clear()
-    this.effectSource = null
   }
 
   /** The scene owns the lobby/table boundary; this controller owns the audible transition. */
@@ -75,7 +74,7 @@ export class CocosAudioController extends Component {
     this.actionVoices.invalidate()
     this.playbackEpoch += 1
     this.roundStartEpoch += 1
-    this.effectSource?.stop()
+    this.effects.stopAll()
   }
 
   /** Plays the semantic start cue, then the existing deal event as a separate layer. */
@@ -223,12 +222,12 @@ export class CocosAudioController extends Component {
       this.lastPlayedAssets.set(assetKey, now)
       const settings = this.session?.snapshot.settings
       const volume = Math.max(0, Math.min(1, (settings?.volume ?? 0.5) * volumeScale))
-      if (this.effectSource?.node.isValid) this.effectSource.playOneShot(clip, volume)
+      this.effects.play(clip, volume)
     })
   }
 
   private isPlaybackCurrent (epoch: number): boolean {
-    if (this.disposed || epoch !== this.playbackEpoch || !this.effectSource?.node.isValid) return false
+    if (this.disposed || epoch !== this.playbackEpoch || !this.node.isValid) return false
     const settings = this.session?.snapshot.settings
     return !settings || settings.soundEnabled
   }

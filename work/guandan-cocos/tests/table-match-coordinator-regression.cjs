@@ -61,6 +61,7 @@ const runtimeRequire = request => {
   }
   if (request === '../ui/TablePromptPolicy') return { tableHintToast: () => null }
   if (request === '../game/TeammateHandProjector') return { TeammateHandProjector: class { project () { return null } reset () {} } }
+  if (request === '../game/HandGestureEpoch') return require('./support/load-typescript-module.cjs').loadTs(path.join(projectRoot, 'assets/scripts/game/HandGestureEpoch.ts'))
   if (request === '../ui/TablePlayActionPolicy') return { TablePlayActionPolicy: class { resolve () { return ['hint', 'play'] } } }
   if (request === '../ui/TableSettlementView') return { TableSettlementView: class { clear () {} render () {} } }
   if (request === './SettlementPresentation') return { projectSettlementContent: () => ({}) }
@@ -124,6 +125,17 @@ const dependencies = {
 
 const coordinator = new TableMatchCoordinator(dependencies)
 const networkBridge = FakeTableNetworkEventBridge.latest
+let statusReflows = 0
+const reflowCoordinator = new TableMatchCoordinator({ ...dependencies, renderDuplicateStatus: () => { statusReflows++ } })
+reflowCoordinator.refresh()
+assert.equal(statusReflows, 1, 'resize refresh must update duplicate controls without waiting for a new room summary or private snapshot')
+let matchReflows = 0
+reflowCoordinator.latest = {}; reflowCoordinator.render = () => { matchReflows++ }
+reflowCoordinator.refresh()
+assert.equal(statusReflows, 2); assert.equal(matchReflows, 1)
+reflowCoordinator.disposed = true; reflowCoordinator.refresh()
+assert.equal(statusReflows, 2, 'disposed views must not reflow')
+assert.match(fs.readFileSync(path.join(projectRoot, 'assets/scripts/scenes/GameScene.ts'), 'utf8'), /private applyResponsiveLayout[\s\S]*this\.tableMatch\?\.refresh\(\)/, 'viewport changes reach the coordinator refresh path')
 assert.ok(networkBridge, 'the coordinator must compose its network bridge')
 coordinator.mount()
 coordinator.mount()

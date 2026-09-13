@@ -1,4 +1,5 @@
 import { createRoomExpiryJobs } from './weapp-room-expiry-jobs.js'
+import { randomUUID } from 'node:crypto'
 
 /** Room expiry policy. Timer leases and queued-job cancellation have a separate owner. */
 export const createRoomExpiry = ({ rooms, seatHasLiveConnection, hasConnectedHuman, enqueueServerOperation, closeRoomWithoutAck, commitRuntimeState, publishDissolveVote, emptyRoomTimeoutMs: EMPTY_ROOM_TIMEOUT_MS, setTimeout = globalThis.setTimeout, clearTimeout = globalThis.clearTimeout }) => {
@@ -27,9 +28,12 @@ export const createRoomExpiry = ({ rooms, seatHasLiveConnection, hasConnectedHum
     clearDissolveTimer(room.roomId)
     const vote = room.dissolveVote
     if (!vote?.expiresAt) return
+    vote.id ||= randomUUID() // Survives whole-room rollback and persisted recovery.
+    const voteId = vote.id
     const expiresAt = vote.expiresAt
     jobs.schedule('dissolve', room, retryDelay ?? expiresAt - Date.now(), async current => {
-      if (room.dissolveVote !== vote || vote.expiresAt !== expiresAt) return
+      if (room.dissolveVote?.id !== voteId || room.dissolveVote.expiresAt !== expiresAt || room.closingReason) return
+      const currentVote = room.dissolveVote
       const version = room.version
       room.dissolveVote = null
       room.version = version + 1
@@ -37,7 +41,7 @@ export const createRoomExpiry = ({ rooms, seatHasLiveConnection, hasConnectedHum
       catch (error) {
         // This job holds the room queue. Roll back the complete transition and retry
         // the business operation, not just the disk write (which cannot publish).
-        room.dissolveVote = vote
+        room.dissolveVote = currentVote
         room.version = version
         if (current()) scheduleDissolveExpiry(room, 1000)
         throw error

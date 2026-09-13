@@ -130,6 +130,7 @@ export const createFriendRoomObserverRuntime = d => {
         member.jti = claims.jti; member.exp = claims.exp
       }
       room.friendHostUserId ||= claims?.hostUserId || (claims?.seat === 'p1' ? claims.sub : null)
+      let restoredDissolveVote = false
       if (member.seat) {
         const seat = member.seat
         room.seats[seat] = connection.id
@@ -137,6 +138,7 @@ export const createFriendRoomObserverRuntime = d => {
         room.userIdsBySeat[seat] = member.userId
         room.ticketJtisBySeat[seat] = member.jti
         room.ticketExpiresAtBySeat[seat] = member.exp
+        restoredDissolveVote = d.restoreOfflineDissolveVote(room, seat)
       }
       connection.roomId = room.roomId
       d.clearEmptyRoomExpiry(room.roomId)
@@ -149,6 +151,7 @@ export const createFriendRoomObserverRuntime = d => {
       await d.commitRuntimeState()
       d.send(connection, responseType, response)
       d.publishRoomMembers(room)
+      if (restoredDissolveVote) d.publishDissolveVote(room)
       publish(room)
       return true
     } finally { d.releaseAccepted(key) }

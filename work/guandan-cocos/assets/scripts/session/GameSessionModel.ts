@@ -33,6 +33,7 @@ export type SessionSnapshot = {
   settings: SessionSettings
   playerStats: PlayerStats
   recentMatch: RecentMatch | null
+  recordedRoundKeys: string[]
 }
 
 const ranks: readonly Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A']
@@ -72,6 +73,7 @@ export const createDefaultSessionSnapshot = (): SessionSnapshot => ({
   },
   playerStats: { gamesPlayed: 0, wins: 0, bombsPlayed: 0, firstPlaceFinishes: 0, elo: 1000 },
   recentMatch: null,
+  recordedRoundKeys: [],
 })
 
 const restoreTeamLevels = (value: unknown, fallback: Record<Team, Rank>): Record<Team, Rank> => {
@@ -136,5 +138,8 @@ export const restoreSessionSnapshot = (value: unknown): SessionSnapshot => {
       elo: count(stats.elo, base.playerStats.elo),
     },
     recentMatch: restoreRecentMatch(value.recentMatch),
+    recordedRoundKeys: Array.isArray(value.recordedRoundKeys)
+      ? Array.from(new Set(value.recordedRoundKeys.filter((key): key is string => typeof key === 'string' && key.length > 0 && key.length <= 512))).slice(-256)
+      : [],
   }
 }

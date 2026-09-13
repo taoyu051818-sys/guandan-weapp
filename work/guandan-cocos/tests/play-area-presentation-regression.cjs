@@ -112,6 +112,32 @@ area.clearPresentation()
 assert.equal(tweens.length, 0, 'destroying a played group must stop its animation')
 process.stdout.write('play area layout and landing-size regression checks passed\n')
 
+// UI-25-001: all 12 viewer changes reflow existing cards/pass roots without replay.
+for (const previous of ['p1', 'p2', 'p3', 'p4']) for (const next of ['p1', 'p2', 'p3', 'p4']) {
+  if (previous === next) continue
+  area.clearPresentation(); tweens = []
+  const play = { ...action, playerId: 'p3' }, pass = { type: 'Pass', playerId: 'p2', cards: [] }
+  const pending = area.deferAction(play, 0)
+  area.resetPresentation(2); area.render([play, pass], previous, play)
+  const cardRoot = area.node.getChildByName('play-p3'), passRoot = area.node.getChildByName('play-p2')
+  const opacity = passRoot.getComponent(cc.UIOpacity)
+  const expiry = tweens.find(t => t.target === opacity && t.steps.some(s => s.end))
+  area.render([play, pass], next, play)
+  assert.strictEqual(area.node.getChildByName('play-p3'), cardRoot)
+  assert.strictEqual(area.node.getChildByName('play-p2'), passRoot)
+  assert.deepEqual(cardRoot.position, area.getActionWorldPosition('p3', next, 2))
+  assert.deepEqual(passRoot.position, area.getActionWorldPosition('p2', next, 1))
+  assert.equal(passRoot.scale.x, 1, 'interrupted pass position/scale finishes at its new-view target')
+  assert.equal(tweens.some(t => t.target === passRoot), false, 'old positional tween cannot move the pass back')
+  assert.ok(tweens.includes(expiry), 'pass expiry remains owned by its original lifetime')
+  expiry.steps.find(s => s.end).end()
+  area.render([play, pass], next, play)
+  assert.equal(area.node.getChildByName('play-p2'), undefined, 'expired pass must not revive after a view change')
+  area.revealCard(play, 0, 'a', pending)
+  area.clearPresentation()
+}
+tweens = []
+
 async function verifyPreLandingShrink () {
   class Handle {
     isActive = true

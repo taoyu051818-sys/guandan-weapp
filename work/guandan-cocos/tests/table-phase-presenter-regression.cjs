@@ -47,7 +47,7 @@ dependencies.lobby.snapshot.trustees = { p1: { reason: 'manual' } }
 assertControls(playing, [])
 dependencies.lobby.snapshot.trustees = {}
 
-const tribute = { ...playing, phase: 'tribute', tribute: { phase: 'tribute', isAntiTribute: false } }
+const tribute = { ...playing, phase: 'tribute', tribute: { phase: 'tributing', isAntiTribute: false } }
 dependencies.lobby.snapshot.deadlinePlayerId = 'p2'
 dependencies.lobby.snapshot.deadlineAction = 'tribute'
 assertControls(tribute, [])
@@ -55,6 +55,24 @@ dependencies.lobby.snapshot.deadlinePlayerId = 'p1'
 assertControls(tribute, ['confirmTribute'])
 assert.equal(controls.confirmTribute.position.x, 0)
 assert.equal(controls.confirmTribute.position.y, -160)
+assert.equal(controls.confirmTribute.label.string, '确认贡牌')
+const returning = { ...tribute, tribute: { phase: 'returning', isAntiTribute: false } }
+dependencies.lobby.snapshot.deadlineAction = 'returnTribute'
+assertControls(returning, ['confirmTribute'])
+assert.equal(controls.confirmTribute.label.string, '确认还牌')
+assert.equal(controls.confirmTribute.label.enableWrapText, false)
+dependencies.lobby.snapshot.deadlinePlayerId = 'p2'
+assertControls(returning, [], 'p1')
+assertControls(returning, ['confirmTribute'], 'p2')
+assert.equal(controls.confirmTribute.label.string, '确认还牌')
+dependencies.session.snapshot.isMultiplayer = false
+assertControls(returning, ['confirmTribute'])
+assert.equal(controls.confirmTribute.label.string, '确认还牌')
+assertControls(tribute, ['confirmTribute'])
+assert.equal(controls.confirmTribute.label.string, '确认贡牌', 'next tribute must reset the reused return label')
+dependencies.session.snapshot.isMultiplayer = true
+dependencies.lobby.snapshot.deadlinePlayerId = 'p1'
+dependencies.lobby.snapshot.deadlineAction = 'tribute'
 canInteract = false
 assertControls(tribute, [])
 const done = { ...tribute, tribute: { phase: 'done' } }

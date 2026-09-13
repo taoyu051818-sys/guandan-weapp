@@ -27,6 +27,7 @@ export class TableOverlayController {
   private modal: Node | null = null
   private dissolveDialog: Node | null = null
   private dissolveCountdownLabel: Label | null = null
+  private readonly modalFrames = new WeakMap<Graphics, { alpha: number, panel?: [number, number, number, number] }>()
   private disposed = false
 
   constructor (private readonly dependencies: TableOverlayControllerDependencies) {
@@ -60,6 +61,18 @@ export class TableOverlayController {
     const toastY = safeBottom <= safeTop ? Math.max(safeBottom, Math.min(safeTop, 98)) : (safeBottom + safeTop) / 2
     this.finishToastLabel.node.setPosition(new Vec3(0, toastY, 90))
     this.finishToastLabel.node.getComponent(UITransform)?.setContentSize(Math.max(220, Math.min(560, safeWidth - 32)), 56)
+    for (const overlay of [this.modal, this.dissolveDialog]) {
+      if (!overlay?.isValid) continue
+      overlay.getComponent(UITransform)?.setContentSize(viewport.width, viewport.height)
+      const graphics = overlay.getComponent(Graphics)!
+      const frame = this.modalFrames.get(graphics)
+      if (!frame) continue
+      graphics.clear()
+      graphics.fillColor = new Color(2, 12, 14, frame.alpha)
+      graphics.rect(-viewport.halfWidth, -viewport.halfHeight, viewport.width, viewport.height)
+      graphics.fill()
+      if (frame.panel) this.drawPanel(graphics, ...frame.panel)
+    }
   }
 
   public get blocksHandInput (): boolean { return Boolean(this.modal || this.dissolveDialog) }
@@ -238,8 +251,11 @@ export class TableOverlayController {
   }
 
   private voteDissolve (agree: boolean): void {
-    if (this.disposed) return
-    this.dependencies.lobby.voteDissolve(agree)
+    if (this.disposed || !this.dissolveDialog) return
+    if (this.dependencies.lobby.voteDissolve(agree) === null) {
+      this.showToast('表决发送失败，请检查网络后重试')
+      return
+    }
     this.clearDissolveDialog()
   }
 
@@ -262,6 +278,7 @@ export class TableOverlayController {
     overlay.addComponent(UITransform).setContentSize(this.viewport.width, this.viewport.height)
     overlay.addComponent(BlockInputEvents)
     const graphics = overlay.addComponent(Graphics)
+    this.modalFrames.set(graphics, { alpha })
     graphics.fillColor = new Color(2, 12, 14, alpha)
     graphics.rect(-this.viewport.halfWidth, -this.viewport.halfHeight, this.viewport.width, this.viewport.height)
     graphics.fill()
@@ -269,6 +286,8 @@ export class TableOverlayController {
   }
 
   private drawPanel (graphics: Graphics, x: number, y: number, width: number, height: number): void {
+    const frame = this.modalFrames.get(graphics)
+    if (frame) frame.panel = [x, y, width, height]
     graphics.fillColor = new Color(26, 43, 43, 250)
     graphics.strokeColor = new Color(218, 179, 79, 255)
     graphics.lineWidth = 3

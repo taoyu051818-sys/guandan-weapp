@@ -187,6 +187,23 @@ const flush = async () => { await Promise.resolve(); await Promise.resolve() }
   await flush()
   assert.equal(lateRoot.children[0].isValid, false, 'late asset completions must not revive a disposed backdrop')
 
+  const retryRoot = new MockNode('RetryRoot')
+  const retryController = new SceneBackdropController(retryRoot, () => viewport)
+  const failedLoad = retryController.preload('table')
+  takePending(SCENE_BACKDROP_ASSETS.table.path).reject(new Error('temporary resource failure'))
+  await assert.rejects(failedLoad, /temporary/)
+  retryController.setMode('table')
+  retryController.setMode('table')
+  const retryLoad = retryController.preload('table')
+  takePending(SCENE_BACKDROP_ASSETS.table.path).resolve(tableTexture)
+  await retryLoad
+  assert.equal(pendingAssets.length, 0, 'mode retry must be coalesced')
+  retryController.mount()
+  assert.equal(retryRoot.children[0].getComponent(MockSprite).spriteFrame.texture, tableTexture)
+  takePending(SCENE_BACKDROP_ASSETS.lobby.path).resolve(lobbyTexture)
+  await flush()
+  retryController.dispose()
+
   console.log('scene backdrop controller regression checks passed')
 })().catch(error => {
   console.error(error)

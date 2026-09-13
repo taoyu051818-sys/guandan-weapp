@@ -1,5 +1,7 @@
 # 客户端架构基线
 
+当前功能与退役边界见 [CURRENT_CAPABILITIES.md](CURRENT_CAPABILITIES.md)。以下 P0–P6 是架构演进分期，不是安全缺陷等级或本轮部署证明；日期化报告只记录当时验收。
+
 本文描述 `work/guandan-cocos` 当前可持续演进的架构基线。它用于约束新代码的归属、状态所有权、依赖方向和生命周期，不代表所有历史大类都已经拆分完成。
 
 2026-09-08 第一批独立职责拆分见 [RESPONSIBILITY_SPLIT.md](RESPONSIBILITY_SPLIT.md)：牌桌提醒/贡还展示游标由 `TableProgressPresentation` 独占；平台观战事件事务由 `SpectatorEventService` 独占。两个组合根只装配和调用，不重新接管其内部状态或验证分支。
@@ -32,7 +34,7 @@
 | P2 | 服务端生产对局以 `MatchState + GameCommand + transition` 原子推进回合、接风、排名、结算、下一局及贡还 | engine/tribute/settlement Vitest 与权威联机 smoke |
 | P3 | `GameManager` 仅转发联机意图并投影权威状态；选牌、计时和网络待确认动作由独立控制器管理，旧单机控制器只作为包外测试夹具 | local-match、audio lifecycle、network effect 回归 |
 | P4 | 客户端只发意图；服务端校验 requestId/expectedVersion、执行 transition，并按观看席位投影手牌和贡还选择 | weapp server 全套协议、四席隐私、重连与持久化测试 |
-| P5 | AI 缓存、记牌、指标、调参和 RNG 均属于 `createAIEngine` 实例；`decisionRunner` 独占单局决策门禁顺序，`policyOverrides` 独占难度策略适配，`fallbackDecision` 独占常规跟牌、领牌与人性化兜底，`runtimeIntel`、`checkpoint`、`decisionSupport` 分别拥有记牌、恢复校验和辅助选牌；服务端每房隔离；旧 Cocos 同步 AI 仅保留在包外测试，Worker runtime 与主线程 checkpoint 连续一致 | AI engine/runtime-intel/random/worker parity 与 room bot 测试 |
+| P5 | `createAIEngine` 持有实例缓存、RNG、指标和 team journal；`decisionRunner` 调用唯一最高档 `team/policy`，队伍推断/路线/牌力分别归纯模块；`checkpoint` 恢复校验，`ruleMemo` 缓存规则查询，服务端每房隔离 | AI/worker parity、团队策略和 room bot 测试 |
 | P6 | `myPlayerId` 驱动四席旋转；快照 presenter、手牌交互、弹层、回合钟和音频生命周期已从组合根拆出 | p1-p4 viewer、controller dispose、runtime reachability 测试 |
 
 旧原生微信客户端和 React/Electron 前端已移到仓库外，见 [历史工程隔离](../../../docs/LEGACY_ISOLATION_20260908.md)。共享源的兼容类型/导出仅作历史契约保留，不代表活动客户端入口。Cocos 只发送网络意图，权威服务端通过 `GameCommand` 推进规则。
@@ -41,7 +43,7 @@
 
 服务端组合根也遵循职责抽取：`weapp-websocket-transport` 独占 HTTP Upgrade、帧编解码和连接传输生命周期，`weapp-room-publisher` 独占权威房间状态到 viewer-safe 协议消息的投影与广播，`weapp-command-gateway` 统一处理验证、版本、幂等与持久化接纳，再由 entry/lobby/game handler 分域执行协议命令；平台侧 account/commerce/tournament/friend-room/merchant service 分别拥有账号、积分交易、赛事、好友房和商户事务，`spectator-domain` 独占观战事件规范、脱敏、延迟与终态投影。`check-server.mjs` 对这些模块及两个组合根实施只降不升的行数预算。
 
-`SynchronousLocalAIEngine`、本地牌局与 AI 调度器已移至 `tests/support/local-match`，只供固定规则与调度回归使用，不被 Cocos 资源图引用。正式机器人在服务端运行，客户端没有第二套本地对局或超时自动出牌路径。共享源的 `lib/ai.ts` 兼容门面仍为旧端保留；`scripts/core-sync-policy.mjs` 明确排除此孤立门面，Cocos 同步其余 36 个共享模块，源与生成副本必须逐文件一致。
+`SynchronousLocalAIEngine`、本地牌局与 AI 调度器已移至 `tests/support/local-match`，只供固定规则与调度回归使用，不被 Cocos 资源图引用。正式机器人在服务端运行，客户端没有第二套本地对局或超时自动出牌路径。共享源的 `lib/ai.ts` 兼容门面仍为旧端保留；`scripts/core-sync-policy.mjs` 明确排除此孤立门面，Cocos 同步其余 39 个共享模块（数量以同步守卫为准），源与生成副本必须逐文件一致。
 
 2026-09-08 专项[退役清理与包体核验](RETIREMENT_PACKAGE_AUDIT_20260908.md)：删除旧页面与实验室，含控制台桥接、固定牌局注入和测试专用预览方法；商户/旧赛事/旧 HTTP 观战网关退出玩家 factory，测试样例迁到包外。好友房观战、正式动效与我的对局保留。
 
@@ -79,14 +81,14 @@
 - `TableHudTurnTimerView` 独占回合计时节点、圆环/秒数绘制、鸡图资源替换和销毁；倒计时权威数据仍由 `TableTurnClockController` 投影。
 - `EffectController` 只组合 Cocos 渲染器、资源、节点池和总清理；`EffectActionPresentationCoordinator` 独占联机 action-count 去重、展示票据与本地飞牌起点，`EffectPlaybackCoordinator` 独占可见动效队列、异步准备代际和播放 handle 生命周期。
 - `FrontPageController` 组装 `PageRouter` 和各页面域；商城、比赛、匹配、好友房、个人中心、回放观战等实现不再回流到 `GameScene`。`MatchmakingPageDomain` 以有界集合保留取消/查询均失败的 uncertain ticket，新入队前必须先对账，未确认时不得再创建队列票据。
-- `FriendRoomSettingsPresenter` 独占好友房设置草稿、标签页、运行时节点和交互生命周期；`FriendRoomSettingsPolicy` 只提供纯 schema、投影和归一化。生产平台好友房由 `FriendRoomPlatformFlow` 保证 HTTP 预留、WebSocket 入席和退出补偿，`FriendRoomPlatformPresenter` 负责平台房间等待页、微信卡片邀请与入席交互；完整口令复制入口已退役；`FriendRoomWaitingPresenter` 按服务端 capabilities 渲染席位、准备与 bot 入口，开发直连仍保留六位房间号入口。
+- `FriendRoomSettingsPresenter` 独占好友房设置草稿、标签页、运行时节点和交互生命周期；`FriendRoomSettingsPolicy` 只提供纯 schema、投影和归一化。生产平台好友房由 `FriendRoomPlatformFlow` 保证 HTTP 预留、WebSocket 入席和退出补偿，`FriendRoomPlatformPresenter` 负责平台房间的微信卡片邀请与入席交互，创建后直接进入牌桌；完整口令复制入口已退役；`FriendRoomWaitingPresenter` 按服务端 capabilities 渲染席位、准备与 bot 入口，平台加入入口使用六位房间号弹窗，受认证和服务端入席校验约束。
 - `PlatformApi.ts` 是稳定生产平台门面，具体客户端、解码和网关位于 `services/platform`。
 - `LobbyController` 保留 Cocos 生命周期、房间身份和公开命令门面；resume 凭证写入失败必须投影为可观察错误，但不能阻止当前牌局。`LobbyCommandSender` 独占命令版本注入与发送失败归一化，`LobbyConnectionEventCoordinator` 固定连接、断线、匹配入桌与本地恢复的调用顺序，`LobbyMessageRouter` 独占服务端消息过滤、快照投影和领域事件转发：直播房间消息必须携带当前六位 roomId，metadata 必须携带非负安全整数 version，state/round 还必须携带 gameVersion；仅入桌 adapter 可兼容缺失版本的旧快照。`LobbyModels` 提供模型工厂，`LobbySyncTracker` 独占版本与特效游标，`LobbyEntryAttemptTracker` 独占 128-bit 入桌幂等键，`LobbyMatchedEntryCoordinator` 管理平台票据的跨连接重试、超时和恢复轮换，`LobbyResumeConnectionWatchdog` 限制本地 resume token 的连接恢复时长与总失败次数。
 - `GameManager` 是 Cocos 联机组件适配器，转发 UI/网络意图并投影权威快照，不直接调用领域 `transition`。`LocalMatchController` 只在 `tests/support/local-match` 中推进测试牌局；正式客户端不能引用该目录。
 - `GameManager` 的 phase、等级、积分、排名、贡还和结算只保存在一个 canonical projection 中；兼容旧 Scene API 的 getter 只能读取该投影，不能重新成为可写状态。
-- `LocalHandSelectionController` 和 `NetworkActionController` 分别拥有选牌和网络待确认生命周期；测试夹具的 AI 调度与事件控制器不进入运行包；`NetworkMatchSnapshotController` 单点消费联机快照，负责 canonical phase/贡还/结算投影、`roundId + revision` 门禁和每局统计去重，旧 result-only 包通过服务端 room/version/gameVersion 事件身份去重。`HandGrouping` 只编排分组命令、原子变更和 revision，状态克隆、等价比较、权威快照归一化与显示排序集中在 `HandGroupingState`；undo/redo 历史已退役，一键恢复使用 `HandWorkspace` 基准快照。
+- `LocalHandSelectionController` 和 `NetworkActionController` 分别拥有选牌和网络待确认生命周期；测试夹具的 AI 调度与事件控制器不进入运行包；`NetworkMatchSnapshotController` 单点消费联机快照，负责 canonical phase/贡还/结算投影，版本门禁按 match/table/view authority 分区；统计按可信 match/table/participant/round 身份持久去重，无可信对局身份的兼容事件只展示不记账。`HandGrouping` 只编排分组命令、原子变更和 revision，状态克隆、等价比较、权威快照归一化与显示排序集中在 `HandGroupingState`；undo/redo 历史已退役，一键恢复使用 `HandWorkspace` 基准快照。
 - `HandArrangement.ts` 只保留稳定导出门面；`HandArrangementModel` 独占基础牌序、配置和公共类型，`HandDisplayOrdering` 独占展示列与组内牌序，`HandGroupSuggestions` 独占百搭分配、牌型候选发现和冲突选择。三者均为无 `cc` 的纯模块，候选发现不得反向读取展示状态。
-- shared-core 用一次 `resolvePlayForContext` 同时完成多解百搭的合法性判断与落账；提示、诊断、状态机和 AI 共享这份解释。`MatchState.roundMeta` 保存贡还/抗贡来源并显式注入 AI，结算 state、operation 和 event payload 之间不共享可变引用。`ai/engine.ts` 只持有实例状态和装配依赖，`ai/decisionRunner.ts` 独占单局门禁顺序，`ai/policyOverrides.ts` 适配 hard/medium/master 策略，`ai/fallbackDecision.ts` 处理常规跟牌、领牌与随机人性化；记牌、checkpoint 校验、规则查询 LRU 和辅助决策分别集中在 `runtimeIntel.ts`、`checkpoint.ts`、`ruleMemo.ts`、`decisionSupport.ts`。
+- shared-core 用一次 `resolvePlayForContext` 同时完成多解百搭的合法性判断与落账；提示、诊断、状态机和 AI 共享这份解释。`MatchState.roundMeta` 保存贡还/抗贡来源并显式注入 AI，结算 state、operation 和 event payload 之间不共享可变引用。`ai/engine.ts` 只持有实例状态和装配依赖，`ai/decisionRunner.ts` 独占单局门禁顺序，`ai/team/policy.ts` 是唯一最高策略；队伍公开信息推断、手牌路线和牌力分别由 team 模块承担，journal、checkpoint、ruleMemo 分别持有决策记录、恢复校验与规则查询缓存。旧多难度适配和低档兜底已删除。
 - `TableHudLayoutPolicy`、`FriendRoomSettingsPolicy`、`NetworkEffectSyncPolicy`、手牌策略等模块保持无 `cc` 运行时依赖，便于纯测试。
 
 ## 依赖方向
@@ -140,13 +142,13 @@ core/generated
 | 好友房设置草稿与设置页标签 | `FriendRoomSettingsPresenter`；规则映射由 `FriendRoomSettingsPolicy` 提供 | `LobbyPageDomain` 只接收创建时的完整设置并编排连接 |
 | 启动下载、预加载、初始化和 ready 门闩 | `StartupCoordinator` | `GameScene` 注入初始化和响应式布局回调 |
 | 背景纹理缓存和切换 revision | `SceneBackdropController` | 页面/牌桌只选择 `lobby` 或 `table` 模式 |
-| 结束提示、离桌/通知弹窗、解散投票倒计时和快捷语 | `TableOverlayController` | `GameScene` 只注入牌桌动作并调用公开交互入口 |
+| 结束提示、离桌/通知弹窗和解散投票倒计时 | `TableOverlayController` | `GameScene` 只注入牌桌动作并调用公开交互入口；快捷语已退役 |
 | 牌桌回合剩余时间、计时文案和 HUD 座位投影 | `TableTurnClockProjection` 纯函数计算，`TableTurnClockController` 管理 tick/文案；联机 deadline 数据源仍是 `LobbyController.snapshot` | `GameScene` 只提交当前快照和布局上下文；无 deadline 时隐藏计时，不产生本地超时动作，不从节点 active 反推计时资格 |
 | 最新牌局快照、阶段衔接与 recovery 视觉基线 | `TableMatchCoordinator`；操作区/结算显示交给 `TablePhasePresenter`，完成者/十张阈值/贡还游标由 `TableProgressPresentation` 持有（均为短期展示状态） | 监听 `GameManager` 与 `TableNetworkEventBridge`，投影到手牌、出牌区、座位、HUD、弹层、音效和动效；不推进规则 |
 | 动效 action-count 游标、展示票据、可见队列和异步准备代际 | `EffectActionPresentationCoordinator` / `EffectPlaybackCoordinator` | `EffectController` 只提供渲染、音频、震动和资源依赖；recovery/destroy 统一取消旧代际，迟到准备不得恢复展示或发声 |
 | 节点位置、按钮可见性和短时提示 | 对应 UI 控制器或页面域 | 只能是上述业务状态的展示，不成为业务真相 |
 
-`TableMatchCoordinator.snapshot` 和动效去重标记属于短期展示状态；牌桌弹窗、快捷语和解散倒计时的短期状态由 `TableOverlayController` 持有，回合计时的短期状态由 `TableTurnClockController` 持有。它们都不应被其他模块读取为规则或联网权威状态。
+`TableMatchCoordinator.snapshot` 和动效去重标记属于短期展示状态；牌桌弹窗和解散倒计时的短期状态由 `TableOverlayController` 持有，回合计时的短期状态由 `TableTurnClockController` 持有。它们都不应被其他模块读取为规则或联网权威状态。
 
 ## 可替换边界
 
@@ -160,7 +162,7 @@ lobbyController.setSocketClient(testSocket)
 
 注入对象只需实现 `LobbySocketClient` 的 `connect`、`on`、`send` 和 `close`。事件绑定后禁止替换传输，避免旧监听器继续写入状态。
 
-服务端为每个席位签发 256-bit 恢复令牌，并在每次成功 `rejoinRoom` 后立即轮换；客户端只有在 room、seat、requestId 和 entry generation 全部匹配的成功响应中才替换内存令牌。匹配票据在 90 秒有效期内同时承担“入桌响应丢失”的幂等恢复凭证，因此同票据恢复返回原席位凭证；它不是长期会话入口。当前令牌不写入 Cocos 本地持久化，因此只承诺同一应用进程内的断线恢复；服务端进程重启可以恢复房间和成员凭证，但客户端应用被系统彻底结束后的冷启动恢复尚未提供 UX，不得宣称为已支持能力。
+服务端为每个席位签发 256-bit 恢复令牌，并在每次成功 `rejoinRoom` 后立即轮换；客户端只有在 room、seat、requestId 和 entry generation 全部匹配的成功响应中才替换内存令牌。匹配票据在 90 秒有效期内同时承担“入桌响应丢失”的幂等恢复凭证，因此同票据恢复返回原席位凭证；它不是长期会话入口。当前令牌由 `LobbyResumeSession` 经 schema 校验后写入本地持久化，冷启动可以尝试恢复；成功轮换、明确退出清理，存储失败给出反馈但不打断当前牌局。代码路径不等于全部手机冷启动、微信登录或弱网恢复已经实测。
 
 ### 平台网关
 

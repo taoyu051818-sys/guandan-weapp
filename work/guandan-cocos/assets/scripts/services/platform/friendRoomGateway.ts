@@ -40,6 +40,7 @@ const normalizeRoomSettings = (value: unknown): FriendRoomSettings => {
     totalTimeMinutes: oneOf(source.totalTimeMinutes, [0, 20, 30, 60] as const, '好友房总时限'),
     spectator: oneOf(source.spectator, ['off', 'live', 'delayed-round', 'delay-15', 'delay-30', 'delay-60'] as const, '好友房观战设置'),
     autoSort: requireBoolean(source.autoSort, '好友房自动理牌'),
+    ...(source.counterEnabled === undefined ? {} : { counterEnabled: requireBoolean(source.counterEnabled, '好友房记牌器') }),
     disableInteraction: requireBoolean(source.disableInteraction, '好友房互动设置'),
     sortOrder: oneOf(source.sortOrder, ['desc', 'asc'] as const, '好友房牌序'),
     authoritativeValidation: true,
@@ -123,12 +124,9 @@ const normalizeCreatedEntry = (raw: unknown, attemptId: string, policy: GameEndp
   return { ...entry, ...normalizeInvitation(source, entry.roomId) }
 }
 
-const operationKey = (settings: FriendRoomSettings): string => JSON.stringify([
-  settings.format, settings.levelMode, settings.levelRank, settings.tributeEnabled,
-  settings.mode, settings.rounds, settings.scoring, settings.scoreVisibility, settings.turnSeconds,
-  settings.trusteeSeconds, settings.totalTimeMinutes, settings.spectator, settings.autoSort,
-  settings.disableInteraction, settings.sortOrder, settings.authoritativeValidation,
-])
+// Only normalized, fixed-order DTOs reach here. All supported settings are part
+// of the intent, including newly added formats; no parallel field whitelist.
+const operationKey = (settings: FriendRoomSettings): string => JSON.stringify(settings)
 
 export class HttpFriendRoomGateway implements FriendRoomGateway {
   private readonly uncertainAttempts = new Map<string, Promise<string>>()

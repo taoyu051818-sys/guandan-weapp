@@ -82,7 +82,9 @@ export class SceneBackdropController {
   public setMode (mode: SceneBackdropMode): void {
     if (this.disposed) return
     this.mode = mode
-    this.apply(mode)
+    void this.preload(mode).catch(error => {
+      if (!this.disposed) console.warn(`Unable to load the ${mode} backdrop texture.`, error)
+    })
   }
 
   public resize (viewport: TableViewport): void {

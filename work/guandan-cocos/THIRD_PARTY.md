@@ -1,6 +1,6 @@
 # Third-party art and tooling
 
-This project keeps runtime assets small and uses code-driven Cocos animation. The full source packs and generators are retained under `third_party/` for reproducible iteration.
+Runtime inventory updated 2026-09-13. Source packs and generators are retained outside the Cocos bundle for provenance; their presence is not permission to re-enable retired features. Local license/hash checks do not independently establish commercial redistribution rights for every supplied asset.
 
 ## Kenney Particle Pack 1.1
 
@@ -29,12 +29,11 @@ Runtime event mapping is centralized in `assets/scripts/audio/AudioProfiles.ts`.
 | --- | --- |
 | Deal, normal play, countdown | `card.wav` |
 | Pass, defeat | `pass_1.wav` |
-| Bomb, straight flush | `bomb.wav` |
+| Bomb | `bomb.wav` |
 | Four-joker/king bomb | `king_bomb.wav` |
-| Wildcard actually used | `wildcard.wav` |
 | Victory | `win.wav` |
 
-These generated clips remain as small fail-safe candidates. Missing optional clips are handled as a normal silent fallback and never stop the game loop.
+These generated clips remain small fail-safe candidates. The wildcard/level-card dedicated route and duplicate straight-flush sound route are retired. Straight flush has exactly one female pattern announcement. Missing optional clips degrade to silence without stopping the game loop.
 
 ## Project-authorized Guandan audio collection
 
@@ -42,11 +41,11 @@ These generated clips remain as small fail-safe candidates. Missing optional cli
 - Authorization: use in this project was confirmed by the user on 2026-08-04.
 - Normalized catalog: `third_party/licenses/gameabc2-audio/catalog.json`.
 - Download manifest and SHA-256 checksums: `third_party/licenses/gameabc2-audio/manifest.json`.
-- Runtime selection: `assets/game-assets/audio/voices/licensed/` (25 reachable clips).
-- Source-only archive: `art-source/audio/licensed-archive/` (2 clips, never imported by Cocos).
+- Runtime selection: `assets/game-assets/audio/voices/licensed/` (4 clips: deal, bomb, defeat, female single 5).
+- Source-only archive: `art-source/audio/licensed-archive/` (22 clips, never imported by Cocos).
 - Reproducible import: `node scripts/import-licensed-audio.mjs`.
 
-All 27 MP3 entries are retained under semantic, collision-free names. The 25 reachable clips include deal, pass, bomb and defeat runtime fallbacks plus unambiguous straight, single-card and pair announcements selected from the actual `PlayAction`. The source straight-flush clip is superseded by the sole canonical NiuMa announcement, while the unusually long “等等，轿夫抬杠子对A” entry remains unconfirmed; both live only in the source archive outside Cocos `assets/`.
+The current importer retains 26 MP3 entries across runtime and source-only archive. Pattern/single/pair announcements otherwise use the canonical female pack; superseded straight-flush and unconfirmed source announcements remain outside Cocos `assets/`. See the catalog and manifest rather than older import counts.
 
 The source list's PNG “炸弹特效图汇总” was rejected during visual curation. It is recorded under `excluded` for auditability and was neither downloaded nor added to the runtime. No other image from this collection was imported.
 
@@ -58,25 +57,18 @@ The source list's PNG “炸弹特效图汇总” was rejected during visual cur
 - Original source directories: `assets/Game/Poker/`, `assets/GuanDan/Audio/ChuPai/Female/`, `assets/GuanDan/Audio/Phrase/Female/`, `assets/GuanDan/Audio/Clock/` and selected files directly under `assets/GuanDan/Audio/`.
 - Runtime selections: `assets/game-assets/cards/classic/`, `assets/game-assets/audio/voices/niuma/` and `assets/game-assets/audio/music/niuma/`.
 - Reproducible audio import: `NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-audio.mjs`.
-- Reproducible optional Male pack import: `NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-male-audio.mjs`.
 - Reproducible BGM import: `NIUMA_CLIENT_COCOS_DIR=/path/to/client-cocos node scripts/import-niuma-bgm.mjs`.
-- Used for: the `classic` card surface background; complete Female and Male single/pair announcements and selected semantically explicit pattern announcements (steel plate/“钢板” excluded); pack-specific pass variants; countdown 0–5; game-start, victory and defeat cues; one exact-copy quick-chat sentence in each voice pack; one optional looping background track.
+- Used for: the `classic` card surface background; female single/pair and selected pattern announcements; three pass variants; countdown 0–5; game-start, victory and defeat cues; one looping background track. Steel plate (“钢板”) uses the separately recorded TTS sample in `art-source/audio/tts/` and its runtime counterpart.
 
 Only `bg_front.png` remains from the former NiuMa face-up card selection. Upstream prefabs, hand-selection, networking and game-state code were not copied. Cocos Creator 3.8.8 owns the imported metadata in this project. The full upstream license is retained both under `third_party/licenses/` and beside the runtime asset selection because the background and audio remain in use.
 
-The 48 selected MP3 files and 1 selected OGG quick-chat file are recorded with their source paths, byte counts and SHA-256 hashes in `third_party/licenses/niuma-client-cocos-audio.json`. Cocos `.meta` files are retained for every runtime clip. The semantic controller rotates `pass1/2/3`, selects the exact countdown second, layers the start cue before the existing deal event, and keeps current generated/authorized fallbacks.
+The 48 selected MP3 files are recorded with source paths, byte counts and SHA-256 hashes in `third_party/licenses/niuma-client-cocos-audio.json`. Cocos `.meta` files are retained for runtime clips. The semantic controller rotates `pass1/2/3`, selects the countdown second and keeps current generated/authorized fallbacks. The former OGG quick-chat clip is retired.
 
-The optional Male pack contains 39 play/pass MP3 files plus the exact-copy Male `phrase02` OGG. It is recorded separately in `third_party/licenses/niuma-client-cocos-male-audio.json` and selected in settings. Human fallbacks never cross from Male to Female or from Female to Male; generated non-voice effects may still provide a neutral fallback.
+The 40-file male pack and its import script are retired; there is no player voice-selection setting. Historical male manifests remain provenance records only, not runtime selections.
 
-The upstream `assets/GuanDan/Audio/bg.mp3` track is separately recorded in `third_party/licenses/niuma-client-cocos-bgm.json` and imported as `music/niuma/table_theme`. It uses an isolated looping `AudioSource`, so one-shot card sounds cannot interrupt it; the existing music switch and volume now control real playback. Its source/hash/format are verified, while loop seam, loudness and device playback remain a human release check.
+The upstream `assets/GuanDan/Audio/bg.mp3` track is separately recorded in `third_party/licenses/niuma-client-cocos-bgm.json` and imported as `music/niuma/table_theme`. It uses an isolated looping `AudioSource`; music preference and volume are internal controller settings, not a restored settings page. Loop seam, loudness and device playback remain a human release check.
 
-Quick-chat meaning was not inferred from file numbers. At the pinned revision, both `GuanDanPlayer.ts` and `SeatPanel.ts` define the same nine displayed phrases in array order, and `AudioControl.playPhrase` adds one before loading `Phrase/Female/phraseNN`. A clip enters runtime only when the current whitelist text exactly matches the verified spoken sentence:
-
-| Current neutral copy | Verified upstream sentence | Runtime keys |
-| --- | --- | --- |
-| 你的牌打得太好啦 | 你的牌打得太好啦 | `niuma/chat_nice_play`, `niuma-male/chat_nice_play` |
-
-The remaining current buttons—请尽快出牌、配合得好、大家加油、谢谢、再来一局—have no exact compatible clip in this source set and intentionally degrade to silence. Upstream phrase01 and phrases 03–09 are recorded as excluded in the manifest because they are approximate/sarcastic, negative, admonishing, context-specific, opposite to “再来一局”, or unnecessarily harsh.
+All quick-chat buttons, text/broadcast logic and audio routes are retired. Earlier phrase-index verification remains historical provenance; no phrase may re-enter runtime through fallback logic. `tests/quick-chat-regression.cjs` is a retirement guard, not a playable feature test.
 
 The following source files are explicitly excluded and remain absent from runtime:
 

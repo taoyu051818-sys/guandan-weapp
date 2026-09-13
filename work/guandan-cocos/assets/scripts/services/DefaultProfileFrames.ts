@@ -11,6 +11,7 @@ export const defaultProfileFrame = (name: string): SpriteFrame | undefined => {
   if (!frames.has(asset) && !pending.has(asset)) {
     pending.add(asset)
     loadGameAsset(asset, Texture2D, (error, texture) => {
+      pending.delete(asset)
       if (error || !texture) return
       const frame = new SpriteFrame(); frame.texture = texture
       frames.set(asset, frame)

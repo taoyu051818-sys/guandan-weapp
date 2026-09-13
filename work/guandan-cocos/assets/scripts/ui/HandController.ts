@@ -26,6 +26,8 @@ export class HandController extends Component {
   private selectedCardIds = new Set<string>()
   private interactive = false
   private longPressPointerId: number | null = null
+  private longPressCallback: (() => void) | null = null
+  private selectionEpoch: number | undefined
   private touchExclusionPredicate: ((screenPoint: Readonly<{ x: number, y: number }>) => boolean) | null = null
 
   protected onLoad (): void {
@@ -95,6 +97,7 @@ export class HandController extends Component {
     stackGroups: readonly HandStackGroup[] = [],
     lockedCardIds?: readonly string[],
     animateEntrance = true,
+    selectionEpoch?: number,
   ): number {
     const fallback = [...hand].sort((a, b) => sortOrder === 'desc' ? b.value - a.value : a.value - b.value)
     const byId = new Map(hand.map(card => [card.id, card]))
@@ -117,10 +120,11 @@ export class HandController extends Component {
     const lockedIds = new Set(lockedCardIds ?? inferredLockedCardIds)
     this.selectedCardIds = playSelectedIds
     this.interactive = interactive
-    if (!interactive) {
+    if (!interactive || selectionEpoch !== this.selectionEpoch) {
       this.cancelLongPressSelection()
       this.dragSelection.cancel()
     }
+    this.selectionEpoch = selectionEpoch
     const entranceCompletions: Promise<void>[] = []
     displayHand.forEach((card, index) => {
       let node = this.cards.get(card.id)
@@ -184,7 +188,11 @@ export class HandController extends Component {
     this.cancelLongPressSelection()
     this.dragSelection.begin(detail.pointerId, detail.cardId, this.selectedCardIds.has(detail.cardId), detail.screenPoint)
     this.longPressPointerId = detail.pointerId
-    this.scheduleOnce(this.activateLongPressSelection, LONG_PRESS_SELECTION_SECONDS)
+    const callback = (): void => {
+      if (this.longPressCallback === callback) this.activateLongPressSelection()
+    }
+    this.longPressCallback = callback
+    this.scheduleOnce(callback, LONG_PRESS_SELECTION_SECONDS)
   }
 
   private handleCardTouchMove (detail: HandCardTouch): void {
@@ -228,7 +236,8 @@ export class HandController extends Component {
   }
 
   private cancelLongPressSelection (): void {
-    this.unschedule(this.activateLongPressSelection)
+    if (this.longPressCallback) this.unschedule(this.longPressCallback)
+    this.longPressCallback = null
     this.longPressPointerId = null
   }
 

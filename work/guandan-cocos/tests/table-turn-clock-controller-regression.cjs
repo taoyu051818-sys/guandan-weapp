@@ -196,6 +196,7 @@ const warnings = createHarness({ network: true, initialLobby: networkLobby, init
 warnings.controller.update({ snapshot: tributeTurn, humanId: 'p1', humanFinished: false, controlsY: 80 })
 for (let now = 16_000; now <= 22_000; now += 1000) {
   warnings.setNow(now)
+  warnings.controller.update({ snapshot: tributeTurn, humanId: 'p1', humanFinished: false, controlsY: 80 })
   warnings.tick()
   warnings.tick()
 }

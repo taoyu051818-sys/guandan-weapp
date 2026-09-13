@@ -68,6 +68,7 @@ export class LobbyPageDomain {
   private readonly playerProfilePresenter: LobbyPlayerProfilePresenter
   private destroyed = false
   private reflowing = false
+  private dashboardSubscriberToken: number | null = null
   private recoveryPending = false
   private renderedRecoveryAvailable = false
   private readonly ambientClock = { elapsed: 0 }
@@ -412,6 +413,9 @@ export class LobbyPageDomain {
   }
 
   private refreshLobbyDashboard (requestToken: number): void {
+    // A rebuilt menu subscribes to the existing request instead of starting a
+    // second one. Other routes and destroyed owners never receive its repaint.
+    this.dashboardSubscriberToken = requestToken
     if (!this.dependencies.gateways.configured || this.dependencies.player.loading || Date.now() - this.dependencies.player.loadedAt < 30_000) return
     this.dependencies.player.loading = true
     void Promise.all([
@@ -419,11 +423,12 @@ export class LobbyPageDomain {
       settle(this.dependencies.gateways.wallet.getWallet()),
     ]).then(([dashboardResult, walletResult]) => {
       this.dependencies.player.loading = false
+      if (this.isDisposed()) return
       this.dependencies.player.loadedAt = Date.now()
       if (dashboardResult.status === 'fulfilled') this.dependencies.player.updateDashboard(dashboardResult.value)
       if (walletResult.status === 'fulfilled') this.dependencies.wallet.update(walletResult.value)
       else this.dependencies.wallet.invalidate()
-      if (!this.isDisposed() && requestToken === this.dependencies.currentPageRequest() && this.dependencies.router.current === 'menu') this.renderMenu()
+      if (this.dashboardSubscriberToken === this.dependencies.currentPageRequest() && this.dependencies.router.current === 'menu') this.renderMenu()
       if (!this.isDisposed() && dashboardResult.status === 'fulfilled') this.dependencies.profileLoaded?.(dashboardResult.value.user)
     })
   }

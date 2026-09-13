@@ -42,7 +42,7 @@ export class DuplicateRoomRuntime {
         let room = original && structuredClone(original)
         let member, recovery
         if (ENTRY.has(type)) {
-          if (!room && this.rooms.size >= this.maxRooms) throw new Error('复式房间已满，请稍后重试')
+          if (!room && [...this.rooms.values()].filter(r => !['closed', 'ended'].includes(r.phase)).length >= this.maxRooms) throw new Error('复式房间已满，请稍后重试')
           ;({ room, member, recovery } = duplicateEntry(room, connection, message, this.verifier, this.now()))
           room.version++; await this.commit(room)
           connection.duplicateRoomId = roomId; connection.roomId = roomId
@@ -91,7 +91,11 @@ export class DuplicateRoomRuntime {
     for (const m of room.members) {
       const connection = this.connections.get(m.connectionId)
       if (!connection || m.left) continue
-      if (room.phase === 'closed') this.send(connection, 'roomDissolved', { roomId: room.roomId, reason: 'host-left' })
+      if (room.phase === 'closed') {
+        if (connection.roomId !== room.roomId || connection.duplicateRoomId !== room.roomId) continue
+        connection.roomId = null; connection.duplicateRoomId = null; connection.duplicateViewKey = null
+        this.send(connection, 'roomDissolved', { roomId: room.roomId, reason: 'host-left' })
+      }
       else {
         const snapshot = duplicateSnapshot(room, m, this.now())
         const key = `${m.seat}/${m.watch}/${snapshot.state?.roundId}/${snapshot.roomRole}/${snapshot.phase}`
@@ -120,8 +124,12 @@ export class DuplicateRoomRuntime {
     return this.serial(async () => {
       const original = this.rooms.get(connection.duplicateRoomId)
       if (!original) return
+      // Transport disconnection is a fact, not a reversible game action. Keep it
+      // offline even if storage is unavailable; later commits persist trustee state.
+      let changed = false
+      for (const m of original.members) if (m.connectionId === connection.id) { m.connectionId = null; m.trustee = true; changed = true }
+      if (!changed) return
       const room = structuredClone(original)
-      for (const m of room.members) if (m.connectionId === connection.id) { m.connectionId = null; m.trustee = true }
       room.version++; await this.commit(room); this.publish(room)
     })
   }

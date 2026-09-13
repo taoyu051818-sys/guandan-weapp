@@ -107,6 +107,7 @@ const findUsage = resolution => {
 
   const rocketCards = [...take('joker', 'Small', 2), ...take('joker', 'Big', 2)]
   const fourBombCards = takeRank(8, 4)
+  const fiveBombCards = takeRank(8, 5)
   const sixBombCards = takeRank(8, 6)
   const rocket = core.resolvePlay(rocketCards, classic)
   const fourBomb = core.resolvePlay(fourBombCards, classic)
@@ -120,6 +121,9 @@ const findUsage = resolution => {
   assert.equal(core.canPlay(straightFlushCards, action(fourBombCards), classic), true, '同花顺应压过四张炸弹')
   assert.equal(core.canPlay(fourBombCards, action(straightFlushCards), classic), false, '四张炸弹不能压过同花顺')
   assert.equal(core.canPlay(sixBombCards, action(straightFlushCards), classic), true, '六张炸弹应压过同花顺')
+  assert.equal(core.canPlay(straightFlushCards, action(fiveBombCards), classic), true, '同花顺为5.5张档位，应压过五张炸弹')
+  assert.equal(core.canPlay(fiveBombCards, action(straightFlushCards), classic), false, '五张炸弹不能压过同花顺')
+  assert.equal(core.canPlay(straightFlushCards, action(sixBombCards), classic), false, '同花顺不能压过六张炸弹')
 
   const lowerPair = takeRank(4, 2)
   const higherPair = takeRank(5, 2)

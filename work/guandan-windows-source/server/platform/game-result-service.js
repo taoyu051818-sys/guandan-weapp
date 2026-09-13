@@ -8,6 +8,7 @@ import { sanitizeSpectatorTimeline } from './spectator-domain.js'
 import { completeTournamentAssignment } from './tournament-orchestrator.js'
 import { isFixedTournament, tournamentRunError } from './tournament-service.js'
 import { qualificationStatus, rankTournamentEntries } from './tournament-standings.js'
+import { resultParticipantsBySeat } from './match-participants.js'
 
 const seats = ['p1', 'p2', 'p3', 'p4']
 const rewards = [100, 60, 30, 10]
@@ -75,7 +76,7 @@ export class GameResultService {
     const match = state.matches[event.matchId]
     if (!match || match.roomId !== String(event.roomId)) throw forbidden('结算事件与已分配匹配不一致')
     if (match.kind === friendRoomKind && match.friendMatchEnd) throw conflict('FRIEND_MATCH_ALREADY_ENDED', '好友房已按配置终局，不能再提交排名结算')
-    const participantsBySeat = Object.fromEntries(match.participants.filter(item => item.seat).map(item => [item.seat, item.userId]))
+    const participantsBySeat = resultParticipantsBySeat(match)
     if (!seats.every(seat => participantsBySeat[seat] === event.userIdsBySeat[seat])) throw forbidden('结算席位用户与匹配分配不一致')
     const settledEventId = state.gameResultByMatch[event.matchId]
     if (settledEventId && settledEventId !== eventId) throw conflict('MATCH_ALREADY_SETTLED', '该匹配已经完成结算')
@@ -247,6 +248,7 @@ export class GameResultService {
     delete match.abortedAt
     delete match.abortReason
     match.participants.forEach(participant => {
+      if (participant.status === 'cancelled') return
       if (participant.seat === 'observer' && state.activeMatchByUser[participant.userId] === event.matchId) delete state.activeMatchByUser[participant.userId]
       participant.status = 'completed'
       participant.completedAt = now

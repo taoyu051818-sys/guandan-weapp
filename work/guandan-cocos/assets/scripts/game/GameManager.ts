@@ -44,6 +44,12 @@ export class GameManager extends Component {
     getProjection: () => this.projection,
     getRoomId: () => this.session?.snapshot.roomId ?? null,
     getHumanId: () => this.humanId,
+    getAuthority: () => JSON.stringify([
+      this.lobby?.matchIdentity ?? this.session?.snapshot.roomId,
+      this.tableIdentity, this.humanId, this.lobby?.snapshot.roomRole,
+    ]),
+    getRecordScope: () => this.lobby?.matchIdentity
+      ? JSON.stringify([this.lobby.matchIdentity, this.tableIdentity, this.humanId]) : null,
     commit: (state, projection) => { this.currentState = ownRoundState(state); this.projection = projection },
     clearSelection: () => this.selection.clear(),
     cancelPendingAction: () => this.networkActionController.cancel(),
@@ -52,13 +58,15 @@ export class GameManager extends Component {
       else if (phase === 'tribute') this.session?.beginTribute()
       else this.session?.beginSettlement()
     },
-    recordRound: ({ settlement, wasFirst, bombCount, scores }) => {
+    recordRound: ({ settlement, wasFirst, bombCount, scores, recordKey }) => {
+      // Unidentified legacy/recovery views are display-only, not a second ledger.
+      if (!recordKey) return
       this.session?.recordRound(settlement.winnerTeam, wasFirst, bombCount, {
         levelUp: settlement.levelUp,
         currentLevel: settlement.currentLevel,
         teamLevels: settlement.teamLevels,
         scores,
-      }, this.state.players[this.session.snapshot.myPlayerId ?? 'p1'].team)
+      }, this.state.players[this.session.snapshot.myPlayerId ?? 'p1'].team, recordKey)
     },
     publishHint: hint => this.emitSnapshot(hint),
   })
@@ -195,6 +203,10 @@ export class GameManager extends Component {
   }
 
   private get humanId (): PlayerId { return this.session?.snapshot.myPlayerId ?? 'p1' }
+  private get tableIdentity (): string {
+    const duplicate = this.lobby?.snapshot.duplicate
+    return duplicate?.watching ?? duplicate?.slots.find(slot => slot.seat === duplicate.mySeat)?.table ?? 'single'
+  }
   public get phase (): GameManagerProjection['phase'] { return this.projection.phase }
   public get teamLevels (): Record<Team, Rank> { return { ...this.projection.teamLevels } }
   public get aFailStreaks (): Record<Team, number> { return { ...this.projection.aFailStreaks } }

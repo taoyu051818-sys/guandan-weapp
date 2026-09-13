@@ -1,9 +1,10 @@
 import type { DuplicateRoomSummary } from '../network/DuplicateRoomModel'
 
-export const duplicateTableLabel = (d?: DuplicateRoomSummary | null): string | null => {
+export const duplicateTableLabel = (d?: DuplicateRoomSummary | null, hideScores = false, phase?: string): string | null => {
   if (!d) return null
   const home = d.slots.find(s => s.seat === d.mySeat)?.table ?? 'A'
-  return `复式 ${d.watching ?? home}桌 · 红 ${d.scores.red} : 蓝 ${d.scores.blue}`
+  const label = `复式 ${d.watching ?? home}桌`
+  return hideScores && (phase ?? d.phase) === 'playing' ? label : `${label} · 红 ${d.scores.red} : 蓝 ${d.scores.blue}`
 }
 
 export const duplicateFinalPresentation = (d: DuplicateRoomSummary): Readonly<{ title: string, detail: string }> => {

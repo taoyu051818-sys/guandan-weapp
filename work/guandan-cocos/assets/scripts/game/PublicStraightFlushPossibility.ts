@@ -31,6 +31,6 @@ export const publicStraightFlushPossibleSuits = (input: Readonly<{
   const sequences = Array.from({ length: 9 }, (_, start) => RANKS.slice(start, start + 5))
   if (input.allowAceLowStraight) sequences.push(['A', 2, 3, 4, 5])
   return SUITS.filter(suit => sequences.some(sequence =>
-    sequence.filter(rank => (remaining.get(`${suit}:${rank}`) ?? 0) === 0).length <= wildcards,
+    sequence.filter(rank => rank === input.level || (remaining.get(`${suit}:${rank}`) ?? 0) === 0).length <= wildcards,
   ))
 }

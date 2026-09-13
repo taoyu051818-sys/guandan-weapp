@@ -87,8 +87,8 @@ const validateLockedRun = (run) => {
   const allAssignments = assignmentList(run)
   const blockedAssignments = allAssignments.filter(assignment => assignment.status === 'blocked')
   if (run.phase === 'blocked') {
-    if (blockedAssignments.length !== 1 || run.blockedAssignmentId !== blockedAssignments[0].assignmentId) {
-      fail('INVALID_RUN', 'blocked 赛事必须且只能绑定一张受阻牌桌')
+    if (!blockedAssignments.some(assignment => assignment.assignmentId === run.blockedAssignmentId) || blockedAssignments.some(assignment => assignment.round !== run.currentRound)) {
+      fail('INVALID_RUN', 'blocked 赛事必须保留首张受阻牌桌，且受阻牌桌须属于当前轮')
     }
   } else if (blockedAssignments.length) {
     fail('INVALID_RUN', '非 blocked 赛事不能包含受阻牌桌')
@@ -283,7 +283,7 @@ export const blockTournamentAssignment = (run, assignmentId, matchId, reason, no
     if (assignment.blockedReason !== safeReason) fail('BLOCK_REASON_MISMATCH', '重复阻塞请求的 reason 不一致')
     return run
   }
-  if (run.phase !== 'round-active') fail('RUN_NOT_ACTIVE', '赛事当前不能阻塞牌桌')
+  if (!['round-active', 'blocked'].includes(run.phase)) fail('RUN_NOT_ACTIVE', '赛事当前不能阻塞牌桌')
   ensureCurrentRound(run, assignment)
   if (!['matching', 'matched'].includes(assignment.status)) fail('INVALID_ASSIGNMENT_STATE', '只有 matching 或 matched 牌桌可以阻塞')
   if (assignment.matchId && assignment.matchId !== safeMatchId) fail('MATCH_MISMATCH', '阻塞回调 matchId 与 assignment 绑定不一致')
@@ -295,6 +295,9 @@ export const blockTournamentAssignment = (run, assignmentId, matchId, reason, no
     blockedAt: timestamp,
     blockedReason: safeReason,
   }
+  // Pausing progression does not prevent other assigned tables from releasing
+  // their users. Each table records its own failure; the run keeps the first cause.
+  if (run.phase === 'blocked') return replaceAssignment(run, blocked)
   return {
     ...replaceAssignment(run, blocked),
     phase: 'blocked',

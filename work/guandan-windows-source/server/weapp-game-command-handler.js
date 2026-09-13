@@ -17,7 +17,7 @@ export const createGameCommandHandler = dependencies => async context => {
     publishTribute, publishRoundReady, publishTrustees, publishTurnStatus, scheduleDissolveExpiry,
     publishDissolveVote, clearDissolveTimer, rememberClosedRoomTombstone, reportSpectatorClosed,
     commitRuntimeState, stagePendingSideEffects, persistRuntimeState, finalizeRemovedRoom,
-    send,
+    send, closeRoomWithoutAck,
   } = dependencies
 
   const acceptanceFor = playerId => ({ cacheKey, playerId, remember: rememberActionAcceptance, accept: acceptAction })
@@ -25,21 +25,10 @@ export const createGameCommandHandler = dependencies => async context => {
   // Both a final human vote and an already-unanimous human + bot proposal
   // must follow the same durable close / acceptance path.
   const closeApprovedVote = async room => {
-    room.closingReason = 'vote-approved'
-    rememberClosedRoomTombstone(room)
-    reportSpectatorClosed(room, 'dissolved')
-    await commitRuntimeState()
-    stagePendingSideEffects(room)
-    rooms.delete(room.roomId)
-    const accepted = rememberActionAcceptance(room)
-    try { await commitRuntimeState() } catch (error) {
-      rooms.set(room.roomId, room)
-      if (cacheKey) { dependencies.acceptedActions.delete(cacheKey); connection.acceptedCacheKeys.delete(requestId) }
-      persistRuntimeState()
-      throw error
-    }
-    send(connection, 'actionAccepted', accepted)
-    finalizeRemovedRoom(room)
+    return closeRoomWithoutAck(room, 'vote-approved', 'roomDissolved', 'dissolved', {
+      cacheKey, remember: rememberActionAcceptance,
+      send: accepted => send(connection, 'actionAccepted', accepted),
+    })
   }
 
   if (type === 'play' || type === 'pass') {

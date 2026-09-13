@@ -464,7 +464,7 @@ export class GameScene extends Component {
       seatOrder: () => this.tableMatch?.snapshot?.state.turnOrder ?? ['p1', 'p2', 'p3', 'p4'],
       hudRoot: () => presenter.node,
       auxiliaryNodes: () => [
-        { id: 'tribute-confirm', label: '确认贡牌', role: 'control', interactive: true, node: this.confirmTributeButton },
+        { id: 'tribute-confirm', label: this.confirmTributeButton?.getComponentInChildren(Label)?.string ?? '确认贡牌', role: 'control', interactive: true, node: this.confirmTributeButton },
         { id: 'tribute-finish', label: '开始本局', role: 'control', interactive: true, node: this.finishTributeButton },
         { id: 'next-round', label: '下一局操作', role: 'control', interactive: true, node: this.nextRoundButton },
       ],

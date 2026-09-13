@@ -107,6 +107,7 @@ export class TableHudPresenter {
     const seatOrder = snapshot.state.turnOrder
     const humanIndex = seatOrder.indexOf(humanId)
     const lobby = this.dependencies.lobbySnapshot()
+    const hideScores = lobby?.roomSettings?.scoreVisibility === 'hidden' && snapshot.phase === 'playing'
     const observing = lobby?.roomRole === 'observer'
     const own = this.dependencies.ownProfile?.()
     const avatarKey = observing ? 'observer' : `${own?.id ?? ''}:${own?.avatarUrl ?? ''}`
@@ -137,7 +138,7 @@ export class TableHudPresenter {
     })
     this.tableHud.render({
       matchLabel: `本局打 ${String(snapshot.state.currentLevel)}`,
-      levelLabel: duplicateTableLabel(lobby?.duplicate) ?? projectTableModeLabel(snapshot.state, humanId, lobby?.roomSettings?.scoreVisibility === 'hidden', lobby?.entryKind === 'match')
+      levelLabel: duplicateTableLabel(lobby?.duplicate, hideScores, snapshot.phase) ?? projectTableModeLabel(snapshot.state, humanId, hideScores, lobby?.entryKind === 'match')
         ?? `我方 ${String(viewer.viewerLevel)}级 · 对方 ${String(viewer.opponentLevel)}级`,
       ...turnClock,
       counterExpanded: this.counterExpanded,

@@ -31,6 +31,7 @@ import { createAcceptedActionStore } from './weapp-accepted-action-store.js'
 import { createRuntimePersistence } from './weapp-runtime-persistence.js'
 import { createRoomMetadata } from './weapp-room-metadata.js'
 import { createRoomExpiry } from './weapp-room-expiry.js'
+import { createRoomCloseCoordinator } from './weapp-room-close-coordinator.js'
 import { roomMember } from './friend-room-members.js'
 import { createFriendRoomObserverRuntime, FRIEND_VIEW_COMMANDS } from './friend-room-observer-runtime.js'
 import { DuplicateRoomRuntime } from './duplicate-room-runtime.js'
@@ -453,27 +454,10 @@ const finalizeRemovedRoom = (room, reason = 'vote-approved', eventType = 'roomDi
   affectedConnections.forEach(syncConnectionRoomId)
   broadcastRooms()
 }
-const closeRoomWithoutAck = async (room, reason, eventType = 'roomDissolved', spectatorReason = reason) => {
-  if (!rooms.has(room.roomId)) return
-  if (reason === 'empty-timeout' && hasConnectedHuman(room)) return
-  rememberClosedRoomTombstone(room)
-  if (!room.closingReason) {
-    room.version += 1
-    room.closingReason = reason
-    reportSpectatorClosed(room, spectatorReason)
-    await commitRuntimeState()
-  }
-  stagePendingSideEffects(room)
-  rooms.delete(room.roomId)
-  try {
-    await commitRuntimeState()
-  } catch (error) {
-    rooms.set(room.roomId, room)
-    persistRuntimeState()
-    throw error
-  }
-  finalizeRemovedRoom(room, reason, eventType)
-}
+const roomCloseCoordinator = createRoomCloseCoordinator({ rooms, hasConnectedHuman,
+  rememberClosedRoomTombstone, reportSpectatorClosed, commitRuntimeState, stagePendingSideEffects,
+  persistRuntimeState, finalizeRemovedRoom, enqueueServerOperation })
+const closeRoomWithoutAck = (...args) => roomCloseCoordinator.close(...args)
 const initializeRoomMatch = room => {
   resetRoomBotPolicy(room)
   room.roundStatsBySeat = createGameStatsBySeat()
@@ -531,6 +515,7 @@ const consumeCommandBudget = connection => {
 }
 
 const gameCommandDependencies = {
+  closeRoomWithoutAck,
   ids, rooms, connections, acceptedActions,
   dissolveTimeoutMs: DISSOLVE_TIMEOUT_MS,
   playerIn, ensureLiveMetadata, ensureLobbyMetadata, isFriendRoom,
@@ -780,6 +765,7 @@ const shutdown = async signal => {
   connections.forEach(connection => { connection.acceptingCommands = false })
   const serverClosed = new Promise(resolve => server.close(resolve))
   roomExpiry.dispose()
+  roomCloseCoordinator.dispose()
   friendObservers.dispose()
   roomExit.dispose()
   for (const timer of sideEffectStageRetryTimers.values()) clearTimeout(timer)

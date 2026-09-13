@@ -1,13 +1,17 @@
 import type { EngineState, MatchState, PlayerId, SettlementResult, TributeState } from '../core/generated'
 import type { NetworkViewerRoundStats } from '../network/LobbyModels'
 import { countPlayerBombs, type RoundRecord, type SessionPhase } from './RoundRecord'
-import { mergeGameManagerProjection, projectAuthoritativeState, type GameManagerProjection, type GameManagerProjectionPatch } from './GameManagerProjection'
+import { createGameManagerProjection, mergeGameManagerProjection, projectAuthoritativeState, type GameManagerProjection, type GameManagerProjectionPatch } from './GameManagerProjection'
 
 export type NetworkMatchSnapshotPorts = Readonly<{
   getState: () => EngineState
   getProjection: () => GameManagerProjection
   getRoomId: () => string | null
   getHumanId: () => PlayerId
+  /** Validated room/match/table/view identity, never an untrusted packet field. */
+  getAuthority?: () => string | null
+  /** Stable platform match + table + participant identity, excluding reusable room numbers. */
+  getRecordScope?: () => string | null
   commit: (state: EngineState, projection: GameManagerProjection) => void
   clearSelection: () => void
   cancelPendingAction: () => void
@@ -19,11 +23,12 @@ export type NetworkMatchSnapshotPorts = Readonly<{
 /** Owns network snapshot projection, version gating, and once-per-round session effects. */
 export class NetworkMatchSnapshotController {
   private readonly recordedRoundKeys = new Set<string>()
+  private authority: string | null | undefined = undefined
 
   public constructor (private readonly ports: NetworkMatchSnapshotPorts) {}
 
   public reset (): void {
-    this.recordedRoundKeys.clear()
+    this.authority = undefined
   }
 
   public applyServerState (state: EngineState, hint = '已同步服务器状态'): boolean {
@@ -53,7 +58,7 @@ export class NetworkMatchSnapshotController {
     eventIdentity?: Readonly<{ roomId: string, version: number, gameVersion: number }>,
   ): boolean {
     const state = packetState ?? this.ports.getState()
-    const current = this.ports.getProjection()
+    const current = this.projectionBaseline()
     const match = state as Partial<MatchState>
     const authoritativeScores = match.phase === 'playing' ? null : match.scores
     const scores = authoritativeScores
@@ -87,6 +92,7 @@ export class NetworkMatchSnapshotController {
     const roundKey = this.roundKey(state, eventIdentity)
     if (!roundKey || !this.recordedRoundKeys.has(roundKey)) {
       this.ports.recordRound({
+        ...(this.ports.getRecordScope?.() && roundKey ? { recordKey: roundKey } : {}),
         settlement,
         wasFirst: settlement.fullRank[0] === humanId,
         bombCount: this.bombCount(state, humanId, viewerRoundStats),
@@ -102,14 +108,14 @@ export class NetworkMatchSnapshotController {
     state: EngineState,
     fallback: GameManagerProjectionPatch,
   ): GameManagerProjection | null {
-    const result = projectAuthoritativeState(this.ports.getProjection(), state, fallback)
+    const result = projectAuthoritativeState(this.projectionBaseline(), state, fallback)
     if (!result.accepted) return null
     return this.commitProjection(state, result.projection)
   }
 
   /** Legacy result-only packets explicitly advance lifecycle after adapting their last playing snapshot. */
   private commitLegacyRoundEnd (state: EngineState, patch: GameManagerProjectionPatch): GameManagerProjection | null {
-    const adapted = projectAuthoritativeState(this.ports.getProjection(), state)
+    const adapted = projectAuthoritativeState(this.projectionBaseline(), state)
     if (!adapted.accepted) return null
     return this.commitProjection(state, mergeGameManagerProjection(adapted.projection, patch))
   }
@@ -123,15 +129,22 @@ export class NetworkMatchSnapshotController {
     const ids = new Set(newHand.map(card => card.id))
     // Other seats' actions must not collapse a local preselection. Own actions,
     // changed hands, lifecycle/round changes and finished views retire it.
-    const keepSelection = previous && projection.phase === 'playing' && oldProjection.phase === 'playing' &&
+    const authority = this.ports.getAuthority?.() ?? null
+    const keepSelection = authority === this.authority && previous && projection.phase === 'playing' && oldProjection.phase === 'playing' &&
       projection.roundId === oldProjection.roundId && !state.finishedPlayers.includes(humanId) &&
       (previous.currentTurn !== humanId || state.currentTurn === humanId) &&
       oldHand.length === newHand.length && oldHand.every(card => ids.has(card.id))
     this.ports.commit(state, projection)
+    this.authority = authority
     if (!keepSelection) this.ports.clearSelection()
     this.ports.cancelPendingAction()
     this.ports.setSessionPhase(projection.phase)
     return projection
+  }
+
+  private projectionBaseline (): GameManagerProjection {
+    const authority = this.ports.getAuthority?.() ?? null
+    return authority !== this.authority ? createGameManagerProjection() : this.ports.getProjection()
   }
 
   private bombCount (state: EngineState, humanId: PlayerId, stats?: NetworkViewerRoundStats): number {
@@ -144,7 +157,7 @@ export class NetworkMatchSnapshotController {
     state: EngineState,
     eventIdentity?: Readonly<{ roomId: string, version: number, gameVersion: number }>,
   ): string | null {
-    const roomId = eventIdentity?.roomId ?? this.ports.getRoomId()
+    const roomId = this.ports.getRecordScope?.() ?? eventIdentity?.roomId ?? this.ports.getRoomId()
     const roundId = (state as Partial<MatchState>).roundId
     if (!roomId) return null
     if (Number.isSafeInteger(roundId)) return `${roomId}:round:${String(roundId)}`

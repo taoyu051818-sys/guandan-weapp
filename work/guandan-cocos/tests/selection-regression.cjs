@@ -130,7 +130,7 @@ function verifySourceConversions () {
   assert.match(cardView, /screenPoint: event\.getLocation\(\)\.clone\(\)/, 'touches passed to hitTest must stay in Cocos screen coordinates')
   assert.doesNotMatch(cardView, /event\.getUILocation\(/, 'pre-converted UI coordinates must never enter the screen-space hand gesture chain')
   assert.match(handController, /new HandDragSelectionPolicy\(\)/, 'one hand-level policy must own the active pointer gesture')
-  assert.match(handController, /LONG_PRESS_SELECTION_SECONDS = 0\.3[\s\S]*scheduleOnce\(this\.activateLongPressSelection/, 'a stationary long press must activate mobile sweep selection')
+  assert.match(handController, /LONG_PRESS_SELECTION_SECONDS = 0\.3[\s\S]*scheduleOnce\(callback, LONG_PRESS_SELECTION_SECONDS\)/, 'a stationary long press must activate through its owned cancellable callback')
   assert.doesNotMatch(handController, /leftSelectedLoose|rightSelectedLoose/, 'selection must never move a card to a higher render layer')
   assert.match(handController, /sampleHandDragSegment[\s\S]*?findTopCardAt/, 'fast movement must be sampled across every crossed card hit area')
   assert.match(handController, /public setTouchExclusionPredicate \(/, 'the hand must accept a presentation-layer touch exclusion predicate')

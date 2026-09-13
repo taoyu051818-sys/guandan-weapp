@@ -52,12 +52,21 @@ for (const [mode, delay] of [['live', 0], ['delay-15', 15000], ['delay-30', 3000
   if (delay) assert.equal(buffer.project(table, 'p1').roundResult, undefined, 'future results must not leak alongside delayed hands')
   assert.equal(new FriendRoomObserverBuffer().project(table, 'p1'), null, 'restart must buffer again rather than replay a future snapshot')
 }
-const delayedRound = room(); delayedRound.roomSettings.spectator = 'delayed-round'; delayedRound.state = { players: Object.fromEntries(seats.map(id => [id, { hand: [] }])) }
+const delayedRound = room(); delayedRound.roundSequence = 0; delayedRound.roomSettings.spectator = 'delayed-round'; delayedRound.state = { roundId: 1, phase: 'playing', players: Object.fromEntries(seats.map(id => [id, { hand: [] }])) }
 const buffer = new FriendRoomObserverBuffer({ now: () => now, maxSnapshots: 2 })
 buffer.capture(delayedRound, { state: delayedRound.state, version: 1 })
 assert.equal(buffer.project(delayedRound, 'p1'), null)
-delayedRound.roundSequence = 2
-assert.equal(buffer.project(delayedRound, 'p1').version, 1)
+delayedRound.roundSequence = 1
+delayedRound.state.phase = 'settled'
+delayedRound.version++
+buffer.capture(delayedRound, { state: delayedRound.state, version: 2 })
+assert.equal(buffer.project(delayedRound, 'p1'), null, 'first settlement is not a new round')
+delayedRound.state = { ...delayedRound.state, roundId: 2, phase: 'playing' }
+delayedRound.version++
+buffer.capture(delayedRound, { state: delayedRound.state, version: 3 })
+assert.equal(buffer.project(delayedRound, 'p1').state.roundId, 1)
+assert.equal(buffer.project(delayedRound, 'p1').state.phase, 'settled')
+assert.equal(buffer.project(delayedRound, 'p1').version, 2)
 delayedRound.roomSettings.spectator = 'off'
 assert.equal(buffer.project(delayedRound, 'p1'), null)
 

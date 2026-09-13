@@ -2,14 +2,16 @@
 // Cocos rendering/resources are mocked; this is not a substitute for phone testing.
 const vm = require('node:vm')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const { createBuiltRuntime } = require('./cocos-built-runtime.cjs')
 const stages = []
 const failures = []
 let ready = false
-const config = {
-  version: 1, platformEndpoint: 'https://api.yutechhn.cn/guandan', lobbyEndpoint: 'wss://api.yutechhn.cn/guandan/weapp',
-  platformAllowDevelopmentLogin: false, platformAllowInsecureEndpoint: false, platformAllowInsecureGameEndpoint: false,
-}
+const entry = fs.readFileSync(path.resolve(__dirname, '../../build/wechatgame/game.js'), 'utf8')
+const embedded = entry.match(/\/\* guandan-runtime-config:start \*\/[\s\S]*?Object\.freeze\((\{[^\n]+\})\)[\s\S]*?\/\* guandan-runtime-config:end \*\//)
+assert.ok(embedded, 'delivered game.js must contain the real runtime configuration')
+const config = JSON.parse(embedded[1])
 const overrides = {
   'chunks:///_virtual/StartupLoadingOverlay.ts': { StartupLoadingOverlay: class {
     resize () {} bringToFront () {} fadeOut () { return Promise.resolve() }

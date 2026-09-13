@@ -24,17 +24,26 @@ const makeClock = () => {
 const { OptionalAudioAssetCache, isMissingAudioAsset } = loadTs(path.join(audioRoot, 'OptionalAudioAssetCache.ts'))
 const { ActionVoiceGate } = loadTs(path.join(audioRoot, 'ActionVoiceGate.ts'))
 const makeAudioHarness = () => {
-  const time = makeClock(), pendingLoads = []
+  const time = makeClock(), pendingLoads = [], played = []
   class AudioClip {}
   class AudioSource {
+    static EventType = { ENDED: 'ended' }
+    static maxAudioChannel = 32
     constructor () { this.node = { isValid: true }; this.clip = null; this.playing = false; this.playCount = 0; this.stopCount = 0; this.played = [] }
     stop () { this.stopCount++; this.playing = false }
-    play () { this.playCount++; this.playing = true }
+    play () { this.playCount++; this.playing = true; if (this.node.name === 'TransientAudio') played.push(this.clip) }
     playOneShot (clip) { this.played.push(clip) }
   }
+  class Node {
+    constructor (name) { this.name = name; this.isValid = true; this.handlers = new Map() }
+    addComponent () { const source = new AudioSource(); source.node = this; return source }
+    once (type, callback) { this.handlers.set(type, callback) }
+    destroy () { this.isValid = false; this.handlers.clear() }
+  }
+  const cc = { _decorator: { ccclass: () => target => target, property: () => () => {} }, AudioClip, AudioSource, Component: class {}, Node }
   const dependencies = {
-    cc: { _decorator: { ccclass: () => target => target, property: () => () => {} }, AudioClip, AudioSource,
-      Component: class {}, Node: class { addComponent () { return new AudioSource() } } },
+    cc,
+    './TransientAudioChannels': loadTs(path.join(audioRoot, 'TransientAudioChannels.ts'), { cc }),
     '../session/GameSession': { GameSession: class {} },
     '../services/GameAssetLoader': { loadGameAsset: (assetPath, assetType, callback) => {
       const load = { assetPath, assetType, callback, cancelled: false }; pendingLoads.push(load)
@@ -51,12 +60,11 @@ const makeAudioHarness = () => {
   }
   const { CocosAudioController } = loadTs(path.join(audioRoot, 'CocosAudioController.ts'), dependencies)
   const controller = new CocosAudioController(), scheduled = []
-  controller.node = { isValid: true }
+  controller.node = new Node('controller')
   controller.session = { snapshot: { settings: { soundEnabled: true, volume: 1, voicePack: 'female', bgmEnabled: true, bgmVolume: .3 } }, events: { on () {}, off () {} } }
-  controller.effectSource = new AudioSource()
   controller.bgmSource = new AudioSource()
   controller.scheduleOnce = (callback, seconds) => { scheduled.push({ callback, seconds }) }
-  return { controller, pendingLoads, scheduled, played: controller.effectSource.played, time, AudioClip }
+  return { controller, pendingLoads, scheduled, played, time, AudioClip }
 }
 
 module.exports = { makeClock, OptionalAudioAssetCache, isMissingAudioAsset, ActionVoiceGate, makeAudioHarness }

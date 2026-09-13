@@ -70,8 +70,13 @@ export const verifyWechatRuntimeConfig = config => {
     let endpoint
     try { endpoint = new URL(value) } catch { throw new Error(`WeChat ${field} is missing or invalid.`) }
     const prefix = `${protocol}//api.yutechhn.cn/guandan`
+    // Validate the raw path before WHATWG URL normalizes dot segments away.
+    const rawPath = typeof value === 'string' ? value.match(/^[a-z]+:\/\/[^/?#]+(\/[^?#]*)?/i)?.[1] ?? '/' : ''
     if (typeof value !== 'string' || endpoint.protocol !== protocol || endpoint.hostname !== 'api.yutechhn.cn' ||
         endpoint.username || endpoint.password || endpoint.port || endpoint.hash ||
+        /[\s\\\u0000-\u001f\u007f]/.test(value) || /%(?![0-9a-f]{2})/i.test(value) ||
+        /%(?:2e|2f|5c|25|0[0-9a-f]|1[0-9a-f]|7f)/i.test(rawPath) ||
+        rawPath.split('/').some(segment => segment === '.' || segment === '..') ||
         !value.startsWith(prefix) || !['', '/', '?'].includes(value.slice(prefix.length, prefix.length + 1))) {
       throw new Error(`WeChat ${field} must use ${prefix}; local/IP/unapproved endpoints are forbidden.`)
     }
@@ -101,10 +106,6 @@ export const runtimeConfigFromEnv = (env, { release = false, bareIpTest = false 
 
 const blockFor = config => `${START_MARKER}\nglobalThis.${GLOBAL_KEY} = Object.freeze(${JSON.stringify(config)});\n${END_MARKER}`
 const markerPattern = /\/\* guandan-runtime-config:start \*\/[\s\S]*?\/\* guandan-runtime-config:end \*\//
-
-const replaceOrInsert = (source, block, anchor, prefix = '') => markerPattern.test(source)
-  ? source.replace(markerPattern, block)
-  : source.replace(anchor, `${prefix}${block}\n${anchor}`)
 
 export const injectWebRuntimeConfig = (source, config) => {
   const block = `<script>\n${blockFor(config)}\n</script>`

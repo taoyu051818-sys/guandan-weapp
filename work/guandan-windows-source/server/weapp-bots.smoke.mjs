@@ -217,11 +217,11 @@ try {
   assert.equal(acceptance.requestType, 'proposeDissolve')
   assert.equal(closed.reason, 'vote-approved')
 
-  // Closing retires resume-token acceptance aliases. A duplicate must report
-  // the absent room, never reopen it or run another vote.
-  const duplicateRejected = waitFor(restoredHost, 'error', packet => packet.requestId === dissolveId)
+  // The final close receipt survives room cleanup so a lost ACK can be replayed
+  // without reopening the room or running another vote.
+  const duplicateAccepted = waitFor(restoredHost, 'actionAccepted', packet => packet.requestId === dissolveId)
   send(restoredHost, 'proposeDissolve', { roomId: friendRoomId }, dissolveId)
-  assert.match((await duplicateRejected).message, /当前不在对局中/)
+  assert.equal((await duplicateAccepted).requestType, 'proposeDissolve')
 
   process.stdout.write('weapp friend-room bot protocol smoke passed\n')
 } finally {

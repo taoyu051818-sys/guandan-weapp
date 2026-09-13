@@ -15,7 +15,8 @@ export class FriendRoomObserverBuffer {
     let history = this.histories.get(room)
     if (!history) { history = []; this.histories.set(room, history) }
     if (history.at(-1)?.version === room.version) return
-    history.push({ at: this.now(), version: room.version, round: room.roundSequence || 1, payload: structuredClone(payload) })
+    const round = Number.isSafeInteger(room.state.roundId) ? room.state.roundId : Math.max(1, (room.roundSequence || 0) + (room.state.phase === 'settled' ? 0 : 1))
+    history.push({ at: this.now(), version: room.version, round, payload: structuredClone(payload) })
     // A count ceiling is deliberate: if an unusually busy table exhausts history,
     // the viewer waits rather than receiving a newer, disallowed snapshot.
     while (history.length > this.maxSnapshots) history.shift()
@@ -32,7 +33,7 @@ export class FriendRoomObserverBuffer {
     if (delay === null && mode !== 'delayed-round') return null
     const history = this.histories.get(room) || []
     const eligible = history.filter(item => mode === 'delayed-round'
-      ? item.round < (room.roundSequence || 1) || Boolean(room.matchEnded)
+      ? item.round < (room.state?.roundId ?? (room.roundSequence || 0) + 1) || Boolean(room.matchEnded)
       : item.at <= this.now() - delay)
     const sample = eligible.at(-1)
     if (!sample) return null

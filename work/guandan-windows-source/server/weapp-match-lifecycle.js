@@ -267,6 +267,7 @@ export const createWeAppMatchLifecycle = ({
       publishRoundEnded(room, pending.result)
       room.pendingRoundFinalization = null
       persistRuntimeState()
+      await advanceOfflineReadyRound(room)
       return true
     } catch (error) {
       schedulePendingRoundFinalization(room)
@@ -388,7 +389,28 @@ export const createWeAppMatchLifecycle = ({
     now, scheduleTimeout, enqueueServerOperation, automatedDeadline, publishTurnStatus,
   })
 
+  const canPrepareNextRound = room => Boolean(room.roundResult && !room.roundResult.isGameWon && !room.matchEnded && !room.pendingRoundFinalization && !room.closingReason)
+  const advanceOfflineReadyRound = async room => {
+    if (rooms.get(room.roomId) !== room || !canPrepareNextRound(room) || !playerIds.every(id => room.roundReady[id])) return
+    const snapshot = structuredClone(room)
+    try { prepareNextRound(room); await commitRuntimeState() } catch (error) {
+      restoreRoom(room, snapshot)
+      clearTurnTimer(room.roomId)
+      if (!isShuttingDown()) {
+        clearTimer(roundFinalizationTimers, room.roomId)
+        const timer = scheduleTimeout(() => {
+          roundFinalizationTimers.delete(room.roomId)
+          void enqueueServerOperation(() => advanceOfflineReadyRound(room), `offline round advance ${room.roomId}`, room.roomId)
+        }, 500)
+        timer.unref?.()
+        roundFinalizationTimers.set(room.roomId, timer)
+      }
+      throw error
+    }
+    stagePendingSideEffects(room); publishTribute(room, 'roundPrepared')
+  }
   const prepareNextRound = (room, incrementVersion = true) => {
+    if (!canPrepareNextRound(room)) throw new Error('当前不能准备下一局')
     const result = room.roundResult
     const nextLevel = ['independent', 'rotating'].includes(room.state.matchFormat?.kind) ? chooseMatchLevel(room.state.matchFormat, shuffleRandom) : result.currentLevel
     const pairingIndex = room.state.matchFormat?.kind === 'rotating' && room.state.matchFormat.teamRotation === 'draw' ? Math.floor(shuffleRandom() * 52) : undefined
@@ -416,10 +438,10 @@ export const createWeAppMatchLifecycle = ({
   }
 
   const markOfflineReady = (room, playerId) => {
-    if (!room.roundResult || room.roundResult.isGameWon) return false
+    if (!room.roundResult || room.roundResult.isGameWon || room.matchEnded || room.closingReason) return false
     ensureLiveMetadata(room)
     room.roundReady[playerId] = true
-    if (playerIds.every(id => room.roundReady[id])) {
+    if (canPrepareNextRound(room) && playerIds.every(id => room.roundReady[id])) {
       prepareNextRound(room, false)
       return true
     }

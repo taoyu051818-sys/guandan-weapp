@@ -35,6 +35,7 @@ export const createCommandGateway = ({
   if (previousAccepted) {
     if (previousAccepted.fingerprint !== requestFingerprint) return reply('error', { code: 'IDEMPOTENCY_CONFLICT', message: '同一个 requestId 不能用于不同动作' })
     if (previousAccepted.completion?.kind === 'room-exit') return completeRoomExit(connection, cacheKey, previousAccepted)
+    if (requestedRoom?.closingReason) return reply('error', { code: 'ROOM_CLOSING', message: '房间正在安全关闭，请稍后重试' })
     if (requestedRoom?.pendingRoundFinalization?.cacheKey === cacheKey) {
       try { await finalizePendingRound(requestedRoom) } catch {
         return reply('error', { code: 'PERSISTENCE_PENDING', message: '终局动作仍在等待安全落盘，请稍后用相同 requestId 重试', retryAfterMs: 500 })

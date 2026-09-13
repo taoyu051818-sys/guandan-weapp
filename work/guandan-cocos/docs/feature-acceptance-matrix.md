@@ -1,5 +1,7 @@
 # 功能吸收与验收矩阵
 
+> 历史参考，2026-09-13 已由 [当前开发与验收基线](CURRENT_CAPABILITIES.md) 取代其中“当前能力”、入口、节奏和文件计数。以下旧实现、旧测试/包体数字仅适用于记录当日；实验室、快捷语、男声、级牌专属声、undo/redo 和旧页面不得按本文恢复。现行路径以 [自动生成文件清单](CODE_FILE_INVENTORY.md) 为准，发布验收以本轮整改报告为准。
+
 > 源码复核：2026-08-05
 >
 > 范围：`guandan-cocos`、`shared-core`、`guandan-windows-source/server`

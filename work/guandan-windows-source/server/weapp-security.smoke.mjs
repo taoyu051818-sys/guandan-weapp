@@ -1,14 +1,28 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import { createConnection } from 'node:net'
+import { createConnection, createServer } from 'node:net'
 import { spawn } from 'node:child_process'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { once } from 'node:events'
 
-const port = 39115
+const directory = await mkdtemp(join(tmpdir(), 'weapp-security-'))
+const portProbe = createServer()
+portProbe.listen(0, '127.0.0.1')
+await once(portProbe, 'listening')
+const port = portProbe.address().port
+await new Promise(resolve => portProbe.close(resolve))
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const child = spawn(process.execPath, ['server/weapp-ws.js'], {
-  cwd: process.cwd(),
+  cwd: dirname(dirname(fileURLToPath(import.meta.url))),
   env: {
-    ...process.env,
+    NODE_ENV: 'test',
+    WEAPP_HOST: '127.0.0.1',
+    WEAPP_ROOM_STATE_FILE: join(directory, 'rooms.json'),
+    GAME_RESULT_OUTBOX_FILE: join(directory, 'results.json'),
+    GAME_SPECTATOR_OUTBOX_FILE: join(directory, 'spectators.json'),
     WEAPP_WS_PORT: String(port),
     WEAPP_ALLOWED_ORIGINS: 'https://allowed.example',
     WEAPP_MAX_CONNECTIONS: '4',
@@ -18,6 +32,7 @@ const child = spawn(process.execPath, ['server/weapp-ws.js'], {
   },
   stdio: 'ignore',
 })
+const childExit = once(child, 'exit')
 
 const sockets = []
 let requestId = 1
@@ -107,4 +122,6 @@ try {
 } finally {
   sockets.forEach(socket => socket.close())
   child.kill('SIGTERM')
+  await childExit
+  await rm(directory, { recursive: true, force: true })
 }

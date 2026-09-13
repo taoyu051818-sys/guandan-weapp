@@ -2,6 +2,7 @@ import type { EngineState, MatchState, PlayerId, SettlementResult, Team } from '
 
 export type SessionPhase = 'playing' | 'tribute' | 'settlement'
 export type RoundRecord = Readonly<{
+  recordKey?: string
   settlement: SettlementResult
   wasFirst: boolean
   bombCount: number

@@ -366,7 +366,7 @@ export class TableGameHud {
     })
 
     if (this.toolbar) configureTransform(this.toolbar, EXPANDED_TOOLBAR_WIDTH, EXPANDED_TOOLBAR_HEIGHT)
-    layoutTableToolbar(this.toolbar, [this.lockButton, this.arrangeButton, this.trusteeButton])
+    layoutTableToolbar(this.toolbar, [this.lockButton, this.arrangeButton, this.trusteeButton], view => view === this.lockButton && this.state.lockDecision.kind !== 'unavailable')
 
   }
 
@@ -539,7 +539,7 @@ export class TableGameHud {
       this.drawToolButton(this.lockButton, this.state.lockDecision.kind !== 'unavailable', false)
     }
     if (this.arrangeButton) this.arrangeButton.label.string = this.state.arrangeRestoreAvailable ? '复原' : '一键理牌'
-    layoutTableToolbar(this.toolbar, [this.lockButton, this.arrangeButton, this.trusteeButton])
+    layoutTableToolbar(this.toolbar, [this.lockButton, this.arrangeButton, this.trusteeButton], view => view === this.lockButton && this.state.lockDecision.kind !== 'unavailable')
   }
 
   private renderCounter (): void {

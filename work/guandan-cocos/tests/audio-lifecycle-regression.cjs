@@ -44,6 +44,7 @@ const localRequire = request => {
     loadGameAsset: (assetPath, assetType, callback) => { pendingLoads.push({ assetPath, assetType, callback }); return () => {} },
   }
   if (request === './OptionalAudioAssetCache' || request === './ActionVoiceGate') return loadTs(path.resolve(path.dirname(sourcePath), `${request}.ts`))
+  if (request === './TransientAudioChannels') return { TransientAudioChannels: class { stopAll () {} } }
   if (request === './AudioProfiles') return {
     RETIRED_AUDIO_ROUTES: { wildcard: { runtimeAllowed: false } },
     resolveAudioEvent: () => null,
@@ -74,10 +75,9 @@ const makeController = () => {
       settings: { soundEnabled: true, volume: 1, voicePack: 'female', bgmEnabled: true, bgmVolume: 0.3 },
     },
   }
-  controller.effectSource = {
-    node: { isValid: true },
-    stop: () => { stopCount += 1 },
-    playOneShot: clip => played.push(clip),
+  controller.effects = {
+    stopAll: () => { stopCount += 1 },
+    play: clip => played.push(clip),
   }
   controller.scheduleOnce = (callback, seconds) => scheduled.push({ callback, seconds })
   controller.playEvent = event => events.push(event)

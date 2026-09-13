@@ -165,7 +165,8 @@ export const createWeAppGameStartCoordinator = ({
     room.gameStartClaimedAt = null
     room.gameStartReconnectDeadlineAt = null
     const pendingRequest = room.pendingGameStartRequest
-    const acceptedActionsBeforeInitialization = new Map(acceptedActions)
+    const previousAcceptance = pendingRequest?.cacheKey && acceptedActions.get(pendingRequest.cacheKey)
+    let ownedAcceptance
     let accepted = null
     if (pendingRequest?.cacheKey && Number.isSafeInteger(pendingRequest.requestId)) {
       accepted = {
@@ -176,14 +177,17 @@ export const createWeAppGameStartCoordinator = ({
         gameVersion: room.gameVersion,
       }
       rememberAccepted(pendingRequest.cacheKey, pendingRequest.fingerprint, accepted)
+      ownedAcceptance = acceptedActions.get(pendingRequest.cacheKey)
     }
     try {
       await commitClaimedStart()
     } catch (error) {
       for (const key of Object.keys(room)) delete room[key]
       Object.assign(room, roomBeforeInitialization)
-      acceptedActions.clear()
-      for (const [key, value] of acceptedActionsBeforeInitialization) acceptedActions.set(key, value)
+      if (ownedAcceptance && acceptedActions.get(pendingRequest.cacheKey) === ownedAcceptance) {
+        if (previousAcceptance) acceptedActions.set(pendingRequest.cacheKey, previousAcceptance)
+        else acceptedActions.delete(pendingRequest.cacheKey)
+      }
       claimedStarts.add(event.eventId)
       reconnectRooms.add(room.roomId)
       scheduleClaim(room, 500)
