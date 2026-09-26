@@ -1,0 +1,53 @@
+name: Guandan Operations and Release Gates
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'work/guandan-admin/**'
+      - 'work/guandan-windows-source/**'
+      - 'work/guandan-cocos/assets/scripts/services/**'
+      - 'work/guandan-cocos/assets/scripts/scenes/front-pages/Operations*'
+      - 'work/guandan-cocos/ops/**'
+      - 'shared-core/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'work/guandan-admin/**'
+      - 'work/guandan-windows-source/**'
+      - 'work/guandan-cocos/assets/scripts/services/**'
+      - 'work/guandan-cocos/assets/scripts/scenes/front-pages/Operations*'
+      - 'work/guandan-cocos/ops/**'
+      - 'shared-core/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  operations-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: shared-core/pnpm-lock.yaml
+      - run: pnpm --dir shared-core install --frozen-lockfile
+      - run: pnpm --dir shared-core build
+      - run: npm --prefix work/guandan-admin run verify
+      - name: Real HTTP authorization and operations contracts
+        run: |
+          node work/guandan-windows-source/server/platform/admin-auth.test.mjs
+          node work/guandan-windows-source/server/platform/admin-http.test.mjs
+          node work/guandan-windows-source/server/platform/operations-service.test.mjs
+      - name: Release, capacity and archival safety
+        run: node scripts/project-management.test.mjs

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
+const artifactPaths = ['shared-core/dist', 'work/guandan-cocos/build/web-desktop', 'work/guandan-cocos/build/wechatgame', 'work/guandan-windows-source/server', 'work/guandan-admin']
 export async function inventory (directory) {
   const rows = []
   async function walk (path) {
@@ -29,12 +30,13 @@ async function main () {
   assert.ok(process.argv.length === 4 && argument && ['create', 'verify'].includes(mode), 'Usage: release-manifest.mjs create RELEASE_ID | verify MANIFEST_FILE')
   if (mode === 'verify') {
     const manifest = JSON.parse(await readFile(resolve(argument), 'utf8'))
-    assert.equal(manifest.schemaVersion, 1)
+    assert.equal(manifest.schemaVersion, 2, 'Legacy inventory lacks server/admin coverage; prepare a new release')
     assert.equal(manifest.source.commit, git('rev-parse', 'HEAD'), 'Source commit differs')
     assert.equal(git('status', '--porcelain', '--untracked-files=all'), '', 'Working tree is not clean')
-    assert.deepEqual(Object.keys(manifest.artifacts).sort(), ['shared-core/dist', 'work/guandan-cocos/build/web-desktop', 'work/guandan-cocos/build/wechatgame'].sort())
+    assert.equal(manifest.source.tree, git('rev-parse', 'HEAD^{tree}'), 'Source tree differs')
+    assert.deepEqual(Object.keys(manifest.artifacts).sort(), artifactPaths.slice().sort())
     for (const [path, expected] of Object.entries(manifest.artifacts)) {
-      assert.ok(['shared-core/dist', 'work/guandan-cocos/build/web-desktop', 'work/guandan-cocos/build/wechatgame'].includes(path))
+      assert.ok(artifactPaths.includes(path))
       assert.deepEqual(await inventory(join(root, path)), expected, `Artifact differs: ${path}`)
     }
     console.log(`Verified immutable artifact inventory for ${manifest.source.commit}`)
@@ -43,9 +45,9 @@ async function main () {
   assert.match(argument || '', /^20\d{6}-[a-z0-9-]+$/)
   assert.equal(git('status', '--porcelain', '--untracked-files=all'), '', 'Commit reviewed sources before generating a release manifest')
   const artifacts = {}
-  for (const path of ['shared-core/dist', 'work/guandan-cocos/build/web-desktop', 'work/guandan-cocos/build/wechatgame']) artifacts[path] = await inventory(join(root, path))
+  for (const path of artifactPaths) artifacts[path] = await inventory(join(root, path))
   const manifest = {
-    schemaVersion: 1, releaseId: argument, createdAt: new Date().toISOString(),
+    schemaVersion: 2, releaseId: argument, createdAt: new Date().toISOString(),
     source: { commit: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}'), branch: git('branch', '--show-current') },
     tooling: { node: process.version, cocos: '3.8.8' }, artifacts,
     acceptance: { realDevice: 'pending', productionCapacity: 'unverified', deployment: 'not-deployed' },
