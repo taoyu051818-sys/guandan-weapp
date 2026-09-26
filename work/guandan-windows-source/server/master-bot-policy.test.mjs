@@ -4,7 +4,39 @@ import { createRoomBotPolicy, MASTER_BOT_DIFFICULTY, roundMetaForAI } from './ma
 import { prepareDuplicateAutomaticPlay } from './duplicate-auto-policy.js'
 
 const require = createRequire(import.meta.url)
-const { createGame, passTurn, playCards } = require('../../../shared-core/dist')
+const { createGame, createMatchState, transition, passTurn, playCards, getPlayInfo, PlayType } = require('../../../shared-core/dist')
+const { createSeededRandom } = require('../../../shared-core/dist/ai/random')
+
+const bombTypes = new Set([PlayType.Bomb, PlayType.StraightFlush, PlayType.Rocket])
+// Use real deals and the authoritative policy entry point, for all four seats.
+for (const mode of ['random', 'no-shuffle']) {
+  for (const playerId of ['p1', 'p2', 'p3', 'p4']) {
+    const state = createGame(2, playerId, undefined, createSeededRandom(0), mode)
+    const openingPolicy = createRoomBotPolicy({ ruleProfile: state.ruleProfile, seed: 0 })
+    const cards = openingPolicy.chooseCards({ state, playerId })
+    assert.ok(cards?.length, '首领不能不要')
+    assert.equal(bombTypes.has(getPlayInfo(cards, state.ruleProfile).type), false, `${mode}/${playerId} 全场首手保留炸弹`)
+  }
+}
+
+let regained = createMatchState({
+  ...createGame(2, 'p1', undefined, createSeededRandom(0), 'no-shuffle'),
+  levelTeam: 'teamA', teamLevels: { teamA: 2, teamB: 2 }, dealerId: 'p1',
+})
+for (const command of [
+  { type: 'PLAY_CARDS', playerId: 'p1', cardIds: ['card-54'] },
+  ...['p2', 'p3', 'p4'].map(playerId => ({ type: 'PASS', playerId })),
+]) {
+  const outcome = transition(regained, { ...command, roundId: regained.roundId, expectedRevision: regained.revision })
+  assert.equal(outcome.ok, true)
+  regained = outcome.state
+}
+assert.equal(regained.players.p1.hand.length, 26)
+assert.equal(regained.lastValidPlay, null)
+const regainPolicy = createRoomBotPolicy({ ruleProfile: regained.ruleProfile, seed: 0 })
+const regainChoice = regainPolicy.chooseCards({ state: regained, playerId: 'p1' })
+assert.equal(bombTypes.has(getPlayInfo(regainChoice, regained.ruleProfile).type), false, '余26张的新墩领出不能因手数收益直接领八炸')
+assert.equal(regainPolicy.getLastDecisionTrace().team.reason, 'preserve_bomb_lead')
 
 const card = (id, suit, rank, value) => ({ id, suit, rank, value, isLevelCard: false })
 const controlledGame = (leaderId) => {

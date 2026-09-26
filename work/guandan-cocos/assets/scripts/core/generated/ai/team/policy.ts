@@ -85,15 +85,22 @@ export const chooseTeamPlay = (
   const planner = createHandRoutePlanner(view.hand, generateLeads(), view.profile, cards => resolve(cards, null));
   record.strength = assessHandStrength(view.hand, planner.whole(), ally.count);
   const weightsByStrength = strengthWeights(record.strength);
+  const intactOrdinaryLead = !target && available.some(cards =>
+    !isBombType(resolve(cards, null)!.type) && getPlayResourceDamage(view.hand, cards).bombSplits === 0);
+  let reservedLeadBomb = false;
   const choices: Choice[] = available.map(cards => {
     const info = resolve(cards, target)!;
     const bomb = isBombType(info.type);
     const route = planner.after(cards);
     const damage = getPlayResourceDamage(view.hand, cards);
     let priority = 50;
-    // Opening bombs are retained as control resources unless the whole hand
-    // finishes (above), or no non-bomb lead exists at all.
-    if (firstLead && bomb) priority = 20;
+    // Keep controls on later free leads too: losing the first card does not
+    // make a long hand an endgame. A short tail may still justify a bomb; when
+    // every ordinary lead breaks a bomb, do not force that destructive split.
+    if (!target && bomb && (firstLead || (!urgent && intactOrdinaryLead && route.turns > 2))) {
+      priority = 20;
+      reservedLeadBomb = true;
+    }
     if (urgent && !target && !bomb
       && enemies.some(enemy => enemy.count === cards.length)) priority = 35;
     if (urgent && !target && bomb) priority = 40;
@@ -146,6 +153,7 @@ export const chooseTeamPlay = (
     score: round(choice.score), probability: round(choice.probability), turns: choice.turns,
     allyFinish: round(choice.allyFinish), enemyFinish: round(choice.enemyFinish), control: round(choice.control) }));
   const reason = allyControls ? 'protect_ally_from_finish' : urgent ? 'deny_enemy_finish' : !target && ally.count > 0 && ally.count <= 10
-    ? 'feed_ally_or_plan_exit' : firstLead ? 'opening_keep_control' : 'team_exit_route';
+    ? 'feed_ally_or_plan_exit' : firstLead ? 'opening_keep_control'
+      : reservedLeadBomb && !isBombType(selected.info.type) ? 'preserve_bomb_lead' : 'team_exit_route';
   return done(selected.cards, reason, priority, planner.nodes());
 };

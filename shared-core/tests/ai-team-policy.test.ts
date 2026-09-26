@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createAIEngine } from '../src/ai';
 import { createDeck, shuffleDeck } from '../src/lib/deck';
+import { createGame, createMatchState, transition } from '../src/lib/engine';
+import { rankHintMoves } from '../src/hints/handHintPolicy';
 import { canPlay, getPlayInfo, getRuleProfile } from '../src/lib/rules';
 import { createSeededRandom } from '../src/ai/random';
 import { isBombType } from '../src/ai/scoring';
@@ -49,6 +51,62 @@ describe('team-first master and trustee policy', () => {
     const { decide } = setup(hand, [7, 5, 15, 16]);
     const choice = decide({ playerId: 'p4', cards: take(8), type: PlayType.Single })!;
     expect(getPlayInfo(choice, profile)?.type).toBe(PlayType.Single);
+  });
+
+  it('keeps bombs after regaining an early lead instead of treating 26 cards as an endgame', () => {
+    let state = createMatchState({
+      ...createGame(2, 'p1', profile, createSeededRandom(0), 'no-shuffle'),
+      levelTeam: 'teamA', teamLevels: { teamA: 2, teamB: 2 }, dealerId: 'p1',
+    });
+    const engine = createAIEngine({ seed: 0, ruleProfile: profile });
+    const decide = () => engine.makeDecision(state.players.p1.hand, state.lastValidPlay,
+      'master', 'teamA', state.players, 'p1', {
+        currentLevel: 2, teamLevels: { teamA: 2, teamB: 2 }, roundMeta: null,
+        ruleProfile: profile, publicHistory: state.playHistory, turnOrder: state.turnOrder,
+        finishedPlayers: state.finishedPlayers,
+      });
+    const opening = decide()!;
+    expect(getPlayInfo(opening, profile)?.type).toBe(PlayType.Single);
+    const played = transition(state, { type: 'PLAY_CARDS', playerId: 'p1',
+      cardIds: opening.map(card => card.id), roundId: state.roundId, expectedRevision: state.revision });
+    if (!played.ok) throw new Error(played.reason);
+    state = played.state;
+    for (const playerId of ['p2', 'p3', 'p4'] as const) {
+      const passed = transition(state, { type: 'PASS', playerId,
+        roundId: state.roundId, expectedRevision: state.revision });
+      if (!passed.ok) throw new Error(passed.reason);
+      state = passed.state;
+    }
+    expect(state.currentTurn).toBe('p1');
+    expect(state.lastValidPlay).toBeNull();
+    expect(state.players.p1.hand).toHaveLength(26);
+    expect(['p2', 'p3', 'p4'].map(id => state.players[id as PlayerId].hand.length)).toEqual([27, 27, 27]);
+    const choice = decide()!;
+    expect(canPlay(choice, null, profile)).toBe(true);
+    expect(isBombType(getPlayInfo(choice, profile)!.type)).toBe(false);
+    expect(engine.getLastDecisionTrace().team?.candidates.every(candidate => !isBombType(candidate.type))).toBe(true);
+    expect(engine.getLastDecisionTrace().team?.reason).toBe('preserve_bomb_lead');
+    const hints = rankHintMoves({ hand: state.players.p1.hand, lastPlay: null,
+      ruleProfile: profile, protectedGroups: [], seed: 0 });
+    expect(hints.length).toBeGreaterThan(0);
+    expect(hints.every(hint => !isBombType(getPlayInfo(hint.cards, profile)!.type))).toBe(true);
+  });
+
+  it('does not split an all-bomb hand solely to avoid leading a bomb', () => {
+    const hand = [...take(3, 4), ...take(5, 4), ...take(8, 4), ...take('K', 4)];
+    const { decide } = setup(hand, [16, 27, 27, 27]);
+    expect(getPlayInfo(decide()!, profile)?.type).toBe(PlayType.Bomb);
+  });
+
+  it('still considers bomb control for a short tail and uses it to stop an imminent enemy finish', () => {
+    const hand = [...take(6, 4), ...take(3)];
+    const closing = setup(hand);
+    closing.decide();
+    expect(closing.engine.getLastDecisionTrace().team?.candidates.some(candidate => candidate.type === PlayType.Bomb)).toBe(true);
+    const defensive = setup(hand, [5, 1, 17, 17]);
+    const choice = defensive.decide({ playerId: 'p2', cards: take('Big'), type: PlayType.Single })!;
+    expect(getPlayInfo(choice, profile)?.type).toBe(PlayType.Bomb);
+    expect(defensive.engine.getLastDecisionTrace().team?.reason).toBe('deny_enemy_finish');
   });
 
   it('takes immediate first place even if doing so requires a bomb or overtaking an ally', () => {
