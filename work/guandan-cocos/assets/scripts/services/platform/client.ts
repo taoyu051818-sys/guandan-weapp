@@ -60,6 +60,11 @@ export class PlatformApiClient {
     return unwrap<T>(retried)
   }
 
+  /** Public catalog requests use the same endpoint policy and bounded transport, without login. */
+  public async requestPublic<T> (path: string): Promise<T> {
+    return unwrap<T>(await this.send(path, 'GET'))
+  }
+
   public signOut (): void {
     this.authGeneration += 1
     this.loginPromise = null

@@ -5,6 +5,7 @@ release_id=${1:?release id required}
 expected_hash=${2:?SHA-256 required}
 allow_active=
 with_web=false
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 for option in "${@:3}"; do
   case "$option" in
     --allow-active) allow_active=$option ;;
@@ -23,9 +24,13 @@ node=/opt/node-v24.19.0/bin/node
 previous=$(readlink -f /srv/guandan/current)
 [[ "$previous" == /srv/guandan/releases/* && -d "$previous/web" ]]
 # Only reviewed code/rules and explicitly requested web assets; never secrets/data.
-tar -tzf "$archive" | "$node" -e 'let s="";process.stdin.on("data",b=>s+=b);process.stdin.on("end",()=>{for(const p of s.trim().split("\n")){const allowed=/^(shared-core\/(dist\/|package.json$)|work\/guandan-windows-source\/(server\/|package.json$))/.test(p)||(process.argv[1]==="true"&&p.startsWith("web/"));if(p.split("/").includes("..")||!allowed)throw Error("Unexpected archive path: "+p)}})' "$with_web"
+tar -tzf "$archive" | "$node" "$script_dir/release-paths.mjs" check "$with_web"
+tar -tvzf "$archive" | "$node" "$script_dir/release-paths.mjs" types
 mkdir "$release"
 tar --no-same-owner -xzf "$archive" -C "$release"
+while IFS= read -r asset; do
+  [[ -f "$release/$asset" && ! -L "$release/$asset" ]]
+done < <("$node" "$script_dir/release-paths.mjs" admin-files)
 if [[ "$with_web" == true ]]; then
   [[ -f "$release/web/index.html" ]]
 else
@@ -41,6 +46,9 @@ for test in matchmaking-service profile-avatar default-profile-upload account-se
 for test in tournament-service tournament-pairing tournament-orchestrator tournament-live; do "$node" "server/platform/${test}.test.mjs"; done
 "$node" server/platform/spectator-event-service.test.mjs
 "$node" server/platform/game-result-service.test.mjs
+"$node" server/platform/admin-auth.test.mjs
+"$node" server/platform/admin-http.test.mjs
+"$node" server/platform/operations-service.test.mjs
 "$node" server/weapp-match-lifecycle.test.mjs
 "$node" server/weapp-friend-bots.smoke.mjs
 "$node" server/duplicate-room-runtime.test.mjs

@@ -23,6 +23,8 @@ import { duplicateTableLabel } from './DuplicateTablePresentation'
 import { defaultProfileFrame } from '../services/DefaultProfileFrames'
 import type { TableTurnClockProjection } from './TableTurnClockController'
 import type { UserProfile } from '../services/FrontPageGatewayContracts'
+import type { AssetLease } from '../services/LeasedAssetCache'
+import { AssetBinding } from '../services/AssetBinding'
 const TABLE_TIMER_ART_ASSET = 'ui/table/chicken-timer-frame/texture'
 const DEFAULT_AVATAR_ART_ASSET = 'ui/common/default-avatar/texture'
 const PLAYER_ORDER: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4']
@@ -34,7 +36,7 @@ export type TableHudPresenterDependencies = Readonly<{
   isMultiplayer: () => boolean
   turnClock: (snapshot: GameSnapshot, humanId: PlayerId) => TableTurnClockProjection | null
   ownProfile?: () => UserProfile | null
-  ownAvatarFrame?: () => Promise<SpriteFrame | null>
+  ownAvatarFrame?: () => AssetLease<SpriteFrame> | null
 }>
 export type TableHudMountOptions = Readonly<{
   turnActionNodes: readonly (Node | null | undefined)[]
@@ -60,7 +62,7 @@ export class TableHudPresenter {
   private generation = 0
   private timerLoadCancel: GameAssetLoadCancel | null = null
   private avatarLoadCancel: GameAssetLoadCancel | null = null
-  private ownAvatarKey = ''
+  private readonly ownAvatar = new AssetBinding<SpriteFrame>(frame => this.tableHud?.setOwnAvatarFrame(frame))
 
   public constructor (private readonly dependencies: TableHudPresenterDependencies) {}
   public get hud (): TableGameHud | null { return this.tableHud }
@@ -111,13 +113,7 @@ export class TableHudPresenter {
     const observing = lobby?.roomRole === 'observer'
     const own = this.dependencies.ownProfile?.()
     const avatarKey = observing ? 'observer' : `${own?.id ?? ''}:${own?.avatarUrl ?? ''}`
-    if (avatarKey !== this.ownAvatarKey) {
-      this.ownAvatarKey = avatarKey
-      const generation = this.generation
-      void (observing ? Promise.resolve(null) : this.dependencies.ownAvatarFrame?.())?.then(frame => {
-        if (this.isCurrent(generation) && avatarKey === this.ownAvatarKey) this.tableHud?.setOwnAvatarFrame(frame)
-      })
-    }
+    this.ownAvatar.update(avatarKey, () => observing ? null : this.dependencies.ownAvatarFrame?.() ?? null)
     const teamLevels = lobby?.scoreboard?.teamLevels ?? snapshot.teamLevels
     const viewer = projectTableViewer(snapshot.state.players, humanId, teamLevels, snapshot.settlement?.winnerTeam ?? null)
     const ranking = snapshot.settlement?.fullRank ?? snapshot.state.finishedPlayers
@@ -178,6 +174,7 @@ export class TableHudPresenter {
     this.avatarLoadCancel?.()
     this.timerLoadCancel = null
     this.avatarLoadCancel = null
+    this.ownAvatar.clear()
     this.tableHud?.dispose()
     this.tableHud = null
   }

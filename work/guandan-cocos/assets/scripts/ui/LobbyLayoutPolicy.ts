@@ -1,6 +1,17 @@
 /** Approved September 7 lobby, in 874 × 402 design pixels. No historical variants ship. */
 export type LobbySafeFrame = { width: number, height: number, left: number, right: number, top: number, bottom: number }
 export type LobbyRect = Readonly<{ x: number, y: number, width: number, height: number }>
+/** Shared lower-left dock; dimensions are design pixels, inside the safe frame. */
+export const LOBBY_BOTTOM_DOCK = Object.freeze({
+  left: 6, bottom: 394, labelBottom: 392, gap: 8,
+  shopSize: 70, serviceWidth: 52, serviceHeight: 56,
+})
+
+/** Local Cocos Y, keeping differently sized labels on the same lower edge. */
+export function lobbyDockLabelY (height: number, fontSize: number): number {
+  return -height / 2 + LOBBY_BOTTOM_DOCK.bottom - LOBBY_BOTTOM_DOCK.labelBottom + (fontSize + 4) / 2
+}
+
 export const LOBBY_DESIGN = Object.freeze({
   width: 874, height: 402,
   classic: Object.freeze({ left: 448, top: 90, width: 184, height: 222 }),
@@ -8,7 +19,8 @@ export const LOBBY_DESIGN = Object.freeze({
   tournament: Object.freeze({ left: 646, top: 244, width: 188, height: 68 }),
   quick: Object.freeze({ left: 624, top: 338, width: 210, height: 46 }),
   account: Object.freeze({ left: 4, top: 6, width: 180, height: 58 }),
-  shop: Object.freeze({ left: 18, top: 316, width: 70, height: 70 }),
+  shop: Object.freeze({ left: LOBBY_BOTTOM_DOCK.left, top: LOBBY_BOTTOM_DOCK.bottom - LOBBY_BOTTOM_DOCK.shopSize,
+    width: LOBBY_BOTTOM_DOCK.shopSize, height: LOBBY_BOTTOM_DOCK.shopSize }),
   shopFontSize: 15.4, shopOutline: 1.89, shopFadeStart: 50.8 / 70,
 })
 

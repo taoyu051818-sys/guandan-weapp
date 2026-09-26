@@ -2,6 +2,7 @@ import { PlatformError, badRequest, notFound } from './errors.js'
 import { verifyGameResultSignature, verifySpectatorEventSignature } from './crypto.js'
 import { readProfileAvatar, validateProfilePatch } from './profile-avatar.js'
 import { isUploadedAvatar } from './profile-upload.js'
+import { createOperationsHttpHandler } from './operations-http.js'
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
 const success = (data) => ({ ok: true, data, error: null })
@@ -38,7 +39,10 @@ const bearer = (request) => {
   return authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : ''
 }
 
-export const createPlatformHttpHandler = ({ service, gameResultSecret, spectatorEventSecret, wxCodeVerifier, enableDevLogin = false, corsOrigin = '*', now = () => Date.now(), logger = console }) => async (request, response) => {
+export const createPlatformHttpHandler = ({ service, operations, adminAuth, gameResultSecret, spectatorEventSecret, wxCodeVerifier, enableDevLogin = false, corsOrigin = '*', now = () => Date.now(), logger = console }) => {
+  const operationsHandler = createOperationsHttpHandler({ service, operations, adminAuth, corsOrigin, logger })
+  return async (request, response) => {
+  if (await operationsHandler(request, response)) return
   if (request.method === 'OPTIONS') {
     response.writeHead(204, {
       'access-control-allow-origin': corsOrigin,
@@ -58,6 +62,10 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
 
     if (method === 'GET' && route === '/api/v1/health') {
       return writeJson(response, 200, success({ status: 'ok', time: now() }), corsOrigin)
+    }
+    if (method === 'GET' && route === '/api/v1/capabilities') {
+      // Public protocol versions only; no deployment paths, secrets or account data.
+      return writeJson(response, 200, success({ contracts: { lobbyServices: 1, messages: 1, feedback: 1 } }), corsOrigin)
     }
     if (method === 'POST' && route === '/api/v1/auth/dev-login') {
       if (!enableDevLogin) throw new PlatformError(403, 'DEV_LOGIN_DISABLED', '开发登录未启用')
@@ -276,4 +284,5 @@ export const createPlatformHttpHandler = ({ service, gameResultSecret, spectator
       : { code: 'INTERNAL_ERROR', message: '服务暂时不可用' }
     if (!response.headersSent) writeJson(response, status, failure(payload), corsOrigin)
   }
+}
 }

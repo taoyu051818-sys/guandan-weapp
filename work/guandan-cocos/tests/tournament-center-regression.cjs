@@ -18,10 +18,10 @@ assert.equal(model.canWithdrawTournament(view({ ...initial, viewerEntry: { enrol
 assert.equal(model.canWithdrawTournament(view(active)), false)
 assert.equal(model.tournamentAction(view({ ...active, assignment: { ...active.assignment, status: 'completed' } })).kind, 'none')
 
-let lastView, actions, renderCount = 0
+let lastView, actions, motion, renderCount = 0
 const { TournamentCenterController } = loadTs(path.join(source, 'TournamentCenterController.ts'), {
   './TournamentCenterModel': model,
-  './TournamentCenterView': { renderTournamentCenter: (_ui, _viewport, state, callbacks) => { lastView = { ...state }; actions = callbacks; renderCount++ } },
+  './TournamentCenterView': { renderTournamentCenter: (_ui, _viewport, state, callbacks, effects) => { lastView = { ...state }; actions = callbacks; motion = effects; renderCount++ } },
 })
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve() }
 async function run () {
@@ -42,6 +42,12 @@ async function run () {
   })
   controller.open(); await flush()
   assert.equal(router.current, 'tournament-center')
+  const sharedClock = motion.clock
+  sharedClock.elapsed = 1.4
+  actions.tab('rules')
+  assert.equal(motion.clock, sharedClock)
+  assert.equal(motion.clock.elapsed, 1.4, 'tab redraw does not restart the three-point round')
+  actions.tab('status')
   assert.equal(model.tournamentAction(lastView).kind, 'enroll')
   actions.action(); actions.action(); await flush()
   assert.equal(enrollCalls, 1, 'double taps cannot enroll twice')
@@ -61,10 +67,14 @@ async function run () {
   assert.equal(renderCount, before, 'unchanged polling must not recreate buttons or restart animations')
   assert.equal(entered, 0, 'polling never automatically enters a table')
   current = structuredClone(active)
+  sharedClock.elapsed = 3.1
   timers.shift()(); await flush()
+  assert.equal(motion.clock, sharedClock)
+  assert.equal(motion.clock.elapsed, 3.1, 'changed polling state preserves animation progress')
   assert.equal(model.tournamentAction(lastView).kind, 'enter')
   actions.action(); actions.action()
   assert.equal(entered, 1, 'explicit entry is only dispatched once')
+  assert.equal(sharedClock.elapsed, 0, 'leaving resets the trophy clock')
   const staleTimers = timers.splice(0)
   staleTimers.forEach(cb => cb()); await flush()
   assert.equal(router.current, 'matching', 'old polling cannot steal the table route')

@@ -443,7 +443,7 @@ export class GameScene extends Component {
       isMultiplayer: () => Boolean(this.session?.snapshot.isMultiplayer),
       turnClock: (snapshot, humanId) => this.tableTurnClock?.project(snapshot, humanId) ?? null,
       ownProfile: () => this.frontPages?.ownProfile ?? null,
-      ownAvatarFrame: () => this.frontPages?.ownAvatarFrame() ?? Promise.resolve(null),
+      ownAvatarFrame: () => this.frontPages?.ownAvatarFrame() ?? null,
     })
     this.tableHudPresenter = presenter
     const hudNode = presenter.mount({

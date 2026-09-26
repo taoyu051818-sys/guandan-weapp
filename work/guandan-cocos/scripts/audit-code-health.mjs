@@ -10,6 +10,7 @@ const roots = [
   ['client', resolve(appRoot, 'assets/scripts')],
   ['core', resolve(repoRoot, 'shared-core/src')],
   ['server', resolve(repoRoot, 'work/guandan-windows-source/server')],
+  ['admin', resolve(repoRoot, 'work/guandan-admin/src')],
 ]
 const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
   const file = resolve(dir, entry.name)
@@ -23,7 +24,7 @@ const retained = new Map([
   ['work/guandan-windows-source/server/hk-bare-ip-profile.js', 'used by the standalone hk-bare-ip-test-preflight.mjs CLI'],
 ])
 for (const [scope, root] of roots) for (const file of walk(root)) {
-  if (!(scope === 'server' ? file.endsWith('.js') : file.endsWith('.ts'))) continue
+  if (!(['server', 'admin'].includes(scope) ? file.endsWith('.js') : file.endsWith('.ts'))) continue
   const source = readFileSync(file, 'utf8')
   modules.set(file, { scope, file: relative(repoRoot, file), source,
     lines: source.split(/\r?\n/).length - Number(source.endsWith('\n')), imports: [], runtimeImports: [],
@@ -69,6 +70,7 @@ const entryReasons = new Map()
 const entry = (file, reason) => { if (modules.has(file)) entryReasons.set(file, reason) }
 entry(resolve(appRoot, 'assets/scripts/scenes/GameScene.ts'), 'Cocos composition root')
 entry(resolve(repoRoot, 'shared-core/src/index.ts'), 'public shared rule API')
+entry(resolve(repoRoot, 'work/guandan-admin/src/app.js'), 'independent operations web entry')
 for (const name of ['weapp-ws.js', 'platform-server.js']) entry(resolve(roots[2][1], name), 'server process entry')
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 const compressedUuid = uuid => {
@@ -92,7 +94,7 @@ const reachable = kind => {
 }
 const runtime = reachable('runtimeImports')
 const all = reachable('imports')
-const testFiles = [resolve(appRoot, 'tests'), resolve(repoRoot, 'shared-core/tests'), roots[2][1]]
+const testFiles = [resolve(appRoot, 'tests'), resolve(repoRoot, 'shared-core/tests'), roots[2][1], resolve(repoRoot, 'work/guandan-admin/tests')]
   .filter(existsSync).flatMap(walk).filter(file => /(?:\.cjs|\.(?:test|smoke)\.[cm]?[jt]s)$/.test(file))
 const testSources = testFiles.map(file => [relative(repoRoot, file), readFileSync(file, 'utf8')])
 for (const info of modules.values()) {
@@ -127,7 +129,7 @@ if (process.argv.includes('--check')) {
 } else if (process.argv.includes('--json')) console.log(JSON.stringify({ summary, records }, null, 2))
 else {
   console.log('# 逐文件代码健康清单\n\n由 `node scripts/audit-code-health.mjs` 只读生成。')
-  console.log('\n范围：Cocos 运行源码、共享规则源码、权威服务端 JS；不含构建产物、第三方素材和归档工程。')
+  console.log('\n范围：Cocos 运行源码、共享规则源码、权威服务端 JS、独立网页后台 JS；不含构建产物、第三方素材和归档工程。')
   console.log('\nruntime=语法级保守入口可达（不等同于打包器最终保留）；type-only=仅类型可达；retained-entry=明确保留的兼容/工具入口；review=需人工核对，不能据此直接删除。')
   console.log('\n测试提及数是静态文本关联，**不是测试覆盖率**。large-file >600 行；高入度/出度 ≥18。生成规则只改 shared-core，不能直接改 generated。')
   console.log('\n| 范围 | 文件 | 行数 | 运行入口可达 | 待核对 |\n| --- | ---: | ---: | ---: | ---: |')

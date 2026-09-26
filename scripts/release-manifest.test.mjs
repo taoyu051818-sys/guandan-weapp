@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import './release-paths.test.mjs'
 import { mkdtemp, writeFile, mkdir, symlink, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

@@ -9,6 +9,7 @@ type Dependencies = {
   gateways: FrontPageGateways
   screen: ScreenAdapter
   isDisposed: () => boolean
+  motionAllowed?: () => boolean
   scheduleOnce: (callback: () => void, delaySeconds: number) => void
   setTableVisible: (visible: boolean) => void
   showMenu: () => void
@@ -22,6 +23,7 @@ export class TournamentCenterController {
   private disposed = false
   private scheduled = false
   private pendingRefresh: Promise<void> | null = null
+  private readonly glintClock = { elapsed: 0 }
   private view: TournamentCenterState = { tournament: null, state: null, standings: null, busy: false, error: '', tab: 'status', rankingPage: 0 }
   constructor (private readonly deps: Dependencies) {}
   public open (): void {
@@ -33,7 +35,7 @@ export class TournamentCenterController {
     this.render()
     void this.refresh(true)
   }
-  public suspend (): void { this.active = false; this.generation++; this.scheduled = false; this.view.busy = false; this.pendingRefresh = null }
+  public suspend (): void { this.active = false; this.generation++; this.scheduled = false; this.view.busy = false; this.pendingRefresh = null; this.glintClock.elapsed = 0 }
   public resume (): void {
     if (this.deps.router.current === 'tournament-center' && !this.active) this.open()
   }
@@ -49,7 +51,7 @@ export class TournamentCenterController {
       action: () => { void this.act() },
       tab: tab => this.changeTab(tab),
       page: delta => { this.view.rankingPage = Math.max(0, this.view.rankingPage + delta); this.render() },
-    })
+    }, { clock: this.glintClock, allowed: () => this.active && !this.disposed && (this.deps.motionAllowed?.() ?? true) })
   }
   private changeTab (tab: TournamentTab): void { this.view.tab = tab; this.render() }
   private refresh (visible: boolean): Promise<void> {

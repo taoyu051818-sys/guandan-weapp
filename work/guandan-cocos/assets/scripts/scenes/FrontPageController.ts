@@ -13,12 +13,14 @@ import { PlayerCenterPageDomain } from './front-pages/PlayerCenterPageDomain'
 import { ReplayPageDomain } from './front-pages/ReplayPageDomain'
 import { ShopPageDomain } from './front-pages/ShopPageDomain'
 import { ProfileEditorModal } from './front-pages/ProfileEditorModal'
-import { profileAvatarFrame } from '../ui/ProfileAvatar'
+import { acquireProfileAvatarFrame, clearProfileAvatarCache } from '../services/ProfileAvatarAssets'
 import { ProfileSaveCoordinator } from '../services/ProfileSaveCoordinator'
 import { WechatProfileSync } from '../services/WechatProfileSync'
 import { WechatFriendScoreSync } from '../services/WechatFriendRanking'
 import { FriendRankingModal } from './front-pages/FriendRankingModal'
 import { TournamentCenterController } from './front-pages/TournamentCenterController'
+import { openLobbyService, type LobbyServiceActions } from './front-pages/LobbyServiceActions'
+import { OperationsPageController } from './front-pages/OperationsPageController'
 
 export type FrontPageHost = {
   refreshProfile?: () => void
@@ -40,6 +42,8 @@ export class FrontPageController {
   private readonly router: PageRouter
   private pageRequestToken = 0
   private disposed = false
+  private applicationHidden = false
+  private serviceGeneration = 0
   private readonly walletState: FrontPageWalletState
   private readonly playerState: FrontPagePlayerState
   private readonly shopPage: ShopPageDomain
@@ -48,6 +52,7 @@ export class FrontPageController {
   private readonly playerCenterPage: PlayerCenterPageDomain
   private readonly replayPage: ReplayPageDomain
   private readonly tournamentPage: TournamentCenterController
+  private readonly operationsPage: OperationsPageController
 
   public constructor (
     root: Node,
@@ -60,6 +65,7 @@ export class FrontPageController {
   ) {
     this.router = new PageRouter(root, (previous, next) => {
       if (previous === 'tournament-center' && next !== previous) this.tournamentPage?.suspend()
+      if (previous?.startsWith('operations-') && !next?.startsWith('operations-')) this.operationsPage?.suspend()
       // Matching shares the empty-table presentation used by room waiting;
       // do not enable stale hands/HUD before the authoritative snapshot arrives.
       if (previous === 'matching' || next === 'matching') this.host.setFriendRoomWaitingVisible(next === 'matching')
@@ -99,6 +105,7 @@ export class FrontPageController {
       scheduleOnce: (callback, delaySeconds) => this.host.scheduleOnce(callback, delaySeconds),
       showNotice: (title, detail) => this.host.showNotice(title, detail),
       showPlayerCenter: () => { void this.playerCenterPage.show() },
+      showMenu: () => this.lobbyPage.showMenu(),
     })
     this.playerCenterPage = new PlayerCenterPageDomain({
       showFriendRanking: () => this.friendRanking.show(),
@@ -133,6 +140,7 @@ export class FrontPageController {
     })
     this.tournamentPage = new TournamentCenterController({
       router: this.router, gateways, screen, isDisposed: () => this.disposed,
+      motionAllowed: () => this.session.snapshot.settings.effectQuality === 'full',
       scheduleOnce: (callback, delay) => host.scheduleOnce(callback, delay),
       setTableVisible: visible => host.setTableVisible(visible), showMenu: () => this.lobbyPage.showMenu(),
       enter: (tournament, state) => {
@@ -141,6 +149,23 @@ export class FrontPageController {
         })
       },
     })
+    this.operationsPage = new OperationsPageController({
+      router: this.router, gateways, screen, isDisposed: () => this.disposed,
+      showMenu: () => this.lobbyPage.showMenu(), setTableVisible: visible => host.setTableVisible(visible),
+    })
+    const serviceActions: LobbyServiceActions = {
+      showTasks: () => { void this.playerCenterPage.showLobbyTasks() },
+      showRecords: () => this.replayPage.showReplayList('menu'),
+      showRanking: () => this.friendRanking.show(),
+      showMessages: () => this.operationsPage.open('messages'),
+      showFeedback: () => this.operationsPage.open('feedback'),
+      showNotice: (title, detail) => this.host.showNotice(title, detail),
+      context: () => this.disposed || this.applicationHidden || this.router.current !== 'menu' ? null : `${this.pageRequestToken}:${this.serviceGeneration}`,
+      loadNotice: async id => {
+        if (!this.gateways.lobbyServices) throw new Error('尚未连接大厅服务，请稍后重试。')
+        return this.gateways.lobbyServices.getNotice(id)
+      },
+    }
     this.lobbyPage = new LobbyPageDomain({
       profileLoaded: profile => this.syncWechatIdentity(profile, profile.comprehensiveScore),
       editProfile: () => this.showProfileEditor(),
@@ -164,6 +189,7 @@ export class FrontPageController {
       showCompetition: () => this.tournamentPage.open(),
       showPlayerCenter: () => { void this.playerCenterPage.show() },
       showShop: () => this.shopPage.showPreview(),
+      openService: id => { void openLobbyService(id, serviceActions) },
       beginMatch: (queueId, queueName, returnPage) => this.matchmakingPage.begin(queueId, queueName, returnPage),
     })
     game.on(Game.EVENT_HIDE, this.handleApplicationHide)
@@ -199,7 +225,7 @@ export class FrontPageController {
   public setRecoveryPending (pending: boolean): void { this.lobbyPage.setRecoveryPending(pending) }
   public get profileEditorOpen (): boolean { return this.profileEditor.open || this.friendRanking.open }
   public get ownProfile () { return this.playerState.profile ?? this.playerState.dashboard?.user ?? null }
-  public ownAvatarFrame () { return profileAvatarFrame(this.ownProfile, this.gateways.auth) }
+  public ownAvatarFrame () { return acquireProfileAvatarFrame(this.ownProfile, this.gateways.auth) }
   public showProfileEditor (): void { this.profileSync.cancel(); void this.profileEditor.show(this.ownProfile) }
 
   public hideAll (): void {
@@ -209,6 +235,7 @@ export class FrontPageController {
     this.matchmakingPage.stop()
     this.replayPage.stop()
     this.tournamentPage.suspend()
+    this.operationsPage.suspend()
     this.lobbyPage.hide()
     this.router.clear()
   }
@@ -225,13 +252,16 @@ export class FrontPageController {
     else if (route && ['replay-list', 'replay-detail'].includes(route)) this.replayPage.reflow()
     else if (route === 'matching') this.matchmakingPage.reflow()
     else if (route === 'tournament-center') this.tournamentPage.reflow()
+    else if (route?.startsWith('operations-')) this.operationsPage.reflow()
   }
 
   private readonly handleApplicationHide = (): void => {
+    this.applicationHidden = true; this.serviceGeneration += 1
     this.replayPage.handleApplicationHide()
     this.tournamentPage.suspend()
+    this.operationsPage.suspend()
   }
-  private readonly handleApplicationShow = (): void => { this.tournamentPage.resume() }
+  private readonly handleApplicationShow = (): void => { this.applicationHidden = false; this.tournamentPage.resume(); this.operationsPage.resume() }
 
   public destroy (): void {
     this.friendRanking.close()
@@ -243,11 +273,13 @@ export class FrontPageController {
     game.off(Game.EVENT_HIDE, this.handleApplicationHide)
     game.off(Game.EVENT_SHOW, this.handleApplicationShow)
     this.tournamentPage.destroy()
+    this.operationsPage.destroy()
     this.matchmakingPage.destroy()
     this.replayPage.destroy()
     this.lobbyPage.destroy()
     this.disposed = true
     this.router.destroy()
+    clearProfileAvatarCache()
   }
 
   private syncWechatIdentity (profile: NonNullable<FrontPageController['ownProfile']>, score: number): void {

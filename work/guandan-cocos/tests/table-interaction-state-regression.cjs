@@ -82,7 +82,7 @@ for (const kind of ['duplicate', 'rotating']) for (const visibility of ['hidden'
   const lobby = { roomId: 'synthetic-room', members: Object.keys(players), roomSettings: { scoreVisibility: visibility }, duplicate: kind === 'duplicate' ? duplicate : null }
   const before = JSON.stringify([snapshot, lobby])
   const presenter = new TableHudPresenter({ root: new Node('root'), actions: {}, lobbySnapshot: () => lobby, isMultiplayer: () => true, turnClock: () => null })
-  presenter.tableHud = { render: value => { rendered = value } }
+  presenter.tableHud = { render: value => { rendered = value }, setOwnAvatarFrame() {} }
   presenter.render(snapshot, 'p1', { availableSuits: [], selectedSuit: null, lockDecision: { kind: 'unavailable' } })
   assert.equal(/37/.test(rendered.levelLabel), visibility !== 'hidden' || phase !== 'playing', `${kind}/${visibility}/${phase} score policy`)
   assert.ok(rendered.levelLabel.includes(kind === 'duplicate' ? '复式 A桌' : '转蛋'), 'mode identity remains visible')

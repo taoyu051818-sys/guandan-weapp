@@ -76,7 +76,7 @@ try {
 
 const { PlatformApiClient, PlatformApiError } = runtimeModule.exports
 const { createHttpGateways } = retiredPlatform
-assert.deepEqual(Object.keys(runtimeModule.exports.createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'retirement' })).sort(), ['configured', 'auth', 'matchmaking', 'friendRooms', 'matchRecovery', 'wallet', 'playerCenter', 'seasons', 'replays', 'tournaments'].sort(), 'the shipped factory must only expose active player services')
+assert.deepEqual(Object.keys(runtimeModule.exports.createHttpGateways({ baseUrl: 'https://platform.example', deviceId: 'retirement' })).sort(), ['configured', 'lobbyServices', 'operations', 'auth', 'matchmaking', 'friendRooms', 'matchRecovery', 'wallet', 'playerCenter', 'seasons', 'replays', 'tournaments'].sort(), 'the shipped factory must only expose active player services')
 const { DevelopmentTournamentGateway } = developmentModule.exports
 const ok = data => ({ status: 200, body: { ok: true, data, error: null } })
 const errorResponse = (status, code, message, details, retryable) => ({

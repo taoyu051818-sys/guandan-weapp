@@ -39,8 +39,10 @@ class SettingsPresenter {
 class EmptyFlow { snapshot={busy:null,entry:null};leave(){}destroy(){} }
 class EmptyInvite {activate(){}dispose(){}}
 const {LobbyPageDomain}=loadTs(file('scenes/front-pages/LobbyPageDomain.ts'),{
-  cc,'../../ui/LobbyLayoutPolicy':layout,'../../ui/LobbyMenuView':{lobbyLabel:label,renderLobbyEntries:()=>{},renderLobbyShop:()=>{}},
+  cc,'../../ui/LobbyLayoutPolicy':layout,'../../ui/LobbyMenuView':{lobbyArtwork:()=>{},lobbyLabel:label,renderLobbyEntries:()=>{},renderLobbyShop:()=>{}},
+  '../../ui/LobbyServiceView':{renderLobbyServices:()=>{}},
   '../../ui/LobbyAmbientMotion':{attachLobbyAmbientMotion:()=>{}},'./FriendRoomSettingsPresenter':{FriendRoomSettingsPresenter:SettingsPresenter},
+  '../../ui/StarGlint':{attachStarGlintSequence:()=>{}},'../../ui/LobbyStarGlintPolicy':{LOBBY_STAR_GLINT:{}},
   './FriendRoomPlatformFlow':{FriendRoomPlatformFlow:EmptyFlow},'./FriendRoomWaitingPresenter':{FriendRoomWaitingPresenter:class{}},
   '../../services/WechatFriendInvite':{WechatFriendInvite:EmptyInvite},'./LobbyPlayerProfilePresenter':{LobbyPlayerProfilePresenter},
   './LobbyPageCatalog':catalog,'../../core/generated/lib/classicModes':modes,
@@ -61,7 +63,7 @@ function fixture(){
   }}
   const session={snapshot:{status:'menu',settings:{effectQuality:'off'}},leaveToMenu(){this.snapshot.status='menu'}}
   const dependencies={router,session,lobby:{snapshot:{recoveryAvailable:false}},screen:{
-    safeSize:()=>({x:1280,y:720}),safeLeftX:m=>-640+m,safeRightX:m=>640-m,safeTopY:m=>360-m,safeBottomY:m=>-360+m},
+    viewport:{},safeSize:()=>({x:1280,y:720}),safeLeftX:m=>-640+m,safeRightX:m=>640-m,safeTopY:m=>360-m,safeBottomY:m=>-360+m},
     gateways:{configured:true,auth:{},friendRooms:{},playerCenter:{getDashboard:()=>{requests++;return dashboard.promise}},wallet:{getWallet:()=>wallet.promise}},
     player,wallet:walletState,isDisposed:()=>disposed,issuePageRequest:()=>++pageToken,currentPageRequest:()=>pageToken,
     invalidateMatchAttempt:()=>{},closeModal:()=>{},setTableVisible:()=>{},setFriendRoomWaitingVisible:()=>{},

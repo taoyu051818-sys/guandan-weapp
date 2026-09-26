@@ -55,6 +55,19 @@ const call = async (baseUrl, path, { method = 'GET', token, body, headers = {} }
 const disabledRuntime = await createPlatformRuntime({ env: baseEnv, wxCodeVerifier: fakeWxVerifier, logger: { error () {} } })
 const disabledBaseUrl = await listen(disabledRuntime)
 try {
+  for (const id of ['messages', 'feedback', 'membership']) {
+    const notice = await call(disabledBaseUrl, `/api/v1/lobby/services/${id}`)
+    assert.equal(notice.status, 200, 'public availability must not require WeChat login')
+    assert.equal(notice.payload.data.status, id === 'membership' ? 'closed' : 'open')
+    assert.equal(notice.payload.data.id, id)
+    assert.equal(notice.payload.data.version, 1)
+    assert.ok(notice.payload.data.detail)
+  }
+  for (const id of ['unknown', 'constructor', '__proto__']) {
+    const notice = await call(disabledBaseUrl, `/api/v1/lobby/services/${id}`)
+    assert.equal(notice.status, 404)
+    assert.equal(notice.payload.error.code, 'LOBBY_SERVICE_NOT_FOUND')
+  }
   const disabled = await call(disabledBaseUrl, '/api/v1/auth/dev-login', { method: 'POST', body: { externalId: 'must-not-login' } })
   assert.equal(disabled.status, 403)
   assert.deepEqual(Object.keys(disabled.payload).sort(), ['data', 'error', 'ok'])

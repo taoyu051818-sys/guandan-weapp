@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { loadAdminConfig } from './admin-config.js'
 
 const developmentSecret = (purpose) => `development-only-${purpose}-secret-change-before-deploying-2026`
 
@@ -104,6 +105,7 @@ export const loadPlatformConfig = (env = process.env) => {
   const wxSecret = requiredInProduction(env, 'WX_SECRET', String(env.WX_SECRET || '').trim())
   const gameEndpoint = endpoint(env, 'GAME_ENDPOINT', env.GAME_ENDPOINT || `ws://127.0.0.1:${env.WEAPP_WS_PORT || 3002}/weapp`, production ? ['wss:'] : ['ws:', 'wss:'])
   return {
+    admin: loadAdminConfig(env),
     host: env.PLATFORM_HOST || '127.0.0.1',
     port: integerSetting(env, 'PLATFORM_PORT', 3003, { minimum: 1, maximum: 65535 }),
     corsOrigin,

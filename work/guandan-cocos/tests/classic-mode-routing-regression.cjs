@@ -14,6 +14,12 @@ class Node {
 const cc = { Color, Vec3, Node, tween: node => ({ delay () { return this }, to (_, props) { Object.assign(node, props); return this }, start () {} }) }
 const catalog = loadTs(path.join(root, 'scenes/front-pages/LobbyPageCatalog.ts'), { cc, '../../core/generated/lib/classicModes': core })
 const imports = { cc, './LobbyPageCatalog': catalog, '../../core/generated/lib/classicModes': core }
+imports['../../ui/StarGlint'] = { attachStarGlintSequence() {} }
+imports['../../ui/LobbyServiceView'] = { renderLobbyServices() {} }
+imports['../../ui/LobbyStarGlintPolicy'] = loadTs(path.join(root, 'ui/LobbyStarGlintPolicy.ts'), {
+  './LobbyMotionPolicy': loadTs(path.join(root, 'ui/LobbyMotionPolicy.ts')),
+  './StarGlintPolicy': loadTs(path.join(root, 'ui/StarGlintPolicy.ts')),
+})
 for (const module of ['../../ui/RuntimeUiFactory', '../../ui/LobbyLayoutPolicy', '../../ui/LobbyMenuView', '../../ui/LobbyAmbientMotion', '../../services/WechatFriendInvite',
   './FriendRoomSettingsPresenter', './FriendRoomPlatformFlow', './FriendRoomWaitingPresenter', './LobbyPlayerProfilePresenter']) imports[module] = {}
 const { LobbyPageDomain } = loadTs(path.join(root, 'scenes/front-pages/LobbyPageDomain.ts'), imports)

@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { extractRuntimeConfig, verifyWechatRuntimeConfig } from './runtime-client-config.mjs'
 import { finalizeOpenDataPackage } from './wechat-open-data-package.mjs'
+import { verifyImageResources } from './image-resource-audit.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 await finalizeOpenDataPackage(projectRoot, true)
 const buildRoot = path.join(projectRoot, 'build/wechatgame')
+verifyImageResources(projectRoot, { buildRoot })
 const packageOnly = process.argv.includes('--package-only')
 const gameJsonPath = path.join(buildRoot, 'game.json')
 const settingsPath = path.join(buildRoot, 'src/settings.json')

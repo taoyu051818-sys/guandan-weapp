@@ -41,6 +41,8 @@ const snapshot = {
   settlement: { fullRank: ['p3', 'p1', 'p4', 'p2'], winnerTeam: 'teamA', levelUp: 3, message: '双上', isGameWon: false },
 }
 const settlement = projectSettlementContent(snapshot, 'p1', '本局胜利', true, ['p1', 'p1', 'p3'])
+assert.equal(settlement.celebrate, true)
+assert.equal(projectSettlementContent(snapshot, 'p2', '本局失利', true, []).celebrate, false)
 assert.deepEqual(settlement.players.map(p => p.team), ['队友', '我', '对手', '对手'])
 assert.deepEqual(settlement.players.map(p => p.ready), ['已准备', '已准备', '未准备', '未准备'])
 assert.match(settlement.footer, /胜方升 3 级 · 下一局准备 2\/4/, 'duplicate ready IDs must not inflate the visible count')
@@ -71,6 +73,7 @@ const individualResult = projectSettlementContent({
   settlement: { ...independentSnapshot.settlement, fullRank: ['p1', 'p3', 'p4', 'p2'], playerPoints: { p1: 3, p3: 2, p4: 1, p2: 0 } },
 }, 'p4', null, true, [], singleEnded)
 assert.equal(individualResult.title, '本轮结束')
+assert.equal(individualResult.celebrate, false, 'individual third place must not inherit the team-win glint')
 assert.match(individualResult.summary, /第 3 名 · 获得 1 分/)
 assert.doesNotMatch(individualResult.summary, /我方 3|对方 0|失利/)
 assert.match(individualResult.players[2].ready, /本轮得 1 分/)
@@ -98,6 +101,7 @@ class SettlementUi {
   }
 }
 const { TableSettlementView } = load('assets/scripts/ui/TableSettlementView.ts', {
+  './StarGlint': { attachStarGlint() {} }, './StarGlintPolicy': { STAR_GLINT: {} },
   cc: { Color: class { constructor (...values) { this.values = values } }, UITransform: SettlementTransform },
   './RuntimeUiFactory': { RuntimeUiFactory: SettlementUi },
   './CoastalUi': { coastalText: (ui, text, x, y, width, height, size, options = {}) => {

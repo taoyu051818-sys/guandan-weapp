@@ -1,0 +1,1769 @@
+{
+  "version": 1,
+  "note": "Reviewed inventory; sourceEvidence is provenance, not proof of redistribution rights. Limits require explicit review, never auto-regenerate in CI.",
+  "maxTotalBytes": 6291456,
+  "images": [
+    {
+      "id": "game-assets/backgrounds/lobby-lingshui-coast-v1",
+      "path": "assets/game-assets/backgrounds/lobby-lingshui-coast-v1.jpg",
+      "usage": "scene background",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 1600,
+      "maxHeight": 719,
+      "maxBytes": 455680,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/SceneBackdropController.ts",
+          "token": "backgrounds/lobby-lingshui-coast-v1/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/backgrounds/table-perspective-blue-v2",
+      "path": "assets/game-assets/backgrounds/table-perspective-blue-v2.jpg",
+      "usage": "scene background",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 1280,
+      "maxHeight": 720,
+      "maxBytes": 329728,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/SceneBackdropController.ts",
+          "token": "backgrounds/table-perspective-blue-v2/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/bg_front",
+      "path": "assets/game-assets/cards/classic/bg_front.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 127,
+      "maxHeight": 181,
+      "maxBytes": 10240,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'bg_front'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/black_joker",
+      "path": "assets/game-assets/cards/classic/black_joker.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 148,
+      "maxHeight": 212,
+      "maxBytes": 11264,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'black_joker'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_1",
+      "path": "assets/game-assets/cards/classic/num_black_1.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_1'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_10",
+      "path": "assets/game-assets/cards/classic/num_black_10.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_10'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_11",
+      "path": "assets/game-assets/cards/classic/num_black_11.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 1024,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_11'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_12",
+      "path": "assets/game-assets/cards/classic/num_black_12.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_12'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_13",
+      "path": "assets/game-assets/cards/classic/num_black_13.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_13'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_2",
+      "path": "assets/game-assets/cards/classic/num_black_2.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_2'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_3",
+      "path": "assets/game-assets/cards/classic/num_black_3.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_3'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_4",
+      "path": "assets/game-assets/cards/classic/num_black_4.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_4'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_5",
+      "path": "assets/game-assets/cards/classic/num_black_5.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_5'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_6",
+      "path": "assets/game-assets/cards/classic/num_black_6.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_6'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_7",
+      "path": "assets/game-assets/cards/classic/num_black_7.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_7'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_8",
+      "path": "assets/game-assets/cards/classic/num_black_8.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_8'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_black_9",
+      "path": "assets/game-assets/cards/classic/num_black_9.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_black_9'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_1",
+      "path": "assets/game-assets/cards/classic/num_red_1.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_1'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_10",
+      "path": "assets/game-assets/cards/classic/num_red_10.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_10'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_11",
+      "path": "assets/game-assets/cards/classic/num_red_11.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 1024,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_11'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_12",
+      "path": "assets/game-assets/cards/classic/num_red_12.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_12'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_13",
+      "path": "assets/game-assets/cards/classic/num_red_13.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_13'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_2",
+      "path": "assets/game-assets/cards/classic/num_red_2.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_2'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_3",
+      "path": "assets/game-assets/cards/classic/num_red_3.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_3'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_4",
+      "path": "assets/game-assets/cards/classic/num_red_4.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_4'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_5",
+      "path": "assets/game-assets/cards/classic/num_red_5.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_5'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_6",
+      "path": "assets/game-assets/cards/classic/num_red_6.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_6'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_7",
+      "path": "assets/game-assets/cards/classic/num_red_7.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_7'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_8",
+      "path": "assets/game-assets/cards/classic/num_red_8.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_8'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/num_red_9",
+      "path": "assets/game-assets/cards/classic/num_red_9.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 48,
+      "maxHeight": 64,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'num_red_9'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/red_joker",
+      "path": "assets/game-assets/cards/classic/red_joker.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 148,
+      "maxHeight": 212,
+      "maxBytes": 11264,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'red_joker'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_club",
+      "path": "assets/game-assets/cards/classic/shape_club.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 10240,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_club'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_club_s",
+      "path": "assets/game-assets/cards/classic/shape_club_s.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 96,
+      "maxHeight": 96,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_club_s'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_diamond",
+      "path": "assets/game-assets/cards/classic/shape_diamond.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 12288,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_diamond'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_diamond_s",
+      "path": "assets/game-assets/cards/classic/shape_diamond_s.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 96,
+      "maxHeight": 96,
+      "maxBytes": 6144,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_diamond_s'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_heart",
+      "path": "assets/game-assets/cards/classic/shape_heart.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 15360,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_heart'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_heart_s",
+      "path": "assets/game-assets/cards/classic/shape_heart_s.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 96,
+      "maxHeight": 96,
+      "maxBytes": 7168,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_heart_s'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_spade",
+      "path": "assets/game-assets/cards/classic/shape_spade.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 9216,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_spade'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/cards/classic/shape_spade_s",
+      "path": "assets/game-assets/cards/classic/shape_spade_s.png",
+      "usage": "shared card component",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 96,
+      "maxHeight": 96,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/CardSkinResolver.ts",
+          "token": "'shape_spade_s'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicCardFrameStore.ts",
+          "token": "cards/classic/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/bomb-v1/bomb-body",
+      "path": "assets/game-assets/effects/bomb-v1/bomb-body.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 256,
+      "maxHeight": 256,
+      "maxBytes": 38912,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'bomb-body.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/bomb-v1/debris-shard",
+      "path": "assets/game-assets/effects/bomb-v1/debris-shard.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 64,
+      "maxHeight": 64,
+      "maxBytes": 9216,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'debris-shard.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/bomb-v1/hot-core",
+      "path": "assets/game-assets/effects/bomb-v1/hot-core.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 256,
+      "maxHeight": 256,
+      "maxBytes": 48128,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'hot-core.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/bomb-v1/noise-tile",
+      "path": "assets/game-assets/effects/bomb-v1/noise-tile.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 18432,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'noise-tile.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/bomb-v1/spark-streak",
+      "path": "assets/game-assets/effects/bomb-v1/spark-streak.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 128,
+      "maxHeight": 32,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'spark-streak.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/bomb-v1/trail-soft",
+      "path": "assets/game-assets/effects/bomb-v1/trail-soft.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 256,
+      "maxHeight": 64,
+      "maxBytes": 13312,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'trail-soft.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/kenney/flame",
+      "path": "assets/game-assets/effects/kenney/flame.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 512,
+      "maxHeight": 512,
+      "maxBytes": 57344,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'flame.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/kenney/impact-ring",
+      "path": "assets/game-assets/effects/kenney/impact-ring.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 512,
+      "maxHeight": 512,
+      "maxBytes": 75776,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'impact-ring.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/kenney/smoke",
+      "path": "assets/game-assets/effects/kenney/smoke.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 512,
+      "maxHeight": 512,
+      "maxBytes": 112640,
+      "consumers": [
+        {
+          "file": "assets/scripts/effects/EffectAssetCatalog.ts",
+          "token": "'smoke.png'"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/lobby-v1/classic-entry-idle-0",
+      "path": "assets/game-assets/effects/lobby-v1/classic-entry-idle-0.jpg",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "scripts/build-classic-entry-atlas.cjs",
+      "maxWidth": 1456,
+      "maxHeight": 1344,
+      "maxBytes": 611328,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimationPolicy.ts",
+          "token": "assetPrefix: 'effects/lobby-v1/classic-entry-idle-'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimation.ts",
+          "token": "loadPage"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/lobby-v1/classic-entry-idle-1",
+      "path": "assets/game-assets/effects/lobby-v1/classic-entry-idle-1.jpg",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "scripts/build-classic-entry-atlas.cjs",
+      "maxWidth": 1456,
+      "maxHeight": 1344,
+      "maxBytes": 627712,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimationPolicy.ts",
+          "token": "assetPrefix: 'effects/lobby-v1/classic-entry-idle-'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimation.ts",
+          "token": "loadPage"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/lobby-v1/classic-entry-idle-2",
+      "path": "assets/game-assets/effects/lobby-v1/classic-entry-idle-2.jpg",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "scripts/build-classic-entry-atlas.cjs",
+      "maxWidth": 1456,
+      "maxHeight": 1344,
+      "maxBytes": 634880,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimationPolicy.ts",
+          "token": "assetPrefix: 'effects/lobby-v1/classic-entry-idle-'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimation.ts",
+          "token": "loadPage"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/lobby-v1/classic-entry-idle-poster",
+      "path": "assets/game-assets/effects/lobby-v1/classic-entry-idle-poster.jpg",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "scripts/build-classic-entry-atlas.cjs",
+      "maxWidth": 360,
+      "maxHeight": 332,
+      "maxBytes": 46080,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimationPolicy.ts",
+          "token": "assetPrefix: 'effects/lobby-v1/classic-entry-idle-'"
+        },
+        {
+          "file": "assets/scripts/ui/ClassicEntryAnimation.ts",
+          "token": "loadPage"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/lobby-v1/metal-star-glint",
+      "path": "assets/game-assets/effects/lobby-v1/metal-star-glint.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 256,
+      "maxHeight": 256,
+      "maxBytes": 26624,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/StarGlintPolicy.ts",
+          "token": "effects/lobby-v1/metal-star-glint/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/effects/lobby-v1/quick_start_star_fx_210_sheet",
+      "path": "assets/game-assets/effects/lobby-v1/quick_start_star_fx_210_sheet.png",
+      "usage": "effect texture",
+      "lifetime": "component-owned",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 840,
+      "maxHeight": 184,
+      "maxBytes": 177152,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyMotionPolicy.ts",
+          "token": "effects/lobby-v1/quick_start_star_fx_210_sheet/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/common/default-avatar",
+      "path": "assets/game-assets/ui/common/default-avatar.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 512,
+      "maxHeight": 512,
+      "maxBytes": 93184,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/TableHudPresenter.ts",
+          "token": "ui/common/default-avatar/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/coin",
+      "path": "assets/game-assets/ui/lobby/coin.png",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 50,
+      "maxHeight": 52,
+      "maxBytes": 8192,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/coin/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/entry-classic",
+      "path": "assets/game-assets/ui/lobby/entry-classic.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 675,
+      "maxHeight": 900,
+      "maxBytes": 160768,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/entry-classic/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/entry-friend",
+      "path": "assets/game-assets/ui/lobby/entry-friend.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 675,
+      "maxHeight": 900,
+      "maxBytes": 142336,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/entry-friend/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/entry-tournament-cutout-v4",
+      "path": "assets/game-assets/ui/lobby/entry-tournament-cutout-v4.png",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 512,
+      "maxHeight": 512,
+      "maxBytes": 264192,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/TournamentCenterView.ts",
+          "token": "ui/lobby/entry-tournament-cutout-v4/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/entry-tournament",
+      "path": "assets/game-assets/ui/lobby/entry-tournament.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 675,
+      "maxHeight": 900,
+      "maxBytes": 182272,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/entry-tournament/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/friend-room-green",
+      "path": "assets/game-assets/ui/lobby/friend-room-green.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 1680,
+      "maxHeight": 945,
+      "maxBytes": 308224,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/friend-room-green/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/quick-start-beach",
+      "path": "assets/game-assets/ui/lobby/quick-start-beach.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "scripts/build-quick-start-background.cjs",
+      "maxWidth": 832,
+      "maxHeight": 176,
+      "maxBytes": 299008,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/quick-start-beach/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/shop-float-chick",
+      "path": "assets/game-assets/ui/lobby/shop-float-chick.png",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 720,
+      "maxHeight": 720,
+      "maxBytes": 612352,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/shop-float-chick/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/tier-blue",
+      "path": "assets/game-assets/ui/lobby/tier-blue.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 600,
+      "maxHeight": 900,
+      "maxBytes": 109568,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/tier-blue/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/tier-gold",
+      "path": "assets/game-assets/ui/lobby/tier-gold.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 600,
+      "maxHeight": 900,
+      "maxBytes": 153600,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/tier-gold/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/tier-green",
+      "path": "assets/game-assets/ui/lobby/tier-green.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 600,
+      "maxHeight": 900,
+      "maxBytes": 101376,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/tier-green/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby/tier-violet",
+      "path": "assets/game-assets/ui/lobby/tier-violet.jpg",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 600,
+      "maxHeight": 900,
+      "maxBytes": 129024,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/front-pages/LobbyPageCatalog.ts",
+          "token": "ui/lobby/tier-violet/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby-services/feedback",
+      "path": "assets/game-assets/ui/lobby-services/feedback.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "third_party/assets/phosphor-lobby/README.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyServicePolicy.ts",
+          "token": "id: 'feedback'"
+        },
+        {
+          "file": "assets/scripts/ui/LobbyServiceIcons.ts",
+          "token": "ui/lobby-services/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby-services/membership",
+      "path": "assets/game-assets/ui/lobby-services/membership.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "third_party/assets/phosphor-lobby/README.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyServicePolicy.ts",
+          "token": "id: 'membership'"
+        },
+        {
+          "file": "assets/scripts/ui/LobbyServiceIcons.ts",
+          "token": "ui/lobby-services/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby-services/messages",
+      "path": "assets/game-assets/ui/lobby-services/messages.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "third_party/assets/phosphor-lobby/README.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyServicePolicy.ts",
+          "token": "id: 'messages'"
+        },
+        {
+          "file": "assets/scripts/ui/LobbyServiceIcons.ts",
+          "token": "ui/lobby-services/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby-services/ranking",
+      "path": "assets/game-assets/ui/lobby-services/ranking.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "third_party/assets/phosphor-lobby/README.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyServicePolicy.ts",
+          "token": "id: 'ranking'"
+        },
+        {
+          "file": "assets/scripts/ui/LobbyServiceIcons.ts",
+          "token": "ui/lobby-services/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby-services/records",
+      "path": "assets/game-assets/ui/lobby-services/records.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "third_party/assets/phosphor-lobby/README.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyServicePolicy.ts",
+          "token": "id: 'records'"
+        },
+        {
+          "file": "assets/scripts/ui/LobbyServiceIcons.ts",
+          "token": "ui/lobby-services/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby-services/share",
+      "path": "assets/game-assets/ui/lobby-services/share.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "third_party/assets/phosphor-lobby/README.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyServicePolicy.ts",
+          "token": "id: 'share'"
+        },
+        {
+          "file": "assets/scripts/ui/LobbyServiceIcons.ts",
+          "token": "ui/lobby-services/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/lobby-services/tasks",
+      "path": "assets/game-assets/ui/lobby-services/tasks.png",
+      "usage": "UI artwork",
+      "lifetime": "page-owned",
+      "sourceEvidence": "third_party/assets/phosphor-lobby/README.md",
+      "maxWidth": 128,
+      "maxHeight": 128,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/ui/LobbyServicePolicy.ts",
+          "token": "id: 'tasks'"
+        },
+        {
+          "file": "assets/scripts/ui/LobbyServiceIcons.ts",
+          "token": "ui/lobby-services/"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/001",
+      "path": "assets/game-assets/ui/profiles/001.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 6144,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/001/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/002",
+      "path": "assets/game-assets/ui/profiles/002.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 6144,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/002/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/003",
+      "path": "assets/game-assets/ui/profiles/003.png",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 7168,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/003/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/004",
+      "path": "assets/game-assets/ui/profiles/004.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/004/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/005",
+      "path": "assets/game-assets/ui/profiles/005.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/005/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/006",
+      "path": "assets/game-assets/ui/profiles/006.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/006/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/007",
+      "path": "assets/game-assets/ui/profiles/007.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/007/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/008",
+      "path": "assets/game-assets/ui/profiles/008.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/008/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/012",
+      "path": "assets/game-assets/ui/profiles/012.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/012/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/015",
+      "path": "assets/game-assets/ui/profiles/015.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 6144,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/015/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/016",
+      "path": "assets/game-assets/ui/profiles/016.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/016/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/017",
+      "path": "assets/game-assets/ui/profiles/017.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 7168,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/017/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/018",
+      "path": "assets/game-assets/ui/profiles/018.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 5120,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/018/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/021",
+      "path": "assets/game-assets/ui/profiles/021.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/021/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/023",
+      "path": "assets/game-assets/ui/profiles/023.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/023/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/024",
+      "path": "assets/game-assets/ui/profiles/024.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/024/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/026",
+      "path": "assets/game-assets/ui/profiles/026.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 4096,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/026/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/027",
+      "path": "assets/game-assets/ui/profiles/027.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 2048,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/027/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/profiles/028",
+      "path": "assets/game-assets/ui/profiles/028.jpg",
+      "usage": "default player avatar",
+      "lifetime": "application-cache",
+      "sourceEvidence": "../guandan-windows-source/server/data/default-profiles/catalog.json",
+      "maxWidth": 100,
+      "maxHeight": 100,
+      "maxBytes": 3072,
+      "consumers": [
+        {
+          "file": "assets/scripts/services/DefaultProfileCatalog.ts",
+          "token": "ui/profiles/028/texture"
+        }
+      ]
+    },
+    {
+      "id": "game-assets/ui/table/chicken-timer-frame",
+      "path": "assets/game-assets/ui/table/chicken-timer-frame.png",
+      "usage": "UI artwork",
+      "lifetime": "application-cache",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 512,
+      "maxHeight": 512,
+      "maxBytes": 217088,
+      "consumers": [
+        {
+          "file": "assets/scripts/scenes/TableHudPresenter.ts",
+          "token": "ui/table/chicken-timer-frame/texture"
+        }
+      ]
+    },
+    {
+      "id": "startup/resource-loading-lingshui-v1",
+      "path": "assets/startup/resource-loading-lingshui-v1.jpg",
+      "usage": "main-package loading image",
+      "lifetime": "startup",
+      "sourceEvidence": "THIRD_PARTY.md",
+      "maxWidth": 1280,
+      "maxHeight": 590,
+      "maxBytes": 317440,
+      "consumers": [
+        {
+          "file": "assets/scenes/Game.scene",
+          "token": "59fb0678-90b0-45df-b50b-07d3e073dea1"
+        }
+      ]
+    }
+  ],
+  "retired": [
+    {
+      "path": "assets/game-assets/ui/lobby/entry-classic-cutout-v2.png",
+      "archive": "art-source/ui/retired-lobby/entry-classic-cutout-v2.png",
+      "sha256": "a8bdc1dbdc78f8e83f01da07a7df13f32e7c5e88e69c83d71055c4103d91747d",
+      "uuid": "0c3d223a-feb9-4fc4-9941-9dab729c71a0"
+    },
+    {
+      "path": "assets/game-assets/ui/lobby/entry-friend-cutout-v2.png",
+      "archive": "art-source/ui/retired-lobby/entry-friend-cutout-v2.png",
+      "sha256": "549db86f16d18ecacb26142d3638c1fcaf162744fd8058c2e7050b390a57dbcb",
+      "uuid": "83b2ae28-eedb-43dd-99a6-63f395e85382"
+    },
+    {
+      "path": "assets/game-assets/ui/lobby/entry-tournament-solid-v3.png",
+      "archive": "art-source/ui/retired-lobby/entry-tournament-solid-v3.png",
+      "sha256": "ac3c5cf7fa593fe1b5a75b8fe4f2759765f21565f1e81648dde6a2c0c664bc2c",
+      "uuid": "6ecac9f8-cae3-4c7c-8aed-3d8922c3165b"
+    },
+    {
+      "path": "assets/game-assets/ui/profiles/011.png",
+      "archive": "art-source/ui/retired-profiles/011.png",
+      "sha256": "2d2cf213888d3bd322be7e5a819e248eebab9c48d482b9dcf1ea1d5db85ac4a3",
+      "uuid": "2ca0ad92-d4bf-442f-928a-acd2013ad7b5"
+    },
+    {
+      "path": "assets/game-assets/ui/profiles/014.png",
+      "archive": "art-source/ui/retired-profiles/014.png",
+      "sha256": "2d2cf213888d3bd322be7e5a819e248eebab9c48d482b9dcf1ea1d5db85ac4a3",
+      "uuid": "951f599a-fdfa-4724-bc2c-53a21bb0ca40"
+    },
+    {
+      "path": "assets/game-assets/ui/profiles/019.png",
+      "archive": "art-source/ui/retired-profiles/019.png",
+      "sha256": "2d2cf213888d3bd322be7e5a819e248eebab9c48d482b9dcf1ea1d5db85ac4a3",
+      "uuid": "39b5e740-f0ad-4296-b0eb-75044c761d91"
+    },
+    {
+      "path": "assets/game-assets/ui/profiles/022.png",
+      "archive": "art-source/ui/retired-profiles/022.png",
+      "sha256": "2d2cf213888d3bd322be7e5a819e248eebab9c48d482b9dcf1ea1d5db85ac4a3",
+      "uuid": "7af3d8ad-a88e-4d82-9769-4fc4d5e19153"
+    },
+    {
+      "path": "assets/game-assets/ui/profiles/025.png",
+      "archive": "art-source/ui/retired-profiles/025.png",
+      "sha256": "2d2cf213888d3bd322be7e5a819e248eebab9c48d482b9dcf1ea1d5db85ac4a3",
+      "uuid": "0859987c-63e9-435d-bc48-90d9c4fe78be"
+    }
+  ]
+}

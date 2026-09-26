@@ -1,6 +1,12 @@
 import { Color, Label, Node, Rect, Size, Sprite, SpriteFrame, Texture2D, UITransform, Vec3 } from 'cc'
 import { loadGameAsset } from '../services/GameAssetLoader'
-import { LOBBY_DESIGN, type LobbyLayout, type LobbyRect } from './LobbyLayoutPolicy'
+import { attachStarGlintSequence } from './StarGlint'
+import type { StarGlintClock } from './StarGlintPolicy'
+import { LOBBY_STAR_GLINT } from './LobbyStarGlintPolicy'
+import { attachClassicEntryAnimation } from './ClassicEntryAnimation'
+import { attachFriendEntrySteam } from './FriendEntrySteam'
+import type { ClassicEntryClock } from './ClassicEntryAnimationPolicy'
+import { LOBBY_DESIGN, lobbyDockLabelY, type LobbyLayout, type LobbyRect } from './LobbyLayoutPolicy'
 import { RuntimeUiFactory } from './RuntimeUiFactory'
 
 /** Approved lobby typography, independent of the other pages' heavy outline floor. */
@@ -37,6 +43,8 @@ export function lobbyArtwork (parent: Node, name: string, asset: string, r: Lobb
     const piece = (start: number, end: number, alpha: number): void => {
       const node = new Node('ArtworkSlice')
       node.parent = root
+      // Static art may finish loading after its animation overlay was attached.
+      node.setSiblingIndex(frames.length)
       node.setPosition(new Vec3(0, r.height * (.5 - (start + end) / 2), 0))
       node.addComponent(UITransform).setContentSize(r.width, r.height * (end - start))
       const frame = new SpriteFrame()
@@ -59,7 +67,8 @@ export function lobbyArtwork (parent: Node, name: string, asset: string, r: Lobb
 }
 
 export function renderLobbyEntries (ui: RuntimeUiFactory, layout: LobbyLayout,
-  entries: ReadonlyArray<{ name: string, art: string, kind: 'classic' | 'friend' | 'tournament', action: () => void }>): void {
+  entries: ReadonlyArray<{ name: string, art: string, kind: 'classic' | 'friend' | 'tournament', action: () => void }>,
+  motion?: { allowed: () => boolean, clock: StarGlintClock, friendClock?: StarGlintClock, classicClock?: ClassicEntryClock }): void {
   const s = layout.scale
   for (const entry of entries) {
     const r = layout[entry.kind], tournament = entry.kind === 'tournament'
@@ -68,12 +77,26 @@ export function renderLobbyEntries (ui: RuntimeUiFactory, layout: LobbyLayout,
       stroke: tournament ? new Color(190, 207, 199) : new Color(234, 214, 155), lineWidth: (tournament ? 1 : 2) * s, frame: 'control', frameScale: s,
     })
     if (tournament) {
-      lobbyArtwork(card, 'TournamentArtwork', entry.art, { x: r.width / 2 - 35.5 * s, y: 0, width: 61 * s, height: r.height - 10 * s }, .74)
+      const width = 61 * s, height = r.height - 10 * s
+      const artwork = lobbyArtwork(card, 'TournamentArtwork', entry.art, { x: r.width / 2 - 35.5 * s, y: 0, width, height }, .74)
+      if (motion) attachStarGlintSequence(artwork, { width, height, scale: s,
+        points: LOBBY_STAR_GLINT.trophy, allowed: motion.allowed, clock: motion.clock, pressTarget: card })
       lobbyLabel(ui, '赛事', -r.width / 2 + 40 * s, r.height / 2 - 25 * s, 21, 70 * s, s, card)
       lobbyLabel(ui, '16人积分赛', -r.width / 2 + 42 * s, r.height / 2 - 47 * s, 12, 75 * s, s, card, new Color(89, 110, 115), 0, false)
     } else {
       const footer = (entry.kind === 'classic' ? 54 : 48) * s
-      lobbyArtwork(card, 'EntryArtwork', entry.art, { x: 0, y: footer / 2 - s, width: r.width - 4 * s, height: r.height - footer - 2 * s }, .74)
+      const width = r.width - 4 * s, height = r.height - footer - 2 * s
+      const artwork = lobbyArtwork(card, 'EntryArtwork', entry.art, { x: 0, y: footer / 2 - s, width, height }, .74)
+      if (entry.kind === 'classic' && motion?.classicClock) attachClassicEntryAnimation(artwork, {
+        width, height, allowed: motion.allowed, clock: motion.classicClock, pressTarget: card,
+      })
+      if (entry.kind === 'friend' && motion) attachStarGlintSequence(artwork, {
+        width, height, scale: s, points: LOBBY_STAR_GLINT.friend,
+        allowed: motion.allowed, clock: motion.friendClock, pressTarget: card,
+      })
+      if (entry.kind === 'friend' && motion) attachFriendEntrySteam(artwork, {
+        scale: s, allowed: motion.allowed, pressTarget: card,
+      })
       lobbyLabel(ui, entry.kind === 'classic' ? '经典掼蛋' : '好友房', 0, -r.height / 2 + footer - 18 * s, 24, r.width - 16 * s, s, card)
       lobbyLabel(ui, entry.kind === 'classic' ? '随机级牌 · 单局对战' : '创建房间 · 邀请好友', 0, -r.height / 2 + 13 * s, 12, r.width - 16 * s, s, card, new Color(93, 113, 111), 0, false)
     }
@@ -81,13 +104,16 @@ export function renderLobbyEntries (ui: RuntimeUiFactory, layout: LobbyLayout,
   }
 }
 
-export function renderLobbyShop (ui: RuntimeUiFactory, layout: LobbyLayout, art: string, action: () => void): void {
+export function renderLobbyShop (ui: RuntimeUiFactory, layout: LobbyLayout, art: string, action: () => void,
+  motion?: { allowed: () => boolean, clock: StarGlintClock }): void {
   const r = layout.shop, s = layout.scale
   const root = new Node('ShopShortcut')
   root.parent = ui.parent
   root.setPosition(new Vec3(r.x, r.y, 0))
   root.addComponent(UITransform).setContentSize(r.width, r.height)
   lobbyArtwork(root, 'ShopChickArtwork', art, { ...r, x: 0, y: 0 }, 1, LOBBY_DESIGN.shopFadeStart)
-  lobbyLabel(ui, '商城', 0, -r.height * .34, LOBBY_DESIGN.shopFontSize, r.width - 12 * s, s, root, new Color(255, 226, 105), LOBBY_DESIGN.shopOutline)
+  if (motion) attachStarGlintSequence(root, { width: r.width, height: r.height, scale: s,
+    points: LOBBY_STAR_GLINT.shop, ...motion, pressTarget: root })
+  lobbyLabel(ui, '商城', 0, lobbyDockLabelY(r.height / s, LOBBY_DESIGN.shopFontSize) * s, LOBBY_DESIGN.shopFontSize, r.width - 12 * s, s, root, new Color(255, 226, 105), LOBBY_DESIGN.shopOutline)
   ui.makeInteractive(root, action, .95)
 }

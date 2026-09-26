@@ -16,6 +16,7 @@ export type ReplayPageDependencies = {
   scheduleOnce: (callback: () => void, delaySeconds: number) => void
   showNotice: (title: string, detail?: string) => void
   showPlayerCenter: () => void
+  showMenu?: () => void
 }
 
 /** Owns completed-match replay only. Live friend-room viewing belongs to the game table. */
@@ -23,15 +24,17 @@ export class ReplayPageDomain {
   private replayPlaybackToken = 0
   private activeReplayTimeline: ReplayTimeline | null = null
   private destroyed = false
+  private listReturnPage: 'menu' | 'player-center' = 'player-center'
   private replayListView: { replays: ReplaySummary[], status: string } = { replays: [], status: '' }
   private replayDetailView: { replay: ReplayDetail | null, status: string, returnPage: ReplayReturnPage, timeline?: ReplayTimeline } | null = null
   public constructor (private readonly dependencies: ReplayPageDependencies) {}
 
-  public showReplayList (): void {
+  public showReplayList (returnPage: 'menu' | 'player-center' = 'player-center'): void {
     if (this.isDisposed()) return
+    this.listReturnPage = returnPage
     this.stopReplayPlayback(true)
     const token = this.dependencies.issuePageRequest()
-    this.renderReplayList([], '正在同步牌谱…')
+    this.renderReplayList([], '正在同步对局…')
     void this.refreshReplayList(token)
   }
 
@@ -63,7 +66,7 @@ export class ReplayPageDomain {
       const replays = await this.dependencies.gateways.replays.list()
       if (!this.isCurrentRequest(token, 'replay-list')) return
       const status = this.dependencies.gateways.configured
-        ? replays.length ? '最近完成的对局' : '暂无牌谱'
+        ? replays.length ? '最近完成的对局' : '暂无对局记录'
         : replays.length ? '开发模拟牌谱 · 不代表真实战绩' : '开发模拟牌谱 · 暂无记录'
       this.renderReplayList(replays, status)
     } catch (error) {
@@ -97,7 +100,8 @@ export class ReplayPageDomain {
         this.showReplayDetail(replay.id)
       })
     })
-    this.pageButton(ui, '返回个人中心', -205, this.dependencies.showPlayerCenter)
+    this.pageButton(ui, this.listReturnPage === 'menu' ? '返回大厅' : '返回个人中心', -205,
+      () => { if (this.listReturnPage === 'menu') this.dependencies.showMenu?.(); else this.dependencies.showPlayerCenter() })
   }
 
   private renderReplayDetail (
@@ -118,7 +122,7 @@ export class ReplayPageDomain {
     this.sizedButton(ui, returnPage === 'player-center' ? '返回个人中心' : '返回牌谱', 0, -310, 220, 40, 17, () => {
       this.stopReplayPlayback(true)
       if (returnPage === 'player-center') this.dependencies.showPlayerCenter()
-      else this.showReplayList()
+      else this.showReplayList(this.listReturnPage)
     })
   }
 

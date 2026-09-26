@@ -1,6 +1,7 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyImageResources } from './image-resource-audit.mjs';
 import {
   extractRuntimeConfig,
   injectWebRuntimeConfig,
@@ -18,6 +19,7 @@ const checkOnly = process.argv.includes('--check');
 const release = process.argv.includes('--release');
 const bareIpTest = process.argv.includes('--bare-ip-test');
 const buildRoot = resolve(projectRoot, 'build/web-desktop');
+verifyImageResources(projectRoot, { buildRoot });
 const forbiddenBundleMarkers = [
   '53e52062-b47e-43f8-b184-fb566cd720bd',
   '0cedd476-e4cd-4e92-a6d1-b85a9143167c',

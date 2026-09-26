@@ -15,6 +15,7 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": [
+    "assets/scripts/scenes/front-pages/OperationsPageModel.ts",
     "assets/scripts/scenes/front-pages/TournamentCenterModel.ts",
     "assets/scripts/ui/TableButtonMetrics.ts",
     "assets/scripts/network/DuplicateRoomModel.ts",
@@ -79,7 +80,12 @@
     "migration/rules/RuleHelpProjection.ts",
     "assets/scripts/ui/SafeAreaLayout.ts",
     "assets/scripts/ui/LobbyLayoutPolicy.ts",
+    "assets/scripts/ui/LobbyServicePolicy.ts",
+    "assets/scripts/scenes/front-pages/LobbyServiceActions.ts",
     "assets/scripts/ui/LobbyMotionPolicy.ts",
+    "assets/scripts/ui/StarGlintPolicy.ts",
+    "assets/scripts/ui/LobbyStarGlintPolicy.ts",
+    "assets/scripts/ui/ClassicEntryAnimationPolicy.ts",
     "assets/scripts/ui/TableHudLayoutPolicy.ts",
     "assets/scripts/ui/PlayedCardLayout.ts",
     "assets/scripts/ui/WechatCapsuleLayout.ts",
@@ -88,6 +94,7 @@
   ],
   "exclude": [
     "assets/scripts/services/DefaultProfileFrames.ts",
+    "assets/scripts/services/ProfileAvatarAssets.ts",
     "assets/scripts/services/GameAssetLoader.ts"
   ]
 }

@@ -6,6 +6,7 @@ import {
   nodeAsyncDurableFileOperations,
 } from '../durable-file.js'
 import { upgradeLoadedState } from './state-migrations.js'
+import { storageCapacity, createStorageCapacityObserver } from './storage-capacity.js'
 export { normalizeAccountId, findAvailableAccountId } from './state-migrations.js'
 
 const clone = (value) => value === undefined ? undefined : structuredClone(value)
@@ -93,10 +94,11 @@ export class MemoryPlatformStore extends PlatformStateStore {
  * 数据库级恢复；多实例部署必须替换为具备事务和唯一约束的正式 repository。
  */
 export class JsonFilePlatformStore extends MemoryPlatformStore {
-  constructor (filePath, initialState, { durableFileOperations = nodeAsyncDurableFileOperations } = {}) {
+  constructor (filePath, initialState, { durableFileOperations = nodeAsyncDurableFileOperations, logger = console } = {}) {
     super(initialState)
     this.filePath = resolve(filePath)
     this.durableFileOperations = durableFileOperations
+    this.observeCapacity = createStorageCapacityObserver(logger)
   }
 
   static async open (filePath, fallbackState = createEmptyPlatformState(), options = {}) {
@@ -112,17 +114,20 @@ export class JsonFilePlatformStore extends MemoryPlatformStore {
       if (error?.code !== 'ENOENT') throw error
     }
     const upgraded = upgradeLoadedState(state, fallbackState)
-    const store = new JsonFilePlatformStore(resolvedPath, upgraded.state, { durableFileOperations })
+    const store = new JsonFilePlatformStore(resolvedPath, upgraded.state, { ...options, durableFileOperations })
     if (!loadedFromDisk || upgraded.changed) await store.persist(upgraded.state)
+    else store.observeCapacity(storageCapacity(upgraded.state, Buffer.byteLength(JSON.stringify(upgraded.state, null, 2)) + 1, { exactAuditBytes: true }))
     return store
   }
 
   async persist (state) {
+    const serialized = `${JSON.stringify(state, null, 2)}\n`
     await durableReplaceFile(
       this.filePath,
-      `${JSON.stringify(state, null, 2)}\n`,
+      serialized,
       this.durableFileOperations,
     )
+    this.observeCapacity(storageCapacity(state, Buffer.byteLength(serialized)))
   }
 }
 

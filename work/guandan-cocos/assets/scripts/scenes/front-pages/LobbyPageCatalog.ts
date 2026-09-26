@@ -9,6 +9,7 @@ export const LOBBY_ART = Object.freeze({
   entryTournament: 'ui/lobby/entry-tournament/texture',
   friendBackground: 'ui/lobby/friend-room-green/texture',
   shopChick: 'ui/lobby/shop-float-chick/texture',
+  quickStart: 'ui/lobby/quick-start-beach/texture',
   coin: 'ui/lobby/coin/texture',
   defaultAvatar: 'ui/common/default-avatar/texture',
   tierGreen: 'ui/lobby/tier-green/texture',

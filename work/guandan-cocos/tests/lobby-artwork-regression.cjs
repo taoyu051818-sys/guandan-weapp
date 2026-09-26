@@ -6,7 +6,8 @@ const root = path.resolve(__dirname, '..')
 class Node {
   static EventType = { NODE_DESTROYED: 'destroyed' }
   constructor(name) { this.name = name; this.children = []; this.components = []; this.events = {}; this.isValid = true }
-  set parent(value) { value.children.push(this) }
+  set parent(value) { this.owner=value; value.children.push(this) }
+  setSiblingIndex(index) { const list=this.owner.children;list.splice(list.indexOf(this),1);list.splice(index,0,this) }
   setPosition(value) { this.position = value }
   addComponent(Type) { const component = new Type(); this.components.push(component); return component }
   on(name, callback) { this.events[name] = callback }
@@ -26,12 +27,18 @@ new Function('module', 'exports', 'require', code)(moduleUnderTest, moduleUnderT
   if (name === 'cc') return { Node, Color, Rect, Vec3, Size, Sprite, SpriteFrame, UITransform, Texture2D: class {} }
   if (name === '../services/GameAssetLoader') return { loadGameAsset: (path, Type, callback) => { pending = callback; return () => cancelled++ } }
   if (name === './LobbyLayoutPolicy') return { LOBBY_DESIGN: {} }
+  if (name === './StarGlint') return { attachStarGlintSequence() {} }
+  if (name === './LobbyStarGlintPolicy') return { LOBBY_STAR_GLINT: {} }
+  if (name === './ClassicEntryAnimation') return { attachClassicEntryAnimation() {} }
+  if (name === './FriendEntrySteam') return { attachFriendEntrySteam() {} }
   throw Error(name)
 })
 const { lobbyArtwork, lobbyLabel } = moduleUnderTest.exports
 const parent = new Node('root'), texture = { width: 600, height: 800 }
 const card = lobbyArtwork(parent, 'card', 'original', { x: 0, y: 0, width: 180, height: 166 }, .74)
+const overlay = new Node('animation'); overlay.parent = card
 pending(null, texture)
+assert.equal(card.children.at(-1), overlay, 'late static load stays underneath animation')
 const frame = card.children[0].components.find(c => c instanceof Sprite).spriteFrame
 assert.equal(frame.texture, texture, 'reuse source texture')
 assert.ok(frame.rect.y + frame.rect.height <= texture.height * .74, 'baked bottom captions must be cropped out')
@@ -52,6 +59,15 @@ const late = lobbyArtwork(parent, 'late', 'chick', { x: 0, y: 0, width: 70, heig
 late.destroy(); pending(null, texture)
 assert.equal(late.children.length, 0, 'navigation before load must not resurrect art')
 assert.equal(cancelled, 3)
+const beach = lobbyArtwork(parent, 'QuickStartBeach', 'ui/lobby/quick-start-beach/texture', {x:0,y:0,width:208,height:44})
+const beachOverlay = new Node('star'); beachOverlay.parent = beach
+pending(null, {width:2172,height:724})
+const beachFrame = beach.children[0].components.find(c=>c instanceof Sprite).spriteFrame
+assert.ok(beachFrame.rect.y > 125 && beachFrame.rect.y + beachFrame.rect.height < 603, 'white bands stay outside the cover crop')
+assert.equal(beachFrame.rect.width, 2172, 'retain waves and starfish at the sides without stretching')
+assert.equal(beach.children.at(-1), beachOverlay, 'late image load cannot cover the star layer')
+beach.destroy()
+assert.equal(beachFrame.destroyed, true)
 const label = lobbyLabel({ outlinedLabel: () => ({ fontSize: 20, outlineWidth: 4 }) }, '商城', 0, 0, 15.4, 70, 1, undefined, undefined, 1.89)
 assert.equal(label.fontSize, 15.4); assert.equal(label.outlineWidth, 1.89)
 console.log('Lobby artwork: cover crop, monotonic fade, exact typography and load/disposal passed')

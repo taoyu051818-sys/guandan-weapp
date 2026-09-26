@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image
 
 root = Path(__file__).resolve().parents[2]
-source = root / 'assets/game-assets/ui/lobby/entry-tournament-solid-v3.png'
+source = root / 'art-source/ui/retired-lobby/entry-tournament-solid-v3.png'
 target = root / 'assets/game-assets/ui/lobby/entry-tournament-cutout-v4.png'
 im = Image.open(source).convert('RGBA')
 # Blue-grey background has B > G; gold and turquoise artwork have G > B.

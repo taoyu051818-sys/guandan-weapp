@@ -10,8 +10,12 @@ import { GameSession } from '../../session/GameSession'
 import { ScreenAdapter } from '../../ui/ScreenAdapter'
 import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import { resolveLobbyLayout } from '../../ui/LobbyLayoutPolicy'
-import { lobbyLabel, renderLobbyEntries, renderLobbyShop } from '../../ui/LobbyMenuView'
+import { lobbyArtwork, lobbyLabel, renderLobbyEntries, renderLobbyShop } from '../../ui/LobbyMenuView'
+import { renderLobbyServices } from '../../ui/LobbyServiceView'
+import type { LobbyServiceId } from '../../ui/LobbyServicePolicy'
 import { attachLobbyAmbientMotion } from '../../ui/LobbyAmbientMotion'
+import { attachStarGlintSequence } from '../../ui/StarGlint'
+import { LOBBY_STAR_GLINT, quickStartGlintGain } from '../../ui/LobbyStarGlintPolicy'
 import { PageRouter } from '../PageRouter'
 import { FriendRoomSettingsPresenter } from './FriendRoomSettingsPresenter'
 import { FriendRoomPlatformFlow } from './FriendRoomPlatformFlow'
@@ -53,6 +57,7 @@ export type LobbyPageDependencies = {
   showPlayerCenter: () => void
   editProfile: () => void
   showShop: () => void
+  openService: (id: LobbyServiceId) => void
   beginMatch: (queueId: MatchQueueId, queueName: string, returnPage: LobbyMatchReturnPage) => void
 }
 
@@ -72,6 +77,11 @@ export class LobbyPageDomain {
   private recoveryPending = false
   private renderedRecoveryAvailable = false
   private readonly ambientClock = { elapsed: 0 }
+  private readonly quickGlintClock = { elapsed: 0 }
+  private readonly trophyGlintClock = { elapsed: 0 }
+  private readonly friendGlintClock = { elapsed: 0 }
+  private readonly shopGlintClock = { elapsed: 0 }
+  private readonly classicEntryClock = { elapsed: 0, playing: false }
   private primaryAction: { node: Node, title: Label, subtitle: Label } | null = null
 
   public constructor (private readonly dependencies: LobbyPageDependencies) {
@@ -181,9 +191,11 @@ export class LobbyPageDomain {
     ] as const).map(entry => ({ ...entry, action: () => {
         if (this.recoveryPending) this.dependencies.showNotice('正在恢复牌局', '请等待当前牌局确认后再选择玩法')
         else entry.action()
-    } })))
+    } })), { allowed: () => this.ambientAllowed(ui), clock: this.trophyGlintClock, friendClock: this.friendGlintClock, classicClock: this.classicEntryClock })
     this.playerProfilePresenter.render(ui, layout)
-    renderLobbyShop(ui, layout, LOBBY_ART.shopChick, this.dependencies.showShop)
+    renderLobbyShop(ui, layout, LOBBY_ART.shopChick, this.dependencies.showShop,
+      { allowed: () => this.ambientAllowed(ui), clock: this.shopGlintClock })
+    renderLobbyServices(ui, layout, id => this.dependencies.openService(id), this.dependencies.screen.viewport.nativeCapsule)
     const { x, y, width, height } = layout.quick
     this.renderQuickStart(ui, x, y, width, height, layout.scale)
     if (!this.reflowing) this.refreshLobbyDashboard(this.dependencies.currentPageRequest())
@@ -439,14 +451,20 @@ export class LobbyPageDomain {
   private renderQuickStart (ui: RuntimeUiFactory, x: number, y: number, width: number, height: number, s: number): void {
     const button = ui.button('LobbyQuickStart', '', x, width, height, 22, {
       fill: new Color(239, 187, 79), pressedFill: new Color(232, 177, 66),
-      stroke: new Color(255, 235, 173), lineWidth: 2 * s, frame: 'panel', frameScale: s,
+      stroke: new Color(255, 235, 173), lineWidth: s, frame: 'control', frameScale: s,
     })
     button.setPosition(new Vec3(x, y, 0))
     // All decorative layers stay inside the original hit box and inherit its
     // press/cancel feedback; they never register their own input handlers.
-    ui.panel('QuickStartInnerRim', 0, 0, width - 8 * s, height - 8 * s, {
-      fill: new Color(255, 224, 145, 0), stroke: new Color(174, 110, 27, 125), lineWidth: s, frame: 'control', frameScale: s,
-    }, button)
+    // Uniform cover crop excludes the supplied image's white letterbox bands.
+    lobbyArtwork(button, 'QuickStartBeach', LOBBY_ART.quickStart, {
+      x: 0, y: 0, width: width - 2 * s, height: height - 2 * s,
+    })
+    // Attach before the text: board -> star sheet -> title/subtitle.
+    const allowed = () => this.ambientAllowed(ui)
+    attachLobbyAmbientMotion(button, { width, height, clock: this.ambientClock, allowed })
+    attachStarGlintSequence(button, { width, height, scale: s, points: LOBBY_STAR_GLINT.quickStart,
+      clock: this.quickGlintClock, allowed, pressTarget: button, intensity: () => quickStartGlintGain(this.ambientClock.elapsed) })
     const title = lobbyLabel(ui, '快速开始', 0, 7 * s, 23, width - 24 * s, s, button, new Color(101, 66, 28))
     const subtitle = lobbyLabel(ui, '随机级牌 · 单局对战', 0, -11 * s, 12, width - 24 * s, s, button, new Color(101, 66, 28), 0, false)
     title.node.getComponent(UITransform)?.setContentSize(width - 24 * s, 23 * s)
@@ -457,11 +475,6 @@ export class LobbyPageDomain {
       else this.dependencies.beginMatch('classic_50', '经典 · 初级场 · 底分50', 'menu')
     })
     this.primaryAction = { node: button, title, subtitle }
-    attachLobbyAmbientMotion(button, { width, height, scale: s, clock: this.ambientClock, allowed: () =>
-      !this.recoveryPending && !this.isDisposed() && this.dependencies.router.current === 'menu' &&
-      this.dependencies.session.snapshot.settings.effectQuality === 'full' &&
-      !ui.parent.parent?.children.some(node => node.active && node.name.startsWith('Modal-')),
-    })
     this.refreshPrimaryAction()
   }
 
@@ -476,6 +489,12 @@ export class LobbyPageDomain {
     // input does not dim readable labels or replay the card entrance tweens.
     if (this.recoveryPending) node.pauseSystemEvents(true)
     else node.resumeSystemEvents(true)
+  }
+
+  private ambientAllowed (ui: RuntimeUiFactory): boolean {
+    return !this.recoveryPending && !this.isDisposed() && this.dependencies.router.current === 'menu' &&
+      this.dependencies.session.snapshot.settings.effectQuality === 'full' &&
+      !ui.parent.parent?.children.some(node => node.active && node.name.startsWith('Modal-'))
   }
 
   private compactButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, action: () => void): Node {

@@ -43,7 +43,7 @@ export const DEFAULT_PROFILE_CATALOG = [
   {
     "displayName": "老",
     "avatarUrl": "profile:011",
-    "asset": "ui/profiles/011/texture"
+    "asset": "ui/profiles/003/texture"
   },
   {
     "displayName": "e小S的",
@@ -53,7 +53,7 @@ export const DEFAULT_PROFILE_CATALOG = [
   {
     "displayName": "4七",
     "avatarUrl": "profile:014",
-    "asset": "ui/profiles/014/texture"
+    "asset": "ui/profiles/003/texture"
   },
   {
     "displayName": "山2",
@@ -78,7 +78,7 @@ export const DEFAULT_PROFILE_CATALOG = [
   {
     "displayName": "心2",
     "avatarUrl": "profile:019",
-    "asset": "ui/profiles/019/texture"
+    "asset": "ui/profiles/003/texture"
   },
   {
     "displayName": "风手和-",
@@ -88,7 +88,7 @@ export const DEFAULT_PROFILE_CATALOG = [
   {
     "displayName": "小孤情-7",
     "avatarUrl": "profile:022",
-    "asset": "ui/profiles/022/texture"
+    "asset": "ui/profiles/003/texture"
   },
   {
     "displayName": "回福",
@@ -103,7 +103,7 @@ export const DEFAULT_PROFILE_CATALOG = [
   {
     "displayName": "城 人言你你我g乐装如多be飞号I清",
     "avatarUrl": "profile:025",
-    "asset": "ui/profiles/025/texture"
+    "asset": "ui/profiles/003/texture"
   },
   {
     "displayName": "别加👑",

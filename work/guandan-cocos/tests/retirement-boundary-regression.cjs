@@ -9,7 +9,7 @@ execFileSync(process.execPath, [path.join(root, 'scripts/verify-retirement.mjs')
 const domains = new Map()
 const mocks = {
   cc: { game: { on () {}, off () {} }, Game: { EVENT_HIDE: 'hide' } },
-  '../ui/ProfileAvatar': { profileAvatarFrame () {} },
+  '../services/ProfileAvatarAssets': { acquireProfileAvatarFrame () {}, clearProfileAvatarCache () {} },
   './PageRouter': { PageRouter: class { current = 'menu'; constructor () {} } },
 }
 for (const name of ['ProfileSaveCoordinator', 'WechatProfileSync', 'WechatFriendRanking']) {
@@ -18,7 +18,7 @@ for (const name of ['ProfileSaveCoordinator', 'WechatProfileSync', 'WechatFriend
   } : {}
   mocks[`../services/${name}`] = loadTs(path.join(root, `assets/scripts/services/${name}.ts`), dependencies)
 }
-for (const name of ['FrontPageWalletState', 'FrontPagePlayerState', 'ProfileEditorModal', 'FriendRankingModal', 'ShopPageDomain', 'ReplayPageDomain', 'PlayerCenterPageDomain', 'MatchmakingPageDomain', 'LobbyPageDomain']) {
+for (const name of ['FrontPageWalletState', 'FrontPagePlayerState', 'ProfileEditorModal', 'FriendRankingModal', 'ShopPageDomain', 'ReplayPageDomain', 'PlayerCenterPageDomain', 'MatchmakingPageDomain', 'LobbyPageDomain', 'OperationsPageController']) {
   mocks[`./front-pages/${name}`] = { [name]: class { constructor (dependencies) { domains.set(name, dependencies) } } }
 }
 let tournamentOpens = 0
@@ -26,6 +26,7 @@ mocks['./front-pages/TournamentCenterController'] = { TournamentCenterController
   constructor (dependencies) { domains.set('TournamentCenterController', dependencies) }
   open () { tournamentOpens++ }
 } }
+mocks['./front-pages/LobbyServiceActions'] = loadTs(path.join(root, 'assets/scripts/scenes/front-pages/LobbyServiceActions.ts'))
 const { FrontPageController } = loadTs(path.join(root, 'assets/scripts/scenes/FrontPageController.ts'), mocks)
 const toasts = []
 const shell = new FrontPageController({}, { snapshot: { settings: { effectQuality: 'full' } } }, {}, {}, { showToast: message => toasts.push(message) }, { configured: true }, {})

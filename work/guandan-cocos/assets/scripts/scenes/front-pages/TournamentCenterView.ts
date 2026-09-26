@@ -1,6 +1,8 @@
 import { Color, Label, Node, UITransform, Vec3 } from 'cc'
 import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import { TABLE_BUTTON_HEIGHT, TABLE_BUTTON_FONT } from '../../ui/TableButtonMetrics'
+import { attachStarGlintSequence } from '../../ui/StarGlint'
+import { TOURNAMENT_TROPHY_GLINT, type StarGlintClock } from '../../ui/StarGlintPolicy'
 import type { TableViewport } from '../../ui/ScreenAdapter'
 import { canWithdrawTournament, tournamentAction, tournamentStatusCopy, type TournamentCenterState, type TournamentTab } from './TournamentCenterModel'
 
@@ -12,7 +14,8 @@ const palette = {
 type Actions = { back: () => void, withdraw: () => void, action: () => void, tab: (tab: TournamentTab) => void, page: (delta: number) => void }
 
 /** Fixed design grid, uniformly fit into the safe landscape area; no capsule frames. */
-export function renderTournamentCenter (parent: RuntimeUiFactory, viewport: TableViewport, view: TournamentCenterState, actions: Actions): void {
+export function renderTournamentCenter (parent: RuntimeUiFactory, viewport: TableViewport, view: TournamentCenterState, actions: Actions,
+  motion?: { allowed: () => boolean, clock: StarGlintClock }): void {
   const surface = new Node('TournamentSurface')
   surface.parent = parent.parent
   surface.addComponent(UITransform).setContentSize(1180, 560)
@@ -46,7 +49,8 @@ export function renderTournamentCenter (parent: RuntimeUiFactory, viewport: Tabl
   ui.panel('TournamentSubtitleBase', -48, 239, 192, 48, { fill: palette.panel, stroke: palette.line, frame: 'panel' })
   text('TournamentSubtitle', '16 人积分赛', -48, 239, 180, 44, 23, palette.muted)
   ui.panel('TournamentOverview', -408, -1, 342, 374, { fill: palette.panel, stroke: palette.line, frame: 'panel' })
-  ui.image('TournamentArtwork', 'ui/lobby/entry-tournament-cutout-v4/texture', -408, 49, 244, 244)
+  const artwork = ui.image('TournamentArtwork', 'ui/lobby/entry-tournament-cutout-v4/texture', -408, 49, 244, 244)
+  if (motion) attachStarGlintSequence(artwork, { width: 244, height: 244, points: TOURNAMENT_TROPHY_GLINT, ...motion })
   text('TournamentName', view.tournament?.name ?? '16 人积分赛', -408, -91, 310, 54, 29)
   text('TournamentFormat', '免费报名 · 3 轮换桌', -408, -142, 308, 44, 23, palette.gold)
   ui.panel('TournamentContent', 187, -1, 790, 374, { fill: palette.panel, stroke: palette.line, frame: 'panel' })

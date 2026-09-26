@@ -31,6 +31,7 @@ export type PlayerCenterPageDependencies = {
 /** Owns the player overview and season-task pages. */
 export class PlayerCenterPageDomain {
   private pendingSeasonTaskId: string | null = null
+  private tasksReturnToLobby = false
   private dashboardView: { dashboard: PlayerDashboard | null, status: string } = { dashboard: null, status: '' }
   private taskView: { taskList: SeasonTaskList | null, status: string } = { taskList: null, status: '' }
 
@@ -74,11 +75,16 @@ export class PlayerCenterPageDomain {
       const points = this.dependencies.wallet.fresh ? String(Math.max(0, Math.round(this.dependencies.wallet.value.points))) : '--'
       coastalText(ui, `${dashboard.user.displayName}    账号 ${dashboard.user.accountId}\n积分  ${points}    综合分  ${Math.round(dashboard.rating.comprehensiveScore)}\n总场数  ${games}    胜率  ${winRate}%    头游  ${dashboard.stats.firstPlaceFinishes}\n${season}`, 0, 76, 680, 144, 24)
     }
-    coastalButton(ui, '赛季任务', -150, -62, 270, 58, () => { void this.showSeasonTasks() })
+    coastalButton(ui, '赛季任务', -150, -62, 270, 58, () => { this.tasksReturnToLobby = false; void this.showSeasonTasks() })
     coastalButton(ui, '我的对局', 150, -62, 270, 58, this.dependencies.showReplayList)
     coastalButton(ui, '修改昵称和头像', -170, -132, 310, 58, this.dependencies.editProfile, true)
     coastalButton(ui, '好友综合分排行', 170, -132, 310, 58, () => this.dependencies.showFriendRanking?.())
     coastalButton(ui, '返回大厅', 0, -208, 230, 56, this.dependencies.showMenu)
+  }
+
+  public async showLobbyTasks (): Promise<void> {
+    this.tasksReturnToLobby = true
+    await this.showSeasonTasks()
   }
 
   private async showSeasonTasks (): Promise<void> {
@@ -106,7 +112,8 @@ export class PlayerCenterPageDomain {
       if (claimable) this.sizedButton(ui, label, 0, 115 - index * 55, 560, 45, 19, () => { void this.claimSeasonTask(task.id) })
       else ui.menuLabel(label, 0, 115 - index * 55, 19)
     })
-    this.pageButton(ui, '返回个人中心', -205, () => { void this.show() })
+    this.pageButton(ui, this.tasksReturnToLobby ? '返回大厅' : '返回个人中心', -205,
+      () => { if (this.tasksReturnToLobby) this.dependencies.showMenu(); else void this.show() })
   }
 
   public reflow (): void {

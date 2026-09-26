@@ -1,11 +1,14 @@
 import { Color, Label, Node, UITransform } from 'cc'
 import { RuntimeUiFactory } from './RuntimeUiFactory'
 import { coastalText } from './CoastalUi'
+import { attachStarGlint } from './StarGlint'
+import { STAR_GLINT, type StarGlintClock } from './StarGlintPolicy'
 
 export type TableSettlementContent = Readonly<{
   title: string
   summary: string
   footer: string
+  celebrate?: boolean
   players: readonly Readonly<{ name: string, team: string, ready: string }>[]
 }>
 
@@ -13,18 +16,23 @@ export type TableSettlementContent = Readonly<{
 export class TableSettlementView {
   private root: Node | null = null
   private key = ''
+  private glintClock: StarGlintClock = { elapsed: 0 }
+  private effectsEnabled = true
 
-  public render (overlay: Label, content: TableSettlementContent): void {
+  public render (overlay: Label, content: TableSettlementContent, effectsEnabled = true): void {
+    this.effectsEnabled = effectsEnabled
     // A phase panel must cover landed cards/effects, while the coordinator keeps its action above it.
     if (overlay.node.parent) overlay.node.setSiblingIndex(overlay.node.parent.children.length - 1)
     const key = JSON.stringify(content)
     if (!this.root?.isValid || this.key !== key) {
-      this.clear()
+      this.clear(false)
       const ui = new RuntimeUiFactory(overlay.node)
       this.root = ui.panel('SettlementSurface', 0, 10, 760, 420, {
         fill: new Color(17, 52, 72, 250), stroke: new Color(180, 196, 155), lineWidth: 2, frame: 'panel',
       })
       const face = new RuntimeUiFactory(this.root)
+      if (content.celebrate) attachStarGlint(this.root, { x: 257, y: 180, profile: STAR_GLINT.victory,
+        clock: this.glintClock, allowed: () => this.effectsEnabled })
       coastalText(face, content.title, 0, 163, 700, 48, 36, { bold: true, color: new Color(255, 224, 141) })
       coastalText(face, content.summary, 0, 122, 704, 32, 22)
       content.players.slice(0, 4).forEach((player, index) => {
@@ -46,9 +54,10 @@ export class TableSettlementView {
     overlay.string = ''
   }
 
-  public clear (): void {
+  public clear (resetMotion = true): void {
     if (this.root?.isValid) { this.root.active = false; this.root.destroy() }
     this.root = null
     this.key = ''
+    if (resetMotion) this.glintClock = { elapsed: 0 }
   }
 }

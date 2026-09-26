@@ -8,6 +8,8 @@ import type { GameEndpointPolicy, HttpTransport, PlatformApiConfig } from './con
 import { HttpAuthGateway, HttpPlayerCenterGateway, HttpSeasonGateway } from './profileGateways'
 import { HttpReplayGateway } from './replayGateways'
 import { TournamentApiGateway } from './TournamentApiGateway'
+import { HttpLobbyServiceGateway } from './lobbyServiceGateway'
+import { HttpOperationsGateway } from './operationsGateway'
 
 export const createHttpGateways = (config: PlatformApiConfig, transport: HttpTransport = new XhrTransport()): FrontPageGateways => {
   const client = new PlatformApiClient(transport, config)
@@ -18,6 +20,8 @@ export const createHttpGateways = (config: PlatformApiConfig, transport: HttpTra
 export const createPlayerGateways = (client: PlatformApiClient, endpointPolicy: GameEndpointPolicy): FrontPageGateways => {
   return {
     configured: true,
+    lobbyServices: new HttpLobbyServiceGateway(client),
+    operations: new HttpOperationsGateway(client),
     tournaments: new TournamentApiGateway(client),
     auth: new HttpAuthGateway(client),
     matchmaking: new HttpMatchmakingGateway(client, endpointPolicy),

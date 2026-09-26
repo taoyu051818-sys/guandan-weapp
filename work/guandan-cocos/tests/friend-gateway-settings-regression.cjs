@@ -33,6 +33,7 @@ const { TableHudPresenter } = loadTs(path.join(app,'assets/scripts/scenes/TableH
   cc: {}, '../ui/TableTributeInfoView': { tributeInfoText: () => '' },
   '../game/PublicStraightFlushPossibility': { publicStraightFlushPossibleSuits: () => [] },
   '../services/GameAssetLoader': {}, '../ui/ClassicCardFrameStore': {},
+  '../services/AssetBinding': source('assets/scripts/services/AssetBinding.ts'),
   '../ui/TableGameHud': { TABLE_GAME_HUD_COUNTER_RANKS: ranks },
   './TableSnapshotPresenter': { projectTableViewer: () => ({ viewerLevel: 2, opponentLevel: 2 }), projectTableSeatStatus: () => '', projectTableModeLabel: () => null },
   './DuplicateTablePresentation': { duplicateTableLabel: () => null },
@@ -44,7 +45,7 @@ function hudCounter(settings) {
   const presenter=new TableHudPresenter({ lobbySnapshot:()=>lobby,isMultiplayer:()=>true,turnClock:()=>null })
   let rendered
   // Inject only the rendering port. Product render and publicCardCounts run unchanged.
-  presenter.tableHud={render:value=>{rendered=value}}
+  presenter.tableHud={render:value=>{rendered=value},setOwnAvatarFrame(){}}
   const state={turnOrder:ids,players:Object.fromEntries(ids.map((id,i)=>[id,{name:id,hand:[{rank:2,suit:['heart','club','spade','diamond'][i]}],team:i%2?'teamB':'teamA'}])),
     finishedPlayers:[],currentLevel:2,currentTurn:'p1',playArea:[],ruleProfile:{allowA2345Straight:true}}
   presenter.render({state,phase:'playing',teamLevels:{teamA:2,teamB:2}},'p1',{availableSuits:[],selectedSuit:null})

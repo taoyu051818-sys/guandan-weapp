@@ -40,7 +40,8 @@ export class TablePhasePresenter {
     } else if (snapshot.phase === 'settlement' && snapshot.settlement) {
       const { session, lobby } = this.dependencies
       this.settlementView.render(overlay, projectSettlementContent(snapshot, humanId, settlementTitle,
-        session.snapshot.isMultiplayer, lobby.snapshot.roundReadyPlayerIds ?? [], matchEnded, lobby.snapshot.duplicate))
+        session.snapshot.isMultiplayer, lobby.snapshot.roundReadyPlayerIds ?? [], matchEnded, lobby.snapshot.duplicate),
+      session.snapshot.settings.effectQuality === 'full' && !session.snapshot.isObserver)
       const button = this.dependencies.controls.nextRound
       if (button?.active) {
         button.setPosition(new Vec3(0, -172, 0))

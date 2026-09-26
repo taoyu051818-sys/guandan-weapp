@@ -24,7 +24,13 @@ export const projectSettlementContent = (
   const resultText = rotating ? `转蛋${snapshot.state.matchFormat?.rotatingScoring ?? 3}分制 · 个人累计积分`
     : independent ? `${winnerLabel}获胜 · 得 ${settlement.pointsEarned ?? 0} 分` : `${winnerLabel}升 ${settlement.levelUp} 级`
   const terminalPresentation = ended ? projectMatchEndedPresentation(ended, humanId, duplicate) : null
+  const duplicateTeam = duplicate?.slots.find(slot => slot.seat === duplicate.mySeat)?.team
+  const celebrate = individual ? settlement.fullRank[0] === humanId
+    : ended && duplicate ? Boolean(duplicateTeam && duplicate.scores[duplicateTeam] > duplicate.scores[duplicateTeam === 'red' ? 'blue' : 'red'])
+    : ended?.playerScores ? ended.playerScores[humanId] === Math.max(...Object.values(ended.playerScores))
+    : (ended ? ended.winnerTeam : settlement.winnerTeam) === viewerTeam
   return {
+    celebrate,
     title: individual ? '本轮结束' : terminalPresentation?.title ?? title ?? '本局结束',
     summary: individual ? `本桌第 ${settlement.fullRank.indexOf(humanId) + 1} 名 · 获得 ${settlement.playerPoints?.[humanId] ?? 0} 分 · 总排名以赛事中心为准` : terminalPresentation?.detail.replace('\n', ' · ') ?? (settlement.isGameWon ? `${winnerLabel}完成过 A · 本场结束` : resultText),
     footer: `${independent ? `本局打 ${snapshot.state.currentLevel} · 不升级、不进贡` : `胜方升 ${settlement.levelUp} 级`}${readyText}`,

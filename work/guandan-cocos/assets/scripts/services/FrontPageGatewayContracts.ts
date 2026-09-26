@@ -4,6 +4,7 @@
  */
 import type { FriendRoomSettings } from '../network/LobbyModels'
 import { CLASSIC_QUEUES } from '../core/generated/lib/classicModes'
+import type { LobbyServiceGateway, OperationsGateway } from './OperationsGatewayContracts'
 
 export const MATCH_QUEUE_IDS = ['quick', ...CLASSIC_QUEUES.map(queue => queue.id), 'rookie_cup', 'weekend_cup', 'master_cup', 'lingshui_16_cup'] as const
 export type MatchQueueId = typeof MATCH_QUEUE_IDS[number]
@@ -355,6 +356,8 @@ export interface MerchantGateway {
 
 export type FrontPageGateways = {
   configured: boolean
+  lobbyServices?: LobbyServiceGateway
+  operations?: OperationsGateway
   tournaments?: TournamentGateway
   auth: AuthGateway
   matchmaking: MatchmakingGateway

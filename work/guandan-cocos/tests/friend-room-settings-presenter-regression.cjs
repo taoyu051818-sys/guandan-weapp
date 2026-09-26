@@ -371,8 +371,11 @@ const { LobbyPageDomain } = compile(lobbyPagePath, {
   '../../core/generated/lib/classicModes': compile(path.join(projectRoot, 'assets/scripts/core/generated/lib/classicModes.ts'), {}),
   '../../ui/LobbyLayoutPolicy': compile(path.join(projectRoot, 'assets/scripts/ui/LobbyLayoutPolicy.ts'), {}),
   '../../ui/LobbyAmbientMotion': { attachLobbyAmbientMotion() {} },
+  '../../ui/StarGlint': { attachStarGlintSequence() {} },
+  '../../ui/LobbyServiceView': { renderLobbyServices() {} },
+  '../../ui/LobbyStarGlintPolicy': { LOBBY_STAR_GLINT: {} },
   '../../ui/LobbyMenuView': { // Rendering is covered by lobby-artwork/refinement suites.
-    renderLobbyEntries() {}, renderLobbyShop() {},
+    lobbyArtwork() {}, renderLobbyEntries() {}, renderLobbyShop() {},
     lobbyLabel: () => ({ node: { getComponent: () => null } }),
   },
   '../../ui/CoastalUi': { coastalText: () => ({}), coastalIcon: () => ({}), coastalButton: () => new MockNode('CoastalButton') },

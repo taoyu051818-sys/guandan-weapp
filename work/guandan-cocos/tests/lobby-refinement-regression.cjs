@@ -29,7 +29,11 @@ const load = relative => {
       return policy.exports
     }
     if (name === '../../ui/LobbyAmbientMotion') return { attachLobbyAmbientMotion() {} }
+    if (name === '../../ui/LobbyServiceView') return { renderLobbyServices() {} }
+    if (name === '../../ui/StarGlint') return { attachStarGlintSequence() {} }
+    if (name === '../../ui/LobbyStarGlintPolicy') return { LOBBY_STAR_GLINT: {} }
     if (name === '../../ui/LobbyMenuView') return {
+      lobbyArtwork: (owner, name, art, rect) => { const node = new Node(name); node.parent = owner; Object.assign(node, rect, { art }); return node },
       renderLobbyEntries: (ui, layout, entries) => entries.forEach(e => {
         const r = layout[e.kind]; const node = ui.panel(e.name, r.x, r.y, r.width, r.height, {})
         Object.assign(node, { art: e.art, action: e.action })
@@ -75,7 +79,7 @@ const render = (Type, width, height, inset, recovery = false, pending = false) =
   domain.dependencies = {
     router: { current: 'menu', open: () => ui }, gateways: { configured: recovery }, currentPageRequest: () => 0,
     lobby: { snapshot: { recoveryAvailable: recovery }, recoverActiveMatch: () => calls.push('recover') }, isDisposed: () => false,
-    screen: { safeSize: () => ({ x: width - 2 * inset, y: height }), safeLeftX: n => -width / 2 + inset + n, safeRightX: n => width / 2 - inset - n, safeTopY: n => height / 2 - n, safeBottomY: n => -height / 2 + n },
+    screen: { viewport: {}, safeSize: () => ({ x: width - 2 * inset, y: height }), safeLeftX: n => -width / 2 + inset + n, safeRightX: n => width / 2 - inset - n, safeTopY: n => height / 2 - n, safeBottomY: n => -height / 2 + n },
     beginMatch: (...args) => calls.push(args), showRules () {}, showMoreMenu () {}, showCompetition () {}, showShop () {},
   }
   domain.playerProfilePresenter = { render () {} }
