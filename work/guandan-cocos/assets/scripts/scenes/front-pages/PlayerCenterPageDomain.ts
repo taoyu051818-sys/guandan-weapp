@@ -1,7 +1,7 @@
-import { Color, Node, Vec3 } from 'cc'
 import type { FrontPageGateways, PlayerDashboard, SeasonTaskList } from '../../services/FrontPageGatewayContracts'
-import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
-import { coastalText, coastalButton } from '../../ui/CoastalUi'
+import type { TableViewport } from '../../ui/ScreenAdapter'
+import { secondaryErrorText } from '../../ui/SecondaryPagePolicy'
+import { renderPlayerCenter, renderSeasonTasks } from './PlayerCenterPageView'
 import type { PageRouter } from '../PageRouter'
 import type { FrontPagePlayerState } from './FrontPagePlayerState'
 import type { FrontPageWalletState } from './FrontPageWalletState'
@@ -26,6 +26,7 @@ export type PlayerCenterPageDependencies = {
   showMenu: () => void
   showReplayList: () => void
   showNotice: (title: string, detail?: string) => void
+  viewport?: () => TableViewport
 }
 
 /** Owns the player overview and season-task pages. */
@@ -61,25 +62,12 @@ export class PlayerCenterPageDomain {
   private render (dashboard: PlayerDashboard | null, status: string): void {
     this.dashboardView = { dashboard, status }
     const page = this.dependencies.router.open('player-center')
-    const panel = page.panel('PlayerCenterSurface', 0, 0, 760, 540, {
-      fill: new Color(17, 52, 72, 247), stroke: new Color(109, 160, 181), lineWidth: 1, frame: 'panel',
-    })
-    const ui = new RuntimeUiFactory(panel)
-    coastalText(ui, '个人中心', 0, 218, 650, 52, 36, { bold: true })
-    coastalText(ui, status, 0, 172, 680, 34, 21, { color: new Color(168, 204, 218) })
-    if (dashboard) {
-      const games = Math.max(0, dashboard.rating.games)
-      const wins = Math.max(0, dashboard.rating.wins)
-      const winRate = games ? Math.round(wins * 100 / games) : 0
-      const season = dashboard.season ? `${dashboard.season.name}  ${dashboard.season.progress.score}分 · ${dashboard.season.progress.gamesPlayed}场` : '暂无赛季'
-      const points = this.dependencies.wallet.fresh ? String(Math.max(0, Math.round(this.dependencies.wallet.value.points))) : '--'
-      coastalText(ui, `${dashboard.user.displayName}    账号 ${dashboard.user.accountId}\n积分  ${points}    综合分  ${Math.round(dashboard.rating.comprehensiveScore)}\n总场数  ${games}    胜率  ${winRate}%    头游  ${dashboard.stats.firstPlaceFinishes}\n${season}`, 0, 76, 680, 144, 24)
-    }
-    coastalButton(ui, '赛季任务', -150, -62, 270, 58, () => { this.tasksReturnToLobby = false; void this.showSeasonTasks() })
-    coastalButton(ui, '我的对局', 150, -62, 270, 58, this.dependencies.showReplayList)
-    coastalButton(ui, '修改昵称和头像', -170, -132, 310, 58, this.dependencies.editProfile, true)
-    coastalButton(ui, '好友综合分排行', 170, -132, 310, 58, () => this.dependencies.showFriendRanking?.())
-    coastalButton(ui, '返回大厅', 0, -208, 230, 56, this.dependencies.showMenu)
+    const points = this.dependencies.wallet.fresh ? String(Math.max(0, Math.round(this.dependencies.wallet.value.points))) : '--'
+    renderPlayerCenter(page, dashboard, status, points, this.dependencies.gateways.auth, {
+      back: this.dependencies.showMenu, retry: () => { void this.show() }, edit: this.dependencies.editProfile,
+      tasks: () => { this.tasksReturnToLobby = false; void this.showSeasonTasks() },
+      records: this.dependencies.showReplayList, ranking: () => this.dependencies.showFriendRanking?.(),
+    }, this.dependencies.viewport?.())
   }
 
   public async showLobbyTasks (): Promise<void> {
@@ -103,17 +91,10 @@ export class PlayerCenterPageDomain {
   private renderSeasonTasks (taskList: SeasonTaskList | null, status: string): void {
     this.taskView = { taskList, status }
     const ui = this.dependencies.router.open('season-tasks')
-    ui.menuLabel(taskList?.season?.name ?? '赛季任务', 0, 220, 42)
-    ui.menuLabel(status, 0, 174, 18)
-    taskList?.tasks.slice(0, 5).forEach((task, index) => {
-      const claimable = this.dependencies.gateways.configured && task.completed && !task.claimed
-      const state = task.claimed ? '已领取' : claimable ? '可领取' : task.completed ? '演示完成' : `${Math.min(task.progress, task.target)}/${task.target}`
-      const label = `${task.name}    +${task.rewardPoints}积分    ${state}`
-      if (claimable) this.sizedButton(ui, label, 0, 115 - index * 55, 560, 45, 19, () => { void this.claimSeasonTask(task.id) })
-      else ui.menuLabel(label, 0, 115 - index * 55, 19)
-    })
-    this.pageButton(ui, this.tasksReturnToLobby ? '返回大厅' : '返回个人中心', -205,
-      () => { if (this.tasksReturnToLobby) this.dependencies.showMenu(); else void this.show() })
+    renderSeasonTasks(ui, taskList, status, this.dependencies.gateways.configured, this.pendingSeasonTaskId, {
+      back: () => { if (this.tasksReturnToLobby) this.dependencies.showMenu(); else void this.show() },
+      retry: () => { void this.showSeasonTasks() }, claim: id => { void this.claimSeasonTask(id) },
+    }, this.dependencies.viewport?.())
   }
 
   public reflow (): void {
@@ -129,6 +110,7 @@ export class PlayerCenterPageDomain {
     if (this.dependencies.isDisposed() || !this.dependencies.gateways.configured || this.pendingSeasonTaskId) return
     const token = this.dependencies.currentPageRequest()
     this.pendingSeasonTaskId = taskId
+    this.reflow()
     try {
       await this.dependencies.gateways.seasons.claim(taskId)
       if (!this.isCurrent(token, 'season-tasks')) return
@@ -137,7 +119,10 @@ export class PlayerCenterPageDomain {
     } catch (error) {
       if (this.isCurrent(token, 'season-tasks')) this.dependencies.showNotice('暂时无法领取', this.errorDetail(error, '请稍后重试'))
     } finally {
-      if (this.pendingSeasonTaskId === taskId) this.pendingSeasonTaskId = null
+      if (this.pendingSeasonTaskId === taskId) {
+        this.pendingSeasonTaskId = null
+        if (!this.dependencies.isDisposed() && this.dependencies.router.current === 'season-tasks') this.reflow()
+      }
     }
   }
 
@@ -145,21 +130,7 @@ export class PlayerCenterPageDomain {
     return !this.dependencies.isDisposed() && token === this.dependencies.currentPageRequest() && this.dependencies.router.current === page
   }
 
-  private pageButton (ui: RuntimeUiFactory, text: string, y: number, action: () => void): Node {
-    const node = ui.button('MenuButton', text, 0)
-    node.setPosition(new Vec3(0, y, 0))
-    node.on(Node.EventType.TOUCH_END, action)
-    return node
-  }
-
-  private sizedButton (ui: RuntimeUiFactory, text: string, x: number, y: number, width: number, height: number, fontSize: number, action: () => void): Node {
-    const node = ui.button('PageButton', text, x, width, height, fontSize)
-    node.setPosition(new Vec3(x, y, 0))
-    node.on(Node.EventType.TOUCH_END, action)
-    return node
-  }
-
   private errorDetail (error: unknown, fallback: string): string {
-    return error instanceof Error && error.message.trim() ? error.message : fallback
+    return secondaryErrorText(error, fallback)
   }
 }

@@ -5,6 +5,9 @@ import { renderReplayBoard } from '../../ui/ReplayBoardView'
 import { neutralReplayViewpoint, playerReplayViewpoint } from '../../ui/ReplayViewpoint'
 import type { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
 import type { PageRouter } from '../PageRouter'
+import type { TableViewport } from '../../ui/ScreenAdapter'
+import { secondaryErrorText } from '../../ui/SecondaryPagePolicy'
+import { renderReplayList } from './ReplayListView'
 
 export type ReplayReturnPage = 'replay-list' | 'player-center'
 export type ReplayPageDependencies = {
@@ -17,6 +20,7 @@ export type ReplayPageDependencies = {
   showNotice: (title: string, detail?: string) => void
   showPlayerCenter: () => void
   showMenu?: () => void
+  viewport?: () => TableViewport
 }
 
 /** Owns completed-match replay only. Live friend-room viewing belongs to the game table. */
@@ -92,16 +96,10 @@ export class ReplayPageDomain {
   private renderReplayList (replays: ReplaySummary[], status: string): void {
     this.replayListView = { replays, status }
     const ui = this.dependencies.router.open('replay-list')
-    ui.menuLabel('我的对局', 0, 220, 42)
-    ui.menuLabel(status, 0, 174, 18)
-    replays.slice(0, 4).forEach((replay, index) => {
-      const time = new Date(replay.finishedAt).toLocaleString()
-      this.sizedButton(ui, `房间 ${replay.roomId || '-'}    ${time}\n${replay.ranking.join(' > ')}    ${replay.eventCount}条事件`, 0, 105 - index * 67, 600, 56, 18, () => {
-        this.showReplayDetail(replay.id)
-      })
-    })
-    this.pageButton(ui, this.listReturnPage === 'menu' ? '返回大厅' : '返回个人中心', -205,
-      () => { if (this.listReturnPage === 'menu') this.dependencies.showMenu?.(); else this.dependencies.showPlayerCenter() })
+    renderReplayList(ui, replays, status, {
+      back: () => { if (this.listReturnPage === 'menu') this.dependencies.showMenu?.(); else this.dependencies.showPlayerCenter() },
+      retry: () => this.showReplayList(this.listReturnPage), select: id => this.showReplayDetail(id),
+    }, this.dependencies.viewport?.())
   }
 
   private renderReplayDetail (
@@ -197,13 +195,6 @@ export class ReplayPageDomain {
     return this.destroyed || this.dependencies.isDisposed()
   }
 
-  private pageButton (ui: RuntimeUiFactory, text: string, y: number, action: () => void): Node {
-    const node = ui.button('MenuButton', text, 0)
-    node.setPosition(new Vec3(0, y, 0))
-    node.on(Node.EventType.TOUCH_END, action)
-    return node
-  }
-
   private sizedButton (
     ui: RuntimeUiFactory,
     text: string,
@@ -221,6 +212,6 @@ export class ReplayPageDomain {
   }
 
   private errorDetail (error: unknown, fallback: string): string {
-    return error instanceof Error ? error.message : fallback
+    return secondaryErrorText(error, fallback)
   }
 }

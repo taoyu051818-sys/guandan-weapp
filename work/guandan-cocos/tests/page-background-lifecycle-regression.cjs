@@ -112,6 +112,8 @@ async function replayPage() {
   const {ReplayPageDomain}=loadTs(src('scenes/front-pages/ReplayPageDomain.ts'),{
     cc:{Node,Vec3},'../../replay/ReplayTimeline':replay,'../../ui/ReplayViewpoint':viewpoints,
     '../../ui/ReplayBoardView':{renderReplayBoard:()=>{}},
+    '../../ui/SecondaryPagePolicy':loadTs(src('ui/SecondaryPagePolicy.ts')),
+    './ReplayListView':{renderReplayList:()=>{}},
   })
   let token=0,ui,count=0
   const timers=[],pending=[],router={current:null,open(route){

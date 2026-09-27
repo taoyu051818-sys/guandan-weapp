@@ -8,6 +8,8 @@ const { ProfileEditorModal } = loadTs(path.join(root, 'scenes/front-pages/Profil
   cc: { game: { on () {}, off () {} }, Game: { EVENT_HIDE: 'hide' }, Tween: { stopAllByTarget () {} },
     Vec3: { ONE: {} }, UITransform: class {}, view: { getVisibleSize: () => ({ width: 874, height: 402 }) } },
   '../../services/ProfileSaveCoordinator': { ProfileSaveCoordinator },
+  '../../ui/SecondaryPageUi': {},
+  '../../ui/SecondaryPagePolicy': loadTs(path.join(root, 'ui/SecondaryPagePolicy.ts')),
   '../../services/ProfileImagePicker': { pickProfileImage: async () => pickedImage },
   '../../services/WechatProfileProvider': { mountWechatProfileButton: (_api, _rect, accept) => {
     nativeAccept = accept; return Object.assign(() => {}, { hide () {}, show () {} })
@@ -90,7 +92,7 @@ async function main () {
     h.writes[1].reject(new Error('save rejected')); await b
     assert.equal(h.published.at(-1).displayName, 'first-committed', 'failed latest save reconciles the actual server result')
     assert.equal(h.editor.open, true); assert.equal(h.editor.busy, false)
-    assert.equal(h.editor.status.string, 'save rejected')
+    assert.equal(h.editor.status.string, '保存失败，请稍后重试。', 'player sees actionable copy, not raw transport errors')
   }
   {
     const h = harness(); await h.open('failed-earlier')

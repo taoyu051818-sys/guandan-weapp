@@ -34,8 +34,11 @@ async function run(){
   assert.equal(state.selected.read,false,'read indicator awaits real server acknowledgement')
   assert.deepEqual(reads,['m1'])
   actions.retry();assert.equal(reads.length,1,'read retry is single-flight')
-  actions.detailPage(1);assert.equal(state.detailPage,1)
+  assert.equal(state.selected.content,message('m1').content,'detail retains full scrollable content')
+  actions.scrollDetail(160)
   pending.resolve();await flush();readPending=null
+  assert.equal(state.detailOffset,160,'late read acknowledgement preserves reading position')
+  controller.reflow();assert.equal(state.detailOffset,160,'viewport reflow preserves reading position')
   assert.equal(state.selected.read,true);assert.equal(state.messages.unreadCount,4)
   controller.open('messages');await flush();pending=deferred();readPending=pending.promise
   actions.select('m1');markedRead.add('m1');actions.back();await flush()
@@ -82,7 +85,7 @@ async function run(){
   assert.ok(inputCloses>0,'native input is closed before destruction/reflow/background')
   controller.destroy();disposed=true;controller.open('messages');assert.equal(router.current,'operations-feedback')
   const long='长文🙂'.repeat(2000)
-  const pages=model.operationsTextPages(long)
+  const pages=model.operationsTextLines(long)
   assert.ok(pages.length>10);assert.equal(pages.join('').replace(/\n/g,''),long,'all long Unicode content is reachable without clipping')
   assert.ok(model.feedbackDetail(feedback).includes(feedback.replies[0].content))
   testView()
@@ -91,13 +94,16 @@ async function run(){
 function testView(){
   const buttons=[],texts=[],forms=[]
   class Ui {
-    constructor(){this.ui={formInput(name,placeholder,x,y,options){const listeners={};const edit={name,placeholder,options,isValid:true,textLabel:{},placeholderLabel:{},node:{on(name,fn){listeners[name]=fn}},blur(){edit.blurred=true}};forms.push(edit);return edit}}}
+    input(name,placeholder,x,y,options){const listeners={};const edit={name,placeholder,options,isValid:true,textLabel:{},placeholderLabel:{},node:{on(name,fn){listeners[name]=fn}},blur(){edit.blurred=true}};forms.push(edit);return edit}
+    empty(){}
+    scroll(name,x,top,bottom,width,height){this.scrollHeight=height;return this}
     text(name,value,x,y,w,h){const label={name,string:value,x,y,w,h};texts.push(label);return label}
     button(name,title,x,y,width,action,primary,disabled){buttons.push({name,title,x,y,width,action,primary,disabled})}
   }
   const {renderOperationsPage}=load('scenes/front-pages/OperationsPageView.ts',{
     cc:{EditBox:{InputMode:{ANY:0}},Label:{HorizontalAlign:{LEFT:0},VerticalAlign:{TOP:0},Overflow:{CLAMP:1}}},
     './OperationsPageModel':model,'./OperationsPageUi':{OperationsPageUi:Ui,operationsPalette:{}},
+    '../../ui/SecondaryPagePolicy':load('ui/SecondaryPagePolicy.ts'),
   })
   const close=renderOperationsPage({}, {}, {...state,mode:'feedback',composing:true,content:'native',submitting:true,error:''},actions)
   assert.equal(forms[0].options.maxLength,2000);assert.equal(forms[0].enabled,false)
@@ -107,9 +113,23 @@ function testView(){
   assert.match(texts.find(item=>item.name==='FeedbackFieldHint').string,/授权运营人员/,'privacy copy accurately discloses staff access')
   assert.doesNotMatch(texts.find(item=>item.name==='FeedbackFieldHint').string,/仅对本人可见/)
   close();assert.equal(forms[0].blurred,true)
-  const source=fs.readFileSync(path.join(root,'scenes/front-pages/OperationsPageUi.ts'),'utf8')
-  assert.match(source,/safeLeft/);assert.match(source,/safeBottom/);assert.match(source,/width, 80, 28/)
-  assert.ok(80*Math.min(740/1240,360/600)>=44,'compact landscape controls retain a minimum touch target')
+  buttons.length=0
+  renderOperationsPage({}, {}, {...state,mode:'messages',composing:false,selected:null,messages:{...page([message('one')]),unreadCount:1}},actions)
+  assert.equal(buttons.some(item=>item.name==='OperationsNext'),false,'single-page lists have no inert pager')
+  renderOperationsPage({}, {}, {...state,mode:'messages',composing:false,selected:null,messages:{...page([message('one')],1,9),unreadCount:1}},actions)
+  assert.ok(buttons.some(item=>item.name==='OperationsNext'&&!item.disabled))
+  const priorTitles=texts.length
+  renderOperationsPage({}, {}, {...state,mode:'feedback',composing:false,selected:null,feedback:page([{...feedback,content:'第一行\n第二行\n第三行'}])},actions)
+  assert.equal(texts.slice(priorTitles).find(item=>item.name==='OperationsItemTitle').string,'第一行 第二行 第三行','multiline feedback previews stay readable on one line')
+  renderOperationsPage({}, {}, {...state,mode:'messages',composing:false,selected:message('long')},actions)
+  assert.ok(texts.find(item=>item.name==='OperationsDetailContent').string.length>1000,'long details use a scrollable body instead of truncation')
+  const source=fs.readFileSync(path.join(root,'ui/SecondaryPageUi.ts'),'utf8')
+  assert.match(source,/Math.max\(72, height\)/)
+  const {secondaryPagePlacement}=load('ui/SecondaryPagePolicy.ts')
+  const compact=secondaryPagePlacement({width:1280,height:590,safeLeft:30,safeRight:30,safeBottom:12,safeTop:20})
+  assert.ok(72*compact.scale*874/1280>=44,'874px landscape controls retain a minimum touch target')
+  const safe=secondaryPagePlacement({width:1280,height:590,nativeCapsule:{left:450,right:620,top:285,bottom:235}})
+  assert.ok(safe.y+260*safe.scale<235,'panel clears native capsule')
   assert.doesNotMatch(fs.readFileSync(path.join(root,'scenes/front-pages/OperationsPageView.ts'),'utf8'),/window\.|prompt\(|innerHTML/)
 }
 run().then(()=>console.log('Operations pages: detail-only reads, pagination, native inputs, retained drafts and stale lifecycle isolation passed')).catch(error=>{console.error(error);process.exitCode=1})

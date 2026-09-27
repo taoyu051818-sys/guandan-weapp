@@ -10,7 +10,7 @@ runtime=语法级保守入口可达（不等同于打包器最终保留）；typ
 
 | 范围 | 文件 | 行数 | 运行入口可达 | 待核对 |
 | --- | ---: | ---: | ---: | ---: |
-| client | 263 | 29785 | 255 | 0 |
+| client | 267 | 29941 | 259 | 0 |
 | core | 40 | 4167 | 37 | 0 |
 | server | 97 | 11880 | 95 | 0 |
 | admin | 10 | 781 | 10 | 0 |
@@ -182,7 +182,7 @@ runtime=语法级保守入口可达（不等同于打包器最终保留）；typ
 | work/guandan-cocos/assets/scripts/scenes/DuplicateTableStatusView.ts | 23 | runtime | 1/4 | 1 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/CoastalPreviewPages.ts | 68 | runtime | 1/4 | 2 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/DuplicateRoomWaitingView.ts | 76 | runtime | 2/6 | 1 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRankingModal.ts | 95 | runtime | 1/5 | 1 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRankingModal.ts | 96 | runtime | 1/6 | 1 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomFormUi.ts | 42 | runtime | 3/1 | 1 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomModeTabs.ts | 21 | runtime | 1/3 | 2 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/FriendRoomNumberModal.ts | 53 | runtime | 1/3 | 1 | — | 可按现有职责扩展 |
@@ -201,18 +201,20 @@ runtime=语法级保守入口可达（不等同于打包器最终保留）；typ
 | work/guandan-cocos/assets/scripts/scenes/front-pages/LobbyServiceActions.ts | 38 | runtime | 1/3 | 2 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/MatchmakingPageDomain.ts | 384 | runtime | 1/6 | 3 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/MatchmakingPageView.ts | 55 | runtime | 1/2 | 3 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageController.ts | 175 | runtime | 1/7 | 1 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageModel.ts | 38 | runtime | 2/1 | 1 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageUi.ts | 44 | runtime | 1/2 | 1 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageView.ts | 86 | runtime | 1/5 | 1 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/PlayerCenterPageDomain.ts | 165 | runtime | 1/6 | 3 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/ProfileEditorModal.ts | 171 | runtime | 1/8 | 2 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/front-pages/ReplayPageDomain.ts | 226 | runtime | 1/6 | 5 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageController.ts | 173 | runtime | 1/7 | 1 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageModel.ts | 36 | runtime | 2/1 | 1 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageUi.ts | 12 | runtime | 1/3 | 1 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/OperationsPageView.ts | 93 | runtime | 1/6 | 1 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/PlayerCenterPageDomain.ts | 136 | runtime | 1/7 | 2 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/PlayerCenterPageView.ts | 69 | runtime | 1/5 | 3 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/ProfileEditorModal.ts | 179 | runtime | 1/10 | 2 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/ReplayListView.ts | 27 | runtime | 1/4 | 2 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/scenes/front-pages/ReplayPageDomain.ts | 217 | runtime | 1/9 | 5 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/ShopPageDomain.ts | 45 | runtime | 1/4 | 4 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/TournamentCenterController.ts | 133 | runtime | 1/5 | 3 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/TournamentCenterModel.ts | 35 | runtime | 2/1 | 3 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/front-pages/TournamentCenterView.ts | 95 | runtime | 1/6 | 3 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/scenes/FrontPageController.ts | 292 | runtime | 2/22 | 11 | high-fan-out | 限制新增职责，优先拆分 |
+| work/guandan-cocos/assets/scripts/scenes/FrontPageController.ts | 294 | runtime | 2/22 | 11 | high-fan-out | 限制新增职责，优先拆分 |
 | work/guandan-cocos/assets/scripts/scenes/GameScene.ts | 571 | runtime | 0/33 | 23 | high-fan-out | 限制新增职责，优先拆分 |
 | work/guandan-cocos/assets/scripts/scenes/MatchEndedPresentation.ts | 39 | runtime | 2/4 | 4 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/scenes/PageRouter.ts | 71 | runtime | 9/1 | 6 | — | 可按现有职责扩展 |
@@ -241,7 +243,7 @@ runtime=语法级保守入口可达（不等同于打包器最终保留）；typ
 | work/guandan-cocos/assets/scripts/services/DevelopmentApis.ts | 127 | runtime | 2/3 | 5 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/services/DevelopmentPlayerStore.ts | 17 | runtime | 1/2 | 0 | no-direct-test-mention | 扩展前核对间接测试 |
 | work/guandan-cocos/assets/scripts/services/FeedbackSubmission.ts | 34 | runtime | 1/1 | 2 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/services/FrontPageGatewayContracts.ts | 370 | runtime | 36/3 | 4 | high-fan-in | 公共基础，兼容性优先 |
+| work/guandan-cocos/assets/scripts/services/FrontPageGatewayContracts.ts | 370 | runtime | 38/3 | 4 | high-fan-in | 公共基础，兼容性优先 |
 | work/guandan-cocos/assets/scripts/services/FrontPagePreviewData.ts | 8 | type-only | 2/2 | 1 | — | 稳定契约，检查调用方 |
 | work/guandan-cocos/assets/scripts/services/GameAssetLoader.ts | 200 | runtime | 13/0 | 18 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/services/LeasedAssetCache.ts | 64 | runtime | 3/0 | 1 | — | 可按现有职责扩展 |
@@ -287,7 +289,7 @@ runtime=语法级保守入口可达（不等同于打包器最终保留）；typ
 | work/guandan-cocos/assets/scripts/ui/ClassicCardGeometry.ts | 27 | runtime | 2/0 | 1 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/ClassicEntryAnimation.ts | 106 | runtime | 1/2 | 1 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/ClassicEntryAnimationPolicy.ts | 24 | runtime | 2/0 | 1 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/ui/CoastalUi.ts | 75 | runtime | 4/1 | 5 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/ui/CoastalUi.ts | 75 | runtime | 3/1 | 4 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/FriendEntrySteam.ts | 101 | runtime | 1/0 | 2 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/HandController.ts | 279 | runtime | 3/6 | 10 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/HandGroupBadgeView.ts | 50 | runtime | 1/2 | 1 | — | 可按现有职责扩展 |
@@ -302,12 +304,14 @@ runtime=语法级保守入口可达（不等同于打包器最终保留）；typ
 | work/guandan-cocos/assets/scripts/ui/PlayAreaController.ts | 264 | runtime | 4/8 | 7 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/PlayedCardLayout.ts | 27 | runtime | 3/1 | 2 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/PlayerSeatController.ts | 129 | runtime | 4/3 | 5 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/ui/ProfileAvatar.ts | 25 | runtime | 2/2 | 3 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/ui/ProfileAvatar.ts | 25 | runtime | 3/2 | 4 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/ReplayBoardView.ts | 179 | runtime | 1/6 | 5 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/ReplayViewpoint.ts | 43 | runtime | 2/1 | 3 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/ui/RuntimeUiFactory.ts | 347 | runtime | 33/2 | 19 | high-fan-in | 公共基础，兼容性优先 |
+| work/guandan-cocos/assets/scripts/ui/RuntimeUiFactory.ts | 347 | runtime | 35/2 | 19 | high-fan-in | 公共基础，兼容性优先 |
 | work/guandan-cocos/assets/scripts/ui/SafeAreaLayout.ts | 176 | runtime | 1/0 | 4 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/ui/ScreenAdapter.ts | 59 | runtime | 25/1 | 1 | high-fan-in | 公共基础，兼容性优先 |
+| work/guandan-cocos/assets/scripts/ui/ScreenAdapter.ts | 59 | runtime | 30/1 | 1 | high-fan-in | 公共基础，兼容性优先 |
+| work/guandan-cocos/assets/scripts/ui/SecondaryPagePolicy.ts | 21 | runtime | 6/0 | 5 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/ui/SecondaryPageUi.ts | 95 | runtime | 5/5 | 4 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/StarGlint.ts | 100 | runtime | 4/2 | 7 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/StarGlintPolicy.ts | 40 | runtime | 5/0 | 4 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/StartupLoadingOverlay.ts | 283 | runtime | 1/3 | 5 | — | 可按现有职责扩展 |
@@ -327,7 +331,7 @@ runtime=语法级保守入口可达（不等同于打包器最终保留）；typ
 | work/guandan-cocos/assets/scripts/ui/TableSettlementView.ts | 63 | runtime | 2/4 | 3 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/TableToolbarLayout.ts | 19 | runtime | 1/2 | 0 | no-direct-test-mention | 扩展前核对间接测试 |
 | work/guandan-cocos/assets/scripts/ui/TableTributeInfoView.ts | 38 | runtime | 2/3 | 3 | — | 可按现有职责扩展 |
-| work/guandan-cocos/assets/scripts/ui/UiFrameStyle.ts | 36 | runtime | 10/0 | 6 | — | 可按现有职责扩展 |
+| work/guandan-cocos/assets/scripts/ui/UiFrameStyle.ts | 36 | runtime | 11/0 | 6 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/WechatCapsuleLayout.ts | 33 | runtime | 6/0 | 4 | — | 可按现有职责扩展 |
 | work/guandan-cocos/assets/scripts/ui/WechatFriendCanvas.ts | 53 | runtime | 1/0 | 1 | — | 可按现有职责扩展 |
 | work/guandan-windows-source/server/bot-turn-pacing.js | 34 | runtime | 3/0 | 1 | — | 可按现有职责扩展 |

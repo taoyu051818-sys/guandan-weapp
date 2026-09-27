@@ -31,6 +31,7 @@
     "assets/scripts/development/FrontPagePreviewData.ts",
     "tests/fixtures/TableLayoutFixtures.ts",
     "assets/scripts/ui/UiFrameStyle.ts",
+    "assets/scripts/ui/SecondaryPagePolicy.ts",
     "assets/scripts/ui/TablePlayActionPolicy.ts",
     "assets/scripts/effects/ArchivedPlayVisuals.ts",
     "assets/scripts/effects/EffectActionPresentationCoordinator.ts",

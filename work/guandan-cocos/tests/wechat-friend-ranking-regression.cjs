@@ -106,6 +106,7 @@ async function main () {
     removeFromParent () { if (this._parent) this._parent.children.splice(this._parent.children.indexOf(this), 1); this._parent = null }
     destroy () { this.isValid = false }
     setScale () {}
+    setPosition () {}
   }
   class Transform { setContentSize () {} }
   const { loadTs } = require('./support/load-typescript-module.cjs')
@@ -116,7 +117,8 @@ async function main () {
       constructor (parent) { this.parent = parent }
       panel (name) { const node = new FakeNode(name); node.parent = this.parent; node.addComponent(Transform); return node }
     } },
-    '../../ui/CoastalUi': { coastalText () {}, coastalButton () {} },
+    '../../ui/SecondaryPageUi': { secondaryColors: {}, SecondaryPageUi: class { text () {} button () {} } },
+    '../../ui/SecondaryPagePolicy': loadTs(path.join(root, 'assets/scripts/ui/SecondaryPagePolicy.ts')),
     '../../ui/WechatFriendCanvas': { WechatFriendCanvas: class { constructor () { assert.fail('browser cannot mount native shared canvas') } } },
     '../../services/WechatFriendRanking': require('../assets/scripts/services/WechatFriendRanking.ts'),
   })

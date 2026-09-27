@@ -1,7 +1,8 @@
 import { BlockInputEvents, Color, Game, game, Node, Tween, UITransform } from 'cc'
 import type { ScreenAdapter } from '../../ui/ScreenAdapter'
 import { RuntimeUiFactory } from '../../ui/RuntimeUiFactory'
-import { coastalButton, coastalText } from '../../ui/CoastalUi'
+import { SecondaryPageUi, secondaryColors as colors } from '../../ui/SecondaryPageUi'
+import { secondaryPagePlacement, secondaryErrorText } from '../../ui/SecondaryPagePolicy'
 import { WechatFriendCanvas } from '../../ui/WechatFriendCanvas'
 import { authorizeRanking, rankingCall, wechatRankingApi, WechatFriendScoreSync } from '../../services/WechatFriendRanking'
 
@@ -28,8 +29,8 @@ export class FriendRankingModal {
     if (!this.root) return
     this.root.getComponent(UITransform)!.setContentSize(this.screen.viewport.width, this.screen.viewport.height)
     const panel = this.root.getChildByName('FriendRankingPanel')
-    const scale = Math.min(1, (this.screen.safeSize().x - 24) / 760, (this.screen.safeSize().y - 24) / 550)
-    if (panel) panel.setScale(scale, scale, 1)
+    const placement = secondaryPagePlacement(this.screen.viewport, 760, 550)
+    if (panel) { panel.setScale(placement.scale, placement.scale, 1); panel.setPosition(placement.x, placement.y, 0) }
     this.root.getChildByName('FriendRankingShade')?.getComponent(UITransform)?.setContentSize(this.screen.viewport.width, this.screen.viewport.height)
   }
   private render (message: string, pending = false): Node | null {
@@ -38,21 +39,21 @@ export class FriendRankingModal {
     for (const node of this.root.children.slice()) { this.stop(node); node.removeFromParent(); node.destroy() }
     const ui = new RuntimeUiFactory(this.root)
     ui.panel('FriendRankingShade', 0, 0, this.screen.viewport.width, this.screen.viewport.height, { fill: new Color(2, 12, 20, 220), frame: 'square', lineWidth: 0 })
-    const panel = ui.panel('FriendRankingPanel', 0, 0, 760, 550, { fill: new Color(17, 52, 72, 255), stroke: new Color(109, 160, 181), frame: 'panel' })
-    const face = new RuntimeUiFactory(panel)
-    coastalText(face, '好友综合分排行', -50, 225, 540, 48, 32, { bold: true })
-    coastalButton(face, '关闭', 292, 225, 104, 48, () => this.close())
-    coastalText(face, '微信好友 · 综合分从高到低', 0, 177, 680, 32, 20, { color: new Color(168, 204, 218) })
-    if (message) coastalText(face, message, 0, 0, 650, 140, 24)
+    const panel = ui.panel('FriendRankingPanel', 0, 0, 760, 550, { fill: colors.panel, stroke: colors.line, frame: 'panel', lineWidth: 1 })
+    const face = new SecondaryPageUi(new RuntimeUiFactory(panel))
+    face.text('RankingTitle', '好友综合分排行', -50, 225, 580, 48, 32, colors.text, true, true)
+    face.button('RankingClose', '关闭', 292, 225, 104, () => this.close())
+    face.text('RankingSubtitle', '微信好友 · 按综合分排序', 0, 177, 680, 32, 20, colors.muted)
+    if (message) face.text('RankingStatus', message, 0, 0, 650, 140, 24, colors.muted, false)
     if (!message) {
-      coastalButton(face, '上一页', -260, -191, 142, 48, () => this.canvas?.send('previous'))
-      coastalButton(face, '下一页', -95, -191, 142, 48, () => this.canvas?.send('next'))
+      face.button('RankingPrevious', '上一页', -260, -191, 142, () => this.canvas?.send('previous'))
+      face.button('RankingNext', '下一页', -95, -191, 142, () => this.canvas?.send('next'))
     }
     if (!pending && wechatRankingApi()) {
-      coastalButton(face, '刷新', message ? -110 : 85, -191, 128, 48, () => { void this.load() }, true)
-      if (wechatRankingApi()?.openSetting) coastalButton(face, '权限设置', message ? 110 : 261, -191, 166, 48, () => { void this.settings() })
+      face.button('RankingRefresh', '刷新', message ? -110 : 85, -191, 128, () => { void this.load() }, true)
+      if (wechatRankingApi()?.openSetting) face.button('RankingPermissions', '权限设置', message ? 110 : 261, -191, 166, () => { void this.settings() })
     }
-    coastalText(face, '仅展示已同步分数的微信好友；好友信息不传入游戏服务器。', 0, -243, 698, 28, 18, { color: new Color(168, 204, 218) })
+    face.text('RankingPrivacy', '仅展示已同步分数的微信好友；好友信息不传入游戏服务器。', 0, -243, 698, 28, 18, colors.muted, false)
     this.reflow()
     return panel
   }
@@ -74,7 +75,7 @@ export class FriendRankingModal {
       const panel = this.render('')
       if (panel) { this.canvas = new WechatFriendCanvas(panel); this.canvas.send('open') }
     } catch (error) {
-      if (current()) this.render(error instanceof Error ? error.message : '好友排行加载失败，请重试。')
+      if (current()) this.render(secondaryErrorText(error, '好友排行加载失败，请重试。'))
     } finally { if (current()) this.busy = false }
   }
   private async settings (): Promise<void> {

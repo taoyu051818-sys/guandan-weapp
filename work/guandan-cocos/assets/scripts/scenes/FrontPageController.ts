@@ -97,6 +97,7 @@ export class FrontPageController {
       showNotice: (title, detail) => this.host.showNotice(title, detail),
     })
     this.replayPage = new ReplayPageDomain({
+      viewport: () => this.screen.viewport,
       router: this.router,
       gateways: this.gateways,
       isDisposed: () => this.disposed,
@@ -108,6 +109,7 @@ export class FrontPageController {
       showMenu: () => this.lobbyPage.showMenu(),
     })
     this.playerCenterPage = new PlayerCenterPageDomain({
+      viewport: () => this.screen.viewport,
       showFriendRanking: () => this.friendRanking.show(),
       profileLoaded: dashboard => { this.syncWechatIdentity(dashboard.user, dashboard.rating.comprehensiveScore) },
       editProfile: () => this.showProfileEditor(),

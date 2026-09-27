@@ -3,7 +3,7 @@ import { FeedbackSubmission } from '../../services/FeedbackSubmission'
 import type { FeedbackCategory, MessagePage, OperationsPage, PlayerFeedback, PlayerMessage } from '../../services/OperationsGatewayContracts'
 import type { ScreenAdapter } from '../../ui/ScreenAdapter'
 import type { PageRouter } from '../PageRouter'
-import { feedbackDetail, OPERATIONS_PAGE_SIZE, operationsTextPages, type OperationsMode } from './OperationsPageModel'
+import { OPERATIONS_PAGE_SIZE, type OperationsMode } from './OperationsPageModel'
 import { renderOperationsPage, type OperationsPageActions } from './OperationsPageView'
 
 type Ports = {
@@ -18,7 +18,7 @@ export class OperationsPageController {
   private messages: MessagePage = { ...emptyPage<PlayerMessage>(), unreadCount: 0 }
   private feedback = emptyPage<PlayerFeedback>()
   private selected: PlayerMessage | PlayerFeedback | null = null
-  private detailPage = 0
+  private detailOffset = 0
   private composing = false
   private loading = false
   private readonly reads = new Set<string>()
@@ -35,7 +35,7 @@ export class OperationsPageController {
   public open (mode: OperationsMode): void {
     if (this.ports.isDisposed()) return
     this.generation += 1; this.hidden = false; this.mode = mode
-    this.selected = null; this.composing = false; this.loading = false; this.error = ''; this.status = ''
+    this.selected = null; this.detailOffset = 0; this.composing = false; this.loading = false; this.error = ''; this.status = ''
     this.messages = { ...emptyPage<PlayerMessage>(), unreadCount: 0 }; this.feedback = emptyPage<PlayerFeedback>()
     this.ports.setTableVisible(false)
     this.render(true)
@@ -85,7 +85,8 @@ export class OperationsPageController {
   private select (id: string): void {
     if (this.loading) return
     this.selected = (this.page.items as Array<PlayerMessage | PlayerFeedback>).find(item => item.id === id) ?? null
-    this.detailPage = 0; this.error = ''; this.status = ''
+    this.detailOffset = 0
+    this.error = ''; this.status = ''
     this.render()
     if (this.selected && this.mode === 'messages') void this.read(this.selected as PlayerMessage)
   }
@@ -126,7 +127,7 @@ export class OperationsPageController {
     try {
       const result = await submission
       if (!result || !this.active(generation)) return
-      this.composing = false; this.selected = result; this.detailPage = 0; this.status = '反馈已提交，可在“我的反馈”查看回复。'
+      this.composing = false; this.selected = result; this.detailOffset = 0; this.status = '反馈已提交，可在“我的反馈”查看回复。'
     } catch (error) {
       if (this.active(generation)) this.error = `${error instanceof Error ? error.message : '提交失败'}；可重试，重试不会重复提交。`
     } finally { if (this.active(generation) || (this.active() && this.mode === 'feedback' && this.composing)) this.render() }
@@ -152,10 +153,7 @@ export class OperationsPageController {
       }),
       page: delta => guard(() => { void this.load(Math.max(1, Math.min(Math.ceil(this.page.total / OPERATIONS_PAGE_SIZE), this.page.page + delta))) })(),
       select: id => guard(() => this.select(id))(),
-      detailPage: delta => guard(() => {
-        const text = this.selected ? ('replies' in this.selected ? feedbackDetail(this.selected) : this.selected.content) : ''
-        this.detailPage = Math.max(0, Math.min(operationsTextPages(text).length - 1, this.detailPage + delta)); this.render()
-      })(),
+      scrollDetail: offset => guard(() => { if (Number.isFinite(offset)) this.detailOffset = Math.max(0, offset) })(),
       compose: guard(() => { if (!this.loading) { this.selected = null; this.composing = true; this.error = ''; this.status = ''; this.render() } }),
       mine: guard(() => { this.selected = null; this.composing = false; this.error = ''; this.status = ''; this.render(); void this.load(1) }),
       category: category => guard(() => { if (!this.draft.busy) { this.draft.category = category; this.render() } })(),
@@ -167,9 +165,9 @@ export class OperationsPageController {
       submit: guard(() => { void this.submit() }),
     }
     this.closeInput = renderOperationsPage(this.ports.router.open(this.route), this.ports.screen.viewport, {
-      mode: this.mode, messages: this.messages, feedback: this.feedback, selected: this.selected, detailPage: this.detailPage,
+      mode: this.mode, messages: this.messages, feedback: this.feedback, selected: this.selected,
       composing: this.composing, loading: this.loading, reading: Boolean(this.selected && this.reads.has(this.selected.id)), submitting: this.draft.busy,
-      error: this.error, status: this.status, category: this.draft.category as FeedbackCategory, content: this.draft.content,
+      error: this.error, status: this.status, category: this.draft.category as FeedbackCategory, content: this.draft.content, detailOffset: this.detailOffset,
     }, actions)
   }
 }
